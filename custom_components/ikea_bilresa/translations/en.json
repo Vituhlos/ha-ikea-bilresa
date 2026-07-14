@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "IKEA BILRESA (smooth scroll)",
+        "description": "Connect to the Matter Server that already controls your BILRESA wheels. The URL is pre-filled from your Matter integration — leave it as is unless you run the Matter Server elsewhere.",
+        "data": {
+          "url": "Matter Server WebSocket URL"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "IKEA BILRESA is already set up."
+    }
+  }
+}

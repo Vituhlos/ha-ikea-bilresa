@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "IKEA BILRESA (plynulý scroll)",
+        "description": "Připoj se k Matter Serveru, který už tvá kolečka BILRESA ovládá. URL je předvyplněná z tvé Matter integrace — nech ji tak, pokud Matter Server neběží jinde.",
+        "data": {
+          "url": "URL websocketu Matter Serveru"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "IKEA BILRESA je už nastavená."
+    }
+  }
+}
