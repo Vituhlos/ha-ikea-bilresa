@@ -57,9 +57,7 @@ async def async_setup_entry(
             async_add_entities(new)
 
     _sync()
-    entry.async_on_unload(
-        async_dispatcher_connect(hass, SIGNAL_WHEELS_UPDATED, _sync)
-    )
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_WHEELS_UPDATED, _sync))
 
 
 class BilresaChannelEvent(EventEntity):

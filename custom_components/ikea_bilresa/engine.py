@@ -50,10 +50,10 @@ class WheelAction:
     wheel_name: str
     channel: int | None
     endpoint_id: int
-    type: str                     # ACTION_ROTATE / ACTION_PRESS / ACTION_HOLD / ACTION_RELEASE
+    type: str  # ACTION_ROTATE / _PRESS / _HOLD / _RELEASE
     direction: str | None = None  # DIRECTION_UP / DIRECTION_DOWN for rotate
-    notches: int = 0              # rotate delta (this event only)
-    presses: int = 0             # 1 / 2 / 3 for press
+    notches: int = 0  # rotate delta (this event only)
+    presses: int = 0  # 1 / 2 / 3 for press
 
 
 class GestureEngine:

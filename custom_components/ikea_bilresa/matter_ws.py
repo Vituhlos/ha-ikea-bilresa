@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import contextlib
 import logging
 from typing import Any
 
@@ -57,10 +58,8 @@ class MatterWSClient:
         self._closing = True
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     def _next_id(self) -> str:

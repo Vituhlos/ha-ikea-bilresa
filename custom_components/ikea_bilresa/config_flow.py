@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
@@ -20,6 +18,7 @@ from homeassistant.config_entries import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
+import voluptuous as vol
 
 from .const import (
     CLICK_ACTIONS,

@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - (planned) Per-binding acceleration; button double/triple/hold actions in the
   GUI binding.
 
+## [0.5.0] - 2026-07-14
+
+### Added
+- Config-entry **diagnostics** download (with sensitive fields redacted).
+- Developer tooling for a professional repo: GitHub Actions CI running
+  **hassfest**, **HACS validation** and **ruff**, unit tests for the gesture
+  engine and node parsing, and ruff/pytest configuration.
+
 ## [0.4.0] - 2026-07-14
 
 ### Added
@@ -70,7 +78,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.2.0

@@ -11,21 +11,21 @@ DEFAULT_MATTER_URL = "ws://core-matter-server:5580/ws"
 CONF_URL = "url"
 
 # --- Matter cluster / attribute ids -------------------------------------
-CLUSTER_SWITCH = 0x003B          # 59  Switch cluster
-CLUSTER_DESCRIPTOR = 0x001D      # 29  Descriptor cluster
-CLUSTER_BASIC_INFO = 0x0028      # 40  Basic Information cluster
+CLUSTER_SWITCH = 0x003B  # 59  Switch cluster
+CLUSTER_DESCRIPTOR = 0x001D  # 29  Descriptor cluster
+CLUSTER_BASIC_INFO = 0x0028  # 40  Basic Information cluster
 
-ATTR_DESCRIPTOR_PARTS_LIST = 3   # Descriptor.PartsList
-ATTR_DESCRIPTOR_TAGLIST = 4      # Descriptor.TagList
+ATTR_DESCRIPTOR_PARTS_LIST = 3  # Descriptor.PartsList
+ATTR_DESCRIPTOR_TAGLIST = 4  # Descriptor.TagList
 ATTR_BASIC_VENDOR_NAME = 1
 ATTR_BASIC_VENDOR_ID = 2
 ATTR_BASIC_PRODUCT_NAME = 3
 
-IKEA_VENDOR_ID = 4476            # 0x117C
+IKEA_VENDOR_ID = 4476  # 0x117C
 BILRESA_PRODUCT_MATCH = "bilresa"
 
 # --- Semantic tag namespaces (Matter "Common" namespaces) ---------------
-NS_SWITCHES = 0x43               # 67  Common Switches namespace
+NS_SWITCHES = 0x43  # 67  Common Switches namespace
 
 # Switches namespace tags
 SWTAG_ON = 0x00
@@ -39,9 +39,9 @@ SWTAG_ENTER_OK = 0x07
 SWTAG_CUSTOM = 0x08
 
 # TagList entry keys (as delivered by the Matter Server, TLV field numbers)
-TAG_KEY_NAMESPACE = "1"          # NamespaceID
-TAG_KEY_TAG = "2"                # Tag
-TAG_KEY_LABEL = "3"              # Label (optional, human string)
+TAG_KEY_NAMESPACE = "1"  # NamespaceID
+TAG_KEY_TAG = "2"  # Tag
+TAG_KEY_LABEL = "3"  # Label (optional, human string)
 
 # --- Switch cluster events (cluster 0x003B) -----------------------------
 EVT_SWITCH_LATCHED = 0x00

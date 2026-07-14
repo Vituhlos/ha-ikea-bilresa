@@ -38,6 +38,11 @@ class BilresaCoordinator:
             url, async_get_clientsession(hass), self._on_event
         )
 
+    @property
+    def matter_server_info(self) -> dict | None:
+        """Server info reported by the Matter Server (schema, sdk version)."""
+        return self._client.server_info
+
     async def async_start(self) -> None:
         await self._client.start()
 

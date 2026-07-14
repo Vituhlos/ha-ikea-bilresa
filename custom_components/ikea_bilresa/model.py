@@ -13,7 +13,6 @@ from typing import Any
 
 from .const import (
     ATTR_BASIC_PRODUCT_NAME,
-    ATTR_BASIC_VENDOR_ID,
     ATTR_DESCRIPTOR_PARTS_LIST,
     ATTR_DESCRIPTOR_TAGLIST,
     BILRESA_PRODUCT_MATCH,
@@ -156,8 +155,8 @@ def decode_event(
         "wheel_name": wheel.name,
         "endpoint_id": endpoint_id,
         "channel": switch.channel,
-        "role": switch.role,          # scroll_up / scroll_down / button
-        "event_type": event_type,     # initial_press / multi_press_ongoing / ...
-        "count": count,               # number of notches for multi-press events
+        "role": switch.role,  # scroll_up / scroll_down / button
+        "event_type": event_type,  # initial_press / multi_press_ongoing / ...
+        "count": count,  # number of notches for multi-press events
         "raw": data,
     }
