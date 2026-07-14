@@ -9,8 +9,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 - (planned) A smooth-dimming **blueprint** built on the clean scroll events.
-- (planned) **GUI light bindings** via config subentries — map a wheel channel
-  to a light and let the integration drive brightness/color directly, no YAML.
+- (planned) Per-binding acceleration and min/max brightness; button
+  double/triple/hold actions in the GUI binding.
+
+## [0.3.0] - 2026-07-14
+
+### Added
+- **GUI light bindings** via config subentries. Add a binding in the UI that
+  maps a wheel channel to a light; the integration then dims it directly
+  (per-notch delta × step, with a transition for a smooth ramp) and runs a
+  configurable action (`toggle` / `on` / `off` / none) on a single button press.
+  Works for any number of wheels and bindings.
+- Czech and English translations for the binding flow.
+
+### Changed
+- The config entry now supports subentries; adding, editing or removing a
+  binding reloads the entry.
 
 ## [0.2.0] - 2026-07-14
 
@@ -41,6 +55,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.1.0

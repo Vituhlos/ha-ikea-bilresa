@@ -116,6 +116,19 @@ Potvrď předvyplněnou URL Matter Serveru (měň ji jen pokud běží jinde). I
 najde všechna kolečka automaticky a vytvoří jedno zařízení na kolečko s jednou
 event entitou na kanál.
 
+### GUI propojení se světly (turnkey stmívání)
+
+Nechceš psát automatizace? U položky **IKEA BILRESA**
+(Nastavení → Zařízení a služby) klikni na **＋ Přidat → Propojení se světlem** a vyber:
+
+- **Kolečko** a **Kanál**,
+- **Světlo**, které se má ovládat,
+- **Změnu jasu na zářez** (%), **Přechod** (s) a **akci jednoduchého stisku**
+  (přepnout / zapnout / vypnout / nic).
+
+Integrace pak to světlo stmívá v reálném čase. Přidej si klidně víc propojení —
+jedno na kanál kolečka — takže to škáluje na libovolný počet koleček bez YAML.
+
 ## Používání (manuál)
 
 Tato sekce je manuál pro aktuální verzi (v0.2).
@@ -210,10 +223,10 @@ logger:
 
 - [x] Listener v reálném čase, auto-discovery koleček, `ikea_bilresa_event`. *(0.1)*
 - [x] Gesture engine, `event` entity, zařízení na kolečko, čisté akce. *(0.2)*
-- [ ] Blueprint na **plynulé stmívání**.
-- [ ] **GUI bindings na světla** (config subentries) — namapuj kanál kolečka na
-      světlo a integrace řídí jas/barvu přímo, bez YAML.
-- [ ] Volby per binding: velikost kroku, akcelerace, min/max, akce tlačítek.
+- [x] **GUI bindings na světla** (config subentries) — namapuj kanál kolečka na
+      světlo a integrace řídí jas přímo, bez YAML. *(0.3)*
+- [ ] Blueprint na **plynulé stmívání** (pro setupy postavené na automatizacích).
+- [ ] Per binding: akcelerace, min/max jasu a akce tlačítka double/triple/hold.
 
 ## Omezení
 

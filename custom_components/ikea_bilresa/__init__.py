@@ -12,9 +12,10 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 
-from .const import CONF_URL, DEFAULT_MATTER_URL
+from .binding import LightBinding
+from .const import CONF_URL, DEFAULT_MATTER_URL, SUBENTRY_BINDING
 from .coordinator import BilresaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,7 +43,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     await coordinator.async_start()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _setup_bindings(hass, entry)
+
+    # Reload when a binding subentry is added, edited or removed.
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
+
+
+@callback
+def _setup_bindings(hass: HomeAssistant, entry: BilresaConfigEntry) -> None:
+    """Attach a LightBinding for every configured binding subentry."""
+    count = 0
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_BINDING:
+            continue
+        binding = LightBinding(hass, dict(subentry.data))
+        entry.async_on_unload(binding.async_attach())
+        count += 1
+    if count:
+        _LOGGER.debug("Attached %s light binding(s)", count)
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> bool:

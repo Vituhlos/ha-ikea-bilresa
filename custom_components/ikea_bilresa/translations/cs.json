@@ -12,5 +12,54 @@
     "abort": {
       "already_configured": "IKEA BILRESA je už nastavená."
     }
+  },
+  "config_subentries": {
+    "binding": {
+      "title": "Propojení se světlem",
+      "initiate_flow": {
+        "user": "Přidat propojení se světlem",
+        "reconfigure": "Upravit propojení se světlem"
+      },
+      "entry_type": "propojení se světlem",
+      "step": {
+        "user": {
+          "title": "Propoj kanál kolečka se světlem",
+          "description": "Otáčení tímto kanálem kolečka bude v reálném čase stmívat vybrané světlo; jednoduchý stisk tlačítka spustí zvolenou akci.",
+          "data": {
+            "node_id": "Kolečko",
+            "channel": "Kanál",
+            "target": "Světlo",
+            "step": "Změna jasu na zářez (%)",
+            "transition": "Přechod (s)",
+            "click_action": "Akce jednoduchého stisku"
+          }
+        },
+        "reconfigure": {
+          "title": "Upravit propojení se světlem",
+          "description": "Uprav, jak tento kanál kolečka ovládá své světlo.",
+          "data": {
+            "node_id": "Kolečko",
+            "channel": "Kanál",
+            "target": "Světlo",
+            "step": "Změna jasu na zářez (%)",
+            "transition": "Přechod (s)",
+            "click_action": "Akce jednoduchého stisku"
+          }
+        }
+      },
+      "abort": {
+        "no_wheels": "Zatím se nenašla žádná kolečka BILRESA. Ověř, že kolečko funguje v Matter integraci, a zkus to znovu."
+      }
+    }
+  },
+  "selector": {
+    "click_action": {
+      "options": {
+        "toggle": "Přepnout",
+        "on": "Zapnout",
+        "off": "Vypnout",
+        "none": "Nedělat nic"
+      }
+    }
   }
 }

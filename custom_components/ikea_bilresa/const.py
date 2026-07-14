@@ -107,6 +107,26 @@ WHEEL_EVENT_TYPES = [
 
 PRESS_EVENT_TYPES = {1: ET_PRESS, 2: ET_DOUBLE_PRESS, 3: ET_TRIPLE_PRESS}
 
+# --- config subentries (GUI light bindings) -----------------------------
+SUBENTRY_BINDING = "binding"
+
+CONF_NODE_ID = "node_id"
+CONF_CHANNEL = "channel"
+CONF_TARGET = "target"
+CONF_STEP = "step"
+CONF_TRANSITION = "transition"
+CONF_CLICK_ACTION = "click_action"
+
+DEFAULT_STEP = 3
+DEFAULT_TRANSITION = 1.0
+DEFAULT_CLICK_ACTION = "toggle"
+
+CLICK_TOGGLE = "toggle"
+CLICK_ON = "on"
+CLICK_OFF = "off"
+CLICK_NONE = "none"
+CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
+
 # --- dispatcher signals -------------------------------------------------
 SIGNAL_WHEELS_UPDATED = f"{DOMAIN}_wheels_updated"
 

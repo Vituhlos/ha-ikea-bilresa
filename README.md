@@ -118,6 +118,20 @@ Confirm the pre-filled Matter Server URL (change it only if you run the Matter
 Server elsewhere). The integration discovers all BILRESA wheels automatically and
 creates one device per wheel with an event entity per channel.
 
+### GUI light bindings (turnkey dimming)
+
+Prefer not to write automations? On the **IKEA BILRESA** entry
+(Settings → Devices & Services) click **＋ Add → Light binding** and pick:
+
+- the **Wheel** and **Channel** to use,
+- the **Light** to control,
+- **Brightness change per notch** (%), **Transition** (s), and the
+  **single-press action** (toggle / on / off / nothing).
+
+The integration then dims that light in real time. Add as many bindings as you
+like — one per wheel channel — so this scales to any number of wheels with no
+YAML.
+
 ## Usage
 
 This section is the manual for the current release (v0.2).
@@ -213,10 +227,11 @@ logger:
 
 - [x] Real-time listener, wheel auto-discovery, `ikea_bilresa_event`. *(0.1)*
 - [x] Gesture engine, `event` entities, per-wheel devices, clean actions. *(0.2)*
-- [ ] Smooth-dimming **blueprint**.
-- [ ] **GUI light bindings** (config subentries) — map a wheel channel to a light
-      and let the integration drive brightness/color directly, no YAML.
-- [ ] Per-binding options: step size, acceleration, min/max, button actions.
+- [x] **GUI light bindings** (config subentries) — map a wheel channel to a light
+      and let the integration drive brightness directly, no YAML. *(0.3)*
+- [ ] Smooth-dimming **blueprint** (for automation-based setups).
+- [ ] Per-binding acceleration, min/max brightness, and button
+      double/triple/hold actions.
 
 ## Limitations
 

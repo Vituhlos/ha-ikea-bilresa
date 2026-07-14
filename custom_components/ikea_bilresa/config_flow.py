@@ -1,4 +1,9 @@
-"""Config flow for the IKEA BILRESA (smooth scroll) integration."""
+"""Config flow for the IKEA BILRESA (smooth scroll) integration.
+
+A single parent config entry holds the Matter Server connection. Light bindings
+are added through **config subentries** — one per wheel channel — configured
+entirely in the UI.
+"""
 
 from __future__ import annotations
 
@@ -6,10 +11,32 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import (
+    ConfigFlow,
+    ConfigFlowResult,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
+)
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import selector
+from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 
-from .const import CONF_URL, DEFAULT_MATTER_URL, DOMAIN
+from .const import (
+    CLICK_ACTIONS,
+    CONF_CHANNEL,
+    CONF_CLICK_ACTION,
+    CONF_NODE_ID,
+    CONF_STEP,
+    CONF_TARGET,
+    CONF_TRANSITION,
+    CONF_URL,
+    DEFAULT_CLICK_ACTION,
+    DEFAULT_MATTER_URL,
+    DEFAULT_STEP,
+    DEFAULT_TRANSITION,
+    DOMAIN,
+    SUBENTRY_BINDING,
+)
 
 
 def _matter_server_url(hass: HomeAssistant) -> str:
@@ -20,14 +47,13 @@ def _matter_server_url(hass: HomeAssistant) -> str:
 
 
 class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Single-instance config flow. Auto-detects the Matter Server URL."""
+    """Single-instance parent flow. Auto-detects the Matter Server URL."""
 
     VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step."""
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
 
@@ -35,10 +61,150 @@ class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title="IKEA BILRESA", data=user_input)
 
         schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_URL, default=_matter_server_url(self.hass)
-                ): str,
-            }
+            {vol.Required(CONF_URL, default=_matter_server_url(self.hass)): str}
         )
         return self.async_show_form(step_id="user", data_schema=schema)
+
+    @staticmethod
+    @callback
+    def async_get_supported_subentry_types(
+        config_entry,
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_BINDING: BindingSubentryFlowHandler}
+
+
+class BindingSubentryFlowHandler(ConfigSubentryFlow):
+    """Add or reconfigure a wheel-channel -> light binding, all in the UI."""
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_step_form("user", user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_step_form("reconfigure", user_input)
+
+    async def _async_step_form(
+        self, step_id: str, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        wheel_options = self._wheel_options()
+        if not wheel_options:
+            return self.async_abort(reason="no_wheels")
+
+        if user_input is not None:
+            title = self._title(user_input)
+            if step_id == "reconfigure":
+                return self.async_update_and_abort(
+                    self._get_entry(),
+                    self._get_reconfigure_subentry(),
+                    title=title,
+                    data=user_input,
+                )
+            return self.async_create_entry(title=title, data=user_input)
+
+        defaults = (
+            self._get_reconfigure_subentry().data if step_id == "reconfigure" else {}
+        )
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=self._schema(wheel_options, defaults),
+        )
+
+    @callback
+    def _wheel_options(self) -> list[selector.SelectOptionDict]:
+        coordinator = self._get_entry().runtime_data
+        device_registry = async_get_device_registry(self.hass)
+        options: list[selector.SelectOptionDict] = []
+        for node_id, wheel in coordinator.wheels.items():
+            label = wheel.name
+            if wheel.serial:
+                device = device_registry.async_get_device(
+                    identifiers={("matter", f"serial_{wheel.serial}")}
+                )
+                if device:
+                    label = device.name_by_user or device.name or label
+            options.append(
+                selector.SelectOptionDict(
+                    value=str(node_id), label=f"{label} (node {node_id})"
+                )
+            )
+        return options
+
+    @callback
+    def _schema(
+        self,
+        wheel_options: list[selector.SelectOptionDict],
+        defaults: dict[str, Any],
+    ) -> vol.Schema:
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_NODE_ID, default=defaults.get(CONF_NODE_ID)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=wheel_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_CHANNEL, default=defaults.get(CONF_CHANNEL, "1")
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["1", "2", "3"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_TARGET, default=defaults.get(CONF_TARGET)
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="light")
+                ),
+                vol.Required(
+                    CONF_STEP, default=defaults.get(CONF_STEP, DEFAULT_STEP)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=25,
+                        step=1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_TRANSITION,
+                    default=defaults.get(CONF_TRANSITION, DEFAULT_TRANSITION),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=5,
+                        step=0.1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="s",
+                    )
+                ),
+                vol.Required(
+                    CONF_CLICK_ACTION,
+                    default=defaults.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=CLICK_ACTIONS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="click_action",
+                    )
+                ),
+            }
+        )
+
+    @callback
+    def _title(self, user_input: dict[str, Any]) -> str:
+        node_id = user_input[CONF_NODE_ID]
+        channel = user_input[CONF_CHANNEL]
+        label = next(
+            (o["label"] for o in self._wheel_options() if o["value"] == node_id),
+            f"node {node_id}",
+        )
+        # Trim the "(node N)" suffix for a cleaner subentry title.
+        label = label.rsplit(" (node", 1)[0]
+        return f"{label} · channel {channel}"

@@ -12,5 +12,54 @@
     "abort": {
       "already_configured": "IKEA BILRESA is already set up."
     }
+  },
+  "config_subentries": {
+    "binding": {
+      "title": "Light binding",
+      "initiate_flow": {
+        "user": "Add light binding",
+        "reconfigure": "Reconfigure light binding"
+      },
+      "entry_type": "light binding",
+      "step": {
+        "user": {
+          "title": "Bind a wheel channel to a light",
+          "description": "Scrolling this wheel channel will dim the chosen light in real time; a single button press runs the selected action.",
+          "data": {
+            "node_id": "Wheel",
+            "channel": "Channel",
+            "target": "Light",
+            "step": "Brightness change per notch (%)",
+            "transition": "Transition (s)",
+            "click_action": "Button single-press action"
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure light binding",
+          "description": "Adjust how this wheel channel controls its light.",
+          "data": {
+            "node_id": "Wheel",
+            "channel": "Channel",
+            "target": "Light",
+            "step": "Brightness change per notch (%)",
+            "transition": "Transition (s)",
+            "click_action": "Button single-press action"
+          }
+        }
+      },
+      "abort": {
+        "no_wheels": "No BILRESA wheels have been discovered yet. Make sure the wheel works in the Matter integration, then try again."
+      }
+    }
+  },
+  "selector": {
+    "click_action": {
+      "options": {
+        "toggle": "Toggle",
+        "on": "Turn on",
+        "off": "Turn off",
+        "none": "Do nothing"
+      }
+    }
   }
 }
