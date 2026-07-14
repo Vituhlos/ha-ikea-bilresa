@@ -76,3 +76,41 @@ DATA_NEW_POSITION = "newPosition"
 DATA_PREVIOUS_POSITION = "previousPosition"
 DATA_CURRENT_COUNT = "currentNumberOfPressesCounted"
 DATA_TOTAL_COUNT = "totalNumberOfPressesCounted"
+
+# --- Clean, high-level actions (emitted by the gesture engine) ----------
+ACTION_ROTATE = "rotate"
+ACTION_PRESS = "press"
+ACTION_HOLD = "hold"
+ACTION_RELEASE = "release"
+
+DIRECTION_UP = "up"
+DIRECTION_DOWN = "down"
+
+# --- event entity event_types (one entity per wheel channel) ------------
+ET_ROTATE_UP = "rotate_up"
+ET_ROTATE_DOWN = "rotate_down"
+ET_PRESS = "press"
+ET_DOUBLE_PRESS = "double_press"
+ET_TRIPLE_PRESS = "triple_press"
+ET_HOLD = "hold"
+ET_RELEASE = "release"
+
+WHEEL_EVENT_TYPES = [
+    ET_ROTATE_UP,
+    ET_ROTATE_DOWN,
+    ET_PRESS,
+    ET_DOUBLE_PRESS,
+    ET_TRIPLE_PRESS,
+    ET_HOLD,
+    ET_RELEASE,
+]
+
+PRESS_EVENT_TYPES = {1: ET_PRESS, 2: ET_DOUBLE_PRESS, 3: ET_TRIPLE_PRESS}
+
+# --- dispatcher signals -------------------------------------------------
+SIGNAL_WHEELS_UPDATED = f"{DOMAIN}_wheels_updated"
+
+
+def signal_channel(node_id: int, channel: int | None) -> str:
+    """Per wheel-channel dispatcher signal carrying decoded WheelActions."""
+    return f"{DOMAIN}_action_{node_id}_{channel}"
