@@ -114,10 +114,13 @@ CONF_NODE_ID = "node_id"
 CONF_CHANNEL = "channel"
 CONF_TARGET = "target"
 CONF_STEP = "step"
+CONF_MIN_BRIGHTNESS = "min_brightness"
 CONF_TRANSITION = "transition"
 CONF_CLICK_ACTION = "click_action"
+CONF_CLICK_TARGET = "click_target"
 
 DEFAULT_STEP = 3
+DEFAULT_MIN_BRIGHTNESS = 1
 DEFAULT_TRANSITION = 1.0
 DEFAULT_CLICK_ACTION = "toggle"
 

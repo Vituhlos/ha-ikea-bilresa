@@ -124,9 +124,12 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
 (Settings → Devices & Services) click **＋ Add → Light binding** and pick:
 
 - the **Wheel** and **Channel** to use,
-- the **Light** to control,
-- **Brightness change per notch** (%), **Transition** (s), and the
-  **single-press action** (toggle / on / off / nothing).
+- the **Light to dim**,
+- **Brightness change per notch** (%), **Minimum brightness** (%, `0` lets a
+  downward scroll switch the light off) and **Transition** (s),
+- the **single-press action** (toggle / on / off / nothing) and an optional
+  **button target entity** — so a press can act on a *different* entity than the
+  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch).
 
 The integration then dims that light in real time. Add as many bindings as you
 like — one per wheel channel — so this scales to any number of wheels with no
@@ -229,9 +232,9 @@ logger:
 - [x] Gesture engine, `event` entities, per-wheel devices, clean actions. *(0.2)*
 - [x] **GUI light bindings** (config subentries) — map a wheel channel to a light
       and let the integration drive brightness directly, no YAML. *(0.3)*
+- [x] Minimum-brightness floor and a separate button target entity. *(0.4)*
 - [ ] Smooth-dimming **blueprint** (for automation-based setups).
-- [ ] Per-binding acceleration, min/max brightness, and button
-      double/triple/hold actions.
+- [ ] Per-binding acceleration and button double/triple/hold actions.
 
 ## Limitations
 

@@ -122,9 +122,12 @@ Nechceš psát automatizace? U položky **IKEA BILRESA**
 (Nastavení → Zařízení a služby) klikni na **＋ Přidat → Propojení se světlem** a vyber:
 
 - **Kolečko** a **Kanál**,
-- **Světlo**, které se má ovládat,
-- **Změnu jasu na zářez** (%), **Přechod** (s) a **akci jednoduchého stisku**
-  (přepnout / zapnout / vypnout / nic).
+- **Světlo ke stmívání**,
+- **Změnu jasu na zářez** (%), **Minimální jas** (%, `0` = otočením dolů lze
+  světlo vypnout) a **Přechod** (s),
+- **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
+  **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
+  (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači).
 
 Integrace pak to světlo stmívá v reálném čase. Přidej si klidně víc propojení —
 jedno na kanál kolečka — takže to škáluje na libovolný počet koleček bez YAML.
@@ -225,8 +228,9 @@ logger:
 - [x] Gesture engine, `event` entity, zařízení na kolečko, čisté akce. *(0.2)*
 - [x] **GUI bindings na světla** (config subentries) — namapuj kanál kolečka na
       světlo a integrace řídí jas přímo, bez YAML. *(0.3)*
+- [x] Minimální práh jasu a samostatný cíl tlačítka. *(0.4)*
 - [ ] Blueprint na **plynulé stmívání** (pro setupy postavené na automatizacích).
-- [ ] Per binding: akcelerace, min/max jasu a akce tlačítka double/triple/hold.
+- [ ] Per binding: akcelerace a akce tlačítka double/triple/hold.
 
 ## Omezení
 

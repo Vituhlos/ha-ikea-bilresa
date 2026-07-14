@@ -9,8 +9,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 - (planned) A smooth-dimming **blueprint** built on the clean scroll events.
-- (planned) Per-binding acceleration and min/max brightness; button
-  double/triple/hold actions in the GUI binding.
+- (planned) Per-binding acceleration; button double/triple/hold actions in the
+  GUI binding.
+
+## [0.4.0] - 2026-07-14
+
+### Added
+- Binding option **Minimum brightness**: scrolling down eases to this floor and
+  stays on; set it to `0` to let a downward scroll switch the light off.
+- Binding option **Button target entity**: a single press can act on a different
+  entity than the dimmed light (e.g. dim a bulb but toggle its Shelly wall
+  switch). Uses the universal `homeassistant` service, so it works on switches,
+  lights, input booleans, etc.
+
+### Fixed
+- Dimming now tracks an absolute brightness target instead of issuing percentage
+  steps, fixing the abrupt "hold near the bottom then snap off" behaviour and a
+  mid-transition read race during fast scrolls.
 
 ## [0.3.0] - 2026-07-14
 
@@ -55,7 +70,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.1.0

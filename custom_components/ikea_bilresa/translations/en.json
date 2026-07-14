@@ -28,10 +28,12 @@
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
-            "target": "Light",
+            "target": "Light to dim",
             "step": "Brightness change per notch (%)",
+            "min_brightness": "Minimum brightness (%, 0 = scroll can switch off)",
             "transition": "Transition (s)",
-            "click_action": "Button single-press action"
+            "click_action": "Button single-press action",
+            "click_target": "Button target entity (optional, defaults to the light)"
           }
         },
         "reconfigure": {
@@ -40,10 +42,12 @@
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
-            "target": "Light",
+            "target": "Light to dim",
             "step": "Brightness change per notch (%)",
+            "min_brightness": "Minimum brightness (%, 0 = scroll can switch off)",
             "transition": "Transition (s)",
-            "click_action": "Button single-press action"
+            "click_action": "Button single-press action",
+            "click_target": "Button target entity (optional, defaults to the light)"
           }
         }
       },

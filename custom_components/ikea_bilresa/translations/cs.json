@@ -28,10 +28,12 @@
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
-            "target": "Světlo",
+            "target": "Světlo ke stmívání",
             "step": "Změna jasu na zářez (%)",
+            "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "transition": "Přechod (s)",
-            "click_action": "Akce jednoduchého stisku"
+            "click_action": "Akce jednoduchého stisku",
+            "click_target": "Cíl tlačítka (volitelné, jinak stejné světlo)"
           }
         },
         "reconfigure": {
@@ -40,10 +42,12 @@
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
-            "target": "Světlo",
+            "target": "Světlo ke stmívání",
             "step": "Změna jasu na zářez (%)",
+            "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "transition": "Přechod (s)",
-            "click_action": "Akce jednoduchého stisku"
+            "click_action": "Akce jednoduchého stisku",
+            "click_target": "Cíl tlačítka (volitelné, jinak stejné světlo)"
           }
         }
       },

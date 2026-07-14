@@ -25,6 +25,8 @@ from .const import (
     CLICK_ACTIONS,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
+    CONF_CLICK_TARGET,
+    CONF_MIN_BRIGHTNESS,
     CONF_NODE_ID,
     CONF_STEP,
     CONF_TARGET,
@@ -32,6 +34,7 @@ from .const import (
     CONF_URL,
     DEFAULT_CLICK_ACTION,
     DEFAULT_MATTER_URL,
+    DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_STEP,
     DEFAULT_TRANSITION,
     DOMAIN,
@@ -173,6 +176,18 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                     )
                 ),
                 vol.Required(
+                    CONF_MIN_BRIGHTNESS,
+                    default=defaults.get(CONF_MIN_BRIGHTNESS, DEFAULT_MIN_BRIGHTNESS),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=50,
+                        step=1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
                     CONF_TRANSITION,
                     default=defaults.get(CONF_TRANSITION, DEFAULT_TRANSITION),
                 ): selector.NumberSelector(
@@ -193,6 +208,12 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                         mode=selector.SelectSelectorMode.DROPDOWN,
                         translation_key="click_action",
                     )
+                ),
+                vol.Optional(
+                    CONF_CLICK_TARGET,
+                    description={"suggested_value": defaults.get(CONF_CLICK_TARGET)},
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["light", "switch"])
                 ),
             }
         )
