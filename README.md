@@ -1,6 +1,6 @@
 # IKEA BILRESA (smooth scroll) for Home Assistant
 
-**English** · [Čeština](README.cs.md) · [Slovenčina](README.sk.md)
+**English** · [Čeština](README.cs.md)
 
 [![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
