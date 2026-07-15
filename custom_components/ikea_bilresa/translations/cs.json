@@ -31,12 +31,18 @@
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
-            "target": "Světlo ke stmívání",
-            "step": "Změna jasu na zářez (%)",
+            "target": "Světlo",
+            "mode": "Scroll ovládá",
+            "step": "Změna na zářez (% rozsahu)",
+            "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
+            "max_brightness": "Maximální jas (%)",
             "transition": "Přechod (s)",
             "click_action": "Akce jednoduchého stisku",
-            "click_target": "Cíl tlačítka (volitelné, jinak stejné světlo)"
+            "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
+            "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
+            "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
+            "hold_target": "Podržení: přepnout entitu (volitelné)"
           }
         },
         "reconfigure": {
@@ -45,12 +51,18 @@
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
-            "target": "Světlo ke stmívání",
-            "step": "Změna jasu na zářez (%)",
+            "target": "Světlo",
+            "mode": "Scroll ovládá",
+            "step": "Změna na zářez (% rozsahu)",
+            "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
+            "max_brightness": "Maximální jas (%)",
             "transition": "Přechod (s)",
             "click_action": "Akce jednoduchého stisku",
-            "click_target": "Cíl tlačítka (volitelné, jinak stejné světlo)"
+            "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
+            "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
+            "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
+            "hold_target": "Podržení: přepnout entitu (volitelné)"
           }
         }
       },
@@ -66,6 +78,13 @@
         "on": "Zapnout",
         "off": "Vypnout",
         "none": "Nedělat nic"
+      }
+    },
+    "scroll_mode": {
+      "options": {
+        "brightness": "Jas",
+        "color_temp": "Teplota bílé",
+        "color": "Barva"
       }
     }
   },

@@ -113,22 +113,41 @@ SUBENTRY_BINDING = "binding"
 CONF_NODE_ID = "node_id"
 CONF_CHANNEL = "channel"
 CONF_TARGET = "target"
+CONF_MODE = "mode"
 CONF_STEP = "step"
+CONF_ACCELERATION = "acceleration"
 CONF_MIN_BRIGHTNESS = "min_brightness"
+CONF_MAX_BRIGHTNESS = "max_brightness"
 CONF_TRANSITION = "transition"
 CONF_CLICK_ACTION = "click_action"
 CONF_CLICK_TARGET = "click_target"
+CONF_DOUBLE_TARGET = "double_press_target"
+CONF_TRIPLE_TARGET = "triple_press_target"
+CONF_HOLD_TARGET = "hold_target"
 
 DEFAULT_STEP = 3
+DEFAULT_ACCELERATION = 0
 DEFAULT_MIN_BRIGHTNESS = 1
+DEFAULT_MAX_BRIGHTNESS = 100
 DEFAULT_TRANSITION = 1.0
 DEFAULT_CLICK_ACTION = "toggle"
+
+# Scroll modes: what a rotation changes on the target light.
+MODE_BRIGHTNESS = "brightness"
+MODE_COLOR_TEMP = "color_temp"
+MODE_COLOR = "color"
+MODES = [MODE_BRIGHTNESS, MODE_COLOR_TEMP, MODE_COLOR]
+DEFAULT_MODE = MODE_BRIGHTNESS
 
 CLICK_TOGGLE = "toggle"
 CLICK_ON = "on"
 CLICK_OFF = "off"
 CLICK_NONE = "none"
 CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
+
+# Sensible fallback white-temperature range (Kelvin) if a light doesn't report it.
+FALLBACK_MIN_KELVIN = 2000
+FALLBACK_MAX_KELVIN = 6500
 
 # --- dispatcher signals -------------------------------------------------
 SIGNAL_WHEELS_UPDATED = f"{DOMAIN}_wheels_updated"

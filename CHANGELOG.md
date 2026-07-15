@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   while the connection is down.
 - A **repair issue** is raised when the Matter Server stays unreachable.
 - **Connection test** when setting up the integration (a bad URL is rejected).
+- Binding **scroll modes**: a rotation can control **brightness**, **colour
+  temperature** or **colour** (`step` becomes a percentage of the mode's range).
+- Binding options **Maximum brightness** and **Acceleration** (faster scrolling
+  takes bigger steps).
+- Binding **double-press / triple-press / hold** actions — each optionally
+  toggles its own entity.
 
 ### Changed
 - Editing a light binding now updates in place instead of reloading the config
@@ -21,7 +27,6 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Planned
 - A smooth-dimming **blueprint** built on the clean scroll events.
-- Per-binding acceleration; button double/triple/hold actions in the GUI binding.
 
 ## [0.5.0] - 2026-07-14
 

@@ -31,12 +31,18 @@
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
-            "target": "Light to dim",
-            "step": "Brightness change per notch (%)",
+            "target": "Light",
+            "mode": "Scroll controls",
+            "step": "Change per notch (% of range)",
+            "acceleration": "Acceleration (faster scroll = bigger steps)",
             "min_brightness": "Minimum brightness (%, 0 = scroll can switch off)",
+            "max_brightness": "Maximum brightness (%)",
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
-            "click_target": "Button target entity (optional, defaults to the light)"
+            "click_target": "Single-press target (optional, defaults to the light)",
+            "double_press_target": "Double-press: toggle entity (optional)",
+            "triple_press_target": "Triple-press: toggle entity (optional)",
+            "hold_target": "Hold: toggle entity (optional)"
           }
         },
         "reconfigure": {
@@ -45,12 +51,18 @@
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
-            "target": "Light to dim",
-            "step": "Brightness change per notch (%)",
+            "target": "Light",
+            "mode": "Scroll controls",
+            "step": "Change per notch (% of range)",
+            "acceleration": "Acceleration (faster scroll = bigger steps)",
             "min_brightness": "Minimum brightness (%, 0 = scroll can switch off)",
+            "max_brightness": "Maximum brightness (%)",
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
-            "click_target": "Button target entity (optional, defaults to the light)"
+            "click_target": "Single-press target (optional, defaults to the light)",
+            "double_press_target": "Double-press: toggle entity (optional)",
+            "triple_press_target": "Triple-press: toggle entity (optional)",
+            "hold_target": "Hold: toggle entity (optional)"
           }
         }
       },
@@ -66,6 +78,13 @@
         "on": "Turn on",
         "off": "Turn off",
         "none": "Do nothing"
+      }
+    },
+    "scroll_mode": {
+      "options": {
+        "brightness": "Brightness",
+        "color_temp": "Colour temperature",
+        "color": "Colour"
       }
     }
   },

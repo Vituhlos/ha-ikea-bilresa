@@ -25,21 +25,31 @@ import voluptuous as vol
 
 from .const import (
     CLICK_ACTIONS,
+    CONF_ACCELERATION,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_TARGET,
+    CONF_HOLD_TARGET,
+    CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
+    CONF_MODE,
     CONF_NODE_ID,
     CONF_STEP,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_TARGET,
     CONF_URL,
+    DEFAULT_ACCELERATION,
     DEFAULT_CLICK_ACTION,
     DEFAULT_MATTER_URL,
+    DEFAULT_MAX_BRIGHTNESS,
     DEFAULT_MIN_BRIGHTNESS,
+    DEFAULT_MODE,
     DEFAULT_STEP,
     DEFAULT_TRANSITION,
     DOMAIN,
+    MODES,
     SUBENTRY_BINDING,
 )
 
@@ -183,6 +193,15 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                     selector.EntitySelectorConfig(domain="light")
                 ),
                 vol.Required(
+                    CONF_MODE, default=defaults.get(CONF_MODE, DEFAULT_MODE)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=MODES,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="scroll_mode",
+                    )
+                ),
+                vol.Required(
                     CONF_STEP, default=defaults.get(CONF_STEP, DEFAULT_STEP)
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
@@ -194,12 +213,36 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                     )
                 ),
                 vol.Required(
+                    CONF_ACCELERATION,
+                    default=defaults.get(CONF_ACCELERATION, DEFAULT_ACCELERATION),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=5,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
                     CONF_MIN_BRIGHTNESS,
                     default=defaults.get(CONF_MIN_BRIGHTNESS, DEFAULT_MIN_BRIGHTNESS),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=0,
                         max=50,
+                        step=1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_MAX_BRIGHTNESS,
+                    default=defaults.get(CONF_MAX_BRIGHTNESS, DEFAULT_MAX_BRIGHTNESS),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=100,
                         step=1,
                         mode=selector.NumberSelectorMode.SLIDER,
                         unit_of_measurement="%",
@@ -230,6 +273,24 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 vol.Optional(
                     CONF_CLICK_TARGET,
                     description={"suggested_value": defaults.get(CONF_CLICK_TARGET)},
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["light", "switch"])
+                ),
+                vol.Optional(
+                    CONF_DOUBLE_TARGET,
+                    description={"suggested_value": defaults.get(CONF_DOUBLE_TARGET)},
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["light", "switch"])
+                ),
+                vol.Optional(
+                    CONF_TRIPLE_TARGET,
+                    description={"suggested_value": defaults.get(CONF_TRIPLE_TARGET)},
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["light", "switch"])
+                ),
+                vol.Optional(
+                    CONF_HOLD_TARGET,
+                    description={"suggested_value": defaults.get(CONF_HOLD_TARGET)},
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=["light", "switch"])
                 ),
