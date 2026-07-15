@@ -102,6 +102,63 @@ Repeat on all three channels:
 
 No complete hardware run has been recorded yet.
 
+### 2026-07-15 - `v0.5.7-rc.2` run in progress
+
+Tester: owner with Codex read-only MCP observation.
+
+Environment recorded at start:
+
+- Home Assistant Core `2026.7.2`, Home Assistant OS `18.1`, Python `3.14.6`;
+- Matter Server add-on `9.0.4`, matterjs-server `1.1.7`, matter.js `0.17.4`,
+  WebSocket schema `11`;
+- custom integration `0.5.7-rc.2`, installed through HACS;
+- event source `core_matter_client`, connected, no fallback reason;
+- two discovered wheels and three configured bindings;
+- physical wheels have mixed firmware: one `1.9.15`, one `1.8.7`, both hardware
+  `P2.0`;
+- exact network, registry, serial, node, entity and target identifiers omitted.
+
+Read-only baseline results:
+
+- **PASS:** integration config entry loaded and Matter event source connected;
+- **PASS:** coordinator discovered two BILRESA nodes, each with all three channel
+  role groups in diagnostics;
+- **PASS:** System Health reported `core_matter_client`, two wheels, three
+  bindings, matter-server `1.1.7` / matter.js `0.17.4`, and no fallback;
+- **PASS:** no current `ikea_bilresa` system-log or error-log entry;
+- **FAIL:** both physical wheels do not appear once with their correct user
+  names in the custom integration device presentation.
+
+Compatibility finding behind the discovery failure:
+
+- firmware `1.9.15` exposes Basic Information Serial Number attribute
+  `0/40/15`; its custom event entities merge onto the corresponding core Matter
+  device and inherit the user name;
+- firmware `1.8.7` does not expose `0/40/15` in the live Matter diagnostics;
+- the current custom integration links to the core Matter device only through
+  `matter:serial_<serial>` when that attribute exists;
+- therefore the `1.8.7` wheel's three event entities are created on a separate
+  default-named BILRESA device instead of the user-named Matter device;
+- both Matter devices themselves are available, so this is a device-registry
+  linking/presentation defect, not evidence that gesture reception is broken.
+
+No Home Assistant state, registry entry, integration option, logger level or
+device was changed during this baseline. Gesture, binding, lifecycle, fallback
+and soak checks remain pending. Final verdict remains **IN PROGRESS**.
+
+An unreleased fix candidate was subsequently implemented in the working tree.
+It resolves the exact core Matter operational identifier from the matching
+server's compressed fabric ID and node ID when serial is absent, refuses
+ambiguous matches, migrates the custom event entities from a legacy standalone
+device, and refreshes wheel metadata after a firmware update. Static checks are
+recorded in `PROJECT_STATUS.md`; CI, deployment, registry migration and physical
+hardware verification remain pending. The recorded discovery failure above is
+not converted to a pass by implementation alone.
+
+A later read-only MCP recheck on 2026-07-15 still reported firmware `1.8.7` for
+the affected wheel and `1.9.15` for the other wheel. No Home Assistant state was
+changed by that check.
+
 When a run is completed, append a dated section containing the environment,
 checked/failed items, relevant redacted logs, fixes made, commit SHA, and final
 verdict: `PASS`, `PASS WITH LIMITATIONS`, or `FAIL`.

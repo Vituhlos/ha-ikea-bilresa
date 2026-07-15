@@ -16,7 +16,6 @@ from .const import (
     ACTION_RELEASE,
     ACTION_ROTATE,
     DIRECTION_UP,
-    DOMAIN,
     ET_HOLD,
     ET_RELEASE,
     ET_ROTATE_DOWN,
@@ -28,6 +27,7 @@ from .const import (
     signal_channel,
 )
 from .coordinator import BilresaCoordinator
+from .device_link import reconcile_wheel_device
 from .engine import WheelAction
 from .model import BilresaWheel
 
@@ -46,6 +46,13 @@ async def async_setup_entry(
         desired: set[tuple[int, int]] = set()
         new: list[BilresaChannelEvent] = []
         for node_id, wheel in coordinator.wheels.items():
+            link = reconcile_wheel_device(
+                hass,
+                config_entry_id=entry.entry_id,
+                matter_url=coordinator.url,
+                server_info=coordinator.matter_server_info,
+                wheel=wheel,
+            )
             channels = sorted(
                 {e.channel for e in wheel.endpoints.values() if e.channel is not None}
             )
@@ -53,9 +60,21 @@ async def async_setup_entry(
                 key = (node_id, channel)
                 desired.add(key)
                 if key not in entities:
-                    entity = BilresaChannelEvent(coordinator, wheel, channel)
+                    entity = BilresaChannelEvent(
+                        coordinator,
+                        wheel,
+                        channel,
+                        set(link.identifiers),
+                        linked_to_matter=link.device is not None,
+                    )
                     entities[key] = entity
                     new.append(entity)
+                else:
+                    entities[key].update_wheel(
+                        wheel,
+                        set(link.identifiers),
+                        linked_to_matter=link.device is not None,
+                    )
         for key in list(entities):
             if key not in desired:
                 entity = entities.pop(key)
@@ -76,23 +95,47 @@ class BilresaChannelEvent(EventEntity):
     _attr_event_types = WHEEL_EVENT_TYPES
 
     def __init__(
-        self, coordinator: BilresaCoordinator, wheel: BilresaWheel, channel: int
+        self,
+        coordinator: BilresaCoordinator,
+        wheel: BilresaWheel,
+        channel: int,
+        identifiers: set[tuple[str, str]],
+        *,
+        linked_to_matter: bool,
     ) -> None:
         self._coordinator = coordinator
         self._wheel = wheel
         self._channel = channel
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}"
         self._attr_name = f"Channel {channel}"
-        # Always carry our own identifier (used by device triggers); when the
-        # wheel reports a serial, also merge onto the core-Matter device.
-        identifiers = {(DOMAIN, str(wheel.node_id))}
-        if wheel.serial:
-            identifiers.add(("matter", f"serial_{wheel.serial}"))
+        self._set_device_info(identifiers, linked_to_matter)
+
+    @callback
+    def update_wheel(
+        self,
+        wheel: BilresaWheel,
+        identifiers: set[tuple[str, str]],
+        *,
+        linked_to_matter: bool,
+    ) -> None:
+        """Refresh metadata after a Matter node or firmware update."""
+        self._wheel = wheel
+        self._set_device_info(identifiers, linked_to_matter)
+
+    @callback
+    def _set_device_info(
+        self, identifiers: set[tuple[str, str]], linked_to_matter: bool
+    ) -> None:
+        """Set registry metadata using identifiers already reconciled safely."""
+        if linked_to_matter:
+            # Keep core Matter's name and hardware metadata authoritative.
+            self._attr_device_info = DeviceInfo(identifiers=identifiers)
+            return
         self._attr_device_info = DeviceInfo(
             identifiers=identifiers,
             manufacturer="IKEA of Sweden",
             model="BILRESA scroll wheel",
-            name=wheel.name,
+            name=self._wheel.name,
         )
 
     @property

@@ -20,7 +20,6 @@ from homeassistant.config_entries import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 import voluptuous as vol
 
 from .const import (
@@ -70,6 +69,7 @@ from .const import (
     SUBENTRY_BINDING,
     TARGET_DOMAINS,
 )
+from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
 from .presentation import generated_binding_title
 
@@ -258,16 +258,17 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
     @callback
     def _wheel_options(self) -> list[selector.SelectOptionDict]:
         coordinator = self._get_entry().runtime_data
-        device_registry = async_get_device_registry(self.hass)
         options: list[selector.SelectOptionDict] = []
         for node_id, wheel in coordinator.wheels.items():
             label = wheel.name
-            if wheel.serial:
-                device = device_registry.async_get_device(
-                    identifiers={("matter", f"serial_{wheel.serial}")}
-                )
-                if device:
-                    label = device.name_by_user or device.name or label
+            link = resolve_matter_device(
+                self.hass,
+                matter_url=coordinator.url,
+                server_info=coordinator.matter_server_info,
+                wheel=wheel,
+            )
+            if link.device:
+                label = link.device.name_by_user or link.device.name or label
             options.append(
                 selector.SelectOptionDict(
                     value=str(node_id), label=f"{label} (node {node_id})"

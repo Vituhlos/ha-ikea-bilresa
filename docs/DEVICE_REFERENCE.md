@@ -61,8 +61,10 @@ remaining button tags identify the button endpoint. A numeric label `1`, `2` or
 hard-coded node IDs.
 
 The Basic Information cluster `0x0028` reports IKEA as vendor, product E2490,
-hardware and software versions. A serial number exists at `0/40/15`, but its
-value must not be recorded in this repository.
+hardware and software versions. Firmware `1.9.15` exposes a serial number at
+`0/40/15`, but the owner's `1.8.7` wheel omitted that optional attribute. Its
+value must never be recorded in this repository. Device-registry linking must
+therefore retain a serial-independent fallback.
 
 ## Switch cluster events
 

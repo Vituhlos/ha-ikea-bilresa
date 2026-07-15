@@ -175,6 +175,51 @@ This establishes Implemented + Static + Unit + CI + Released and a successful
 non-hardware Home Assistant deployment smoke test for the overview cleanup. It
 does not establish Hardware or complete visual review in the owner's browser.
 
+## Future BILRESA panel concept
+
+`docs/PANEL_DESIGN.md` now records the agreed product direction for an optional
+first-party BILRESA panel inside Home Assistant. The native integration page
+remains the installation and registry surface; the future panel would present
+physical wheels, channel behavior, a guided binding editor, safe live hardware
+event visualization and redacted diagnostics.
+
+`docs/PANEL_ROADMAP.md` is the execution contract for that concept. It splits
+the work into a visually selected and technically proven read-only `0.5.8`, an
+administrator-only binding editor in `0.5.9`, workflow polish in `0.5.10`, and
+individually evaluated later capabilities. Every phase has explicit privacy,
+permission, frontend, CI, HA UI and physical-hardware gates.
+
+The owner selected the panel's desktop direction on 2026-07-15: use the
+master-detail wheel workspace as the landing structure and place the live test
+inside an opened wheel alongside Channels and Diagnostics. Four sanitized
+references are stored under `docs/images/panel/`; the combined target is
+`04-selected-combined-direction.png`. AI-generated decorative bars, coloured
+icon circles and progress artwork are not implementation requirements. No panel
+code has been started; mobile/dark variants and the technical spike remain open.
+
+The documented delivery sequence is additive and provisional: a read-only panel
+in planning package `0.5.8`, binding editing in `0.5.9`, workflow polish in
+`0.5.10`, and carefully selected expansion afterward. A stored-configuration or
+subentry-model migration still requires a minor version under `ROADMAP.md`.
+
+This is **design documentation only**. No frontend, WebSocket API, runtime
+behavior, binding storage, Home Assistant deployment or hardware behavior was
+changed or verified. The physical `v0.5.7-rc.2` checklist remains the release
+gate and the single best next action.
+
+Documentation validation on 2026-07-15:
+
+```text
+git diff --check    passed (CRLF conversion warnings only)
+panel-doc trailing-whitespace/final-newline check    passed
+```
+
+No static code checks, automated tests, CI, Home Assistant deployment or
+hardware test was run because this change adds design documentation only.
+Files in this documentation change are `docs/PANEL_DESIGN.md`,
+`docs/PANEL_ROADMAP.md`, `docs/ROADMAP.md`, `docs/images/panel/*.png`, and
+`PROJECT_STATUS.md`.
+
 ## Important files added or expanded
 
 - Runtime: `binding.py`, `config_flow.py`, `coordinator.py`, `matter_core.py`,
@@ -251,6 +296,89 @@ sources, cumulative counts, every channel, binding targets, scene cycling,
 hold safety, copy/profile UI, diagnostics privacy, reconnect/reload/fallback and
 soak behavior with exact HA/Matter/BILRESA versions recorded.
 
+### Hardware run started 2026-07-15
+
+The owner is now home and authorized the physical `v0.5.7-rc.2` checklist. A
+read-only baseline was recorded in `docs/HARDWARE_TEST.md`; physical gesture
+steps have not yet been observed, so Hardware remains open.
+
+The two current physical wheels use different firmware. The `1.9.15` wheel
+exposes Basic Information Serial Number `0/40/15` and its three custom event
+entities merge with the user-named core Matter device. The `1.8.7` wheel omits
+that attribute; its event entities appear on a separate default-named custom
+device because `event.py` currently relies on the serial identifier for the
+cross-integration registry merge. Coordinator diagnostics still discover both
+wheels and all three channels. This is a confirmed presentation/linking defect,
+not yet a gesture-processing failure.
+
+No HA configuration or registry mutation was made. The next physical step is a
+single slow clockwise notch on channel 1 of the `1.8.7` wheel to map its
+standalone event entities and start the raw-gesture checklist.
+
+### Serial-independent Matter device linking (current working tree)
+
+An unreleased post-`v0.5.7-rc.2` fix candidate now addresses the mixed-firmware
+device-registry defect without changing Matter event decoding or issuing Matter
+commands:
+
+- new `device_link.py` reproduces Home Assistant Core 2026.7.2's canonical
+  unbridged Matter identifier from the compressed fabric ID and node ID;
+- resolution is restricted to a core Matter config entry using the same server
+  URL, accepts serial and operational identifiers only when they resolve
+  unambiguously, and never uses device name, area, entity ID or discovery order;
+- firmware `1.8.7` can therefore link without Basic Information Serial Number;
+- existing custom event entities are reassigned to the canonical core Matter
+  device and an otherwise empty legacy standalone device is retired;
+- linked event entities use link-only `DeviceInfo`, leaving core Matter's user
+  name and hardware metadata authoritative;
+- the custom node identifier remains on the merged device for existing device
+  trigger lookup;
+- coordinator node updates now refresh wheel metadata, allowing a newly
+  reported serial after firmware update to take effect without a full reload;
+- the binding selector uses the same resolver and can show the core Matter
+  device's user name even when serial is absent.
+
+Files involved: new `custom_components/ikea_bilresa/device_link.py`,
+`event.py`, `coordinator.py`, `config_flow.py`, new
+`tests/test_device_link.py`, expanded `tests/test_coordinator.py`, `CHANGELOG.md`,
+`docs/DEVICE_REFERENCE.md`, `docs/HARDWARE_TEST.md`, and this handoff.
+
+Validation for this fix candidate:
+
+```text
+python -m compileall -q custom_components tests     passed
+ruff format custom_components tests                 completed (1 file changed)
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (15 source files)
+```
+
+The new tests cover the exact operational identifier, missing serial, server
+URL isolation, conflicting serial/operational matches, legacy-device
+reconciliation, and metadata refresh. The full static gate passed, including
+JSON parsing, compileall, Ruff format and lint, mypy and `git diff --check`.
+Local `python -m pytest -q` stopped during collection with 12
+`ModuleNotFoundError: No module named 'homeassistant'` errors in the known
+Windows/Python 3.13 environment. This is **Unit not run**, not a failure of an
+executed test. CI and Home Assistant deployment have not run for this working
+tree. Hardware is still pending; implementation and MCP observations are not
+Hardware evidence.
+
+Known migration assumption: when two registry devices already exist, the core
+Matter device is retained as canonical and the otherwise empty custom duplicate
+is removed. Home Assistant has no public general-purpose device-ID merge API;
+existing automations that explicitly stored the duplicate custom device ID must
+be reviewed during the controlled HA test. Core Matter device identity and all
+entity IDs are preserved.
+
+A read-only MCP recheck after implementation still reported firmware `1.8.7`
+for the affected wheel and `1.9.15` for the other wheel. No HA state was changed.
+
+The owner explicitly requested preparation, publication and controlled Home
+Assistant deployment of `v0.5.7-rc.3` on 2026-07-15. The manifest is staged at
+`0.5.7-rc.3`. Publication uses the sanitized current tree; rewriting the older
+sensitive documentation commit remains a separate deferred decision and is not
+part of this RC operation.
+
 ## Known risks and decisions
 
 - The seven packages are stacked in one dirty tree; release them only in small,
@@ -269,10 +397,10 @@ soak behavior with exact HA/Matter/BILRESA versions recorded.
 
 ## Single best next action
 
-Owner visually reviews the deployed `v0.5.7-rc.2` integration overview and
-reports any remaining hierarchy or wording issue. If the screen is correct, run
-the complete physical checklist in `docs/HARDWARE_TEST.md`; Hardware remains the
-release gate.
+Run CI for the serial-independent linking fix, then deploy it as a controlled
+release candidate and verify that both wheels appear exactly once before
+resuming the physical gesture checklist. Until then, the fix is only
+Implemented + Static and the earlier discovery failure remains open.
 
 ## Next-agent handoff
 

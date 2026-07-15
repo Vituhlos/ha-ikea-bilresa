@@ -65,6 +65,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   trailing rotation batch.
 - Hold-to-ramp now stops on a lost-release watchdog, connection transition, new
   gesture and unload, preventing a target from changing indefinitely.
+- BILRESA wheels that omit the optional Matter serial-number attribute now link
+  to the correct core Matter device through its fabric-scoped operational node
+  identifier. Existing standalone duplicates are reconciled conservatively,
+  and changed node metadata is refreshed after firmware updates.
 
 ### Removed
 - The redundant Matter Server connection service device and binary sensor. The

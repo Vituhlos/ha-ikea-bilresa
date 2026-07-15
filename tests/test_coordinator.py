@@ -9,6 +9,7 @@ import pytest
 
 from custom_components.ikea_bilresa.coordinator import BilresaCoordinator
 from custom_components.ikea_bilresa.matter_core import CoreMatterUnavailable
+from custom_components.ikea_bilresa.model import BilresaWheel
 
 
 class FailingCoreSource:
@@ -80,3 +81,37 @@ def test_recent_telemetry_is_bounded_and_excludes_node_id(monkeypatch) -> None:
     assert len(recent) == 20
     assert recent[0]["event_number"] == 5
     assert all("node_id" not in event for event in recent)
+
+
+def test_existing_wheel_metadata_is_refreshed(monkeypatch) -> None:
+    """A firmware update may add serial metadata to an already known node."""
+    hass = SimpleNamespace()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    original = BilresaWheel(
+        node_id=12,
+        name="BILRESA scroll wheel",
+        product_name="BILRESA scroll wheel",
+        serial=None,
+        endpoints={},
+    )
+    updated = BilresaWheel(
+        node_id=12,
+        name="BILRESA scroll wheel",
+        product_name="BILRESA scroll wheel",
+        serial="new-serial",
+        endpoints={},
+    )
+    wheels = iter([original, updated, updated])
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.parse_node",
+        lambda _node: next(wheels),
+    )
+
+    assert coordinator._register_wheel({}) is True
+    assert coordinator._register_wheel({}) is True
+    assert coordinator.wheels[12].serial == "new-serial"
+    assert coordinator._register_wheel({}) is False

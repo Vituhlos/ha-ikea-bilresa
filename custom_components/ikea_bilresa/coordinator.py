@@ -254,9 +254,15 @@ class BilresaCoordinator:
     @callback
     def _register_wheel(self, node) -> bool:
         wheel = parse_node(node)
-        if wheel is None or wheel.node_id in self.wheels:
+        if wheel is None:
+            return False
+        existing = self.wheels.get(wheel.node_id)
+        if existing == wheel:
             return False
         self.wheels[wheel.node_id] = wheel
+        if existing is not None:
+            _LOGGER.info("Updated BILRESA wheel metadata for node %s", wheel.node_id)
+            return True
         _LOGGER.info(
             "Discovered BILRESA wheel: node %s '%s' -> %s",
             wheel.node_id,
