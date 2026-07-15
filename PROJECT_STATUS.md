@@ -103,6 +103,11 @@ connection/protocol failure.
 - Internal evidence-only `quality_scale.yaml`.
 - English/Czech documentation and translations.
 - Shared handoff entry points: `AGENTS.md`, `CLAUDE.md`, this file, and `docs/`.
+- Explicit per-binding fast or multi-press-aware button response; this
+  post-`rc.3` change is not deployed or hardware-verified.
+- Gesture-aware trailing-scroll suppression, time-based acceleration,
+  state-observed resynchronization and HA-native event polish; all are
+  post-`rc.3`, undeployed and not hardware-verified.
 
 ## Integration-overview cleanup (current working tree)
 
@@ -190,13 +195,47 @@ administrator-only binding editor in `0.5.9`, workflow polish in `0.5.10`, and
 individually evaluated later capabilities. Every phase has explicit privacy,
 permission, frontend, CI, HA UI and physical-hardware gates.
 
-The owner selected the panel's desktop direction on 2026-07-15: use the
-master-detail wheel workspace as the landing structure and place the live test
-inside an opened wheel alongside Channels and Diagnostics. Four sanitized
-references are stored under `docs/images/panel/`; the combined target is
-`04-selected-combined-direction.png`. AI-generated decorative bars, coloured
-icon circles and progress artwork are not implementation requirements. No panel
-code has been started; mobile/dark variants and the technical spike remain open.
+The owner selected the panel's desktop direction on 2026-07-15 and **revised it
+the same day**. The earlier record in this file — master-detail as the landing
+structure, targeting `04-selected-combined-direction.png` — is superseded and
+must not be built from.
+
+The current direction is a two-layer model: a grid of wheel cards as the
+landing layer, and a wheel detail containing a 256 px wheel rail with Channels,
+Live test and Diagnostics as views of the opened wheel. The rail is a switcher
+inside the detail, never the landing page.
+
+All four images under `docs/images/panel/` are now superseded and are **not**
+implementation targets; `04-selected-combined-direction.png` in particular
+shows the rejected master-detail landing, an `Add control binding` action on a
+read-only surface, and a sidebar labelled `Wheel Workspace`/`WHEELY`. Build
+from `docs/PANEL_DESIGN.md` only. AI-generated decorative bars, coloured icon
+circles and progress artwork are not implementation requirements.
+
+The revision came from a browser prototype held **outside this repository**, at
+`bilresa-panel-lab/compare.html` alongside the repo checkout. It is not a build
+dependency, is not referenced by any code, and nothing in this repository needs
+it to check out, test or run. It compared four layouts — grid, grid with a chip
+switcher, grid to master-detail, and master-detail as landing — on measured
+layout rather than prose. What it established:
+
+- a rail landing page shows the channels of exactly one wheel at any wheel
+  count, whereas the grid shows every channel of every wheel (6 for two wheels,
+  15 for five); the panel's stated product intent requires the latter;
+- a 300 px rail collapsed the detail to a single column on a 1024 px laptop; at
+  256 px — Home Assistant's own sidebar width — the detail keeps two columns;
+- the two-column detail must break on pane width, not window width;
+- no horizontal page scroll and no element escaping the frame at 1280, 1024,
+  900, 380 or 320 px, at one, two and five wheels, in normal and degraded state.
+
+Explicitly **not** established by the prototype, and not claimable from it:
+dark and non-default themes (defined in variables but never visually reviewed),
+Czech/English text expansion, keyboard navigation, focus order, screen-reader
+labels, WCAG 2.2 AA contrast, reduced motion, and anything about what Home
+Assistant will actually register or serve. Prototype layout evidence is not
+Implemented, Static, Unit, CI, HA UI or Hardware.
+
+No panel code has been started. The technical spike remains open.
 
 The documented delivery sequence is additive and provisional: a read-only panel
 in planning package `0.5.8`, binding editing in `0.5.9`, workflow polish in
@@ -205,8 +244,21 @@ subentry-model migration still requires a minor version under `ROADMAP.md`.
 
 This is **design documentation only**. No frontend, WebSocket API, runtime
 behavior, binding storage, Home Assistant deployment or hardware behavior was
-changed or verified. The physical `v0.5.7-rc.2` checklist remains the release
-gate and the single best next action.
+changed or verified. The physical `v0.5.7` checklist remains the release gate;
+see `Single best next action` below for the current priority, which is not the
+panel.
+
+### Panel direction revision on 2026-07-15 (Claude Code)
+
+Claude Code revised the panel direction with the owner and rewrote the affected
+documentation. Files changed: `docs/PANEL_DESIGN.md`, `docs/PANEL_ROADMAP.md`
+and this handoff. No code, no images and no runtime file was touched.
+
+This revision was made **concurrently with Codex's uncommitted low-latency and
+hardware work in the same tree.** Claude Code touched only the three files
+listed above; every other modified file in `git status` belongs to Codex. If
+Codex held any of these three files in memory from before 17:05 and writes them
+back, this revision will be silently lost — re-read before writing.
 
 Documentation validation on 2026-07-15:
 
@@ -220,6 +272,94 @@ hardware test was run because this change adds design documentation only.
 Files in this documentation change are `docs/PANEL_DESIGN.md`,
 `docs/PANEL_ROADMAP.md`, `docs/ROADMAP.md`, `docs/images/panel/*.png`, and
 `PROJECT_STATUS.md`.
+
+## Runtime behavior polish roadmap
+
+`docs/RUNTIME_POLISH_ROADMAP.md` records the owner-approved runtime hardening
+program discovered during the 2026-07-15 physical run. It is deliberately
+separate from the revised two-layer panel program and orders eight packages by
+safety and user impact:
+
+1. explicit fast versus multi-press-aware button response;
+2. unavailable/unknown target safety;
+3. mode/target domain validation;
+4. measured transition presets;
+5. gesture-aware trailing-scroll protection;
+6. velocity-based acceleration;
+7. predictable off/on and external-state resynchronization;
+8. Home Assistant-native event polish.
+
+R1 now replaces the provisional automatic ShortRelease heuristic with an
+explicit per-binding policy. New profiles select fast response; existing and
+copied bindings without the field remain completion-aware. The native HA form
+contains English/Czech trade-off text and rejects a fast policy combined with a
+double/triple target. Runtime polish stays in the `0.5.7` candidate train; the
+separate read-only panel remains planned for `0.5.8` after runtime
+stabilization.
+
+R1 is currently **Implemented + Static** in the dirty working tree. Regression
+tests are authored for single/double/triple completion, hold, lost completion,
+reconnect, unload, old-binding compatibility and config-flow conflicts, but
+Unit is not run because the local Windows environment lacks Home Assistant.
+CI, HA UI and Hardware remain pending. This does not authorize commit, push,
+release or Home Assistant deployment.
+
+R2 is also **Implemented + Static** in the dirty working tree. A shared target
+availability guard covers brightness, colour temperature, colour, volume,
+cover, climate, fan, number/input_number and button/scene targets. Missing,
+`unknown` or `unavailable` targets receive no service call; an active ramp
+stops, log messages are transition-deduplicated, and recovery clears the stale
+tracked value. Parameterized unavailable-state, ramp, recovery and button tests
+are authored. Unit, CI, HA UI and Hardware remain pending.
+
+R3 is **Implemented + Static** in the dirty working tree. Config flow and
+runtime use one compatibility map for light, media_player, cover, climate, fan,
+number and input_number targets. The form returns a localized field error and
+preserves its input; an incompatible legacy binding logs once and issues no
+scroll service. Mapping and helper-level flow tests are authored. Full
+create/edit/copy flow execution, Unit, CI, HA UI and Hardware remain pending.
+
+R4 transition A/B tuning is explicitly **deferred for future physical work** at
+the owner's request. No transition default or profile value changed.
+
+R5 is **Implemented + Static**. The coordinator exposes private per-channel raw
+gesture metadata; bindings record scroll generations and the button's preceding
+boundary. Only the preceding generation is suppressed, a deliberate new
+`InitialPress` passes immediately, and a two-second timeout is only a lost-event
+fallback. Authored tests cover trailing, new and missing-boundary sequences.
+Timestamped live fixtures, Unit, CI and both-firmware Hardware remain pending.
+
+R6 is **Implemented + Static**. Acceleration now uses decoded notches over a
+bounded monotonic-time window, not one Matter batch size. It resets on idle,
+direction changes, gesture boundaries and reconnect, caps the multiplier, and
+preserves every delta when acceleration is zero. The default remains disabled.
+Deterministic tests are authored; Unit, CI and slow/medium/fast Hardware samples
+on both firmware versions remain pending.
+
+R7 is **Implemented + Static**. Rotate-up from off starts at the configured
+floor or one usable step; target-state observation invalidates external changes
+outside a bounded own-command echo window; direction reversal retains the last
+requested target; unavailable/reconnect clears tracking. Tests are authored;
+Unit, CI, HA UI and Hardware remain pending.
+
+R8 is **Implemented + Static**. Channel event entities declare
+`EventDeviceClass.BUTTON`; declared event types, unique IDs and device triggers
+are unchanged. The legacy domain event preserves its payload and adds registry
+`device_id` when a matching BILRESA device exists. Tests are authored; Unit,
+CI, hassfest/HACS and live automation compatibility remain pending.
+
+Commit preparation on 2026-07-15:
+
+- Claude Code's two-layer panel revision is preserved in `863bded`;
+- R1-R3/R5-R8 runtime, translations and authored tests are committed in
+  `1982188` (`feat: harden binding runtime behavior`);
+- English/Czech README terminology was corrected from the historical
+  light-only flow to the current Control binding / Ovládací propojení flow;
+- the README status now distinguishes CI-verified `v0.5.7-rc.3` from the newer
+  Static-only runtime polish;
+- the owner authorized the logical commits to be pushed together once to the
+  existing `agent/stabilize-0.5-x` branch and draft PR #1. Check the resulting
+  exact-revision CI before changing any validation label.
 
 ## Important files added or expanded
 
@@ -287,10 +427,11 @@ the `0.5.3` coverage-above-95% exit gate and does not establish Hardware.
 
 ## Hardware status
 
-**No post-v0.5.0 work and no active working-tree feature is hardware-verified.**
-`docs/DEVICE_REFERENCE.md` contains earlier observations of the device's event
-model; those observations are evidence for implementation, not a pass for this
-release candidate.
+`v0.5.7-rc.3` now has partial physical hardware evidence on both installed
+BILRESA wheels. Raw direction/channel routing and a representative gesture set
+are verified as recorded below and in `docs/HARDWARE_TEST.md`. This is not a
+complete Hardware PASS for the release candidate: binding outcomes, lifecycle,
+failure injection, dedicated-WebSocket fallback and soak checks remain open.
 
 The complete pending run is in `docs/HARDWARE_TEST.md`. It must cover both event
 sources, cumulative counts, every channel, binding targets, scene cycling,
@@ -403,8 +544,129 @@ Publication and deployment results:
 - exact-domain system-log and error-log searches returned no entries.
 
 This establishes Implemented + Static + Unit + CI + Released and a successful
-non-gesture Home Assistant deployment/registry smoke test. It does not establish
-physical gesture Hardware validation.
+Home Assistant deployment/registry smoke test.
+
+### Physical gesture smoke on `v0.5.7-rc.3`
+
+The owner then operated both installed wheels while Codex observed their event
+entities and diagnostics through read-only Home Assistant MCP calls:
+
+- firmware `1.8.7` (`Kolečko Nelča`) passed clockwise/counter-clockwise routing
+  and a single press on all three channels;
+- its channel 1 additionally passed a batched fast clockwise rotation, single,
+  double and triple press, and one `hold` followed by exactly one `release`;
+- the first deliberately slower triple-press attempt was closed by the device
+  as separate presses; a retry with all three presses inside the device's
+  multi-press window produced `triple_press` with `presses: 3`;
+- firmware `1.9.15` (`Kolečko Obývák`) passed clockwise/counter-clockwise
+  routing and a single press on all three channels;
+- no event crossed into a non-selected channel, the source remained
+  `core_matter_client`, fallback count remained zero, and exact error-log
+  searches returned zero matching `ikea_bilresa` and Matter errors.
+
+This is Hardware evidence for the listed raw gestures, both firmware versions
+and all six channel routes. It is not evidence for unobserved binding target
+results or the remaining lifecycle/failure/soak checklist. The overall RC run
+therefore remains **IN PROGRESS**.
+
+### Explicit low-latency single-press candidate after `v0.5.7-rc.3`
+
+During the physical run the owner reported visible button-to-light latency on
+the firmware `1.9.15` wheel's channel 2. Read-only HA history showed that the
+two separate public `press` events were followed by the configured light state
+in 114 ms and 424 ms. The binding service path is therefore reasonably fast;
+the remaining perceived delay occurs before the public action because the
+existing engine waits for the device's `MultiPressComplete` classification.
+
+The working tree now implements an explicit per-binding low-latency path
+supported by the observed BILRESA event order:
+
+- the coordinator sends button event names over a new internal per-channel
+  dispatcher signal; raw hints are never fired on `ikea_bilresa_event`;
+- a binding set to fast response executes its single-press action once on the
+  first `ShortRelease`;
+- subsequent releases in that gesture and its later completion cannot execute
+  the binding again;
+- bindings set to multi-press recognition keep the existing completion-aware
+  single/double/triple behavior;
+- the native HA form defaults new profiles to fast response, preserves old or
+  copied bindings without the field as multi-press-aware, explains the trade-off
+  in English and Czech, and rejects fast response with a double/triple target;
+- public event entities, device triggers and the event bus remain based on the
+  exact `MultiPressComplete` count;
+- connection changes/unload clear the internal guard, and a stale guard can
+  recover on a clearly later gesture.
+
+Files involved: `binding.py`, `config_flow.py`, `coordinator.py`, `const.py`,
+strings/translations, expanded binding/config-flow/coordinator tests,
+`CHANGELOG.md`, English/Czech READMEs, `docs/DEVICE_REFERENCE.md`,
+`docs/HARDWARE_TEST.md`, and this handoff.
+
+Validation for this uncommitted candidate:
+
+```text
+python -m compileall -q custom_components tests     passed
+ruff format --check custom_components tests         passed (28 files)
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (15 source files)
+git diff --check                                    passed (CRLF warnings only)
+python -m pytest -q                                 12 collection errors:
+  ModuleNotFoundError: No module named 'homeassistant'
+```
+
+The final R1 static run also parsed manifest/strings/en/cs JSON successfully.
+The authored R1 tests cover explicit policy defaults and validation plus
+single/double/triple completion suppression, hold, lost completion recovery,
+reconnect and unload. They were collected only as far as the missing
+Home Assistant import permits; this is not a Unit pass.
+
+After R2 the same complete static gate passed again with 28 formatted files and
+15 mypy-checked source modules. A fresh pytest attempt again stopped during
+collection with the same 12 missing-Home-Assistant errors; R2 therefore remains
+Unit not run.
+
+After R3 the combined R1-R3 static gate passed again: all four JSON files,
+compileall, Ruff format/lint, mypy over 15 source modules and `git diff --check`.
+No Unit, CI, HA UI or Hardware claim follows from that static result.
+
+After R5-R8 and the explicit R4 deferral, the complete dirty-tree static gate
+passed again:
+
+```text
+manifest/strings/en/cs JSON parsing                 passed
+python -m compileall -q custom_components tests     passed
+ruff format --check custom_components tests         passed (29 files)
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (15 source files)
+git diff --check                                    passed (CRLF warnings only)
+python -m pytest -q                                 13 collection errors:
+  ModuleNotFoundError: No module named 'homeassistant'
+```
+
+The added R5-R8 tests were authored but did not execute in this Windows/Python
+3.13 environment. This is **Unit not run**. CI, HA deployment and new physical
+checks were not run, so none of R1-R8 is CI- or Hardware-verified in the current
+working tree.
+
+The pytest result is **Unit not run**, not a failed executed test. The owner has
+now authorized the prepared commits and a single combined push; CI results are
+not recorded until the exact pushed revision completes. The currently installed
+`v0.5.7-rc.3` does not contain this implementation, so today's latency evidence
+justifies the change but does not Hardware-verify it.
+
+The owner also ran a physical channel-1 brightness batch on the installed
+`v0.5.7-rc.3` using the firmware `1.9.15` wheel. With step 3%, acceleration 0
+and transition 1.0 s, slow down/up and faster down gestures produced 3/5/6
+decoded updates, total deltas 9/13/18 and stream durations
+1.032/2.051/2.095 s. First recorded target-state updates followed after
+1.166/1.125/1.098 s; final brightness was 46% from a 100% baseline. No matching
+BILRESA or Matter error was present.
+
+This Hardware-verifies the installed RC's rotation-to-brightness data path for
+that binding. The approximately one-second recorded state completion matches
+its configured one-second transition and does not demonstrate a software
+dispatch backlog. HA history cannot measure first visible light onset, so a
+shorter transition remains a later A/B test, not a justified default change.
 
 ## Known risks and decisions
 
@@ -424,10 +686,11 @@ physical gesture Hardware validation.
 
 ## Single best next action
 
-When the owner is home, visually confirm that both wheels appear once with the
-correct names, then perform one slow clockwise notch on channel 1 of the
-firmware `1.8.7` wheel and continue the physical gesture checklist. Hardware
-remains the release gate.
+Observe Linux CI for the combined pushed snapshot, including the authored
+R1-R3/R5-R8 tests plus hassfest/HACS validation. Only after exact-revision CI
+passes should the next `v0.5.7` candidate be prepared for focused HA UI and
+physical checks. R4 remains deferred; none of the new runtime polish is
+Hardware-verified yet.
 
 ## Next-agent handoff
 

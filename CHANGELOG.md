@@ -48,6 +48,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   safety, binding presets, diagnostics, telemetry and System Health failures.
 
 ### Changed
+- Each binding now has an explicit **button response** policy. New profiles
+  recommend a fast single press on `ShortRelease`; existing bindings retain the
+  completion-aware default until changed. Multi-press targets require exact
+  recognition, while public event entities and device triggers always retain
+  exact single/double/triple classification.
+- Binding setup now rejects a scroll mode paired with an incompatible entity
+  domain, while legacy incompatible bindings fail closed at runtime.
+- Acceleration now uses decoded notches over monotonic elapsed time instead of
+  treating a large Matter batch as proof of fast rotation. It resets on idle,
+  direction changes, gesture boundaries and reconnects; the default remains
+  disabled pending physical tuning.
+- Channel event entities now use Home Assistant's button event device class.
+  The legacy domain event keeps its existing payload and adds `device_id` when
+  the wheel has a matching registry device.
 - Editing a light binding now updates in place instead of reloading the config
   entry — no reconnect.
 - The integration name and generated binding titles are shorter and clearer in
@@ -60,9 +74,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   software accumulator would add latency without defeating device-side batching.
 
 ### Fixed
-- A button press now briefly suppresses trailing scroll events, so pressing to
-  turn a light off while dimming isn't immediately undone by the wheel's
-  trailing rotation batch.
+- Bindings now fail closed while any scroll or button target is missing,
+  `unknown` or `unavailable`. Hold-to-ramp stops, repeated events do not spam
+  commands or logs, and recovery discards stale tracked values before resuming.
+- Post-press protection now suppresses only scroll updates belonging to the
+  preceding gesture. A deliberate new rotation is accepted immediately, with
+  a bounded timeout retained only for lost gesture boundaries.
+- Target state changes from Home Assistant now invalidate stale binding state
+  after a bounded own-command echo window. Rotate-up from off starts
+  predictably at the configured floor/first step, while direction reversal
+  continues from the last requested target instead of a transition midpoint.
 - Hold-to-ramp now stops on a lost-release watchdog, connection transition, new
   gesture and unload, preventing a target from changing indefinitely.
 - BILRESA wheels that omit the optional Matter serial-number attribute now link
@@ -76,8 +97,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   entry status, Repairs and diagnostics without appearing as a fake device.
 
 ### Planned
-- Validate the `0.5.1`–`0.5.7` patch train through Unit, CI and applicable
-  physical-device gates before creating any release candidate.
+- Validate the post-`v0.5.7-rc.3` runtime polish through Unit, CI and applicable
+  physical-device gates before publishing the next candidate or stable release.
 - Submission to the HACS default store and a brand icon remain the final phase.
 
 ## [0.5.0] - 2026-07-14

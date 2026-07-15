@@ -103,6 +103,11 @@ multi_press_complete count=18
 - Button single/double/triple presses complete with count 1/2/3.
 - A hold is InitialPress, LongPress and LongRelease with no multi-press
   completion. The event carries no ramp direction.
+- Waiting for MultiPressComplete adds the device's multi-press classification
+  delay. An explicitly fast binding may react once on the first ShortRelease
+  and suppress its later binding completion; a binding with double/triple
+  targets must use the completion-aware response policy and wait for the final
+  count. Public events remain completion-based in either mode.
 - The highest observed rotary count was 18.
 
 These are earlier device-reference observations. Re-test ordering and timing

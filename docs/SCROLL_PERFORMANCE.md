@@ -33,3 +33,26 @@ Record event arrival, decoded delta, dispatched target value and service-call
 completion using sanitized identifiers. Test both the reused core-client source
 and the dedicated passive WebSocket. Never include node IDs, entity IDs, serial
 numbers or household URLs in committed fixtures or reports.
+
+## 2026-07-15 physical brightness measurement
+
+On `v0.5.7-rc.3`, firmware `1.9.15`, channel 1 and a live brightness binding
+using `step=3`, acceleration `0` and transition `1.0 s`, three physical gestures
+produced:
+
+| Gesture | Decoded updates | Total delta | Stream duration | First recorded target update |
+|---|---:|---:|---:|---:|
+| Slow down | 3 | 9 | 1.032 s | 1.166 s |
+| Slow up | 5 | 13 | 2.051 s | 1.125 s |
+| Faster down | 6 | 18 | 2.095 s | 1.098 s |
+
+The target finished at 46% brightness after starting at 100%. No BILRESA or
+Matter error was logged. The roughly one-second target-state updates align with
+the configured one-second transition, while decoded actions continued to arrive
+in the device's roughly one-second batches. This shows no software dispatch
+backlog and does not satisfy the accumulator revisit criteria.
+
+Home Assistant history records target-state updates, not the first visible
+photon change. A future comparison may test a 0.3-0.5 second transition for a
+more immediate feel, but the global default must not change from this recording
+alone; visual smoothness and onset latency still need owner observation.

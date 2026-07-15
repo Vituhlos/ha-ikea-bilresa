@@ -71,7 +71,23 @@ Repeat on all three channels:
 - [ ] Fan percentage clamps to 0–100%.
 - [ ] `number` and `input_number` respect min/max/step.
 - [ ] Unavailable/unknown targets do not cause errors or runaway commands.
+- [ ] Binding setup rejects one incompatible mode/target pair, preserves the
+      other form values, and then saves one compatible pair successfully.
+- [ ] A trailing scroll from before a button action is ignored, while a new
+      deliberate rotation immediately after the press is accepted.
+- [ ] With acceleration enabled, collect slow/medium/fast samples on firmware
+      `1.8.7` and `1.9.15`; with acceleration zero, no decoded delta is lost.
+- [ ] Rotate-up from off starts at the documented floor; an external HA
+      brightness change becomes the next scroll baseline; reconnect has no jump.
+- [ ] Existing event-entity and device-trigger automations still fire, and the
+      compatibility domain event contains the matching registry `device_id`.
 - [ ] Single/double/triple/hold targets affect only their configured entities.
+- [ ] A binding explicitly set to fast response runs one single-press action on
+      `ShortRelease` and does not repeat it on `MultiPressComplete`.
+- [ ] A binding set to multi-press recognition preserves completion-aware
+      behavior and does not fire the single action early.
+- [ ] The config flow rejects fast response while a double/triple target is
+      configured, without losing the other entered values.
 
 ## D. Convenience features
 
@@ -176,6 +192,62 @@ This passes the live HA registry/presentation portion of discovery. No wheel was
 pressed or rotated during this deployment, so raw gestures, bindings, lifecycle,
 fallback injection and soak checks remain pending and the overall verdict stays
 **IN PROGRESS**, not Hardware PASS.
+
+Physical gesture smoke continued later on 2026-07-15 against the same installed
+`v0.5.7-rc.3` and environment:
+
+- **PASS:** firmware `1.8.7` wheel, channel 1, slow clockwise mapped to
+  `rotate_up` and slow counter-clockwise mapped to `rotate_down`;
+- **PASS:** a faster clockwise movement on that channel produced six ordered
+  `rotate_up` entity updates with deltas `3, 2, 3, 3, 3, 1` (15 total); the
+  device's physical count was not independently instrumented, so this does not
+  prove absolute no-loss accuracy;
+- **PASS:** the same channel produced `press`/`presses: 1`,
+  `double_press`/`presses: 2`, and `triple_press`/`presses: 3`;
+- **OBSERVED:** a deliberately slower first triple-press attempt exceeded the
+  device's multi-press window and completed as separate single presses; a fast
+  retry completed correctly as one triple press;
+- **PASS:** a roughly two-second hold produced one `hold` followed by exactly
+  one `release`;
+- **PASS:** firmware `1.8.7` channels 2 and 3 each produced clockwise,
+  counter-clockwise and single-press events only on the selected channel;
+- **PASS:** firmware `1.9.15` channels 1, 2 and 3 each produced clockwise,
+  counter-clockwise and single-press events only on the selected channel;
+- **PASS:** throughout the batch the event source remained
+  `core_matter_client`, fallback count remained zero, and no matching
+  `ikea_bilresa` or Matter error-log line appeared.
+
+This provides Hardware evidence for both firmware versions, all six channel
+routes, direction decoding and the representative channel-1 gesture set. Target
+binding outcomes, event-entity/device-trigger/custom-event agreement, lifecycle,
+fallback injection, UI flows and soak tests were not observed. Overall verdict
+remains **IN PROGRESS**; the raw-gesture smoke subset is **PASS**.
+
+A subsequent channel-2 binding observation on the firmware `1.9.15` wheel found
+that two separate physical single presses toggled the configured light. Once
+the public `press` event appeared, the target state followed after 114 ms and
+424 ms respectively. The larger perceived delay therefore occurred before the
+binding service call while the device/integration waited for
+`MultiPressComplete` to classify single/double/triple. No household identifiers
+are recorded here.
+
+The working tree now contains an explicit low-latency candidate. A binding set
+to fast response reacts once to `ShortRelease`; a binding set to multi-press
+recognition waits for completion. The form rejects fast response with a
+configured double/triple target, and public events retain completion-based
+classification. This candidate has not been deployed or physically tested and
+must not be marked Hardware until a later installed build confirms response
+time and exactly-once behavior.
+
+A channel-1 brightness measurement on the same firmware `1.9.15` wheel then
+used the installed `v0.5.7-rc.3` binding with step 3%, zero acceleration and a
+one-second transition. Slow down/up and faster down gestures produced 3/5/6
+decoded updates, total deltas 9/13/18 and event-stream durations
+1.032/2.051/2.095 seconds. The first recorded light-state updates followed the
+first decoded events after 1.166/1.125/1.098 seconds. The light moved from 100%
+to 46%, and no matching BILRESA or Matter error appeared. This passes the live
+rotation-to-binding data path; visual onset/smoothness and absolute physical
+notch accuracy were not independently measured.
 
 When a run is completed, append a dated section containing the environment,
 checked/failed items, relevant redacted logs, fixes made, commit SHA, and final

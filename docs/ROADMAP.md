@@ -51,6 +51,19 @@ Neither path may issue device-control commands.
 The `0.5.5` measurement and no-accumulator decision is documented in
 `SCROLL_PERFORMANCE.md`.
 
+## Runtime behavior polish before the panel
+
+`RUNTIME_POLISH_ROADMAP.md` is the ordered implementation contract for the
+post-`rc.3` behavior findings: explicit button-response policy, unavailable
+target safety, mode/domain validation, measured transitions, gesture-aware
+trailing-scroll protection, velocity-based acceleration, predictable
+resynchronization and Home Assistant-native event polish.
+
+These items remain in the `0.5.7` release-candidate train until the runtime
+baseline is stable. They take precedence over starting new panel runtime code;
+panel design work may continue independently because it does not alter the
+integration runtime.
+
 ## Future BILRESA panel program
 
 The optional first-party panel is specified in `PANEL_DESIGN.md` and governed

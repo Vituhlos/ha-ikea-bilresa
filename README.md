@@ -11,9 +11,10 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** latest release v0.5.0; the dirty development tree contains
-> additional work with passing Linux Unit/CI checks. The >95% coverage target
-> and complete BILRESA hardware verification are still pending.
+> **Status:** latest stable release v0.5.0; prerelease v0.5.7-rc.3 passed its
+> exact-revision Linux CI. Newer runtime polish in the dirty tree has passed
+> static checks only; Unit/CI and applicable BILRESA hardware checks are still
+> pending.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
@@ -126,29 +127,50 @@ Confirm the pre-filled Matter Server URL (change it only if you run the Matter
 Server elsewhere). The integration discovers all BILRESA wheels automatically and
 creates one device per wheel with an event entity per channel.
 
-### GUI light bindings (turnkey dimming)
+### GUI control bindings (turnkey control)
 
 Prefer not to write automations? On the **IKEA BILRESA** entry
-(Settings → Devices & Services) click **＋ Add → Light binding** and pick:
+(Settings → Devices & Services) click **＋ Add → Control binding** and pick:
 
 - a starting profile (light, media, cover, climate, scenes, or custom), or copy
   an existing binding as a starting point,
 - the **Wheel** and **Channel** to use,
-- the **Light to dim**,
+- the **target entity** controlled by scrolling,
 - **Brightness change per notch** (%), **Minimum brightness** (%, `0` lets a
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
   **button target entity** — so a press can act on a *different* entity than the
   dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch),
+- the **button response**: fast single press for immediate direct control, or
+  exact single/double/triple recognition for multi-press bindings,
 - an optional ordered list of **scenes** to cycle on single presses (this takes
   precedence over the normal single-press action),
 - the **hold action**: toggle an entity, continuously ramp the scroll target,
   or do nothing. Hold-to-ramp starts upward and alternates direction after each
   completed hold because the BILRESA long-press event carries no direction.
 
+For responsive lighting, select **Fast single press** to run that binding's
+single-press action as soon as the button is released. Select multi-press
+recognition when the binding uses double/triple targets; it waits for the
+BILRESA completion event. Existing bindings without this setting retain the
+completion-aware behavior until explicitly changed. Public event entities and
+device triggers keep exact single/double/triple classification in either mode.
+
 The integration then dims that light in real time. Add as many bindings as you
 like — one per wheel channel — so this scales to any number of wheels with no
-YAML.
+YAML. A binding sends no command while its target is missing, unknown or
+unavailable; hold-to-ramp stops safely and the next action resynchronizes from
+the recovered entity's real state. Rotate-up from an off light starts at the
+configured minimum (or one usable step when the minimum is zero). External HA
+changes rebase the next wheel action, while direction reversal during a
+transition continues from the last requested value.
+
+Acceleration, when enabled, is based on decoded notches per elapsed time rather
+than the size of one Matter batch. It resets after idle, direction changes,
+gesture completion and reconnect; the default remains disabled until physical
+tuning is complete. Post-press protection likewise follows gesture boundaries,
+so an old trailing batch cannot undo a button action but a deliberate new
+rotation is accepted immediately.
 
 ## Usage
 
@@ -160,7 +182,9 @@ latest release are identified in [PROJECT_STATUS.md](PROJECT_STATUS.md).
 Each wheel channel becomes an `event` entity, e.g.
 `event.bilresa_scroll_wheel_channel_1`. Its state is the timestamp of the
 last action; the `event_type` attribute (and `notches` / `presses`) tells you
-what happened. Use it as an automation trigger.
+what happened. Use it as the primary automation trigger. These entities use
+Home Assistant's button event device class; the compatibility domain event also
+includes registry `device_id` when available.
 
 ### Event reference
 
