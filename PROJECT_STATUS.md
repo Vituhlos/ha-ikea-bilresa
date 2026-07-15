@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-15 by Codex**
+Last updated: **2026-07-15 by Claude Code**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -248,6 +248,91 @@ behavior, binding storage, Home Assistant deployment or hardware behavior was
 changed or verified. The physical `v0.5.7` checklist remains the release gate;
 see `Single best next action` below for the current priority, which is not the
 panel.
+
+### Per-wheel availability, GAP-1 (Claude Code, 2026-07-15)
+
+Drafting the panel contract against the real source found that **three fields
+the panel design promises have no backend source at all.** The first is now
+closed; the other two are open and block the Live test view as designed.
+
+**GAP-1 — per-wheel availability — CLOSED.** Implemented + Static; Unit not
+run.
+Every "unavailable" in this integration meant the Matter Server or the core
+client, never a node. `BilresaWheel` had no availability field, nothing
+subscribed to per-node availability, and `BilresaChannelEvent.available` returns
+`coordinator.connected` — the server connection. A wheel with a flat battery
+therefore reported available for as long as the server was up.
+
+New `device_link.wheel_availability(hass, device)` returns
+`connected`/`unavailable`/`unknown` for one wheel by reading the states of the
+linked core Matter device's own entities. Core Matter tracks per-node
+reachability; this integration cannot. It is read-only and changes no behaviour.
+Two deliberate choices: this integration's own entities are excluded (they live
+on the same device after linking and their availability *is*
+`coordinator.connected`, so reading them is circular), and `unknown` means "no
+evidence", never "healthy".
+
+`diagnostics.py` now calls it per wheel and reports `availability` plus
+`linked_to_matter` — the latter because it is the reason availability can be
+`unknown`. Diagnostics can therefore distinguish a flat battery from a dead
+server for the first time. This also gives the function a caller instead of
+leaving it as dead code, and makes GAP-1 verifiable in a running HA through
+MCP diagnostics before any frontend exists.
+
+`tests/test_diagnostics.py` previously asserted only the contents of the
+`TO_REDACT` set and never executed the diagnostics function; redaction was
+tested as a list of strings, not as behaviour. It now exercises the function and
+asserts the new fields did not reopen the redaction policy.
+
+**GAP-2 — live-test result string — OPEN.** The "brightness 42 -> 58%" line.
+Bindings call a service and never report what they computed. Producing it
+means either reading the target's state after dispatch (racy,
+domain-specific) or having the
+binding surface its result — which touches `binding.py` dispatch and needs its
+own package and hardware gate. `PANEL_DESIGN.md` makes this string the hero of
+the Live test view, so that view's headline is currently unbuildable. If it is
+built, the live subscription is opt-in: the binding must check whether anyone is
+watching before doing any work, or it will cost latency in the exact path
+`rc.4` just optimised.
+
+**GAP-3 — per-action dispatch outcome — OPEN.** The counter
+`telemetry.actions_dispatched` is global; a failing service call is not
+attributed to the gesture that caused it.
+
+Two corrections worth recording, because both are easy to get wrong again:
+
+- Per-wheel *last activity* and *last active channel* are NOT missing. Each
+  channel is an `EventEntity` (`event.py`) whose state is the timestamp of its
+  last event, so both come from the HA state machine, not the coordinator. But
+  `EventEntity` does not restore state, so both are empty after every HA restart
+  until the wheel is next touched. The UI must render that as "no activity yet",
+  never as a fault.
+- `BilresaWheel.name` is the Matter *product* name and is identical for every
+  wheel. The user-visible name must come from the device registry.
+
+Related defect, **not fixed**: `event.py` reporting `available` from
+`coordinator.connected` means a dead wheel looks alive in Home Assistant itself
+— in dashboards and automations, not only in the panel. Fixing it is an entity
+behaviour change and needs its own hardware gate.
+
+Files: `custom_components/ikea_bilresa/device_link.py`,
+`custom_components/ikea_bilresa/diagnostics.py`, `tests/test_device_link.py`,
+`tests/test_diagnostics.py`. The panel contract draft lives outside this
+repository at `bilresa-panel-lab/contract.ts` and is not a build dependency.
+
+```text
+python -m compileall -q custom_components tests     passed
+ruff format custom_components tests                 passed
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (15 source files)
+git diff --check                                    passed (CRLF warnings only)
+python -m pytest -q                                 Unit not run
+  ModuleNotFoundError: No module named 'homeassistant' (Windows/3.13)
+```
+
+CI has not run. No Home Assistant deployment and no hardware check was performed
+for this change. The panel program's entry gate 1 is still open; the owner
+authorized this work anyway, and it does not claim any gate.
 
 ### Panel direction revision on 2026-07-15 (Claude Code)
 

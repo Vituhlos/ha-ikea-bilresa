@@ -17,6 +17,7 @@ from .const import (
     CONF_TRIPLE_TARGET,
     CONF_URL,
 )
+from .device_link import resolve_matter_device, wheel_availability
 
 TO_REDACT = {
     CONF_CLICK_TARGET,
@@ -39,18 +40,32 @@ async def async_get_config_entry_diagnostics(
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data
 
-    wheels = [
-        {
-            "node_id": node_id,
-            "name": wheel.name,
-            "serial": wheel.serial,
-            "endpoints": {
-                ep: {"channel": e.channel, "role": e.role}
-                for ep, e in wheel.endpoints.items()
-            },
-        }
-        for node_id, wheel in coordinator.wheels.items()
-    ]
+    wheels = []
+    for node_id, wheel in coordinator.wheels.items():
+        # `matter_event_source` and `telemetry` below describe the server
+        # connection and say nothing about one wheel. Resolving the linked core
+        # Matter device is the only read-only way to tell a flat battery apart
+        # from a dead server. `linked_to_matter` is included because it is the
+        # reason availability can be "unknown".
+        link = resolve_matter_device(
+            hass,
+            matter_url=coordinator.url,
+            server_info=coordinator.matter_server_info,
+            wheel=wheel,
+        )
+        wheels.append(
+            {
+                "node_id": node_id,
+                "name": wheel.name,
+                "serial": wheel.serial,
+                "linked_to_matter": link.device is not None,
+                "availability": wheel_availability(hass, link.device),
+                "endpoints": {
+                    ep: {"channel": e.channel, "role": e.role}
+                    for ep, e in wheel.endpoints.items()
+                },
+            }
+        )
 
     bindings = [
         {"title": subentry.title, **dict(subentry.data)}

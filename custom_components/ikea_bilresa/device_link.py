@@ -1,11 +1,16 @@
-"""Safely link BILRESA entities to Home Assistant's core Matter device."""
+"""Safely link BILRESA entities to Home Assistant's core Matter device.
+
+The link is also this integration's only read-only source of truth for whether
+one physical wheel is reachable; see `wheel_availability`.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import Any, Literal
 
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -21,6 +26,8 @@ _MATTER_SERIAL_PREFIX = "serial"
 _MATTER_NODE_POSTFIX = "MatterNodeDevice"
 
 type DeviceIdentifier = tuple[str, str]
+
+type WheelAvailability = Literal["connected", "unavailable", "unknown"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +127,48 @@ def resolve_matter_device(
         device,
         frozenset({custom_identifier, *identifiers}),
     )
+
+
+@callback
+def wheel_availability(
+    hass: HomeAssistant, device: dr.DeviceEntry | None
+) -> WheelAvailability:
+    """Report whether one physical wheel is reachable, read-only.
+
+    This integration cannot answer that on its own. `BilresaCoordinator.connected`
+    describes the Matter Server connection, not a node, and
+    `BilresaChannelEvent.available` returns it verbatim — so a wheel with a flat
+    battery reports available for as long as the server is up. Core Matter does
+    track per-node reachability and marks its own entities unavailable, so the
+    linked device is the only source that distinguishes one dead wheel from a
+    dead server.
+
+    Only core Matter's entities are consulted. This integration's own entities
+    live on the same device after linking, and reading those would just return
+    the server-wide state back through a longer path.
+
+    Returns `unknown` rather than guessing when the wheel never linked, when the
+    device exposes no core Matter entities, or when none of them have a state
+    yet. `unknown` means "no evidence", not "fine".
+    """
+    if device is None:
+        return "unknown"
+
+    entity_registry = er.async_get(hass)
+    states = [
+        state
+        for entry in er.async_entries_for_device(entity_registry, device.id)
+        if entry.platform == _MATTER_DOMAIN
+        and (state := hass.states.get(entry.entity_id)) is not None
+    ]
+    if not states:
+        return "unknown"
+    # Core Matter drops every entity of an unreachable node at once. A single
+    # live state is therefore enough to prove the wheel answered. STATE_UNKNOWN
+    # is not unavailable: the node is reachable, it just has no value yet.
+    if all(state.state == STATE_UNAVAILABLE for state in states):
+        return "unavailable"
+    return "connected"
 
 
 @callback
