@@ -97,8 +97,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   entry status, Repairs and diagnostics without appearing as a fake device.
 
 ### Planned
-- Validate the post-`v0.5.7-rc.3` runtime polish through Unit, CI and applicable
-  physical-device gates before publishing the next candidate or stable release.
+- Validate the CI-green post-`v0.5.7-rc.3` runtime polish in the Home Assistant
+  UI and through applicable physical-device gates before publishing the next
+  candidate or stable release.
 - Submission to the HACS default store and a brand icon remain the final phase.
 
 ## [0.5.0] - 2026-07-14

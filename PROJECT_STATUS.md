@@ -27,7 +27,8 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: intentionally dirty. Preserve all changes.
+- Working tree: clean after the final CI-status commit described below. Preserve
+  any later changes and always verify with `git status --short`.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
@@ -297,56 +298,56 @@ double/triple target. Runtime polish stays in the `0.5.7` candidate train; the
 separate read-only panel remains planned for `0.5.8` after runtime
 stabilization.
 
-R1 is currently **Implemented + Static** in the dirty working tree. Regression
+R1 is currently **Implemented + Static + Unit + CI**. Regression
 tests are authored for single/double/triple completion, hold, lost completion,
 reconnect, unload, old-binding compatibility and config-flow conflicts, but
-Unit is not run because the local Windows environment lacks Home Assistant.
-CI, HA UI and Hardware remain pending. This does not authorize commit, push,
-release or Home Assistant deployment.
+HA UI and Hardware remain pending. The local Windows environment still cannot
+run Unit because it lacks Home Assistant; the Unit result comes from the exact
+Linux CI revision recorded below.
 
-R2 is also **Implemented + Static** in the dirty working tree. A shared target
+R2 is also **Implemented + Static + Unit + CI**. A shared target
 availability guard covers brightness, colour temperature, colour, volume,
 cover, climate, fan, number/input_number and button/scene targets. Missing,
 `unknown` or `unavailable` targets receive no service call; an active ramp
 stops, log messages are transition-deduplicated, and recovery clears the stale
 tracked value. Parameterized unavailable-state, ramp, recovery and button tests
-are authored. Unit, CI, HA UI and Hardware remain pending.
+passed in CI. HA UI and Hardware remain pending.
 
-R3 is **Implemented + Static** in the dirty working tree. Config flow and
+R3 is **Implemented + Static + Unit + CI**. Config flow and
 runtime use one compatibility map for light, media_player, cover, climate, fan,
 number and input_number targets. The form returns a localized field error and
 preserves its input; an incompatible legacy binding logs once and issues no
 scroll service. Mapping and helper-level flow tests are authored. Full
-create/edit/copy flow execution, Unit, CI, HA UI and Hardware remain pending.
+create/edit/copy HA UI execution and Hardware remain pending.
 
 R4 transition A/B tuning is explicitly **deferred for future physical work** at
 the owner's request. No transition default or profile value changed.
 
-R5 is **Implemented + Static**. The coordinator exposes private per-channel raw
+R5 is **Implemented + Static + Unit + CI**. The coordinator exposes private per-channel raw
 gesture metadata; bindings record scroll generations and the button's preceding
 boundary. Only the preceding generation is suppressed, a deliberate new
 `InitialPress` passes immediately, and a two-second timeout is only a lost-event
 fallback. Authored tests cover trailing, new and missing-boundary sequences.
-Timestamped live fixtures, Unit, CI and both-firmware Hardware remain pending.
+Timestamped live fixtures and both-firmware Hardware remain pending.
 
-R6 is **Implemented + Static**. Acceleration now uses decoded notches over a
+R6 is **Implemented + Static + Unit + CI**. Acceleration now uses decoded notches over a
 bounded monotonic-time window, not one Matter batch size. It resets on idle,
 direction changes, gesture boundaries and reconnect, caps the multiplier, and
 preserves every delta when acceleration is zero. The default remains disabled.
-Deterministic tests are authored; Unit, CI and slow/medium/fast Hardware samples
-on both firmware versions remain pending.
+Deterministic tests passed in CI; slow/medium/fast Hardware samples on both
+firmware versions remain pending.
 
-R7 is **Implemented + Static**. Rotate-up from off starts at the configured
+R7 is **Implemented + Static + Unit + CI**. Rotate-up from off starts at the configured
 floor or one usable step; target-state observation invalidates external changes
 outside a bounded own-command echo window; direction reversal retains the last
 requested target; unavailable/reconnect clears tracking. Tests are authored;
-Unit, CI, HA UI and Hardware remain pending.
+HA UI and Hardware remain pending.
 
-R8 is **Implemented + Static**. Channel event entities declare
+R8 is **Implemented + Static + Unit + CI**. Channel event entities declare
 `EventDeviceClass.BUTTON`; declared event types, unique IDs and device triggers
 are unchanged. The legacy domain event preserves its payload and adds registry
 `device_id` when a matching BILRESA device exists. Tests are authored; Unit,
-CI, hassfest/HACS and live automation compatibility remain pending.
+CI and hassfest/HACS passed. Live automation compatibility remains pending.
 
 Commit preparation on 2026-07-15:
 
@@ -356,10 +357,27 @@ Commit preparation on 2026-07-15:
 - English/Czech README terminology was corrected from the historical
   light-only flow to the current Control binding / Ovládací propojení flow;
 - the README status now distinguishes CI-verified `v0.5.7-rc.3` from the newer
-  Static-only runtime polish;
-- the owner authorized the logical commits to be pushed together once to the
-  existing `agent/stabilize-0.5-x` branch and draft PR #1. Check the resulting
-  exact-revision CI before changing any validation label.
+  runtime polish, which is now CI-verified but remains undeployed and
+  hardware-unverified;
+- documentation was committed in `2480b34`; the first combined CI run exposed
+  only brittle test assumptions, not a production-code failure;
+- deterministic time cleanup and instance-level event device-class verification
+  were committed in `7bc523b` (`test: make runtime behavior checks deterministic`).
+
+Exact-revision GitHub Actions run `29430829523` passed for commit `7bc523b`:
+
+```text
+Validate manifest (hassfest) passed
+Validate HACS               passed
+Lint (ruff)                 passed
+Type check (mypy)           passed
+Unit tests                  112 passed in 1.13 s
+Total coverage              68%
+```
+
+This establishes Unit + CI for R1-R3/R5-R8 at that revision. It does not
+establish HA UI, deployment or Hardware for the new runtime behavior. R4 remains
+explicitly deferred.
 
 ## Important files added or expanded
 
@@ -643,16 +661,11 @@ python -m pytest -q                                 13 collection errors:
   ModuleNotFoundError: No module named 'homeassistant'
 ```
 
-The added R5-R8 tests were authored but did not execute in this Windows/Python
-3.13 environment. This is **Unit not run**. CI, HA deployment and new physical
-checks were not run, so none of R1-R8 is CI- or Hardware-verified in the current
-working tree.
-
-The pytest result is **Unit not run**, not a failed executed test. The owner has
-now authorized the prepared commits and a single combined push; CI results are
-not recorded until the exact pushed revision completes. The currently installed
-`v0.5.7-rc.3` does not contain this implementation, so today's latency evidence
-justifies the change but does not Hardware-verify it.
+The added R5-R8 tests did not execute in the local Windows/Python 3.13
+environment, so the local result remains **Unit not run**. They subsequently
+passed in the exact-revision Linux CI run recorded above. The currently
+installed `v0.5.7-rc.3` does not contain this implementation, so today's latency
+evidence justifies the change but does not Hardware-verify it.
 
 The owner also ran a physical channel-1 brightness batch on the installed
 `v0.5.7-rc.3` using the firmware `1.9.15` wheel. With step 3%, acceleration 0
@@ -686,18 +699,17 @@ shorter transition remains a later A/B test, not a justified default change.
 
 ## Single best next action
 
-Observe Linux CI for the combined pushed snapshot, including the authored
-R1-R3/R5-R8 tests plus hassfest/HACS validation. Only after exact-revision CI
-passes should the next `v0.5.7` candidate be prepared for focused HA UI and
-physical checks. R4 remains deferred; none of the new runtime polish is
-Hardware-verified yet.
+Prepare the next `v0.5.7` release candidate from the CI-green runtime snapshot,
+then perform focused HA UI and physical checks for R1-R3/R5-R8. R4 remains
+deferred; none of the new runtime polish is Hardware-verified yet.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
 2. Re-check HEAD, branch, status and full relevant diff.
 3. Preserve every dirty and untracked file.
-4. Do not claim Unit, CI or Hardware from the current record.
+4. Unit + CI are established only for exact commit `7bc523b`; do not infer HA
+   deployment or Hardware from them.
 5. The current authorization covers this stabilization PR, an RC release and a
    controlled HA deployment. It does not authorize unrelated repository or HA
    changes.
