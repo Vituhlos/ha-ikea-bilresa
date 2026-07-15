@@ -10,28 +10,45 @@ been implemented and verified.
 Version labels below are provisional work-package names. They are not releases,
 tags or evidence that a gate passed.
 
-Visual-direction status on 2026-07-15: **selected**. The chosen target combines
-the master-detail wheel workspace with live test as a view inside an opened
-wheel. See `PANEL_DESIGN.md` and
-`images/panel/04-selected-combined-direction.png`. Generated decorative graphics
-are explicitly excluded; the spike must use supported Home Assistant/Lit
-components.
+Visual-direction status on 2026-07-15: **selected, then revised the same day.**
+
+The target is the two-layer model in `PANEL_DESIGN.md`: a grid of wheel cards
+as the landing layer, and a wheel detail containing a 256 px wheel rail, with
+live test as a view inside an opened wheel. It was chosen by comparing four
+layouts in a browser prototype against measured layout.
+
+`images/panel/04-selected-combined-direction.png` is **superseded and is not
+an implementation target** — it shows master-detail as the landing page. So are
+the other three images. Build from `PANEL_DESIGN.md`, not from the images.
+
+Generated decorative graphics remain excluded; the spike must use supported
+Home Assistant/Lit components.
 
 ## Entry gate
 
 Panel implementation starts only after both conditions are satisfied:
 
-1. The applicable `v0.5.7-rc.2` physical checks in `HARDWARE_TEST.md` have been
-   run and recorded, so panel failures cannot be confused with an unverified
-   runtime baseline.
-2. The owner selects one of exactly three visually grounded panel directions
-   covering desktop, narrow mobile, light and dark Home Assistant themes. The
-   desktop direction is selected; mobile and dark-theme adaptations remain a
-   Phase 0 deliverable before production frontend code.
+1. The applicable physical checks in `HARDWARE_TEST.md` have been run and
+   recorded, so panel failures cannot be confused with an unverified runtime
+   baseline. **Still open.** As of 2026-07-15 the `v0.5.7-rc.3` run has partial
+   hardware evidence — raw direction/channel routing and a representative
+   gesture set on both firmware versions — but binding outcomes, lifecycle,
+   failure injection, fallback and soak checks remain open, so the RC run is
+   IN PROGRESS. `PROJECT_STATUS.md` is authoritative for the current state and
+   for the current single best next action, which is not this gate. The panel
+   program has not started and must not consume the hardware window.
+2. The owner selects a visually grounded panel direction. **Satisfied on
+   2026-07-15.** Four layouts were compared in a browser prototype and the
+   two-layer model was selected; desktop, laptop, tablet and narrow layouts
+   were measured. Dark-theme and non-default-theme review remains a Phase 0
+   deliverable before production frontend code.
 
-The design comparison must include one wheel, multiple wheels, an unconfigured
-channel, a disconnected event source, an unavailable target and an active live
-gesture. Do not begin production frontend code from prose alone.
+The comparison covered one wheel, multiple wheels, an unconfigured channel, a
+disconnected event source, an unavailable target and an active live gesture.
+Do not begin production frontend code from prose alone.
+
+Design work carried out outside this repository does not satisfy gate 1 and
+does not count as any validation state in `PROJECT_STATUS.md`.
 
 ## Non-negotiable engineering rules
 
@@ -131,8 +148,11 @@ rotation cannot create unbounded browser or backend memory growth.
 
 Deliverables:
 
-- exactly three visual directions based on real Home Assistant references;
-- owner-selected desktop and mobile target;
+- ~~exactly three visual directions based on real Home Assistant references~~
+  — done 2026-07-15; four layouts compared in a browser prototype;
+- ~~owner-selected desktop target~~ — done 2026-07-15, two-layer model;
+- owner-reviewed dark theme, at least one non-default theme, and Czech/English
+  text expansion, none of which the prototype has verified;
 - proof that a custom integration can register, serve, cache-bust and unregister
   one local panel asset on the supported Home Assistant version;
 - proof of a read-only authenticated WebSocket request and subscription;
@@ -198,11 +218,13 @@ Deliverables:
 - locally bundled custom element and panel lifecycle;
 - Home Assistant theme variables, locale and narrow-layout support;
 - loading, empty, ready, degraded and fatal-error states;
-- summary header and one card per physical wheel;
-- three channel summaries per wheel;
+- summary header and a width-constrained grid with one card per physical wheel;
+- three channel summaries per wheel, visible on the overview without drilling
+  into a wheel;
 - navigation from overview to wheel detail;
 - retry/reconnect behavior without a full HA reload;
-- no binding mutation controls.
+- no binding mutation controls, and no `Add control binding` action on any
+  read-only surface — deep-link to the native config flow instead.
 
 Frontend quality floor:
 
@@ -222,11 +244,17 @@ comparison passes against the selected target in all required states.
 
 Deliverables:
 
+- the 256 px wheel rail, switching wheels in one click, dropped below 620 px;
+- a back affordance to the grid overview from every detail width;
+- the two-column detail collapsing on *pane* width, not window width — with the
+  rail present the pane is ~256 px narrower than the viewport, and a window
+  breakpoint will keep two columns in a pane too narrow for them;
 - channel and behavior detail;
 - safe listen-only live mode;
 - direction, cumulative count, calculated delta, channel, press and hold state;
 - calculated-result and dispatch-outcome feedback where existing runtime
-  evidence can support it;
+  evidence can support it, presented **result-first**: the outcome is the
+  hero, the gesture is a caption (see `PANEL_DESIGN.md`, `Live test`);
 - automatic subscription stop when leaving live mode;
 - bounded activity presentation with clear `last active channel` wording.
 
@@ -441,6 +469,10 @@ Resolve and record these before Phase 1:
 - frontend test runner and visual-regression tooling;
 - cache-busting behavior across HACS upgrades.
 
-The single best next action remains the physical `v0.5.7-rc.2` checklist. After
-that passes, begin `0.5.8` Phase 0 with three visual directions and the smallest
-possible read-only technical spike.
+The panel is not the next action. `PROJECT_STATUS.md` holds the current single
+best next action and is authoritative; as of 2026-07-15 that is the `v0.5.7`
+low-latency release candidate and its latency verification, not this program.
+
+The visual-direction step is done. When the `v0.5.7` hardware run closes,
+`0.5.8` Phase 0 begins with the dark-theme and localization review plus the
+smallest possible read-only technical spike.
