@@ -31,9 +31,10 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.1` was published
-  from CI-verified commit `fa6d38d`; it contains all seven work packages. Draft
-  PR #1 remains open and `main` has not been merged.
+- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.3` was published
+  from CI-verified commit `6db5b5b`; it contains all seven work packages, the
+  overview cleanup and serial-independent Matter device linking. Draft PR #1
+  remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -315,9 +316,9 @@ No HA configuration or registry mutation was made. The next physical step is a
 single slow clockwise notch on channel 1 of the `1.8.7` wheel to map its
 standalone event entities and start the raw-gesture checklist.
 
-### Serial-independent Matter device linking (current working tree)
+### Serial-independent Matter device linking (`v0.5.7-rc.3`)
 
-An unreleased post-`v0.5.7-rc.2` fix candidate now addresses the mixed-firmware
+The post-`v0.5.7-rc.2` fix addresses the mixed-firmware
 device-registry defect without changing Matter event decoding or issuing Matter
 commands:
 
@@ -374,10 +375,36 @@ A read-only MCP recheck after implementation still reported firmware `1.8.7`
 for the affected wheel and `1.9.15` for the other wheel. No HA state was changed.
 
 The owner explicitly requested preparation, publication and controlled Home
-Assistant deployment of `v0.5.7-rc.3` on 2026-07-15. The manifest is staged at
-`0.5.7-rc.3`. Publication uses the sanitized current tree; rewriting the older
-sensitive documentation commit remains a separate deferred decision and is not
-part of this RC operation.
+Assistant deployment of `v0.5.7-rc.3` on 2026-07-15. Publication uses the
+sanitized current tree; rewriting the older sensitive documentation commit
+remains a separate deferred decision and was not part of this RC operation.
+
+Publication and deployment results:
+
+- panel design documentation was preserved separately in commit `bbda9de`;
+- runtime fix and manifest `0.5.7-rc.3` were committed as `6db5b5b` and pushed
+  to `agent/stabilize-0.5-x`, updating draft PR #1;
+- GitHub Actions run `29422785785` passed for exact commit `6db5b5b`: hassfest,
+  HACS validation, Ruff and mypy passed; 51 tests passed in 1.07 s on Python
+  3.14.6 and total coverage was 56%;
+- prerelease `v0.5.7-rc.3` was published from exact commit `6db5b5b`;
+- before deployment, a read-only consumer scan found no references to the
+  legacy duplicate device ID in automations, scripts, scenes or helpers; both
+  storage dashboards were loaded separately and contained no reference;
+- HACS installed exactly `v0.5.7-rc.3`; the pre-restart config check was valid
+  with no errors and Home Assistant restarted normally;
+- after restart the config entry was loaded through `core_matter_client`, with
+  two wheels, three bindings, fallback count zero and no fallback reason;
+- exactly two unique BILRESA devices were present in the custom integration:
+  `Kolečko Nelča` on firmware `1.8.7` and `Kolečko Obývák` on `1.9.15`; both had
+  Matter plus `ikea_bilresa` sources and exactly three custom event entities;
+- the legacy standalone device was absent, proving the registry fallback and
+  migration in the running HA instance while serial remained absent;
+- exact-domain system-log and error-log searches returned no entries.
+
+This establishes Implemented + Static + Unit + CI + Released and a successful
+non-gesture Home Assistant deployment/registry smoke test. It does not establish
+physical gesture Hardware validation.
 
 ## Known risks and decisions
 
@@ -397,10 +424,10 @@ part of this RC operation.
 
 ## Single best next action
 
-Run CI for the serial-independent linking fix, then deploy it as a controlled
-release candidate and verify that both wheels appear exactly once before
-resuming the physical gesture checklist. Until then, the fix is only
-Implemented + Static and the earlier discovery failure remains open.
+When the owner is home, visually confirm that both wheels appear once with the
+correct names, then perform one slow clockwise notch on channel 1 of the
+firmware `1.8.7` wheel and continue the physical gesture checklist. Hardware
+remains the release gate.
 
 ## Next-agent handoff
 

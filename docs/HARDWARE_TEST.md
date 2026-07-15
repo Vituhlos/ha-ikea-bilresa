@@ -159,6 +159,24 @@ A later read-only MCP recheck on 2026-07-15 still reported firmware `1.8.7` for
 the affected wheel and `1.9.15` for the other wheel. No Home Assistant state was
 changed by that check.
 
+`v0.5.7-rc.3` deployment/registry smoke result:
+
+- CI passed on exact commit `6db5b5b` with 51 tests and 56% total coverage;
+- HACS installed exactly `v0.5.7-rc.3`, config preflight passed and HA restarted;
+- integration loaded through `core_matter_client` with two wheels, three
+  bindings and no event-source fallback;
+- exactly two unique BILRESA devices appeared with the correct user names;
+- firmware `1.8.7` remained installed on the affected wheel, proving that the
+  serial-independent registry path—not a firmware update—removed the duplicate;
+- each physical wheel had both Matter and `ikea_bilresa` sources and exactly
+  three custom event entities;
+- no matching `ikea_bilresa` system-log or error-log entry was present.
+
+This passes the live HA registry/presentation portion of discovery. No wheel was
+pressed or rotated during this deployment, so raw gestures, bindings, lifecycle,
+fallback injection and soak checks remain pending and the overall verdict stays
+**IN PROGRESS**, not Hardware PASS.
+
 When a run is completed, append a dated section containing the environment,
 checked/failed items, relevant redacted logs, fixes made, commit SHA, and final
 verdict: `PASS`, `PASS WITH LIMITATIONS`, or `FAIL`.
