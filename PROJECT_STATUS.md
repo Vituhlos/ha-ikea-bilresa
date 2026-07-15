@@ -32,10 +32,10 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.3` was published
-  from CI-verified commit `6db5b5b`; it contains all seven work packages, the
-  overview cleanup and serial-independent Matter device linking. Draft PR #1
-  remains open and `main` has not been merged.
+- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.4` was published
+  from CI-verified commit `36f9c1c`; it adds the post-rc.3 runtime polish to the
+  seven work packages, overview cleanup and serial-independent Matter device
+  linking. Draft PR #1 remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -104,11 +104,11 @@ connection/protocol failure.
 - Internal evidence-only `quality_scale.yaml`.
 - English/Czech documentation and translations.
 - Shared handoff entry points: `AGENTS.md`, `CLAUDE.md`, this file, and `docs/`.
-- Explicit per-binding fast or multi-press-aware button response; this
-  post-`rc.3` change is not deployed or hardware-verified.
+- Explicit per-binding fast or multi-press-aware button response; this is
+  deployed in `rc.4` but not hardware-verified.
 - Gesture-aware trailing-scroll suppression, time-based acceleration,
-  state-observed resynchronization and HA-native event polish; all are
-  post-`rc.3`, undeployed and not hardware-verified.
+  state-observed resynchronization and HA-native event polish; all are deployed
+  in `rc.4` but not hardware-verified.
 
 ## Integration-overview cleanup (current working tree)
 
@@ -681,6 +681,36 @@ its configured one-second transition and does not demonstrate a software
 dispatch backlog. HA history cannot measure first visible light onset, so a
 shorter transition remains a later A/B test, not a justified default change.
 
+### `v0.5.7-rc.4` publication and Home Assistant deployment
+
+The owner explicitly approved RC.4 publication and controlled deployment on
+2026-07-15. Release commit `36f9c1c` changes only the manifest/release metadata;
+the runtime implementation is inherited from the previously CI-verified
+commits.
+
+- exact-revision GitHub Actions run `29431669462` passed hassfest, HACS
+  validation, Ruff, mypy and 112 tests on Python 3.14.6; total coverage was 68%;
+- prerelease `v0.5.7-rc.4` was published from exact commit `36f9c1c`;
+- the pre-deployment Home Assistant configuration check was valid with zero
+  errors;
+- HACS explicitly installed `v0.5.7-rc.4`, after which Home Assistant restarted
+  normally;
+- post-restart System Health reported Home Assistant Core 2026.7.2, Python
+  3.14.6, the integration loaded and connected through `core_matter_client`, two
+  discovered wheels, four configured bindings and no fallback reason;
+- HACS still reported exactly `v0.5.7-rc.4` as installed after restart;
+- the existing binding reconfigure schema exposed `button_response` with the
+  compatibility default `multi_press`; no binding, target or automation was
+  recreated or automatically changed;
+- exact-domain system-log search returned no entries, and the raw error log had
+  zero errors; its three matching warnings were Home Assistant's standard
+  custom-integration loader warning only.
+
+This establishes Released plus a successful non-hardware Home Assistant
+deployment smoke test for RC.4. It does not establish Hardware for the fast
+button path, trailing-scroll protection, time-based acceleration,
+resynchronization or event compatibility.
+
 ## Known risks and decisions
 
 - The seven packages are stacked in one dirty tree; release them only in small,
@@ -699,9 +729,9 @@ shorter transition remains a later A/B test, not a justified default change.
 
 ## Single best next action
 
-Prepare the next `v0.5.7` release candidate from the CI-green runtime snapshot,
-then perform focused HA UI and physical checks for R1-R3/R5-R8. R4 remains
-deferred; none of the new runtime polish is Hardware-verified yet.
+Edit one existing single-press-only binding to select Fast response, then perform
+the focused RC.4 HA UI and physical checks for R1-R3/R5-R8. R4 remains deferred;
+none of the new runtime polish is Hardware-verified yet.
 
 ## Next-agent handoff
 

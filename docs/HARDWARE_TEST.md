@@ -252,3 +252,22 @@ notch accuracy were not independently measured.
 When a run is completed, append a dated section containing the environment,
 checked/failed items, relevant redacted logs, fixes made, commit SHA, and final
 verdict: `PASS`, `PASS WITH LIMITATIONS`, or `FAIL`.
+
+### 2026-07-15 - `v0.5.7-rc.4` deployment baseline
+
+- Release commit `36f9c1c` passed exact-revision CI run `29431669462`:
+  hassfest, HACS validation, Ruff, mypy and 112 tests passed with 68% total
+  coverage.
+- HACS installed exactly `v0.5.7-rc.4`; the Home Assistant configuration check
+  was valid before restart.
+- After restart, Home Assistant Core 2026.7.2 / Python 3.14.6 loaded the
+  integration through `core_matter_client` with two discovered wheels, four
+  bindings and no fallback reason.
+- No integration system-log entry or error was present; only Home Assistant's
+  standard custom-integration loader warning matched in the raw error log.
+- An existing binding's reconfigure schema exposed Button response with the
+  compatibility default `multi_press`. The deployment did not recreate or
+  automatically change any binding, target or automation.
+
+This is a deployment baseline only. No physical press or rotation was performed
+against RC.4 yet, so every RC.4-specific Hardware item remains open.
