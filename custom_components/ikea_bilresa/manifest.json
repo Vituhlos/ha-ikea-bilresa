@@ -1,6 +1,6 @@
 {
   "domain": "ikea_bilresa",
-  "name": "IKEA BILRESA (smooth scroll)",
+  "name": "IKEA BILRESA",
   "codeowners": ["@Vituhlos"],
   "config_flow": true,
   "dependencies": ["matter"],
@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/Vituhlos/ha-ikea-bilresa/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.5.0"
+  "version": "0.5.7-rc.2"
 }

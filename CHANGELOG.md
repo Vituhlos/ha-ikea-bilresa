@@ -10,8 +10,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Added
 - Runtime **hot add / remove of wheels** — a newly commissioned BILRESA appears
   (and a removed one disappears) without restarting Home Assistant.
-- **Matter Server connection** binary sensor; wheel entities become unavailable
-  while the connection is down.
+- Wheel entities become unavailable while the Matter Server connection is down.
 - A **repair issue** is raised when the Matter Server stays unreachable.
 - **Connection test** when setting up the integration (a bad URL is rejected).
 - Binding **scroll modes**: a rotation can control **brightness**, **colour
@@ -51,7 +50,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Changed
 - Editing a light binding now updates in place instead of reloading the config
   entry — no reconnect.
-- The Matter Server connection entity is now categorized as diagnostic.
+- The integration name and generated binding titles are shorter and clearer in
+  Home Assistant's integration overview.
 - The declared minimum Home Assistant version is now 2026.6, matching the
   config-subentry and current reconfigure APIs used by the integration.
 - Core Matter-client reuse is restricted to a matching configured server URL;
@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   trailing rotation batch.
 - Hold-to-ramp now stops on a lost-release watchdog, connection transition, new
   gesture and unload, preventing a target from changing indefinitely.
+
+### Removed
+- The redundant Matter Server connection service device and binary sensor. The
+  same integration-wide state remains available through System Health, config
+  entry status, Repairs and diagnostics without appearing as a fake device.
 
 ### Planned
 - Validate the `0.5.1`–`0.5.7` patch train through Unit, CI and applicable

@@ -15,9 +15,11 @@ from custom_components.ikea_bilresa.const import (
     BINDING_PROFILE_SCENES,
     CLICK_NONE,
     CONF_BINDING_PROFILE,
+    CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_COPY_FROM,
     CONF_MODE,
+    CONF_NODE_ID,
     CONF_STEP,
     MODE_BRIGHTNESS,
     MODE_COVER,
@@ -61,3 +63,14 @@ def test_copy_existing_binding_takes_precedence() -> None:
             CONF_COPY_FROM: "copy-id",
         }
     ) == {CONF_MODE: MODE_VOLUME, CONF_STEP: 7}
+
+
+def test_binding_title_uses_compact_channel_suffix() -> None:
+    flow = object.__new__(BindingSubentryFlowHandler)
+    flow._wheel_options = lambda: [
+        {"value": "101", "label": "Kitchen wheel (node 101)"}
+    ]
+
+    assert flow._title({CONF_NODE_ID: "101", CONF_CHANNEL: "2"}) == (
+        "Kitchen wheel · CH 2"
+    )

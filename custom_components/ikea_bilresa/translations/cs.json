@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "IKEA BILRESA (plynulý scroll)",
+        "title": "IKEA BILRESA",
         "description": "Připoj se k Matter Serveru, který už tvá kolečka BILRESA ovládá. URL je předvyplněná z tvé Matter integrace — nech ji tak, pokud Matter Server neběží jinde.",
         "data": {
           "url": "URL websocketu Matter Serveru"
@@ -134,13 +134,6 @@
       "fallback_reason": "Důvod přepnutí zdroje událostí",
       "discovered_wheels": "Nalezená kolečka BILRESA",
       "configured_bindings": "Nastavená propojení"
-    }
-  },
-  "entity": {
-    "binary_sensor": {
-      "matter_server": {
-        "name": "Připojení k Matter Serveru"
-      }
     }
   },
   "issues": {

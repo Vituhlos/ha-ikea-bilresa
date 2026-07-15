@@ -111,7 +111,7 @@ Každé kolečko má **3 kanály**, každý = 3 Matter Switch endpointy:
 
 1. HACS → ⋮ → **Vlastní repozitáře** → přidej
    `https://github.com/Vituhlos/ha-ikea-bilresa`, kategorie **Integration**.
-2. Nainstaluj **IKEA BILRESA (smooth scroll)**.
+2. Nainstaluj **IKEA BILRESA**.
 3. **Restartuj Home Assistant.**
 
 ### Ručně

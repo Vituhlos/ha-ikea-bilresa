@@ -13,15 +13,66 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import (
+    DeviceEntryType,
+)
+from homeassistant.helpers.device_registry import (
+    async_get as async_get_device_registry,
+)
+from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 
-from .const import CONF_URL, DEFAULT_MATTER_URL
+from .const import CONF_URL, DEFAULT_MATTER_URL, DOMAIN, SUBENTRY_BINDING
 from .coordinator import BilresaCoordinator
+from .presentation import migrate_generated_binding_title
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.EVENT]
+PLATFORMS: list[Platform] = [Platform.EVENT]
 
 type BilresaConfigEntry = ConfigEntry[BilresaCoordinator]
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> bool:
+    """Remove the retired service device and normalize generated binding titles."""
+    _LOGGER.debug(
+        "Migrating IKEA BILRESA config entry from version %s.%s",
+        entry.version,
+        entry.minor_version,
+    )
+
+    if entry.version != 1:
+        return False
+
+    if entry.minor_version < 2:
+        entity_registry = async_get_entity_registry(hass)
+        if entity_id := entity_registry.async_get_entity_id(
+            Platform.BINARY_SENSOR,
+            DOMAIN,
+            f"{entry.entry_id}_connection",
+        ):
+            entity_registry.async_remove(entity_id)
+
+        device_registry = async_get_device_registry(hass)
+        service_device = device_registry.async_get_device(
+            identifiers={(DOMAIN, entry.entry_id)}
+        )
+        if (
+            service_device is not None
+            and service_device.entry_type is DeviceEntryType.SERVICE
+        ):
+            device_registry.async_remove_device(service_device.id)
+
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type != SUBENTRY_BINDING:
+                continue
+            title = migrate_generated_binding_title(subentry.title)
+            if title != subentry.title:
+                hass.config_entries.async_update_subentry(entry, subentry, title=title)
+
+        hass.config_entries.async_update_entry(entry, minor_version=2)
+
+    _LOGGER.info("IKEA BILRESA config entry migration completed")
+    return True
 
 
 def _matter_server_url(hass: HomeAssistant) -> str:

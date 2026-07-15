@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "IKEA BILRESA (smooth scroll)",
+        "title": "IKEA BILRESA",
         "description": "Connect to the Matter Server that already controls your BILRESA wheels. The URL is pre-filled from your Matter integration — leave it as is unless you run the Matter Server elsewhere.",
         "data": {
           "url": "Matter Server WebSocket URL"
@@ -134,13 +134,6 @@
       "fallback_reason": "Event-source fallback reason",
       "discovered_wheels": "Discovered BILRESA wheels",
       "configured_bindings": "Configured bindings"
-    }
-  },
-  "entity": {
-    "binary_sensor": {
-      "matter_server": {
-        "name": "Matter Server connection"
-      }
     }
   },
   "issues": {

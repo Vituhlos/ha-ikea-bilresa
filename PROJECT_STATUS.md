@@ -103,6 +103,55 @@ connection/protocol failure.
 - English/Czech documentation and translations.
 - Shared handoff entry points: `AGENTS.md`, `CLAUDE.md`, this file, and `docs/`.
 
+## Integration-overview cleanup (current working tree)
+
+The post-`v0.5.7-rc.1` working tree now implements a focused Home Assistant UI
+model cleanup intended for `v0.5.7-rc.2`:
+
+- the redundant Matter Server connection binary sensor and its
+  `DeviceEntryType.SERVICE` device are retired, leaving only physical BILRESA
+  devices in the integration overview;
+- config-entry migration `1.1 -> 1.2` removes the obsolete entity and service
+  device registry records on upgrade, without touching physical Matter devices;
+- the same integration-wide connection state remains in System Health, config
+  entry state, delayed Repairs and redacted diagnostics;
+- automatically generated binding titles use the compact, language-neutral
+  `Wheel name · CH N` form; generated legacy titles are migrated while custom
+  titles are preserved;
+- the displayed integration name is shortened to `IKEA BILRESA`, and the
+  manifest version is aligned to `0.5.7-rc.2`;
+- brand/icon assets are deliberately unchanged because the owner is handling
+  them separately.
+
+Files involved: `custom_components/ikea_bilresa/__init__.py`, deleted
+`binary_sensor.py`, `config_flow.py`, new `presentation.py`, manifest and
+English/Czech strings, `hacs.json`, both READMEs, `CHANGELOG.md`, and regression
+tests in `tests/test_init.py`, `tests/test_presentation.py`, and
+`tests/test_config_flow.py`.
+
+Validation for this uncommitted working tree:
+
+```text
+JSON parsing (manifest/strings/en/cs)               passed
+python -m compileall -q custom_components tests     passed
+mypy custom_components/ikea_bilresa                 passed (14 source files)
+initial Ruff check                                  import formatting only
+ruff check --fix + ruff format on affected files    completed
+final ruff format --check (26 files)                 passed
+final ruff check                                     passed
+final mypy (14 source files)                         passed
+presentation-helper behavioral smoke                passed
+git diff --check                                     passed (CRLF warnings only)
+python -m pytest -q                                 11 collection errors:
+  ModuleNotFoundError: No module named 'homeassistant'
+```
+
+The pytest result is **Unit not run**, matching the existing Windows/Python
+3.13 environment limitation. CI has not run for this working tree. The updated
+overview and registry migration have not yet been exercised in a running Home
+Assistant. No hardware behavior changed and no post-v0.5.0 work is
+hardware-verified.
+
 ## Important files added or expanded
 
 - Runtime: `binding.py`, `config_flow.py`, `coordinator.py`, `matter_core.py`,
@@ -197,9 +246,11 @@ soak behavior with exact HA/Matter/BILRESA versions recorded.
 
 ## Single best next action
 
-Run the complete physical `v0.5.7-rc.1` checklist in
-`docs/HARDWARE_TEST.md`, recording exact versions and every result. Fix observed
-regressions before merging PR #1 or publishing stable `v0.5.7`.
+After owner approval, commit and push the focused `v0.5.7-rc.2` overview-cleanup
+patch, require green Linux CI, then deploy it to Home Assistant and visually
+confirm that migration leaves only the physical BILRESA devices and binding
+cards. The complete physical checklist in `docs/HARDWARE_TEST.md` remains the
+release gate afterward.
 
 ## Next-agent handoff
 

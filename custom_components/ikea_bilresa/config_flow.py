@@ -71,6 +71,7 @@ from .const import (
     TARGET_DOMAINS,
 )
 from .matter_ws import MatterWSIncompatible, validate_server_info
+from .presentation import generated_binding_title
 
 
 def _matter_server_url(hass: HomeAssistant) -> str:
@@ -106,6 +107,7 @@ class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Single-instance parent flow. Auto-detects the Matter Server URL."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -433,4 +435,4 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         )
         # Trim the "(node N)" suffix for a cleaner subentry title.
         label = label.rsplit(" (node", 1)[0]
-        return f"{label} · channel {channel}"
+        return generated_binding_title(label, channel)

@@ -111,7 +111,7 @@ Each wheel exposes **3 channels**, each of which is 3 Matter Switch endpoints:
 
 1. HACS → ⋮ → **Custom repositories** → add
    `https://github.com/Vituhlos/ha-ikea-bilresa`, category **Integration**.
-2. Install **IKEA BILRESA (smooth scroll)**.
+2. Install **IKEA BILRESA**.
 3. **Restart Home Assistant.**
 
 ### Manual
