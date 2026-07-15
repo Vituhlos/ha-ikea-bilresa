@@ -29,6 +29,13 @@ from custom_components.ikea_bilresa.const import (
 from custom_components.ikea_bilresa.engine import WheelAction
 
 
+def _monotonic_values(*values: float):
+    """Return deterministic test time without failing during fixture cleanup."""
+    iterator = iter(values)
+    last = values[-1]
+    return lambda: next(iterator, last)
+
+
 def _binding(monkeypatch, **overrides) -> tuple[LightBinding, Mock, Mock]:
     state = SimpleNamespace(state="on", attributes={"brightness": 128})
     hass = SimpleNamespace(
@@ -171,9 +178,9 @@ def test_lost_completion_guard_recovers_on_later_gesture(monkeypatch) -> None:
         monkeypatch, **{CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST}
     )
     binding._single_press = Mock()
-    times = iter([1.0, 1.0, 4.0, 4.1, 4.1])
     monkeypatch.setattr(
-        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: next(times)
+        "custom_components.ikea_bilresa.binding.time.monotonic",
+        _monotonic_values(1.0, 1.0, 4.0, 4.1, 4.1),
     )
 
     binding._handle_raw_button("short_release")
@@ -328,9 +335,9 @@ def test_deliberate_new_rotation_after_button_is_not_suppressed(monkeypatch) -> 
 
 def test_missing_gesture_boundary_expires(monkeypatch) -> None:
     binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
-    times = iter([1.0, 4.0])
     monkeypatch.setattr(
-        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: next(times)
+        "custom_components.ikea_bilresa.binding.time.monotonic",
+        _monotonic_values(1.0, 4.0),
     )
     binding._handle_raw_input("button", "initial_press")
     binding._hold_off_rotation()
@@ -346,9 +353,9 @@ def test_velocity_acceleration_uses_elapsed_time_not_first_batch_size(
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_ACCELERATION: 100}
     )
-    times = iter([0.0, 1.0])
     monkeypatch.setattr(
-        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: next(times)
+        "custom_components.ikea_bilresa.binding.time.monotonic",
+        _monotonic_values(0.0, 1.0),
     )
 
     assert binding._accelerate(20, DIRECTION_UP) == 20
@@ -361,9 +368,9 @@ def test_velocity_acceleration_resets_after_idle_and_direction_change(
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_ACCELERATION: 100}
     )
-    times = iter([0.0, 1.0, 3.0, 3.5])
     monkeypatch.setattr(
-        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: next(times)
+        "custom_components.ikea_bilresa.binding.time.monotonic",
+        _monotonic_values(0.0, 1.0, 3.0, 3.5),
     )
 
     assert binding._accelerate(6, DIRECTION_UP) == 6
