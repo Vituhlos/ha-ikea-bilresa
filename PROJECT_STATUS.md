@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-15 by Claude Code**
+Last updated: **2026-07-15 by Claude Code and Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -251,10 +251,75 @@ panel.
 
 ### Panel `0.5.8` Phase 0 technical spike (Claude Code, 2026-07-15)
 
-Status: **Implemented + Static. Unit not run. CI has not run. Nothing about this
-spike is proven** — every question it exists to answer needs a running Home
-Assistant, and it has not been deployed. Do not record Phase 0 as passed on the
-strength of this commit.
+Status: **Implemented + Static + Unit + CI + Released + deployed and observed in
+the owner's Home Assistant.** The delivery path works. Phase 0's core question is
+answered: a panel can be built, because it can be delivered.
+
+Released as `v0.5.7-rc.6` from CI-verified commit `325b080` (hassfest, HACS,
+ruff, mypy, 134 tests on Python 3.14.6), installed through HACS, HA restarted.
+
+Observed live on 2026-07-15 against Home Assistant 2026.7.2:
+
+- the integration set up normally: `loaded`, two wheels, three bindings,
+  `core_matter_client`, no fallback, and **no `ikea_bilresa` log entries at all**;
+- the sidebar entry appeared and the module loaded and executed;
+- `hass`, `narrow` and `panel` were all injected; the panel config carried the
+  cache-busted `module_url` `.../ikea_bilresa_panel.js?v=0.5.7-rc.6`;
+- the authenticated read-only WebSocket request returned real coordinator data
+  (`wheel_count: 2`);
+- **a config-entry reload re-registered the panel and did NOT re-register the
+  static path** — the guard holds. This was the one thing inferred from HA source
+  and unverifiable locally, and it is now confirmed;
+- the subscription pushed twice across that reload (disconnect + reconnect),
+  proving the push path, not merely that subscribing does not raise.
+
+**Defect found and fixed in the working tree, NOT yet deployed: the spike trapped
+the owner in the companion app.** A custom panel owns the whole viewport; Home
+Assistant draws no app header. On a narrow screen the sidebar's only door is that
+header's menu button, so a panel without one cannot be left except by a system
+back gesture. Invisible on a desktop, where the sidebar is already on screen. The
+stub now renders a header whose menu button fires `hass-toggle-menu` (bubbling
+and composed, as `ha-menu-button` does), and `PANEL_DESIGN.md` now carries this
+as a requirement for **every** layer and state of the real panel — the wheel
+detail's back affordance goes to the grid and is not a substitute for the way out
+to Home Assistant.
+
+The header fix is Implemented + Static only. It has not been deployed, because
+cache-busting keys on the integration version: it needs an `rc.7` (or a manual
+file replacement plus a hard browser refresh) to reach a browser.
+
+Codex then hardened the candidate for RC.7 without changing its navigation
+contract: the app header is semantic, the menu is a native button with a 48 px
+touch target, the static SVG is hidden from assistive technology, Home Assistant
+theme tokens provide its colours, and keyboard focus has a distinct visible
+indicator. A regression test preserves the header/event/accessibility contract.
+
+Local RC.7 validation before publication:
+
+```text
+manifest/strings/en/cs JSON parsing                 passed
+node --check ikea_bilresa_panel.js                  passed
+python -m compileall -q custom_components tests     passed
+ruff format --check custom_components tests         passed (33 files)
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (17 source files)
+dependency-free DOM event contract                  passed
+git diff --check                                    passed (CRLF warnings only)
+python -m pytest -q                                 15 collection errors:
+  ModuleNotFoundError: No module named 'homeassistant'
+```
+
+The pytest result remains **Unit not run locally**, not a failure or pass. Linux
+CI is required for the authored regression test and the existing suite. The
+header remains not deployed and not verified on a real phone at this point.
+
+Still owed before Phase 0 can be called closed:
+
+- re-verify the companion app **on a real phone** with the header fix;
+- the degradation test: delete
+  `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`, reload, and
+  confirm setup still succeeds with a warning and no panel. Currently evidenced
+  only by a mocked unit test, which says nothing about reality.
 
 The owner authorized starting the panel program with the `v0.5.7` hardware gate
 still open. The spike is deliberately additive: no event decoding, gesture
@@ -912,6 +977,25 @@ not leave it enabled indefinitely during heavy rotation testing.
 
 ## Known risks and decisions
 
+### Planned latency, telemetry and recovery program
+
+`docs/LATENCY_ROADMAP.md` is now the ordered implementation contract for the
+owner-selected next responsiveness work. It records four independent backend
+packages: a bounded measurement foundation, an opt-in `InitialPress` response
+policy alongside the existing `ShortRelease` and completion-aware policies,
+automatic return from the passive fallback to a stable URL-matched core Matter
+client, and a versioned read-only API for Claude Code's future Latency Lab.
+
+The Latency Lab frontend remains part of the panel program and is explicitly
+owned by Claude Code. The Python integration owns timing truth, privacy,
+aggregation and Matter lifecycle recovery; the frontend must not parse logs or
+open a separate Matter connection.
+
+This section is **Planning only**. None of L1-L4 is Implemented, Static, Unit,
+CI, Hardware or Released. The current dirty Phase 0 companion-app header fix
+must be preserved and completed as a separate coherent candidate before latency
+runtime work begins.
+
 - The seven packages are stacked in one dirty tree; release them only in small,
   owner-tested patch snapshots rather than pretending all gates passed at once.
 - Core Matter runtime-data structure is not a public custom-integration API.
@@ -928,10 +1012,12 @@ not leave it enabled indefinitely during heavy rotation testing.
 
 ## Single best next action
 
-Decide from the RC.5 evidence whether fast response should remain a user-facing
-option/default: on firmware `1.9.15` it saves only about 6 ms after
-`ShortRelease`. Before changing the product default, repeat the same focused
-measurement on firmware `1.8.7`. R4 remains deferred.
+Finish the current Phase 0 dirty work without mixing in runtime behavior:
+validate the companion-app header fix, preserve Claude Code's handoff, and—only
+after owner authorization—deliver it as its own cache-busted candidate for a
+real-phone exit test. After that exact revision is secured, begin L1 in
+`docs/LATENCY_ROADMAP.md`; do not start Instant or the Latency Lab before the
+measurement contract exists. R4 remains deferred.
 
 ## Next-agent handoff
 
