@@ -50,3 +50,14 @@ Neither path may issue device-control commands.
 
 The `0.5.5` measurement and no-accumulator decision is documented in
 `SCROLL_PERFORMANCE.md`.
+
+## Future BILRESA panel program
+
+The optional first-party panel is specified in `PANEL_DESIGN.md` and governed
+by the gated implementation plan in `PANEL_ROADMAP.md`. It does not change or
+close any `0.5.1`-`0.5.7` stabilization gate.
+
+Panel work begins only after the current physical release-candidate baseline is
+recorded. Its first package is additive and read-only: no Matter protocol,
+gesture, binding or stored-config changes. Binding writes and guided workflows
+remain later packages with independent Unit, CI, HA UI and Hardware gates.
