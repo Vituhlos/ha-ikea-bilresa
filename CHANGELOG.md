@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.4] - 2026-07-15
+
 ### Added
 - Runtime **hot add / remove of wheels** — a newly commissioned BILRESA appears
   (and a removed one disappears) without restarting Home Assistant.
@@ -168,7 +170,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.4...HEAD
+[0.5.7-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...v0.5.7-rc.4
 [0.5.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.3.0

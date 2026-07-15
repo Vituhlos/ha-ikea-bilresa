@@ -11,10 +11,9 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** latest stable release v0.5.0; prerelease v0.5.7-rc.3 passed its
-> exact-revision Linux CI. Newer runtime polish has also passed static checks
-> and exact-revision Linux Unit/CI; it is not released, deployed, or
-> hardware-verified yet.
+> **Status:** latest stable release v0.5.0; prerelease v0.5.7-rc.4 contains the
+> CI-verified runtime polish. It is intended for focused Home Assistant UI and
+> physical BILRESA testing before a stable release.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared

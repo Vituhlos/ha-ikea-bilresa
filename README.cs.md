@@ -15,10 +15,9 @@ jaké má na originálním IKEA hubu DIRIGERA — tím, že reaguje na **`MultiP
 události v reálném čase**, které vestavěná Matter integrace v Home Assistantu
 zahazuje.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.7-rc.3 prošel
-> Linux CI pro přesný commit. Novější runtime změny také prošly statickými
-> kontrolami a Linux Unit/CI pro přesný commit; zatím nejsou vydané, nasazené
-> ani hardwarově ověřené.
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.7-rc.4 obsahuje
+> runtime vylepšení ověřená v CI. Je určený pro cílené ověření v Home Assistantu
+> a na fyzické BILRESE před stabilním vydáním.
 >
 > Malý patch release train `0.5.1`–`0.5.7` je v
 > [docs/ROADMAP.md](docs/ROADMAP.md).
