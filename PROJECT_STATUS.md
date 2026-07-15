@@ -31,8 +31,9 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Draft PR #1 publishes the
-  stabilization snapshot and targets the prerelease `v0.5.1-rc.1` after CI.
+- Latest stable release remains `v0.5.0`. Draft PR #1 publishes one snapshot
+  containing all seven work packages and therefore targets the prerelease
+  `v0.5.7-rc.1` after CI.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -182,7 +183,7 @@ soak behavior with exact HA/Matter/BILRESA versions recorded.
 
 Push the stabilization snapshot, let GitHub Actions validate the exact revision,
 and fix every CI regression. Only a passing revision may be merged and tagged as
-the prerelease `v0.5.1-rc.1`; non-hardware HA diagnostics may then be run before
+the prerelease `v0.5.7-rc.1`; non-hardware HA diagnostics may then be run before
 the complete physical checklist in `docs/HARDWARE_TEST.md`.
 
 ## Next-agent handoff

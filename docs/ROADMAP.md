@@ -36,6 +36,11 @@ backwards-compatible and independently verifiable work package. Release
 candidates use `v0.5.N-rc.K`. A larger configuration-model change or intentional
 compatibility break requires a minor-version change instead.
 
+If several sequential work packages are shipped in one snapshot, the version
+uses the highest included package number. The current combined snapshot includes
+`0.5.1` through `0.5.7`, so its candidate version is `v0.5.7-rc.1`, not
+`v0.5.1-rc.1`.
+
 ## Cross-cutting compatibility rule
 
 All Matter access stays behind an event-source abstraction. The preferred path
