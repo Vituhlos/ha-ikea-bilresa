@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - **Connection test** when setting up the integration (a bad URL is rejected).
 - Binding **scroll modes**: a rotation can control **brightness**, **colour
   temperature** or **colour** (`step` becomes a percentage of the mode's range).
+- **Universal control target**: a binding can also scroll a **media player's
+  volume**, a **cover's position**, a **climate target temperature**, a **fan's
+  speed** or a **number's value** — not just lights.
 - Binding options **Maximum brightness** and **Acceleration** (faster scrolling
   takes bigger steps).
 - Binding **double-press / triple-press / hold** actions — each optionally

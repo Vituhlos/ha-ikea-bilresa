@@ -1,14 +1,17 @@
-"""Turnkey light bindings configured via config subentries.
+"""Turnkey control bindings configured via config subentries.
 
-A binding subscribes to one wheel channel and drives a target light directly.
-Scrolling adjusts brightness, colour temperature or colour (the binding's
-*mode*); a single / double / triple press and a hold each run an optional
-action, which may target a *different* entity (e.g. dim a bulb but toggle the
-Shelly in the wall switch).
+A binding subscribes to one wheel channel and drives a target entity directly.
+Depending on its *mode*, scrolling adjusts a light's brightness / colour
+temperature / colour, a media player's volume, a cover's position, a climate
+target temperature, a fan's speed, or a number's value. A single / double /
+triple press and a hold each run an optional action, which may target a
+*different* entity (e.g. dim a bulb but toggle the Shelly in the wall switch).
 
 Values are tracked internally as an absolute target rather than issued as
-relative steps. This avoids reading a mid-transition value back from the light
-(a race during fast scrolling) and the abrupt "snap off" of ``*_step`` calls.
+relative steps. This avoids reading a mid-transition value back from the entity
+(a race during fast scrolling) and the abrupt "snap off" of relative steps.
+``step`` is interpreted as a percentage of the mode's range per notch, so one
+setting feels consistent across every kind of target.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ import time
 from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import (
@@ -55,6 +58,11 @@ from .const import (
     FALLBACK_MIN_KELVIN,
     MODE_COLOR,
     MODE_COLOR_TEMP,
+    MODE_COVER,
+    MODE_FAN,
+    MODE_NUMBER,
+    MODE_TEMPERATURE,
+    MODE_VOLUME,
     signal_channel,
 )
 from .engine import WheelAction
@@ -70,6 +78,8 @@ ATTR_MAX_KELVIN = "max_color_temp_kelvin"
 
 _CLICK_SERVICE = {"toggle": "toggle", CLICK_ON: "turn_on", CLICK_OFF: "turn_off"}
 
+_UNAVAILABLE = (None, "unknown", "unavailable")
+
 # How long our tracked target stays authoritative before we resync from state.
 _RESYNC_AFTER = 3.0
 
@@ -82,8 +92,15 @@ def _pct_to_units(pct: float) -> int:
     return round(pct / 100 * 255)
 
 
+def _as_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class LightBinding:
-    """Runtime for one GUI-configured wheel-channel -> light binding."""
+    """Runtime for one GUI-configured wheel-channel -> entity binding."""
 
     def __init__(self, hass: HomeAssistant, data: dict[str, Any]) -> None:
         self.hass = hass
@@ -105,7 +122,6 @@ class LightBinding:
         self._double_target = data.get(CONF_DOUBLE_TARGET)
         self._triple_target = data.get(CONF_TRIPLE_TARGET)
         self._hold_target = data.get(CONF_HOLD_TARGET)
-        # per-mode tracked target and the last-touched timestamp
         self._tracked: float | None = None
         self._saturation = 100.0
         self._last = 0.0
@@ -152,6 +168,16 @@ class LightBinding:
             self._rotate_color_temp(notches, up)
         elif self._mode == MODE_COLOR:
             self._rotate_color(notches, up)
+        elif self._mode == MODE_VOLUME:
+            self._rotate_volume(notches, up)
+        elif self._mode == MODE_COVER:
+            self._rotate_cover(notches, up)
+        elif self._mode == MODE_TEMPERATURE:
+            self._rotate_temperature(notches, up)
+        elif self._mode == MODE_FAN:
+            self._rotate_fan(notches, up)
+        elif self._mode == MODE_NUMBER:
+            self._rotate_number(notches, up)
         else:
             self._rotate_brightness(notches, up)
 
@@ -169,6 +195,11 @@ class LightBinding:
             self._tracked = current if current is not None else fallback
         return self._tracked
 
+    @staticmethod
+    def _delta(step_pct: float, span: float, notches: int, up: bool) -> float:
+        magnitude = step_pct / 100 * span * notches
+        return magnitude if up else -magnitude
+
     @callback
     def _rotate_brightness(self, notches: int, up: bool) -> None:
         state = self.hass.states.get(self._target)
@@ -178,59 +209,132 @@ class LightBinding:
         if not state_on and tracked <= 0 and not up:
             return  # don't switch a light on by scrolling down
 
-        step = _pct_to_units(self._step) * notches
-        target = tracked + (step if up else -step)
+        target = tracked + self._delta(self._step, 255, notches, up)
         if target >= self._max_units:
             target = self._max_units
         elif target <= self._min_units:
             if self._min_units <= 0:
                 self._tracked = 0
-                self._call_light("turn_off", {ATTR_TRANSITION: self._transition})
+                self._call("light", "turn_off", {ATTR_TRANSITION: self._transition})
                 return
             target = self._min_units
         self._tracked = target
-        self._call_light(
+        self._call(
+            "light",
             "turn_on",
             {ATTR_BRIGHTNESS: round(target), ATTR_TRANSITION: self._transition},
         )
 
     @callback
     def _rotate_color_temp(self, notches: int, up: bool) -> None:
-        state = self.hass.states.get(self._target)
-        if state is None or state.state != "on":
-            return  # colour changes only make sense on a lit light
+        state = self._lit_state()
+        if state is None:
+            return
         min_k = state.attributes.get(ATTR_MIN_KELVIN, FALLBACK_MIN_KELVIN)
         max_k = state.attributes.get(ATTR_MAX_KELVIN, FALLBACK_MAX_KELVIN)
         tracked = self._resync(
             state.attributes.get(ATTR_COLOR_TEMP_KELVIN), (min_k + max_k) / 2
         )
-        step = self._step / 100 * max(max_k - min_k, 1) * notches
-        target = min(max_k, max(min_k, tracked + (step if up else -step)))
+        target = tracked + self._delta(self._step, max(max_k - min_k, 1), notches, up)
+        target = min(max_k, max(min_k, target))
         self._tracked = target
-        self._call_light(
+        self._call(
+            "light",
             "turn_on",
             {ATTR_COLOR_TEMP_KELVIN: round(target), ATTR_TRANSITION: self._transition},
         )
 
     @callback
     def _rotate_color(self, notches: int, up: bool) -> None:
-        state = self.hass.states.get(self._target)
-        if state is None or state.state != "on":
+        state = self._lit_state()
+        if state is None:
             return
         hs_color = state.attributes.get(ATTR_HS_COLOR)
         if hs_color:
             self._saturation = float(hs_color[1])
         tracked = self._resync(hs_color[0] if hs_color else None, 0.0)
-        step = self._step / 100 * 360 * notches
-        hue = (tracked + (step if up else -step)) % 360
+        hue = (tracked + self._delta(self._step, 360, notches, up)) % 360
         self._tracked = hue
-        self._call_light(
+        self._call(
+            "light",
             "turn_on",
             {
                 ATTR_HS_COLOR: [round(hue, 1), self._saturation],
                 ATTR_TRANSITION: self._transition,
             },
         )
+
+    @callback
+    def _rotate_volume(self, notches: int, up: bool) -> None:
+        state = self.hass.states.get(self._target)
+        if state is None:
+            return
+        tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
+        target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
+        self._tracked = target
+        self._call("media_player", "volume_set", {"volume_level": round(target, 3)})
+
+    @callback
+    def _rotate_cover(self, notches: int, up: bool) -> None:
+        state = self.hass.states.get(self._target)
+        if state is None:
+            return
+        tracked = self._resync(_as_float(state.attributes.get("current_position")), 50)
+        target = min(
+            100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
+        )
+        self._tracked = target
+        self._call("cover", "set_cover_position", {"position": target})
+
+    @callback
+    def _rotate_temperature(self, notches: int, up: bool) -> None:
+        state = self.hass.states.get(self._target)
+        if state is None:
+            return
+        min_t = _as_float(state.attributes.get("min_temp")) or 7.0
+        max_t = _as_float(state.attributes.get("max_temp")) or 35.0
+        temp_step = _as_float(state.attributes.get("target_temp_step")) or 0.5
+        tracked = self._resync(
+            _as_float(state.attributes.get("temperature")), (min_t + max_t) / 2
+        )
+        target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
+        target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
+        self._tracked = target
+        self._call("climate", "set_temperature", {"temperature": round(target, 2)})
+
+    @callback
+    def _rotate_fan(self, notches: int, up: bool) -> None:
+        state = self.hass.states.get(self._target)
+        if state is None:
+            return
+        tracked = self._resync(_as_float(state.attributes.get("percentage")), 50)
+        target = min(
+            100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
+        )
+        self._tracked = target
+        self._call("fan", "set_percentage", {"percentage": target})
+
+    @callback
+    def _rotate_number(self, notches: int, up: bool) -> None:
+        state = self.hass.states.get(self._target)
+        if state is None:
+            return
+        min_n = _as_float(state.attributes.get("min")) or 0.0
+        max_n = _as_float(state.attributes.get("max")) or 100.0
+        num_step = _as_float(state.attributes.get("step")) or 1.0
+        current = None if state.state in _UNAVAILABLE else _as_float(state.state)
+        tracked = self._resync(current, (min_n + max_n) / 2)
+        target = tracked + self._delta(
+            self._step, max(max_n - min_n, num_step), notches, up
+        )
+        target = min(max_n, max(min_n, round(target / num_step) * num_step))
+        self._tracked = target
+        domain = self._target.split(".", 1)[0]
+        self._call(domain, "set_value", {"value": round(target, 4)})
+
+    def _lit_state(self) -> State | None:
+        state = self.hass.states.get(self._target)
+        return state if state is not None and state.state == "on" else None
 
     # -- button presses ---------------------------------------------------
 
@@ -239,24 +343,24 @@ class LightBinding:
         if self._click == CLICK_NONE:
             return
         service = _CLICK_SERVICE.get(self._click, "toggle")
-        self._call("homeassistant", service, self._click_target)
+        self._call_entity("homeassistant", service, self._click_target)
 
     @callback
     def _toggle(self, target: str | None) -> None:
         if target:
-            self._call("homeassistant", "toggle", target)
+            self._call_entity("homeassistant", "toggle", target)
 
     # -- service helpers --------------------------------------------------
 
     @callback
-    def _call_light(self, service: str, data: dict[str, Any]) -> None:
+    def _call(self, domain: str, service: str, data: dict[str, Any]) -> None:
         payload = {ATTR_ENTITY_ID: self._target, **data}
         self.hass.async_create_task(
-            self.hass.services.async_call("light", service, payload, blocking=False)
+            self.hass.services.async_call(domain, service, payload, blocking=False)
         )
 
     @callback
-    def _call(self, domain: str, service: str, entity_id: str) -> None:
+    def _call_entity(self, domain: str, service: str, entity_id: str) -> None:
         self.hass.async_create_task(
             self.hass.services.async_call(
                 domain, service, {ATTR_ENTITY_ID: entity_id}, blocking=False

@@ -31,7 +31,7 @@
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
-            "target": "Světlo",
+            "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
             "mode": "Scroll ovládá",
             "step": "Změna na zářez (% rozsahu)",
             "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
@@ -51,7 +51,7 @@
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
-            "target": "Světlo",
+            "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
             "mode": "Scroll ovládá",
             "step": "Změna na zářez (% rozsahu)",
             "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
@@ -82,9 +82,14 @@
     },
     "scroll_mode": {
       "options": {
-        "brightness": "Jas",
-        "color_temp": "Teplota bílé",
-        "color": "Barva"
+        "brightness": "Jas světla",
+        "color_temp": "Teplota bílé světla",
+        "color": "Barva světla",
+        "volume": "Hlasitost media playeru",
+        "cover_position": "Poloha žaluzie",
+        "temperature": "Cílová teplota klimatizace",
+        "fan_speed": "Otáčky ventilátoru",
+        "number": "Hodnota čísla"
       }
     }
   },

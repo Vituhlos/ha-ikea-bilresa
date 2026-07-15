@@ -132,12 +132,37 @@ DEFAULT_MAX_BRIGHTNESS = 100
 DEFAULT_TRANSITION = 1.0
 DEFAULT_CLICK_ACTION = "toggle"
 
-# Scroll modes: what a rotation changes on the target light.
+# Scroll modes: what a rotation changes on the target entity.
 MODE_BRIGHTNESS = "brightness"
 MODE_COLOR_TEMP = "color_temp"
 MODE_COLOR = "color"
-MODES = [MODE_BRIGHTNESS, MODE_COLOR_TEMP, MODE_COLOR]
+MODE_VOLUME = "volume"
+MODE_COVER = "cover_position"
+MODE_TEMPERATURE = "temperature"
+MODE_FAN = "fan_speed"
+MODE_NUMBER = "number"
+MODES = [
+    MODE_BRIGHTNESS,
+    MODE_COLOR_TEMP,
+    MODE_COLOR,
+    MODE_VOLUME,
+    MODE_COVER,
+    MODE_TEMPERATURE,
+    MODE_FAN,
+    MODE_NUMBER,
+]
 DEFAULT_MODE = MODE_BRIGHTNESS
+
+# Entity domains a binding can target (its scroll control adapts to the mode).
+TARGET_DOMAINS = [
+    "light",
+    "media_player",
+    "cover",
+    "climate",
+    "fan",
+    "number",
+    "input_number",
+]
 
 CLICK_TOGGLE = "toggle"
 CLICK_ON = "on"

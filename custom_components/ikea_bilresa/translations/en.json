@@ -31,7 +31,7 @@
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
-            "target": "Light",
+            "target": "Target (light, media player, cover, climate, fan, number)",
             "mode": "Scroll controls",
             "step": "Change per notch (% of range)",
             "acceleration": "Acceleration (faster scroll = bigger steps)",
@@ -51,7 +51,7 @@
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
-            "target": "Light",
+            "target": "Target (light, media player, cover, climate, fan, number)",
             "mode": "Scroll controls",
             "step": "Change per notch (% of range)",
             "acceleration": "Acceleration (faster scroll = bigger steps)",
@@ -82,9 +82,14 @@
     },
     "scroll_mode": {
       "options": {
-        "brightness": "Brightness",
-        "color_temp": "Colour temperature",
-        "color": "Colour"
+        "brightness": "Light brightness",
+        "color_temp": "Light colour temperature",
+        "color": "Light colour",
+        "volume": "Media player volume",
+        "cover_position": "Cover position",
+        "temperature": "Climate target temperature",
+        "fan_speed": "Fan speed",
+        "number": "Number value"
       }
     }
   },

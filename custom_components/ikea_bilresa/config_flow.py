@@ -51,6 +51,7 @@ from .const import (
     DOMAIN,
     MODES,
     SUBENTRY_BINDING,
+    TARGET_DOMAINS,
 )
 
 
@@ -190,7 +191,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 vol.Required(
                     CONF_TARGET, default=defaults.get(CONF_TARGET)
                 ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="light")
+                    selector.EntitySelectorConfig(domain=TARGET_DOMAINS)
                 ),
                 vol.Required(
                     CONF_MODE, default=defaults.get(CONF_MODE, DEFAULT_MODE)
