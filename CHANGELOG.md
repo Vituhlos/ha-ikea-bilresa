@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.8] - 2026-07-15
+
+### Fixed
+- Panel module registration is now idempotent when Home Assistant imports a
+  cache-busted upgrade into a browser tab that still has the previous custom
+  element registered. This prevents the sidebar panel from raising a duplicate
+  `CustomElementRegistry` error after an integration upgrade or reload.
+
+### Notes
+- A full browser or companion-app page reload is still required to replace an
+  already registered panel class with the new release's implementation; web
+  platform custom elements cannot be redefined in place.
+- No Matter event, gesture, binding or stored configuration behavior changed.
+
 ## [0.5.7-rc.7] - 2026-07-15
 
 ### Fixed
@@ -207,7 +221,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.5...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.8...HEAD
+[0.5.7-rc.8]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.7...v0.5.7-rc.8
+[0.5.7-rc.7]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.6...v0.5.7-rc.7
+[0.5.7-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.5...v0.5.7-rc.6
 [0.5.7-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.4...v0.5.7-rc.5
 [0.5.7-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...v0.5.7-rc.4
 [0.5.0]: https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.5.0

@@ -242,4 +242,10 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 }
 
-customElements.define("ikea-bilresa-panel", IkeaBilresaPanel);
+// Home Assistant can import a cache-busted panel module into a document that
+// still owns the previous release's custom-element registration. The browser
+// does not allow redefining that name, so keep registration idempotent. A full
+// page reload then picks up the new class from the new module URL.
+if (!customElements.get("ikea-bilresa-panel")) {
+  customElements.define("ikea-bilresa-panel", IkeaBilresaPanel);
+}

@@ -132,3 +132,19 @@ def test_panel_asset_has_an_accessible_mobile_exit() -> None:
     assert "inline-size: 48px" in asset
     assert "block-size: 48px" in asset
     assert ".bilresa-panel-menu:focus-visible" in asset
+
+
+def test_panel_asset_registration_is_browser_idempotent() -> None:
+    """A cache-busted upgrade must not redefine an element in an open tab."""
+    asset = (
+        Path(__file__).parents[1]
+        / "custom_components"
+        / "ikea_bilresa"
+        / "frontend"
+        / "ikea_bilresa_panel.js"
+    ).read_text(encoding="utf-8")
+
+    guard = 'if (!customElements.get("ikea-bilresa-panel")) {'
+    registration = 'customElements.define("ikea-bilresa-panel", IkeaBilresaPanel);'
+    assert guard in asset
+    assert asset.index(guard) < asset.index(registration)
