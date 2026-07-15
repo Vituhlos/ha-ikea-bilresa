@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.7] - 2026-07-15
+
+### Fixed
+- The Phase 0 custom panel now owns a Home Assistant-style app header with a
+  keyboard- and touch-accessible menu button, so companion-app users can reopen
+  the sidebar and leave the panel.
+
+### Notes
+- The header uses Home Assistant theme tokens and a 48 px touch target with a
+  dedicated keyboard focus indicator. No Matter, gesture, binding or stored
+  configuration behavior changed.
+
 ## [0.5.7-rc.6] - 2026-07-15
 
 ### Added
