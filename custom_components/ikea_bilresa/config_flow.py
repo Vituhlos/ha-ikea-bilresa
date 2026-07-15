@@ -29,10 +29,13 @@ from .const import (
     BINDING_PROFILE_MEDIA,
     BINDING_PROFILE_SCENES,
     BINDING_PROFILES,
+    BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
     CONF_ACCELERATION,
     CONF_BINDING_PROFILE,
+    CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
@@ -51,6 +54,7 @@ from .const import (
     CONF_TRIPLE_TARGET,
     CONF_URL,
     DEFAULT_ACCELERATION,
+    DEFAULT_BUTTON_RESPONSE,
     DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
     DEFAULT_MATTER_URL,
@@ -68,6 +72,7 @@ from .const import (
     MODES,
     SUBENTRY_BINDING,
     TARGET_DOMAINS,
+    mode_supports_target,
 )
 from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
@@ -185,7 +190,10 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         if not wheel_options:
             return self.async_abort(reason="no_wheels")
 
+        errors: dict[str, str] = {}
         if user_input is not None:
+            errors = self._validate_binding(user_input)
+        if user_input is not None and not errors:
             title = self._title(user_input)
             if step_id == "reconfigure":
                 return self.async_update_and_abort(
@@ -196,7 +204,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 )
             return self.async_create_entry(title=title, data=user_input)
 
-        defaults = (
+        defaults = user_input or (
             self._get_reconfigure_subentry().data
             if step_id == "reconfigure"
             else getattr(self, "_pending_defaults", {})
@@ -204,7 +212,21 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         return self.async_show_form(
             step_id=step_id,
             data_schema=self._schema(wheel_options, defaults),
+            errors=errors,
         )
+
+    @staticmethod
+    @callback
+    def _validate_binding(user_input: dict[str, Any]) -> dict[str, str]:
+        """Reject response policies whose configured actions cannot run."""
+        errors: dict[str, str] = {}
+        if not mode_supports_target(user_input[CONF_MODE], user_input[CONF_TARGET]):
+            errors[CONF_TARGET] = "mode_target_mismatch"
+        if user_input.get(CONF_BUTTON_RESPONSE) == BUTTON_RESPONSE_FAST and (
+            user_input.get(CONF_DOUBLE_TARGET) or user_input.get(CONF_TRIPLE_TARGET)
+        ):
+            errors[CONF_BUTTON_RESPONSE] = "fast_response_conflicts_with_multi_press"
+        return errors
 
     @callback
     def _setup_schema(self) -> vol.Schema:
@@ -241,7 +263,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 return dict(subentry.data)
 
         profile = user_input[CONF_BINDING_PROFILE]
-        defaults: dict[str, Any] = {}
+        defaults: dict[str, Any] = {CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST}
         if profile == BINDING_PROFILE_LIGHT:
             defaults[CONF_MODE] = MODE_BRIGHTNESS
         elif profile == BINDING_PROFILE_MEDIA:
@@ -381,6 +403,16 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                         options=CLICK_ACTIONS,
                         mode=selector.SelectSelectorMode.DROPDOWN,
                         translation_key="click_action",
+                    )
+                ),
+                vol.Required(
+                    CONF_BUTTON_RESPONSE,
+                    default=defaults.get(CONF_BUTTON_RESPONSE, DEFAULT_BUTTON_RESPONSE),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=BUTTON_RESPONSES,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="button_response",
                     )
                 ),
                 vol.Optional(

@@ -7,7 +7,15 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from custom_components.ikea_bilresa.const import (
+    ACTION_PRESS,
+    CLUSTER_SWITCH,
+    DOMAIN,
+    EVENT_BILRESA,
+    signal_raw_button,
+)
 from custom_components.ikea_bilresa.coordinator import BilresaCoordinator
+from custom_components.ikea_bilresa.engine import WheelAction
 from custom_components.ikea_bilresa.matter_core import CoreMatterUnavailable
 from custom_components.ikea_bilresa.model import BilresaWheel
 
@@ -115,3 +123,79 @@ def test_existing_wheel_metadata_is_refreshed(monkeypatch) -> None:
     assert coordinator._register_wheel({}) is True
     assert coordinator.wheels[12].serial == "new-serial"
     assert coordinator._register_wheel({}) is False
+
+
+def test_raw_gesture_hint_is_dispatched_only_internally(monkeypatch) -> None:
+    hass = SimpleNamespace()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    dispatch = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.async_dispatcher_send", dispatch
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.decode_event",
+        lambda *_args: {
+            "role": "button",
+            "channel": 2,
+            "event_type": "short_release",
+        },
+    )
+    coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    coordinator._engine.process = Mock(return_value=None)
+    coordinator.wheels[12] = BilresaWheel(
+        node_id=12,
+        name="Test wheel",
+        product_name="BILRESA scroll wheel",
+        serial=None,
+        endpoints={},
+    )
+
+    coordinator._handle_node_event(
+        {"node_id": 12, "cluster_id": CLUSTER_SWITCH, "endpoint_id": 3}
+    )
+
+    dispatch.assert_called_once_with(
+        hass, signal_raw_button(12, 2), "button", "short_release"
+    )
+
+
+def test_public_event_includes_registry_device_id_without_breaking_payload(
+    monkeypatch,
+) -> None:
+    bus = SimpleNamespace(async_fire=Mock())
+    hass = SimpleNamespace(bus=bus)
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    registry = SimpleNamespace(
+        async_get_device=Mock(return_value=SimpleNamespace(id="device-123"))
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.dr.async_get",
+        lambda _hass: registry,
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.async_dispatcher_send", Mock()
+    )
+    coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    action = WheelAction(
+        node_id=12,
+        wheel_name="Test wheel",
+        channel=2,
+        endpoint_id=3,
+        type=ACTION_PRESS,
+        presses=1,
+    )
+
+    coordinator._dispatch(action)
+
+    registry.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "12")})
+    event_type, event_data = bus.async_fire.call_args.args
+    assert event_type == EVENT_BILRESA
+    assert event_data["device_id"] == "device-123"
+    assert event_data["node_id"] == 12
+    assert event_data["presses"] == 1

@@ -48,12 +48,16 @@
             "max_brightness": "Maximum brightness (%)",
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
+            "button_response": "Button response",
             "click_target": "Single-press target (optional, defaults to the light)",
             "double_press_target": "Double-press: toggle entity (optional)",
             "triple_press_target": "Triple-press: toggle entity (optional)",
             "hold_target": "Hold target (optional, used by Toggle entity)",
             "hold_action": "Button hold action",
             "scenes": "Scenes cycled by single press (optional, overrides its action)"
+          },
+          "data_description": {
+            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition if this binding uses double- or triple-press actions. Public BILRESA events remain fully classified in either mode."
           }
         },
         "reconfigure": {
@@ -70,14 +74,22 @@
             "max_brightness": "Maximum brightness (%)",
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
+            "button_response": "Button response",
             "click_target": "Single-press target (optional, defaults to the light)",
             "double_press_target": "Double-press: toggle entity (optional)",
             "triple_press_target": "Triple-press: toggle entity (optional)",
             "hold_target": "Hold target (optional, used by Toggle entity)",
             "hold_action": "Button hold action",
             "scenes": "Scenes cycled by single press (optional, overrides its action)"
+          },
+          "data_description": {
+            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition if this binding uses double- or triple-press actions. Public BILRESA events remain fully classified in either mode."
           }
         }
+      },
+      "error": {
+        "fast_response_conflicts_with_multi_press": "Fast response cannot be combined with a double- or triple-press target. Remove those targets or choose multi-press recognition.",
+        "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls."
       },
       "abort": {
         "no_wheels": "No BILRESA wheels have been discovered yet. Make sure the wheel works in the Matter integration, then try again."
@@ -120,6 +132,12 @@
         "cover": "Cover position",
         "climate": "Climate temperature",
         "scenes": "Scene selector"
+      }
+    },
+    "button_response": {
+      "options": {
+        "fast": "Fast single press",
+        "multi_press": "Recognize single, double or triple press"
       }
     }
   },

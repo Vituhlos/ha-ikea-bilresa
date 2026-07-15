@@ -48,12 +48,16 @@
             "max_brightness": "Maximální jas (%)",
             "transition": "Přechod (s)",
             "click_action": "Akce jednoduchého stisku",
+            "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
             "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
             "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
             "hold_target": "Cíl podržení (volitelné, používá volba Přepnout entitu)",
             "hold_action": "Akce při podržení tlačítka",
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
+          },
+          "data_description": {
+            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá dvojstisk nebo trojstisk, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
           }
         },
         "reconfigure": {
@@ -70,14 +74,22 @@
             "max_brightness": "Maximální jas (%)",
             "transition": "Přechod (s)",
             "click_action": "Akce jednoduchého stisku",
+            "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
             "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
             "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
             "hold_target": "Cíl podržení (volitelné, používá volba Přepnout entitu)",
             "hold_action": "Akce při podržení tlačítka",
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
+          },
+          "data_description": {
+            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá dvojstisk nebo trojstisk, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
           }
         }
+      },
+      "error": {
+        "fast_response_conflicts_with_multi_press": "Rychlou odezvu nelze kombinovat s cílem pro dvojstisk nebo trojstisk. Tyto cíle odeber nebo zvol rozpoznání více stisků.",
+        "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním scrollu. Vyber odpovídající entitu nebo změň, co scroll ovládá."
       },
       "abort": {
         "no_wheels": "Zatím se nenašla žádná kolečka BILRESA. Ověř, že kolečko funguje v Matter integraci, a zkus to znovu."
@@ -120,6 +132,12 @@
         "cover": "Poloha krytu",
         "climate": "Teplota klimatizace",
         "scenes": "Výběr scén"
+      }
+    },
+    "button_response": {
+      "options": {
+        "fast": "Rychlý jednoduchý stisk",
+        "multi_press": "Rozpoznat jeden, dva nebo tři stisky"
       }
     }
   },

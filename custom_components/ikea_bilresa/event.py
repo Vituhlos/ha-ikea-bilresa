@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.event import EventEntity
+from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -91,6 +91,7 @@ class BilresaChannelEvent(EventEntity):
 
     _attr_should_poll = False
     _attr_has_entity_name = True
+    _attr_device_class = EventDeviceClass.BUTTON
     _attr_icon = "mdi:knob"
     _attr_event_types = WHEEL_EVENT_TYPES
 

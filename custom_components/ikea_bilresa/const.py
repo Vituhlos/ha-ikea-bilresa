@@ -120,6 +120,7 @@ CONF_MIN_BRIGHTNESS = "min_brightness"
 CONF_MAX_BRIGHTNESS = "max_brightness"
 CONF_TRANSITION = "transition"
 CONF_CLICK_ACTION = "click_action"
+CONF_BUTTON_RESPONSE = "button_response"
 CONF_CLICK_TARGET = "click_target"
 CONF_DOUBLE_TARGET = "double_press_target"
 CONF_TRIPLE_TARGET = "triple_press_target"
@@ -159,6 +160,13 @@ DEFAULT_MAX_BRIGHTNESS = 100
 DEFAULT_TRANSITION = 1.0
 DEFAULT_CLICK_ACTION = "toggle"
 
+# When the configured single-press action runs.  Missing values intentionally
+# keep the historic completion-aware behavior for existing stored bindings.
+BUTTON_RESPONSE_FAST = "fast"
+BUTTON_RESPONSE_MULTI_PRESS = "multi_press"
+BUTTON_RESPONSES = [BUTTON_RESPONSE_FAST, BUTTON_RESPONSE_MULTI_PRESS]
+DEFAULT_BUTTON_RESPONSE = BUTTON_RESPONSE_MULTI_PRESS
+
 # Scroll modes: what a rotation changes on the target entity.
 MODE_BRIGHTNESS = "brightness"
 MODE_COLOR_TEMP = "color_temp"
@@ -179,6 +187,24 @@ MODES = [
     MODE_NUMBER,
 ]
 DEFAULT_MODE = MODE_BRIGHTNESS
+
+MODE_TARGET_DOMAINS = {
+    MODE_BRIGHTNESS: frozenset({"light"}),
+    MODE_COLOR_TEMP: frozenset({"light"}),
+    MODE_COLOR: frozenset({"light"}),
+    MODE_VOLUME: frozenset({"media_player"}),
+    MODE_COVER: frozenset({"cover"}),
+    MODE_TEMPERATURE: frozenset({"climate"}),
+    MODE_FAN: frozenset({"fan"}),
+    MODE_NUMBER: frozenset({"number", "input_number"}),
+}
+
+
+def mode_supports_target(mode: str, entity_id: str) -> bool:
+    """Return whether a scroll mode supports the target entity domain."""
+    domain, separator, _object_id = entity_id.partition(".")
+    return bool(separator and domain in MODE_TARGET_DOMAINS.get(mode, frozenset()))
+
 
 # Entity domains a binding can target (its scroll control adapts to the mode).
 TARGET_DOMAINS = [
@@ -214,3 +240,8 @@ DISCONNECT_GRACE_SECONDS = 60
 def signal_channel(node_id: int, channel: int | None) -> str:
     """Per wheel-channel dispatcher signal carrying decoded WheelActions."""
     return f"{DOMAIN}_action_{node_id}_{channel}"
+
+
+def signal_raw_button(node_id: int, channel: int | None) -> str:
+    """Internal per-channel signal carrying raw button event names."""
+    return f"{DOMAIN}_raw_button_{node_id}_{channel}"

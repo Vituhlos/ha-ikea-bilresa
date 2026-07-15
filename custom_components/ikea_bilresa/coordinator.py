@@ -12,6 +12,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -28,6 +29,7 @@ from .const import (
     SIGNAL_WHEELS_UPDATED,
     SUBENTRY_BINDING,
     signal_channel,
+    signal_raw_button,
 )
 from .engine import GestureEngine, WheelAction
 from .matter_core import CoreMatterEventSource, CoreMatterUnavailable
@@ -209,6 +211,15 @@ class BilresaCoordinator:
         if decoded is None:
             self._ignored_counts["undecodable_switch_event"] += 1
             return
+        # Internal gesture metadata lets bindings distinguish trailing updates
+        # from a deliberate new rotation and lets fast button bindings react to
+        # ShortRelease. It never reaches the public HA event bus.
+        async_dispatcher_send(
+            self.hass,
+            signal_raw_button(wheel.node_id, decoded["channel"]),
+            decoded["role"],
+            decoded["event_type"],
+        )
         action = self._engine.process(wheel, decoded)
         if action is not None:
             self._dispatch(action)
@@ -227,7 +238,13 @@ class BilresaCoordinator:
             action.notches,
             action.presses,
         )
-        self.hass.bus.async_fire(EVENT_BILRESA, asdict(action))
+        event_data = asdict(action)
+        device = dr.async_get(self.hass).async_get_device(
+            identifiers={(DOMAIN, str(action.node_id))}
+        )
+        if device is not None:
+            event_data["device_id"] = device.id
+        self.hass.bus.async_fire(EVENT_BILRESA, event_data)
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )
