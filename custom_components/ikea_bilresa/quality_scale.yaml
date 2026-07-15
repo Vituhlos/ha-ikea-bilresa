@@ -1,0 +1,79 @@
+# Internal engineering checklist based on Home Assistant's Integration Quality
+# Scale. This custom integration remains officially in the Custom tier. Rules
+# not listed below are intentionally not claimed yet.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: The integration does not register custom service actions.
+  appropriate-polling:
+    status: exempt
+    comment: The integration is local-push and does not poll.
+  common-modules: done
+  config-flow: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: The integration does not register custom service actions.
+  docs-conditions:
+    status: exempt
+    comment: The integration does not provide custom conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: The integration does not register custom service actions.
+  config-entry-unloading: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  parallel-updates:
+    status: exempt
+    comment: The integration is local-push and has no polling updates.
+  reauthentication-flow:
+    status: exempt
+    comment: The local Matter Server connection does not authenticate.
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: There is no supported discovery source for another configured integration.
+  discovery:
+    status: exempt
+    comment: BILRESA is discovered inside the configured Matter fabric; HA has no manifest discovery source for a Matter dependency.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices: done
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: exempt
+    comment: All created event and connectivity entities are essential.
+  exception-translations:
+    status: exempt
+    comment: The integration exposes no custom actions that raise user-facing exceptions.
+  reconfiguration-flow: done
+  repair-issues: done
+
+  # Platinum
+  async-dependency: done
+  inject-websession: done
+
+# Not yet claimed: brands, config-flow-test-coverage, docs-removal-instructions,
+# docs-triggers, test-before-setup, docs-configuration-parameters,
+# log-when-unavailable, test-coverage, docs-supported-functions,
+# entity-translations, icon-translations, stale-devices, strict-typing.

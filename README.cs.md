@@ -1,5 +1,9 @@
 # IKEA BILRESA (plynulý scroll) pro Home Assistant
 
+> **Předávání vývoje:** aktuální stav implementace, úroveň ověření a prioritní
+> backlog jsou v [PROJECT_STATUS.md](PROJECT_STATUS.md). Společný postup vývoje
+> je v [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
 [English](README.md) · **Čeština**
 
 [![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
@@ -11,8 +15,12 @@ jaké má na originálním IKEA hubu DIRIGERA — tím, že reaguje na **`MultiP
 události v reálném čase**, které vestavěná Matter integrace v Home Assistantu
 zahazuje.
 
-> **Stav:** v0.2 — vrstva událostí v reálném čase hotová. Blueprint na plynulé
-> stmívání a GUI bindings na světla jsou v [plánu](#plán).
+> **Stav:** poslední vydání je v0.5.0; dirty vývojový strom obsahuje další
+> staticky ověřenou práci. Unit testy, CI aktuálního stromu a kompletní ověření
+> na skutečné BILRESE zatím čekají.
+>
+> Malý patch release train `0.5.1`–`0.5.7` je v
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -44,9 +52,10 @@ otáčení *ukončíš*, a pak pošle jednu dávku „N stisků", navíc omezeno
 je laglé, skákavé stmívání a rychlé zatočení nad 8 zářezů se úplně ztratí.
 
 Zařízení přitom posílá i **`MultiPressOngoing`** — průběžný čítač v reálném čase,
-zatímco točíš — což je přesně to, co dělá hub DIRIGERA plynulým. Tato integrace si
-otevře vlastní read-only WebSocket spojení k Matter Serveru a tyto průběžné události
-poslouchá, takže Home Assistant reaguje během gesta, ne až po něm.
+zatímco točíš — což je přesně to, co dělá hub DIRIGERA plynulým. Tato integrace
+odebírá události z existujícího Matter klienta Home Assistantu, takže reaguje
+během gesta, ne až po něm. Na starším nebo nekompatibilním klientském API použije
+jako fallback vlastní read-only WebSocket.
 
 Navazující práce v HA:
 [core#159035 (issue)](https://github.com/home-assistant/core/issues/159035) ·
@@ -75,10 +84,11 @@ kolečko BILRESA ──Matter/Thread──▶ Matter Server ──WS──▶ ta
                                                                           └▶ ikea_bilresa_event
 ```
 
-Integrace se připojí k WebSocketu Matter Serveru (výchozí
-`ws://core-matter-server:5580/ws`, automaticky zjištěné z tvé Matter konfigurace),
-pošle jednou `start_listening` a dekóduje události clusteru `Switch` (`0x003B`) pro
-každý nalezený BILRESA uzel.
+Integrace běžně znovu použije existující subscription klienta `MatterClient` z
+jádrové Matter integrace. Kompatibilní fallback se připojí k WebSocketu Matter
+Serveru (výchozí `ws://core-matter-server:5580/ws`), pošle jednou
+`start_listening` a dekóduje události clusteru `Switch` (`0x003B`) pro každý
+nalezený BILRESA uzel.
 
 Každé kolečko má **3 kanály**, každý = 3 Matter Switch endpointy:
 
@@ -89,7 +99,7 @@ Každé kolečko má **3 kanály**, každý = 3 Matter Switch endpointy:
 
 ## Požadavky
 
-- Home Assistant **2024.6** nebo novější.
+- Home Assistant **2026.6** nebo novější.
 - Add-on **Matter Server** (nebo externí Matter Server) s BILRESA kolečky už
   spárovanými do Matteru a funkčními.
 - Nakonfigurovaná jádrová integrace **Matter** (slouží k automatickému zjištění
@@ -121,25 +131,33 @@ event entitou na kanál.
 Nechceš psát automatizace? U položky **IKEA BILRESA**
 (Nastavení → Zařízení a služby) klikni na **＋ Přidat → Propojení se světlem** a vyber:
 
+- výchozí profil (světlo, média, roleta, klima, scény nebo vlastní), případně
+  zkopíruj existující propojení jako výchozí nastavení,
 - **Kolečko** a **Kanál**,
 - **Světlo ke stmívání**,
 - **Změnu jasu na zářez** (%), **Minimální jas** (%, `0` = otočením dolů lze
   světlo vypnout) a **Přechod** (s),
 - **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
   **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
-  (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači).
+  (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači),
+- volitelný seřazený seznam **scén**, které jednoduché stisky postupně aktivují
+  (má přednost před běžnou akcí jednoduchého stisku),
+- **akci při podržení**: přepnout entitu, plynule měnit cíl scrollu, nebo nic.
+  Rampování začne nahoru a po každém dokončeném podržení obrátí směr, protože
+  událost dlouhého stisku BILRESY sama žádný směr nenese.
 
 Integrace pak to světlo stmívá v reálném čase. Přidej si klidně víc propojení —
 jedno na kanál kolečka — takže to škáluje na libovolný počet koleček bez YAML.
 
 ## Používání (manuál)
 
-Tato sekce je manuál pro aktuální verzi (v0.2).
+Tato sekce popisuje současné chování integrace. Funkce nad rámec posledního
+vydání jsou označené v [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ### Event entity
 
 Každý kanál kolečka se stane `event` entitou, např.
-`event.bilresa_scroll_wheel_nelca_channel_1`. Její stav je časové razítko poslední
+`event.bilresa_scroll_wheel_channel_1`. Její stav je časové razítko poslední
 akce; atribut `event_type` (a `notches` / `presses`) říká, co se stalo. Používej ji
 jako spouštěč automatizace.
 
@@ -164,7 +182,7 @@ jako spouštěč automatizace.
 alias: BILRESA – plynulé zesvětlení
 triggers:
   - trigger: state
-    entity_id: event.bilresa_scroll_wheel_nelca_channel_1
+    entity_id: event.bilresa_scroll_wheel_channel_1
     attribute: event_type
     to: rotate_up
 conditions:
@@ -172,7 +190,7 @@ conditions:
 actions:
   - action: light.turn_on
     target:
-      entity_id: light.svetylka_svetylka
+      entity_id: light.priklad
     data:
       brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
       transition: 1
@@ -234,7 +252,18 @@ logger:
 - [x] Režimy scrollu (jas / teplota bílé / barva), akcelerace, max jas,
       akce double/triple/hold. *(další)*
 - [x] **Device triggers** a **blueprint na plynulé stmívání**. *(další)*
-- [ ] Zařazení do HACS default store a brand icon.
+- [x] Cyklení scén, hold-to-ramp a informace System Health. *(další)*
+- [x] Změna URL Matter Serveru přes parent reconfigure flow. *(další)*
+- [x] Prověřené discovery — HA nemá podporovaný discovery zdroj pro závislost na
+      jiné integraci; rozhodnutí je v [docs/DISCOVERY.md](docs/DISCOVERY.md).
+- [x] Interní `quality_scale.yaml` pouze s doloženými pravidly `done`/`exempt`.
+- [x] Reuse event streamu core Matter klienta s kompatibilním fallbackem na
+      samostatný pasivní WebSocket. *(další)*
+- [x] Naplánovaný stabilizační patch train `0.5.1`–`0.5.7`; implementace je v
+      pracovním stromu, ale každý balík má vlastní ověřovací bránu.
+- [ ] Dokončit hardwarové ověření a automatické pokrytí testy.
+- [ ] **Finální publikační fáze:** brand icon/PR do `home-assistant/brands` a
+      zařazení do výchozího HACS katalogu, až když bude integrace hotová.
 
 ## Omezení
 
@@ -248,7 +277,9 @@ logger:
 
 Issues a pull requesty jsou vítány. Při hlášení problému prosím uveď firmware
 kolečka a verze Home Assistantu / Matter Serveru a u problémů se scrollem přilož
-debug log událostí.
+debug log událostí. Postup vývoje a hardwarového ověření je v
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) a
+[docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
 
 ## Licence
 

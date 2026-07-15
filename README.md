@@ -11,8 +11,14 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** v0.2 — real-time event layer complete. A smooth-dimming blueprint
-> and GUI light bindings are on the [roadmap](#roadmap).
+> **Status:** latest release v0.5.0; the dirty development tree contains
+> additional statically verified work. Unit, current-tree CI, and complete
+> BILRESA hardware verification are still pending.
+
+> **Development handoff:** current implementation state, validation level, and
+> prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
+> workflow is documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+> The ordered patch release train is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -46,9 +52,10 @@ scrolls beyond 8 notches are lost entirely.
 
 The device **also** emits `MultiPressOngoing` events — a running counter, in real
 time, while you turn the wheel — which is exactly what makes the DIRIGERA hub
-feel continuous. This integration opens its own read-only WebSocket connection to
-the Matter Server and listens for those ongoing events, so Home Assistant can
-react per gesture as it happens.
+feel continuous. This integration subscribes to Home Assistant's existing Matter
+client event stream, so Home Assistant can react per gesture as it happens. On
+an older or incompatible client API it falls back to its own read-only
+WebSocket.
 
 Related upstream work:
 [core#159035 (issue)](https://github.com/home-assistant/core/issues/159035) ·
@@ -77,10 +84,11 @@ BILRESA wheel ──Matter/Thread──▶ Matter Server ──WS──▶ this 
                                                                           └▶ ikea_bilresa_event
 ```
 
-The integration connects to the Matter Server WebSocket
-(`ws://core-matter-server:5580/ws` by default, auto-detected from your Matter
-config entry), issues a single `start_listening`, and decodes `Switch` cluster
-events (cluster `0x003B`) for every discovered BILRESA node.
+The integration normally reuses the core Matter integration's existing
+`MatterClient` subscription. Its compatibility fallback connects to the Matter
+Server WebSocket (`ws://core-matter-server:5580/ws` by default), issues a single
+`start_listening`, and decodes `Switch` cluster events (cluster `0x003B`) for
+every discovered BILRESA node.
 
 Each wheel exposes **3 channels**, each of which is 3 Matter Switch endpoints:
 
@@ -91,7 +99,7 @@ Each wheel exposes **3 channels**, each of which is 3 Matter Switch endpoints:
 
 ## Requirements
 
-- Home Assistant **2024.6** or newer.
+- Home Assistant **2026.6** or newer.
 - The **Matter Server** add-on (or an external Matter Server), with your BILRESA
   wheel(s) already commissioned to Matter and working.
 - The core **Matter** integration configured (used to auto-detect the server
@@ -123,13 +131,20 @@ creates one device per wheel with an event entity per channel.
 Prefer not to write automations? On the **IKEA BILRESA** entry
 (Settings → Devices & Services) click **＋ Add → Light binding** and pick:
 
+- a starting profile (light, media, cover, climate, scenes, or custom), or copy
+  an existing binding as a starting point,
 - the **Wheel** and **Channel** to use,
 - the **Light to dim**,
 - **Brightness change per notch** (%), **Minimum brightness** (%, `0` lets a
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
   **button target entity** — so a press can act on a *different* entity than the
-  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch).
+  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch),
+- an optional ordered list of **scenes** to cycle on single presses (this takes
+  precedence over the normal single-press action),
+- the **hold action**: toggle an entity, continuously ramp the scroll target,
+  or do nothing. Hold-to-ramp starts upward and alternates direction after each
+  completed hold because the BILRESA long-press event carries no direction.
 
 The integration then dims that light in real time. Add as many bindings as you
 like — one per wheel channel — so this scales to any number of wheels with no
@@ -137,12 +152,13 @@ YAML.
 
 ## Usage
 
-This section is the manual for the current release (v0.2).
+This section documents the current integration behavior. Features ahead of the
+latest release are identified in [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ### Event entities
 
 Each wheel channel becomes an `event` entity, e.g.
-`event.bilresa_scroll_wheel_nelca_channel_1`. Its state is the timestamp of the
+`event.bilresa_scroll_wheel_channel_1`. Its state is the timestamp of the
 last action; the `event_type` attribute (and `notches` / `presses`) tells you
 what happened. Use it as an automation trigger.
 
@@ -167,7 +183,7 @@ the light ramps between the wheel's ~1 s batches:
 alias: BILRESA – smooth dim up
 triggers:
   - trigger: state
-    entity_id: event.bilresa_scroll_wheel_nelca_channel_1
+    entity_id: event.bilresa_scroll_wheel_channel_1
     attribute: event_type
     to: rotate_up
 conditions:
@@ -175,7 +191,7 @@ conditions:
 actions:
   - action: light.turn_on
     target:
-      entity_id: light.svetylka_svetylka
+      entity_id: light.example
     data:
       brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
       transition: 1
@@ -238,7 +254,18 @@ logger:
 - [x] Scroll modes (brightness / colour temperature / colour), acceleration,
       maximum brightness, double/triple/hold actions. *(next)*
 - [x] **Device triggers** and a **smooth-dimming blueprint**. *(next)*
-- [ ] HACS default store submission and a brand icon.
+- [x] Scene cycling, hold-to-ramp and System Health information. *(next)*
+- [x] Parent Matter Server URL reconfiguration. *(next)*
+- [x] Discovery feasibility reviewed — no supported dependency-discovery source;
+      decision documented in [docs/DISCOVERY.md](docs/DISCOVERY.md). *(next)*
+- [x] Internal `quality_scale.yaml` with only evidenced `done`/`exempt` rules.
+- [x] Reuse the core Matter client event stream, with a compatibility fallback
+      to the dedicated passive WebSocket. *(next)*
+- [x] Plan the small-patch `0.5.1`–`0.5.7` stabilization train; implementation
+      exists in the working tree, but each package keeps its own validation gate.
+- [ ] Complete hardware validation and automated coverage.
+- [ ] **Final publication stage:** brand icon/`home-assistant/brands` PR and
+      default HACS-store submission, only after the integration is finished.
 
 ## Limitations
 
@@ -252,7 +279,9 @@ logger:
 
 Issues and pull requests are welcome. Please describe your wheel firmware and
 Home Assistant / Matter Server versions when reporting a problem, and include a
-debug log of the events if it concerns scrolling behaviour.
+debug log of the events if it concerns scrolling behaviour. Development and
+hardware-validation procedures are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+and [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
 
 ## License
 

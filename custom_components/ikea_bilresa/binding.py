@@ -17,6 +17,7 @@ setting feels consistent across every kind of target.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 import logging
 import time
 from typing import Any
@@ -24,10 +25,12 @@ from typing import Any
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
 from .const import (
     ACTION_HOLD,
     ACTION_PRESS,
+    ACTION_RELEASE,
     ACTION_ROTATE,
     CLICK_NONE,
     CLICK_OFF,
@@ -37,17 +40,20 @@ from .const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
+    CONF_SCENES,
     CONF_STEP,
     CONF_TARGET,
     CONF_TRANSITION,
     CONF_TRIPLE_TARGET,
     DEFAULT_ACCELERATION,
     DEFAULT_CLICK_ACTION,
+    DEFAULT_HOLD_ACTION,
     DEFAULT_MAX_BRIGHTNESS,
     DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_MODE,
@@ -56,6 +62,8 @@ from .const import (
     DIRECTION_UP,
     FALLBACK_MAX_KELVIN,
     FALLBACK_MIN_KELVIN,
+    HOLD_RAMP,
+    HOLD_TOGGLE,
     MODE_COLOR,
     MODE_COLOR_TEMP,
     MODE_COVER,
@@ -63,6 +71,7 @@ from .const import (
     MODE_NUMBER,
     MODE_TEMPERATURE,
     MODE_VOLUME,
+    SIGNAL_CONNECTION,
     signal_channel,
 )
 from .engine import WheelAction
@@ -86,6 +95,12 @@ _RESYNC_AFTER = 3.0
 # After a button press, ignore scroll events briefly so trailing rotation events
 # (the wheel keeps emitting its batch for ~1 s) can't override a press-to-off.
 _SUPPRESS_ROTATE_AFTER_PRESS = 0.8
+
+# Hold-to-ramp: how often and by how much to step while the button is held.
+_RAMP_INTERVAL = timedelta(seconds=0.2)
+_RAMP_NOTCHES = 1
+# A lost Matter LongRelease event must never leave a target changing forever.
+_RAMP_WATCHDOG_SECONDS = 30
 
 
 def _pct_to_units(pct: float) -> int:
@@ -122,6 +137,12 @@ class LightBinding:
         self._double_target = data.get(CONF_DOUBLE_TARGET)
         self._triple_target = data.get(CONF_TRIPLE_TARGET)
         self._hold_target = data.get(CONF_HOLD_TARGET)
+        self._hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
+        self._scenes: list[str] = list(data.get(CONF_SCENES) or [])
+        self._scene_index = 0
+        self._ramp_up = True
+        self._ramp_unsub: Callable[[], None] | None = None
+        self._ramp_watchdog_unsub: Callable[[], None] | None = None
         self._tracked: float | None = None
         self._saturation = 100.0
         self._last = 0.0
@@ -130,14 +151,31 @@ class LightBinding:
     @callback
     def async_attach(self) -> Callable[[], None]:
         """Start listening for this channel's actions; returns an unsubscribe."""
-        return async_dispatcher_connect(
+        action_unsub = async_dispatcher_connect(
             self.hass,
             signal_channel(self._node_id, self._channel),
             self._handle_action,
         )
+        connection_unsub = async_dispatcher_connect(
+            self.hass, SIGNAL_CONNECTION, self._handle_connection_change
+        )
+
+        @callback
+        def unsubscribe() -> None:
+            self._stop_ramp(change_direction=False)
+            connection_unsub()
+            action_unsub()
+
+        return unsubscribe
 
     @callback
     def _handle_action(self, action: WheelAction) -> None:
+        if self._ramp_unsub is not None and action.type in (
+            ACTION_ROTATE,
+            ACTION_PRESS,
+        ):
+            # Any new gesture supersedes a hold whose release may have been lost.
+            self._stop_ramp(change_direction=False)
         if action.type == ACTION_ROTATE:
             if time.monotonic() < self._suppress_rotate_until:
                 return
@@ -152,7 +190,17 @@ class LightBinding:
                 self._toggle(self._triple_target)
         elif action.type == ACTION_HOLD:
             self._hold_off_rotation()
-            self._toggle(self._hold_target)
+            if self._hold_action == HOLD_RAMP:
+                self._start_ramp()
+            elif self._hold_action == HOLD_TOGGLE:
+                self._toggle(self._hold_target)
+        elif action.type == ACTION_RELEASE and self._hold_action == HOLD_RAMP:
+            self._stop_ramp(change_direction=True)
+
+    @callback
+    def _handle_connection_change(self) -> None:
+        """Stop safety-critical timers whenever Matter connectivity changes."""
+        self._stop_ramp(change_direction=False)
 
     @callback
     def _hold_off_rotation(self) -> None:
@@ -164,6 +212,10 @@ class LightBinding:
     def _rotate(self, action: WheelAction) -> None:
         notches = self._accelerate(action.notches)
         up = action.direction == DIRECTION_UP
+        self._rotate_by(notches, up)
+
+    @callback
+    def _rotate_by(self, notches: int, up: bool) -> None:
         if self._mode == MODE_COLOR_TEMP:
             self._rotate_color_temp(notches, up)
         elif self._mode == MODE_COLOR:
@@ -180,6 +232,45 @@ class LightBinding:
             self._rotate_number(notches, up)
         else:
             self._rotate_brightness(notches, up)
+
+    # -- hold-to-ramp -----------------------------------------------------
+
+    @callback
+    def _start_ramp(self) -> None:
+        if self._ramp_unsub is not None:
+            return
+        self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+        self._ramp_unsub = async_track_time_interval(
+            self.hass, self._ramp_tick, _RAMP_INTERVAL
+        )
+        self._ramp_watchdog_unsub = async_call_later(
+            self.hass, _RAMP_WATCHDOG_SECONDS, self._ramp_watchdog
+        )
+
+    @callback
+    def _ramp_tick(self, _now) -> None:
+        self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+
+    @callback
+    def _ramp_watchdog(self, _now) -> None:
+        _LOGGER.warning(
+            "Stopping hold-to-ramp after %s seconds without a release event",
+            _RAMP_WATCHDOG_SECONDS,
+        )
+        self._ramp_watchdog_unsub = None
+        self._stop_ramp(change_direction=False)
+
+    @callback
+    def _stop_ramp(self, *, change_direction: bool) -> None:
+        if self._ramp_unsub is None:
+            return
+        self._ramp_unsub()
+        self._ramp_unsub = None
+        if self._ramp_watchdog_unsub is not None:
+            self._ramp_watchdog_unsub()
+            self._ramp_watchdog_unsub = None
+        if change_direction:
+            self._ramp_up = not self._ramp_up
 
     def _accelerate(self, notches: int) -> int:
         if self._accel <= 0:
@@ -342,6 +433,11 @@ class LightBinding:
 
     @callback
     def _single_press(self) -> None:
+        if self._scenes:
+            scene = self._scenes[self._scene_index]
+            self._scene_index = (self._scene_index + 1) % len(self._scenes)
+            self._call_entity("scene", "turn_on", scene)
+            return
         if self._click == CLICK_NONE:
             return
         service = _CLICK_SERVICE.get(self._click, "toggle")

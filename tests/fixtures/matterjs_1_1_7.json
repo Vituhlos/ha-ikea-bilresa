@@ -1,0 +1,43 @@
+{
+  "server_info": {
+    "fabric_id": 2,
+    "compressed_fabric_id": 0,
+    "schema_version": 11,
+    "min_supported_schema_version": 9,
+    "sdk_version": "matter-server/1.1.7 (matter.js/0.17.4)",
+    "wifi_credentials_set": false,
+    "thread_credentials_set": true,
+    "bluetooth_enabled": false,
+    "ble_proxy_enabled": true
+  },
+  "node": {
+    "node_id": 101,
+    "attributes": {
+      "0/40/3": "BILRESA scroll wheel",
+      "0/29/3": [1, 2, 3],
+      "1/59/65532": 22,
+      "1/29/4": [
+        {"1": 8, "2": 6, "3": "1"},
+        {"1": 67, "2": 3},
+        {"1": 67, "2": 8, "3": "rotary"}
+      ]
+    }
+  },
+  "ongoing_event": {
+    "event": "node_event",
+    "data": {
+      "node_id": 101,
+      "endpoint_id": 1,
+      "cluster_id": 59,
+      "event_id": 5,
+      "event_number": 1001,
+      "priority": 1,
+      "timestamp": 123456,
+      "timestamp_type": 0,
+      "data": {
+        "newPosition": 1,
+        "currentNumberOfPressesCounted": 8
+      }
+    }
+  }
+}

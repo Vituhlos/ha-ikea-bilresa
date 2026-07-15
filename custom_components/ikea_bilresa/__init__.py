@@ -52,6 +52,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
 async def _async_update_listener(
     hass: HomeAssistant, entry: BilresaConfigEntry
 ) -> None:
+    configured_url = entry.data.get(CONF_URL) or _matter_server_url(hass)
+    if configured_url != entry.runtime_data.url:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
     entry.runtime_data.async_setup_bindings(entry)
 
 

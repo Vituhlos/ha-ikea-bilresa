@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections import Counter, deque
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import UTC, datetime
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -26,6 +30,7 @@ from .const import (
     signal_channel,
 )
 from .engine import GestureEngine, WheelAction
+from .matter_core import CoreMatterEventSource, CoreMatterUnavailable
 from .matter_ws import MatterWSClient
 from .model import BilresaWheel, decode_event, parse_node
 
@@ -46,26 +51,96 @@ class BilresaCoordinator:
         self.connected = False
         self.wheels: dict[int, BilresaWheel] = {}
         self._engine = GestureEngine()
-        self._client = MatterWSClient(
-            url, async_get_clientsession(hass), self._on_event
+        self._client: CoreMatterEventSource | MatterWSClient = CoreMatterEventSource(
+            hass, url, self._on_event, self._core_matter_unavailable
         )
+        self._source_switch_lock = asyncio.Lock()
+        self._stopping = False
         self._binding_unsubs: list[Callable[[], None]] = []
         self._disconnect_timer: Callable[[], None] | None = None
+        self._event_counts: Counter[str] = Counter()
+        self._ignored_counts: Counter[str] = Counter()
+        self._recent_events: deque[dict[str, Any]] = deque(maxlen=20)
+        self._actions_dispatched = 0
+        self._connection_count = 0
+        self._fallback_count = 0
+        self._last_event_at: datetime | None = None
+        self._last_fallback_reason: str | None = None
 
     @property
     def matter_server_info(self) -> dict | None:
         """Server info reported by the Matter Server (schema, sdk version)."""
         return self._client.server_info
 
+    @property
+    def event_source(self) -> str:
+        """Return which Matter event stream is currently in use."""
+        return self._client.source
+
+    @property
+    def telemetry(self) -> dict[str, Any]:
+        """Return bounded, privacy-safe runtime counters for diagnostics."""
+        return {
+            "event_counts": dict(self._event_counts),
+            "ignored_counts": dict(self._ignored_counts),
+            "actions_dispatched": self._actions_dispatched,
+            "connection_count": self._connection_count,
+            "fallback_count": self._fallback_count,
+            "last_fallback_reason": self._last_fallback_reason,
+            "last_event_at": (
+                self._last_event_at.isoformat() if self._last_event_at else None
+            ),
+            "recent_events": list(self._recent_events),
+        }
+
     async def async_start(self) -> None:
-        await self._client.start()
+        self._stopping = False
+        try:
+            await self._client.start()
+        except CoreMatterUnavailable as err:
+            _LOGGER.warning(
+                "Cannot reuse Home Assistant's Matter client (%s); falling back "
+                "to a dedicated read-only WebSocket",
+                err,
+            )
+            self._fallback_count += 1
+            self._last_fallback_reason = str(err)
+            self._client = MatterWSClient(
+                self.url, async_get_clientsession(self.hass), self._on_event
+            )
+            await self._client.start()
 
     async def async_stop(self) -> None:
+        self._stopping = True
         self._detach_bindings()
         if self._disconnect_timer is not None:
             self._disconnect_timer()
             self._disconnect_timer = None
         await self._client.stop()
+
+    @callback
+    def _core_matter_unavailable(self, reason: str) -> None:
+        """Schedule a one-way runtime fallback without blocking HA callbacks."""
+        if self._stopping or not isinstance(self._client, CoreMatterEventSource):
+            return
+        self.hass.async_create_task(self._async_fallback_to_websocket(reason))
+
+    async def _async_fallback_to_websocket(self, reason: str) -> None:
+        async with self._source_switch_lock:
+            if self._stopping or not isinstance(self._client, CoreMatterEventSource):
+                return
+            _LOGGER.warning(
+                "Core Matter event source became unavailable (%s); switching "
+                "to the dedicated passive WebSocket",
+                reason,
+            )
+            self._fallback_count += 1
+            self._last_fallback_reason = reason
+            await self._client.stop()
+            self._client = MatterWSClient(
+                self.url, async_get_clientsession(self.hass), self._on_event
+            )
+            await self._client.start()
 
     # -- bindings ---------------------------------------------------------
 
@@ -95,6 +170,7 @@ class BilresaCoordinator:
 
     @callback
     def _on_event(self, event_type: str, data) -> None:
+        self._event_counts[event_type] += 1
         if event_type == "__connected__":
             self._set_connected(True)
         elif event_type == "__disconnected__":
@@ -106,25 +182,42 @@ class BilresaCoordinator:
         elif event_type == "node_removed":
             self._remove_node(data)
         elif event_type == "node_event" and isinstance(data, dict):
+            self._last_event_at = datetime.now(UTC)
+            self._recent_events.append(
+                {
+                    "endpoint_id": data.get("endpoint_id"),
+                    "cluster_id": data.get("cluster_id"),
+                    "event_id": data.get("event_id"),
+                    "event_number": data.get("event_number"),
+                }
+            )
             self._handle_node_event(data)
+        else:
+            self._ignored_counts["unsupported_event"] += 1
 
     @callback
     def _handle_node_event(self, data: dict) -> None:
         if data.get("cluster_id") != CLUSTER_SWITCH:
+            self._ignored_counts["non_switch_cluster"] += 1
             return
         node_id = data.get("node_id")
         wheel = self.wheels.get(node_id) if node_id is not None else None
         if wheel is None:
+            self._ignored_counts["unknown_wheel"] += 1
             return
         decoded = decode_event(wheel, data)
         if decoded is None:
+            self._ignored_counts["undecodable_switch_event"] += 1
             return
         action = self._engine.process(wheel, decoded)
         if action is not None:
             self._dispatch(action)
+        else:
+            self._ignored_counts["non_actionable_switch_event"] += 1
 
     @callback
     def _dispatch(self, action: WheelAction) -> None:
+        self._actions_dispatched += 1
         _LOGGER.debug(
             "action: node=%s ch=%s %s dir=%s notches=%s presses=%s",
             action.node_id,
@@ -184,6 +277,8 @@ class BilresaCoordinator:
 
     @callback
     def _set_connected(self, connected: bool) -> None:
+        if connected and not self.connected:
+            self._connection_count += 1
         self.connected = connected
         if connected:
             if self._disconnect_timer is not None:

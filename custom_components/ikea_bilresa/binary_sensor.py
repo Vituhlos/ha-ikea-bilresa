@@ -9,6 +9,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, SIGNAL_CONNECTION
@@ -27,7 +28,7 @@ class BilresaConnectionSensor(BinarySensorEntity):
 
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_entity_category = None
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_translation_key = "matter_server"
 

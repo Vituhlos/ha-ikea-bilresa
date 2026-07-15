@@ -28,18 +28,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - A **smooth-dimming blueprint** (`blueprints/automation/ikea_bilresa/`) for
   automation-based setups.
 - **Strict typing**: a `py.typed` marker plus a **mypy** type-check job in CI.
+- Optional **scene cycling**: each single press activates the next configured
+  scene for that channel.
+- Optional **hold-to-ramp**: holding the wheel button repeatedly steps the
+  configured scroll target until release; the direction alternates per hold.
+- **System Health** information for Matter Server connectivity and version,
+  discovered wheels and configured bindings.
+- **Parent reconfiguration** for changing and validating the Matter Server URL
+  without removing the integration.
+- Reuse of Home Assistant's existing core **MatterClient event stream**, with a
+  feature-detected fallback to the dedicated passive WebSocket on incompatible
+  Home Assistant versions.
+- Strict matterjs-server **schema-11 compatibility validation** and a sanitized
+  protocol fixture for the add-on 9.0.4 / server 1.1.7 baseline.
+- Binding creation **profiles** and the option to copy an existing binding as a
+  starting point.
+- Bounded, privacy-redacted runtime telemetry in diagnostics, including event,
+  fallback and connection counters without node or entity identifiers.
+- Expanded Linux CI test harness and authored tests for Matter sources, hold
+  safety, binding presets, diagnostics, telemetry and System Health failures.
 
 ### Changed
 - Editing a light binding now updates in place instead of reloading the config
   entry — no reconnect.
+- The Matter Server connection entity is now categorized as diagnostic.
+- The declared minimum Home Assistant version is now 2026.6, matching the
+  config-subentry and current reconfigure APIs used by the integration.
+- Core Matter-client reuse is restricted to a matching configured server URL;
+  repeated runtime incompatibility switches one-way to the passive WebSocket.
+- Fast-scroll handling remains direct and delta-based: evidence shows an extra
+  software accumulator would add latency without defeating device-side batching.
 
 ### Fixed
 - A button press now briefly suppresses trailing scroll events, so pressing to
   turn a light off while dimming isn't immediately undone by the wheel's
   trailing rotation batch.
+- Hold-to-ramp now stops on a lost-release watchdog, connection transition, new
+  gesture and unload, preventing a target from changing indefinitely.
 
 ### Planned
-- Submission to the HACS default store and a brand icon.
+- Validate the `0.5.1`–`0.5.7` patch train through Unit, CI and applicable
+  physical-device gates before creating any release candidate.
+- Submission to the HACS default store and a brand icon remain the final phase.
 
 ## [0.5.0] - 2026-07-14
 

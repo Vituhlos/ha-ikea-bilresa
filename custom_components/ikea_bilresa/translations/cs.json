@@ -7,6 +7,13 @@
         "data": {
           "url": "URL websocketu Matter Serveru"
         }
+      },
+      "reconfigure": {
+        "title": "Změnit připojení k Matter Serveru",
+        "description": "Aktualizuj URL websocketu Matter Serveru. Nová adresa se před opětovným připojením integrace otestuje.",
+        "data": {
+          "url": "URL websocketu Matter Serveru"
+        }
       }
     },
     "error": {
@@ -18,17 +25,19 @@
   },
   "config_subentries": {
     "binding": {
-      "title": "Propojení se světlem",
+      "title": "Ovládací propojení",
       "initiate_flow": {
-        "user": "Přidat propojení se světlem",
-        "reconfigure": "Upravit propojení se světlem"
+        "user": "Přidat ovládací propojení",
+        "reconfigure": "Upravit ovládací propojení"
       },
-      "entry_type": "propojení se světlem",
+      "entry_type": "ovládací propojení",
       "step": {
         "user": {
-          "title": "Propoj kanál kolečka se světlem",
-          "description": "Otáčení tímto kanálem kolečka bude v reálném čase stmívat vybrané světlo; jednoduchý stisk tlačítka spustí zvolenou akci.",
+          "title": "Propoj kanál kolečka s cílem",
+          "description": "Vyber profil nebo zkopíruj existující propojení a potom nastav scroll a akce tlačítka.",
           "data": {
+            "binding_profile": "Výchozí profil",
+            "copy_from": "Kopírovat nastavení z existujícího propojení (volitelné)",
             "node_id": "Kolečko",
             "channel": "Kanál",
             "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
@@ -42,12 +51,14 @@
             "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
             "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
             "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
-            "hold_target": "Podržení: přepnout entitu (volitelné)"
+            "hold_target": "Cíl podržení (volitelné, používá volba Přepnout entitu)",
+            "hold_action": "Akce při podržení tlačítka",
+            "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           }
         },
         "reconfigure": {
-          "title": "Upravit propojení se světlem",
-          "description": "Uprav, jak tento kanál kolečka ovládá své světlo.",
+          "title": "Upravit ovládací propojení",
+          "description": "Uprav, jak tento kanál kolečka ovládá svůj cíl.",
           "data": {
             "node_id": "Kolečko",
             "channel": "Kanál",
@@ -62,7 +73,9 @@
             "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
             "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
             "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
-            "hold_target": "Podržení: přepnout entitu (volitelné)"
+            "hold_target": "Cíl podržení (volitelné, používá volba Přepnout entitu)",
+            "hold_action": "Akce při podržení tlačítka",
+            "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           }
         }
       },
@@ -91,6 +104,36 @@
         "fan_speed": "Otáčky ventilátoru",
         "number": "Hodnota čísla"
       }
+    },
+    "hold_action": {
+      "options": {
+        "toggle": "Přepnout entitu",
+        "ramp": "Plynule měnit cíl při podržení",
+        "none": "Nedělat nic"
+      }
+    },
+    "binding_profile": {
+      "options": {
+        "custom": "Vlastní",
+        "light": "Stmívač světla",
+        "media": "Hlasitost médií",
+        "cover": "Poloha krytu",
+        "climate": "Teplota klimatizace",
+        "scenes": "Výběr scén"
+      }
+    }
+  },
+  "system_health": {
+    "info": {
+      "configured": "Nastaveno",
+      "config_entry_state": "Stav položky konfigurace",
+      "matter_server_connected": "Matter Server připojen",
+      "matter_server_version": "Verze SDK Matter Serveru",
+      "matter_event_source": "Zdroj Matter událostí",
+      "last_matter_event": "Poslední Matter událost",
+      "fallback_reason": "Důvod přepnutí zdroje událostí",
+      "discovered_wheels": "Nalezená kolečka BILRESA",
+      "configured_bindings": "Nastavená propojení"
     }
   },
   "entity": {

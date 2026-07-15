@@ -124,6 +124,33 @@ CONF_CLICK_TARGET = "click_target"
 CONF_DOUBLE_TARGET = "double_press_target"
 CONF_TRIPLE_TARGET = "triple_press_target"
 CONF_HOLD_TARGET = "hold_target"
+CONF_HOLD_ACTION = "hold_action"
+CONF_SCENES = "scenes"
+
+# Flow-only convenience fields used when creating a binding.
+CONF_BINDING_PROFILE = "binding_profile"
+CONF_COPY_FROM = "copy_from"
+BINDING_PROFILE_CUSTOM = "custom"
+BINDING_PROFILE_LIGHT = "light"
+BINDING_PROFILE_MEDIA = "media"
+BINDING_PROFILE_COVER = "cover"
+BINDING_PROFILE_CLIMATE = "climate"
+BINDING_PROFILE_SCENES = "scenes"
+BINDING_PROFILES = [
+    BINDING_PROFILE_CUSTOM,
+    BINDING_PROFILE_LIGHT,
+    BINDING_PROFILE_MEDIA,
+    BINDING_PROFILE_COVER,
+    BINDING_PROFILE_CLIMATE,
+    BINDING_PROFILE_SCENES,
+]
+
+# What holding the button does.
+HOLD_TOGGLE = "toggle"  # toggle the hold target entity (default)
+HOLD_RAMP = "ramp"  # continuously ramp the scroll target while held
+HOLD_NONE = "none"
+HOLD_ACTIONS = [HOLD_TOGGLE, HOLD_RAMP, HOLD_NONE]
+DEFAULT_HOLD_ACTION = HOLD_TOGGLE
 
 DEFAULT_STEP = 3
 DEFAULT_ACCELERATION = 0
