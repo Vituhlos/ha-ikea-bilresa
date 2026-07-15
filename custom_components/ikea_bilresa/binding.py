@@ -201,6 +201,9 @@ class LightBinding:
             == BUTTON_RESPONSE_FAST
         )
         self._fast_press_started: float | None = None
+        self._latency_trace_sequence = 0
+        self._latency_trace_started_at: float | None = None
+        self._latency_trace_target_seen = False
 
     @callback
     def async_attach(self) -> Callable[[], None]:
@@ -221,11 +224,23 @@ class LightBinding:
         state_unsub = async_track_state_change_event(
             self.hass, [self._target], self._handle_target_state_change
         )
+        trace_state_unsub = (
+            async_track_state_change_event(
+                self.hass,
+                [self._click_target],
+                self._handle_latency_target_state_change,
+            )
+            if self._click_target != self._target
+            else None
+        )
 
         @callback
         def unsubscribe() -> None:
             self._stop_ramp(change_direction=False)
             self._fast_press_started = None
+            self._reset_latency_trace()
+            if trace_state_unsub is not None:
+                trace_state_unsub()
             state_unsub()
             connection_unsub()
             raw_button_unsub()
@@ -249,6 +264,7 @@ class LightBinding:
                 # The binding already ran one immediate single-press action.
                 # MultiPressComplete still reaches event entities/device
                 # triggers, but must not execute the binding a second time.
+                self._log_latency_stage("multi_press_complete", presses=action.presses)
                 self._fast_press_started = None
                 return
             if action.presses == 1:
@@ -270,6 +286,7 @@ class LightBinding:
     def _handle_connection_change(self) -> None:
         """Stop safety-critical timers whenever Matter connectivity changes."""
         self._fast_press_started = None
+        self._reset_latency_trace()
         self._tracked = None
         self._command_authoritative_until = 0.0
         self._last_direction = None
@@ -282,6 +299,8 @@ class LightBinding:
     @callback
     def _handle_target_state_change(self, event) -> None:
         """Rebase the next action after a genuine external target change."""
+        if self._click_target == self._target:
+            self._handle_latency_target_state_change(event)
         new_state = event.data.get("new_state")
         if new_state is None or new_state.state in _UNAVAILABLE:
             self._tracked = None
@@ -293,6 +312,18 @@ class LightBinding:
         # and the next wheel action reads reality again.
         if time.monotonic() >= self._command_authoritative_until:
             self._tracked = None
+
+    @callback
+    def _handle_latency_target_state_change(self, event) -> None:
+        """Record the first target-state acknowledgement for an active trace."""
+        if (
+            self._latency_trace_started_at is None
+            or self._latency_trace_target_seen
+            or event.data.get("new_state") is None
+        ):
+            return
+        self._latency_trace_target_seen = True
+        self._log_latency_stage("target_state_change")
 
     @callback
     def _handle_raw_input(self, role: str, event_type: str) -> None:
@@ -331,10 +362,47 @@ class LightBinding:
         # click action. Further releases in the same multi-press gesture are
         # collapsed until its public MultiPressComplete action arrives.
         self._fast_press_started = now
+        self._start_latency_trace(now)
         if self._ramp_unsub is not None:
             self._stop_ramp(change_direction=False)
         self._hold_off_rotation()
         self._single_press()
+
+    def _start_latency_trace(self, now: float) -> None:
+        """Start a privacy-safe fast-press trace only while DEBUG is enabled."""
+        if not _LOGGER.isEnabledFor(logging.DEBUG):
+            self._reset_latency_trace()
+            return
+        self._latency_trace_sequence += 1
+        self._latency_trace_started_at = now
+        self._latency_trace_target_seen = False
+        self._log_latency_stage("short_release", now=now)
+
+    def _reset_latency_trace(self) -> None:
+        """Discard transient latency measurement state."""
+        self._latency_trace_started_at = None
+        self._latency_trace_target_seen = False
+
+    def _log_latency_stage(
+        self,
+        stage: str,
+        *,
+        now: float | None = None,
+        presses: int | None = None,
+    ) -> None:
+        """Log one trace stage without household or Matter identifiers."""
+        started_at = self._latency_trace_started_at
+        if started_at is None:
+            return
+        elapsed_ms = ((time.monotonic() if now is None else now) - started_at) * 1000
+        _LOGGER.debug(
+            "BILRESA latency trace=%s channel=%s stage=%s elapsed_ms=%.1f presses=%s",
+            self._latency_trace_sequence,
+            self._channel,
+            stage,
+            elapsed_ms,
+            presses if presses is not None else "-",
+        )
 
     @callback
     def _hold_off_rotation(self) -> None:
@@ -696,6 +764,8 @@ class LightBinding:
     def _call_entity(self, domain: str, service: str, entity_id: str) -> bool:
         if self._available_state(entity_id) is None:
             return False
+        if entity_id == self._click_target:
+            self._log_latency_stage("service_dispatch")
         self.hass.async_create_task(
             self.hass.services.async_call(
                 domain, service, {ATTR_ENTITY_ID: entity_id}, blocking=False

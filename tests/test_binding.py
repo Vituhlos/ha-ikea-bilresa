@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -188,6 +189,37 @@ def test_lost_completion_guard_recovers_on_later_gesture(monkeypatch) -> None:
     binding._handle_raw_button("short_release")
 
     assert binding._single_press.call_count == 2
+
+
+def test_fast_press_debug_trace_records_latency_without_identifiers(
+    monkeypatch, caplog
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST}
+    )
+    now = [10.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    caplog.set_level(logging.DEBUG, logger="custom_components.ikea_bilresa.binding")
+
+    binding._handle_raw_button("short_release")
+    now[0] = 10.08
+    binding._handle_target_state_change(
+        SimpleNamespace(data={"new_state": SimpleNamespace(state="on")})
+    )
+    now[0] = 10.25
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("stage=short_release elapsed_ms=0.0" in msg for msg in messages)
+    assert any("stage=service_dispatch elapsed_ms=0.0" in msg for msg in messages)
+    assert any("stage=target_state_change elapsed_ms=80.0" in msg for msg in messages)
+    assert any(
+        "stage=multi_press_complete elapsed_ms=250.0 presses=1" in msg
+        for msg in messages
+    )
+    assert all("light.test" not in msg and "101" not in msg for msg in messages)
 
 
 def test_hold_sequence_never_runs_fast_single_press(monkeypatch) -> None:
