@@ -100,6 +100,7 @@ class MatterWSClient:
                 "Matter Server connected: %s",
                 (self.server_info or {}).get("sdk_version"),
             )
+            self._on_event("__connected__", None)
 
             # Kick off start_listening; its result (the node dump) is delivered
             # via the read loop below and dispatched from the done-callback.
@@ -118,21 +119,23 @@ class MatterWSClient:
                 {"message_id": listen_id, "command": "start_listening", "args": {}}
             )
 
-            async for msg in ws:
-                if msg.type == WSMsgType.TEXT:
-                    self._handle_message(msg.json(), pending)
-                elif msg.type in (
-                    WSMsgType.CLOSE,
-                    WSMsgType.CLOSING,
-                    WSMsgType.CLOSED,
-                    WSMsgType.ERROR,
-                ):
-                    break
-
-        # Connection ended: fail any still-pending futures so awaiters unblock.
-        for fut in pending.values():
-            if not fut.done():
-                fut.set_exception(ConnectionError("Matter WS closed"))
+            try:
+                async for msg in ws:
+                    if msg.type == WSMsgType.TEXT:
+                        self._handle_message(msg.json(), pending)
+                    elif msg.type in (
+                        WSMsgType.CLOSE,
+                        WSMsgType.CLOSING,
+                        WSMsgType.CLOSED,
+                        WSMsgType.ERROR,
+                    ):
+                        break
+            finally:
+                # Connection ended: fail pending futures and signal a disconnect.
+                for fut in pending.values():
+                    if not fut.done():
+                        fut.set_exception(ConnectionError("Matter WS closed"))
+                self._on_event("__disconnected__", None)
 
     def _handle_message(
         self, data: dict[str, Any], pending: dict[str, asyncio.Future]

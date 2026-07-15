@@ -9,6 +9,9 @@
         }
       }
     },
+    "error": {
+      "cannot_connect": "Připojení k Matter Serveru selhalo. Zkontroluj URL a že add-on Matter Server běží."
+    },
     "abort": {
       "already_configured": "IKEA BILRESA je už nastavená."
     }
@@ -64,6 +67,19 @@
         "off": "Vypnout",
         "none": "Nedělat nic"
       }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "matter_server": {
+        "name": "Připojení k Matter Serveru"
+      }
+    }
+  },
+  "issues": {
+    "cannot_connect": {
+      "title": "Matter Server je nedostupný",
+      "description": "IKEA BILRESA se nemůže připojit k Matter Serveru na {url}. Kolečka nebudou reagovat, dokud se spojení neobnoví. Zkontroluj, že add-on Matter Server běží."
     }
   }
 }

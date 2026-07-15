@@ -132,6 +132,12 @@ CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
 
 # --- dispatcher signals -------------------------------------------------
 SIGNAL_WHEELS_UPDATED = f"{DOMAIN}_wheels_updated"
+SIGNAL_CONNECTION = f"{DOMAIN}_connection"
+
+# --- repair issues ------------------------------------------------------
+ISSUE_CANNOT_CONNECT = "cannot_connect"
+# Grace period before a lost connection is surfaced as a repair issue.
+DISCONNECT_GRACE_SECONDS = 60
 
 
 def signal_channel(node_id: int, channel: int | None) -> str:

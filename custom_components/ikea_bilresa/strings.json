@@ -9,6 +9,9 @@
         }
       }
     },
+    "error": {
+      "cannot_connect": "Failed to connect to the Matter Server. Check the URL and that the Matter Server add-on is running."
+    },
     "abort": {
       "already_configured": "IKEA BILRESA is already set up."
     }
@@ -64,6 +67,19 @@
         "off": "Turn off",
         "none": "Do nothing"
       }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "matter_server": {
+        "name": "Matter Server connection"
+      }
+    }
+  },
+  "issues": {
+    "cannot_connect": {
+      "title": "Cannot reach the Matter Server",
+      "description": "IKEA BILRESA cannot connect to the Matter Server at {url}. Scroll wheels won't respond until the connection is restored. Check that the Matter Server add-on is running."
     }
   }
 }

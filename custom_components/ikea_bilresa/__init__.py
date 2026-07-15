@@ -12,15 +12,14 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 
-from .binding import LightBinding
-from .const import CONF_URL, DEFAULT_MATTER_URL, SUBENTRY_BINDING
+from .const import CONF_URL, DEFAULT_MATTER_URL
 from .coordinator import BilresaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.EVENT]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.EVENT]
 
 type BilresaConfigEntry = ConfigEntry[BilresaCoordinator]
 
@@ -43,29 +42,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     await coordinator.async_start()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    _setup_bindings(hass, entry)
+    coordinator.async_setup_bindings(entry)
 
-    # Reload when a binding subentry is added, edited or removed.
-    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    # Re-sync bindings in place when a subentry changes — no reload / reconnect.
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
-@callback
-def _setup_bindings(hass: HomeAssistant, entry: BilresaConfigEntry) -> None:
-    """Attach a LightBinding for every configured binding subentry."""
-    count = 0
-    for subentry in entry.subentries.values():
-        if subentry.subentry_type != SUBENTRY_BINDING:
-            continue
-        binding = LightBinding(hass, dict(subentry.data))
-        entry.async_on_unload(binding.async_attach())
-        count += 1
-    if count:
-        _LOGGER.debug("Attached %s light binding(s)", count)
-
-
-async def _async_reload_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
+async def _async_update_listener(
+    hass: HomeAssistant, entry: BilresaConfigEntry
+) -> None:
+    entry.runtime_data.async_setup_bindings(entry)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> bool:

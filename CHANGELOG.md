@@ -8,9 +8,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Added
-- (planned) A smooth-dimming **blueprint** built on the clean scroll events.
-- (planned) Per-binding acceleration; button double/triple/hold actions in the
-  GUI binding.
+- Runtime **hot add / remove of wheels** — a newly commissioned BILRESA appears
+  (and a removed one disappears) without restarting Home Assistant.
+- **Matter Server connection** binary sensor; wheel entities become unavailable
+  while the connection is down.
+- A **repair issue** is raised when the Matter Server stays unreachable.
+- **Connection test** when setting up the integration (a bad URL is rejected).
+
+### Changed
+- Editing a light binding now updates in place instead of reloading the config
+  entry — no reconnect.
+
+### Planned
+- A smooth-dimming **blueprint** built on the clean scroll events.
+- Per-binding acceleration; button double/triple/hold actions in the GUI binding.
 
 ## [0.5.0] - 2026-07-14
 

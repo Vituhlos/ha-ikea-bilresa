@@ -22,6 +22,7 @@ from .const import (
     ET_ROTATE_DOWN,
     ET_ROTATE_UP,
     PRESS_EVENT_TYPES,
+    SIGNAL_CONNECTION,
     SIGNAL_WHEELS_UPDATED,
     WHEEL_EVENT_TYPES,
     signal_channel,
@@ -36,12 +37,13 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up event entities, adding more as wheels are discovered."""
+    """Set up event entities, reconciling as wheels are added or removed."""
     coordinator: BilresaCoordinator = entry.runtime_data
-    known: set[tuple[int, int]] = set()
+    entities: dict[tuple[int, int], BilresaChannelEvent] = {}
 
     @callback
     def _sync() -> None:
+        desired: set[tuple[int, int]] = set()
         new: list[BilresaChannelEvent] = []
         for node_id, wheel in coordinator.wheels.items():
             channels = sorted(
@@ -49,10 +51,15 @@ async def async_setup_entry(
             )
             for channel in channels:
                 key = (node_id, channel)
-                if key in known:
-                    continue
-                known.add(key)
-                new.append(BilresaChannelEvent(wheel, channel))
+                desired.add(key)
+                if key not in entities:
+                    entity = BilresaChannelEvent(coordinator, wheel, channel)
+                    entities[key] = entity
+                    new.append(entity)
+        for key in list(entities):
+            if key not in desired:
+                entity = entities.pop(key)
+                hass.async_create_task(entity.async_remove(force_remove=True))
         if new:
             async_add_entities(new)
 
@@ -68,13 +75,15 @@ class BilresaChannelEvent(EventEntity):
     _attr_icon = "mdi:knob"
     _attr_event_types = WHEEL_EVENT_TYPES
 
-    def __init__(self, wheel: BilresaWheel, channel: int) -> None:
+    def __init__(
+        self, coordinator: BilresaCoordinator, wheel: BilresaWheel, channel: int
+    ) -> None:
+        self._coordinator = coordinator
         self._wheel = wheel
         self._channel = channel
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}"
         self._attr_name = f"Channel {channel}"
         if wheel.serial:
-            # Attach to the existing core-Matter device for this wheel.
             identifiers = {("matter", f"serial_{wheel.serial}")}
         else:
             identifiers = {(DOMAIN, str(wheel.node_id))}
@@ -85,12 +94,21 @@ class BilresaChannelEvent(EventEntity):
             name=wheel.name,
         )
 
+    @property
+    def available(self) -> bool:
+        return self._coordinator.connected
+
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
                 signal_channel(self._wheel.node_id, self._channel),
                 self._handle_action,
+            )
+        )
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, SIGNAL_CONNECTION, self.async_write_ha_state
             )
         )
 

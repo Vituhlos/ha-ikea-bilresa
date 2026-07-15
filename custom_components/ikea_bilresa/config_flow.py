@@ -7,8 +7,10 @@ entirely in the UI.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
+import aiohttp
 from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
@@ -17,6 +19,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 import voluptuous as vol
 
@@ -48,6 +51,20 @@ def _matter_server_url(hass: HomeAssistant) -> str:
     return DEFAULT_MATTER_URL
 
 
+async def _async_can_connect(hass: HomeAssistant, url: str) -> bool:
+    """Return True if a Matter Server answers with a ServerInfo message."""
+    session = async_get_clientsession(hass)
+    try:
+        async with (
+            asyncio.timeout(10),
+            session.ws_connect(url, heartbeat=None) as ws,
+        ):
+            message = await ws.receive_json()
+    except (TimeoutError, OSError, aiohttp.ClientError, ValueError, TypeError):
+        return False
+    return isinstance(message, dict) and "sdk_version" in message
+
+
 class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Single-instance parent flow. Auto-detects the Matter Server URL."""
 
@@ -59,13 +76,15 @@ class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
 
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(title="IKEA BILRESA", data=user_input)
+            if await _async_can_connect(self.hass, user_input[CONF_URL]):
+                return self.async_create_entry(title="IKEA BILRESA", data=user_input)
+            errors["base"] = "cannot_connect"
 
-        schema = vol.Schema(
-            {vol.Required(CONF_URL, default=_matter_server_url(self.hass)): str}
-        )
-        return self.async_show_form(step_id="user", data_schema=schema)
+        default_url = (user_input or {}).get(CONF_URL) or _matter_server_url(self.hass)
+        schema = vol.Schema({vol.Required(CONF_URL, default=default_url): str})
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     @staticmethod
     @callback
