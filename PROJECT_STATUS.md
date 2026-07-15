@@ -152,6 +152,29 @@ overview and registry migration have not yet been exercised in a running Home
 Assistant. No hardware behavior changed and no post-v0.5.0 work is
 hardware-verified.
 
+Publication and deployment results recorded later on 2026-07-15:
+
+- implementation commit `cc3a20f` (`fix: clean up integration overview`) was
+  pushed to `agent/stabilize-0.5-x` and updated draft PR #1;
+- GitHub Actions run `29406230111` passed for exact commit `cc3a20f`: hassfest,
+  HACS validation, Ruff and mypy passed; 45 tests passed in 0.75 s and total
+  coverage was 53%;
+- prerelease `v0.5.7-rc.2` was published from exact commit `cc3a20f`;
+- HACS installed exactly `v0.5.7-rc.2`; the pre-restart Home Assistant config
+  check returned valid with no errors, and Home Assistant restarted normally;
+- post-restart read-only MCP checks found the integration loaded, connected via
+  `core_matter_client`, with two physical devices, six `ikea_bilresa` event
+  entities and two binding subentries;
+- both generated binding titles migrated to the `Wheel name · CH 1` format;
+  the obsolete service device and connection entity were absent;
+- exact-domain system-log search returned no entries; the raw error log only
+  contained Home Assistant's standard warning that a custom integration is not
+  tested by Home Assistant Core.
+
+This establishes Implemented + Static + Unit + CI + Released and a successful
+non-hardware Home Assistant deployment smoke test for the overview cleanup. It
+does not establish Hardware or complete visual review in the owner's browser.
+
 ## Important files added or expanded
 
 - Runtime: `binding.py`, `config_flow.py`, `coordinator.py`, `matter_core.py`,
@@ -246,11 +269,10 @@ soak behavior with exact HA/Matter/BILRESA versions recorded.
 
 ## Single best next action
 
-After owner approval, commit and push the focused `v0.5.7-rc.2` overview-cleanup
-patch, require green Linux CI, then deploy it to Home Assistant and visually
-confirm that migration leaves only the physical BILRESA devices and binding
-cards. The complete physical checklist in `docs/HARDWARE_TEST.md` remains the
-release gate afterward.
+Owner visually reviews the deployed `v0.5.7-rc.2` integration overview and
+reports any remaining hierarchy or wording issue. If the screen is correct, run
+the complete physical checklist in `docs/HARDWARE_TEST.md`; Hardware remains the
+release gate.
 
 ## Next-agent handoff
 

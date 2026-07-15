@@ -250,7 +250,8 @@ logger:
       and let the integration drive brightness directly, no YAML. *(0.3)*
 - [x] Minimum-brightness floor and a separate button target entity. *(0.4)*
 - [x] CI, unit tests and diagnostics. *(0.5)*
-- [x] Hot add/remove of wheels, connection sensor, in-place binding updates. *(next)*
+- [x] Hot add/remove of wheels, connection health/Repairs, in-place binding
+      updates. *(next)*
 - [x] Scroll modes (brightness / colour temperature / colour), acceleration,
       maximum brightness, double/triple/hold actions. *(next)*
 - [x] **Device triggers** and a **smooth-dimming blueprint**. *(next)*

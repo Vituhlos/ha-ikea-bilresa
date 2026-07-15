@@ -248,7 +248,8 @@ logger:
       světlo a integrace řídí jas přímo, bez YAML. *(0.3)*
 - [x] Minimální práh jasu a samostatný cíl tlačítka. *(0.4)*
 - [x] CI, unit testy a diagnostics. *(0.5)*
-- [x] Hot add/remove koleček, senzor připojení, in-place bindingy. *(další)*
+- [x] Hot add/remove koleček, stav připojení/Repairs a in-place bindingy.
+      *(další)*
 - [x] Režimy scrollu (jas / teplota bílé / barva), akcelerace, max jas,
       akce double/triple/hold. *(další)*
 - [x] **Device triggers** a **blueprint na plynulé stmívání**. *(další)*
