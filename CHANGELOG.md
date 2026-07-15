@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.6] - 2026-07-15
+
+### Added
+- A **technical spike** for the future BILRESA panel, behind an admin-only
+  sidebar entry. This is not the panel and not a feature: it renders a
+  diagnostic table and exists to prove that the integration can serve, cache-bust
+  and remove a frontend asset through HACS. It will be replaced wholesale.
+- Two read-only WebSocket commands used only by that spike. They return three
+  non-identifying scalars and have no write path.
+
+### Notes
+- The panel cannot affect wheels, bindings or events. If its asset is missing or
+  registration fails, the integration sets up normally without a sidebar entry.
+- No event decoding, gesture timing, binding behaviour or stored configuration
+  changed in this release candidate.
+
 ## [0.5.7-rc.5] - 2026-07-15
 
 ### Added
