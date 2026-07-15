@@ -31,9 +31,9 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Draft PR #1 publishes one snapshot
-  containing all seven work packages and therefore targets the prerelease
-  `v0.5.7-rc.1` after CI.
+- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.1` was published
+  from CI-verified commit `fa6d38d`; it contains all seven work packages. Draft
+  PR #1 remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -54,9 +54,24 @@ Read-only MCP checks succeeded earlier in this task:
 - core Matter and `ikea_bilresa` config entries were loaded;
 - exact-name log searches returned no current Matter/BILRESA entries.
 
-No Home Assistant state was changed. The running custom integration appeared to
-be an older deployed copy and does not validate this working tree. MCP does not
-replace physical BILRESA input.
+During that earlier read-only phase no Home Assistant state was changed. The
+running custom integration was an older deployed copy and did not validate the
+working tree. MCP does not replace physical BILRESA input.
+
+After owner authorization, HACS explicitly installed `v0.5.7-rc.1` and Home
+Assistant was restarted with a valid preflight config check. Non-hardware smoke
+checks after restart established:
+
+- HACS installed version `v0.5.7-rc.1`;
+- `ikea_bilresa` config entry state `loaded`;
+- parent reconfigure and binding subentry schema are available;
+- event source `core_matter_client`, two discovered wheels, two bindings, and no
+  event-source fallback;
+- diagnostics contract available, with all 14 sampled URL/node/name/title/
+  serial/target fields redacted and bounded recent-event metadata present;
+- no matching `ikea_bilresa` system-log or error-log entries after restart.
+
+These checks are Home Assistant smoke/diagnostic evidence, not Hardware.
 
 ## `0.5.x` stabilization train
 
@@ -137,7 +152,8 @@ Not run for the current working tree:
 - Home Assistant UI/config-flow and failure-injection checks;
 - physical IKEA BILRESA release-candidate checklist.
 
-GitHub Actions run `29404200175` passed for commit `83bb24a` on Python 3.14.6:
+GitHub Actions runs `29404200175`, `29404377898`, and final RC run
+`29404628773` passed on Python 3.14.6. The final run validates commit `fa6d38d`:
 
 ```text
 Validate manifest (hassfest) passed
@@ -148,7 +164,7 @@ Unit tests                  39 passed in 0.92s
 Total coverage              51%
 ```
 
-The green test job establishes Unit + CI for that snapshot. It does not satisfy
+The green test job establishes Unit + CI for the RC snapshot. It does not satisfy
 the `0.5.3` coverage-above-95% exit gate and does not establish Hardware.
 
 ## Hardware status
@@ -181,10 +197,9 @@ soak behavior with exact HA/Matter/BILRESA versions recorded.
 
 ## Single best next action
 
-Push the stabilization snapshot, let GitHub Actions validate the exact revision,
-and fix every CI regression. Only a passing revision may be merged and tagged as
-the prerelease `v0.5.7-rc.1`; non-hardware HA diagnostics may then be run before
-the complete physical checklist in `docs/HARDWARE_TEST.md`.
+Run the complete physical `v0.5.7-rc.1` checklist in
+`docs/HARDWARE_TEST.md`, recording exact versions and every result. Fix observed
+regressions before merging PR #1 or publishing stable `v0.5.7`.
 
 ## Next-agent handoff
 
