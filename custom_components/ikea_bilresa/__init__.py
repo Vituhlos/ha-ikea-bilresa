@@ -23,6 +23,8 @@ from homeassistant.helpers.entity_registry import async_get as async_get_entity_
 
 from .const import CONF_URL, DEFAULT_MATTER_URL, DOMAIN, SUBENTRY_BINDING
 from .coordinator import BilresaCoordinator
+from .panel import async_remove_panel, async_setup_panel
+from .panel_api import async_register_commands
 from .presentation import migrate_generated_binding_title
 
 _LOGGER = logging.getLogger(__name__)
@@ -95,6 +97,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_setup_bindings(entry)
 
+    # Panel last, and never fatal: a panel that cannot be served must degrade to
+    # "no panel", not to a failed setup. Wheels, bindings and events do not
+    # depend on it. See panel.py — this is still the Phase 0 spike.
+    async_register_commands(hass)
+    await async_setup_panel(hass)
+
     # Re-sync bindings in place when a subentry changes — no reload / reconnect.
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
@@ -114,5 +122,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> 
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        # Before stopping the coordinator: a sidebar entry pointing at an
+        # unloaded integration is worse than no sidebar entry.
+        async_remove_panel(hass)
         await entry.runtime_data.async_stop()
     return unloaded

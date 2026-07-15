@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-15 by Codex**
+Last updated: **2026-07-15 by Claude Code**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -248,6 +248,86 @@ behavior, binding storage, Home Assistant deployment or hardware behavior was
 changed or verified. The physical `v0.5.7` checklist remains the release gate;
 see `Single best next action` below for the current priority, which is not the
 panel.
+
+### Panel `0.5.8` Phase 0 technical spike (Claude Code, 2026-07-15)
+
+Status: **Implemented + Static. Unit not run. CI has not run. Nothing about this
+spike is proven** — every question it exists to answer needs a running Home
+Assistant, and it has not been deployed. Do not record Phase 0 as passed on the
+strength of this commit.
+
+The owner authorized starting the panel program with the `v0.5.7` hardware gate
+still open. The spike is deliberately additive: no event decoding, gesture
+timing, binding behaviour or stored configuration is touched.
+
+New files: `panel.py` (asset + sidebar lifecycle), `panel_api.py` (two read-only
+WebSocket commands), `frontend/ikea_bilresa_panel.js` (a dependency-free stub
+that reports what worked), `tests/test_panel.py`, `tests/test_panel_api.py`.
+Changed: `__init__.py` (wire-up), `manifest.json` (frontend/http/panel_custom/
+websocket_api dependencies).
+
+The JS stub is not the panel and must not grow into one. The real panel is
+TypeScript + Lit via Vite, laid out per the two-layer model in
+`PANEL_DESIGN.md`. The stub exists to be deleted.
+
+Three Home Assistant facts found while writing it, recorded because they are not
+in the developer documentation and cost a deploy cycle each to rediscover:
+
+- **Static paths cannot be unregistered.** `http.async_register_static_paths`
+  adds aiohttp routes for the process lifetime with no removal API, so a
+  config-entry reload must not re-register the path. Only the static path is
+  guarded; the panel itself is removed and re-added normally.
+- **`frontend.async_register_built_in_panel` and `frontend.async_remove_panel`
+  are `@callback`, not coroutines**, despite the `async_` prefix.
+  `panel_custom.async_register_panel` genuinely is a coroutine.
+- The developer docs cover only `panel_custom` via `configuration.yaml`, not the
+  integration-level API. These signatures were read from Home Assistant 2026.7.2
+  source, not from documentation.
+
+Decisions taken, all reversible and all recorded here because a later agent
+cannot infer them from the code:
+
+- sidebar entry is **admin-only** (`require_admin=True`), per the roadmap's rule
+  to restrict rather than over-serve when per-device permission filtering is not
+  yet possible;
+- cache-busting is a `?v=<integration version>` query on the module URL,
+  which is why the static path can keep `cache_headers=True`;
+- the asset ships inside `custom_components/ikea_bilresa/frontend/`, so HACS
+  delivers it with the integration — no `configuration.yaml`, no Lovelace
+  resource;
+- the two WebSocket commands are named `.../spike/...` on purpose. They return
+  three scalars, expose no identifier and have no write path. They are to be
+  deleted when the real contract lands, not extended.
+
+`async_setup_panel` never raises: a panel that cannot be served must degrade to
+"no panel", not to a failed integration setup. That is tested, but tests are not
+evidence that it holds in a real Home Assistant.
+
+```text
+python -m json.tool manifest.json                   valid
+python -m compileall -q custom_components tests     passed
+ruff format --check custom_components tests         passed
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (17 source files)
+git diff --check                                    passed
+python -m pytest -q                                 Unit not run
+  ModuleNotFoundError: No module named 'homeassistant' (Windows/3.13)
+```
+
+**The spike's exit gate is a deployment, and it is open.** After a HACS install,
+verify in this order:
+
+1. an "IKEA BILRESA" entry appears in the sidebar and opens;
+2. every row of the stub's table is populated, including `wheels discovered`;
+3. reload the config entry — the panel returns, is not duplicated, and no
+   duplicate-route error appears in the log;
+4. restart Home Assistant — same;
+5. check the companion app's WebView, not only a desktop browser;
+6. **delete the `.js` and reload** — setup must still succeed, with a warning
+   and no panel. This is the only real test of the degradation path.
+
+If step 3, 4 or 6 fails, the packaging approach is wrong and the roadmap says to
+revise or abandon the architecture rather than work around it.
 
 ### Per-wheel availability, GAP-1 (Claude Code, 2026-07-15)
 
