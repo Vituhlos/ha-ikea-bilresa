@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -108,3 +109,26 @@ def test_remove_is_quiet_when_the_panel_never_registered(monkeypatch) -> None:
 
     remover.assert_called_once()
     assert remover.call_args.kwargs["warn_if_unknown"] is False
+
+
+def test_panel_asset_has_an_accessible_mobile_exit() -> None:
+    """The custom viewport must never trap companion-app users."""
+    asset = (
+        Path(__file__).parents[1]
+        / "custom_components"
+        / "ikea_bilresa"
+        / "frontend"
+        / "ikea_bilresa_panel.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'document.createElement("header")' in asset
+    assert 'menu.type = "button"' in asset
+    assert 'aria-label", "Open Home Assistant sidebar"' in asset
+    assert 'aria-hidden="true" focusable="false"' in asset
+    assert (
+        'new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })'
+        in asset
+    )
+    assert "inline-size: 48px" in asset
+    assert "block-size: 48px" in asset
+    assert ".bilresa-panel-menu:focus-visible" in asset

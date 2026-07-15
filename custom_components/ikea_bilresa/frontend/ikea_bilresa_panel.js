@@ -88,6 +88,45 @@ class IkeaBilresaPanel extends HTMLElement {
    * rendering", and the real panel will be interpolating device and area names
    * that users chose. Whatever this file does, that one will copy.
    */
+  /**
+   * A custom panel owns its whole viewport, including the app header. Home
+   * Assistant does not draw one for you.
+   *
+   * On a narrow screen the sidebar is collapsed and its only door is the
+   * header's menu button. A panel without a header therefore TRAPS the user:
+   * in the companion app there is no way back out except a system back gesture.
+   * Found the hard way on a real phone, and invisible on a desktop where the
+   * sidebar is already on screen.
+   *
+   * `hass-toggle-menu` is the event Home Assistant's own `ha-menu-button`
+   * fires; it must bubble and cross the shadow boundary to reach the listener.
+   */
+  _header() {
+    const bar = document.createElement("header");
+    bar.className = "bilresa-panel-header";
+
+    const menu = document.createElement("button");
+    menu.type = "button";
+    menu.className = "bilresa-panel-menu";
+    menu.setAttribute("aria-label", "Open Home Assistant sidebar");
+    menu.innerHTML =
+      '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">' +
+      '<path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>';
+    menu.addEventListener("click", () => {
+      this.dispatchEvent(
+        new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }),
+      );
+    });
+
+    const title = document.createElement("div");
+    title.textContent = "IKEA BILRESA";
+    title.setAttribute("style", "font-size:20px;font-weight:400");
+
+    bar.appendChild(menu);
+    bar.appendChild(title);
+    return bar;
+  }
+
   _render() {
     const el = (tag, text, style) => {
       const node = document.createElement(tag);
@@ -96,10 +135,56 @@ class IkeaBilresaPanel extends HTMLElement {
       return node;
     };
 
+    const page = el("div", undefined, "font-family:Roboto,sans-serif");
+    const style = document.createElement("style");
+    style.textContent = `
+      ikea-bilresa-panel .bilresa-panel-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 56px;
+        padding: 0 4px;
+        border-bottom: 1px solid var(--divider-color);
+        background: var(--app-header-background-color, var(--primary-color));
+        color: var(--app-header-text-color, var(--text-primary-color));
+      }
+      ikea-bilresa-panel .bilresa-panel-menu {
+        display: grid;
+        place-items: center;
+        flex: 0 0 48px;
+        inline-size: 48px;
+        block-size: 48px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        cursor: pointer;
+        background: transparent;
+        color: inherit;
+      }
+      ikea-bilresa-panel .bilresa-panel-menu:hover {
+        background: var(--secondary-background-color);
+        color: var(--primary-text-color);
+      }
+      ikea-bilresa-panel .bilresa-panel-menu:active {
+        background: var(--divider-color);
+      }
+      ikea-bilresa-panel .bilresa-panel-menu:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: -4px;
+      }
+      ikea-bilresa-panel .bilresa-panel-menu svg {
+        inline-size: 24px;
+        block-size: 24px;
+        fill: currentColor;
+      }
+    `;
+    page.appendChild(style);
+    page.appendChild(this._header());
+
     const root = el(
       "div",
       undefined,
-      "padding:24px;font-family:Roboto,sans-serif;color:var(--primary-text-color)",
+      "padding:24px;color:var(--primary-text-color)",
     );
     root.appendChild(
       el("h1", "BILRESA panel — Phase 0 spike", "font-size:20px;font-weight:500"),
@@ -152,7 +237,8 @@ class IkeaBilresaPanel extends HTMLElement {
       root.appendChild(table);
     }
 
-    this.replaceChildren(root);
+    page.appendChild(root);
+    this.replaceChildren(page);
   }
 }
 
