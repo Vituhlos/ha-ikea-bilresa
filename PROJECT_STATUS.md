@@ -31,7 +31,8 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest published release remains `v0.5.0`.
+- Latest stable release remains `v0.5.0`. Draft PR #1 publishes the
+  stabilization snapshot and targets the prerelease `v0.5.1-rc.1` after CI.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -63,13 +64,13 @@ open as shown below.
 
 | Package | Implemented behavior | Current validation |
 |---|---|---|
-| `0.5.1` | Matter Server 9.0.4 / matterjs-server 1.1.7 / schema-11 contract fixture and validation; hold-to-ramp lost-release watchdog plus stop on new gesture, connection transition and unload | Implemented + Static; Unit/CI/Hardware pending |
-| `0.5.2` | Reuse core Matter client only for matching server URL; monitor replacement/unavailability; one-way initial/runtime fallback to dedicated passive WebSocket; fallback telemetry | Implemented + Static; tests authored; Unit/CI/Hardware pending |
-| `0.5.3` | Python 3.14 Linux HA test dependencies, pytest coverage reporting, and expanded binding/config-flow/coordinator/diagnostics/System Health/Matter tests | Harness implemented + Static; local collection blocked; CI and >95% measurement pending |
-| `0.5.4` | Stronger diagnostics redaction and bounded counters/recent event metadata without node IDs or entity IDs | Implemented + Static; privacy-contract test authored; Unit/CI/privacy review pending |
+| `0.5.1` | Matter Server 9.0.4 / matterjs-server 1.1.7 / schema-11 contract fixture and validation; hold-to-ramp lost-release watchdog plus stop on new gesture, connection transition and unload | Implemented + Static + Unit + CI; Hardware pending |
+| `0.5.2` | Reuse core Matter client only for matching server URL; monitor replacement/unavailability; one-way initial/runtime fallback to dedicated passive WebSocket; fallback telemetry | Implemented + Static + Unit + CI; Hardware pending |
+| `0.5.3` | Python 3.14 Linux HA test dependencies, pytest coverage reporting, and expanded binding/config-flow/coordinator/diagnostics/System Health/Matter tests | Harness + Static + Unit + CI; 39 tests passed, coverage 51%; >95% gate open |
+| `0.5.4` | Stronger diagnostics redaction and bounded counters/recent event metadata without node IDs or entity IDs | Implemented + Static + Unit + CI; live diagnostics privacy review pending |
 | `0.5.5` | Evidence-based decision to retain immediate delta dispatch and avoid a latency-only accumulator; explicit measurement/revisit criteria | Documented; hardware soak gate pending |
-| `0.5.6` | Two-stage binding creation with light/media/cover/climate/scenes/custom profiles and copy-from-existing defaults; English/Czech UI | Implemented + Static; tests authored; Unit/CI/HA UI hardware check pending |
-| `0.5.7` | Degraded-state-safe System Health with source/last event/fallback detail; existing delayed connection Repair retained; failure tests authored | Implemented + Static; Unit/CI/failure injection/Hardware pending |
+| `0.5.6` | Two-stage binding creation with light/media/cover/climate/scenes/custom profiles and copy-from-existing defaults; English/Czech UI | Implemented + Static + Unit + CI; HA UI/hardware check pending |
+| `0.5.7` | Degraded-state-safe System Health with source/last event/fallback detail; existing delayed connection Repair retained; failure tests authored | Implemented + Static + Unit + CI; live failure injection/Hardware pending |
 
 The lack of user activity alone deliberately does not create a Repair: a remote
 may legitimately be untouched for days. Repairs are reserved for an observable
@@ -132,10 +133,22 @@ environment green.
 
 Not run for the current working tree:
 
-- GitHub Actions: hassfest, HACS validation, Ruff, mypy, pytest/coverage;
-- coverage percentage and the `0.5.3` >95% exit gate;
 - Home Assistant UI/config-flow and failure-injection checks;
 - physical IKEA BILRESA release-candidate checklist.
+
+GitHub Actions run `29404200175` passed for commit `83bb24a` on Python 3.14.6:
+
+```text
+Validate manifest (hassfest) passed
+Validate HACS               passed
+Lint (ruff)                 passed
+Type check (mypy)           passed
+Unit tests                  39 passed in 0.92s
+Total coverage              51%
+```
+
+The green test job establishes Unit + CI for that snapshot. It does not satisfy
+the `0.5.3` coverage-above-95% exit gate and does not establish Hardware.
 
 ## Hardware status
 

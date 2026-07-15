@@ -12,17 +12,17 @@ request. Device-facing packages require the applicable checks in
 
 | Work package | Scope | Current state | Exit gate still required |
 |---|---|---|---|
-| `0.5.1` | matter.js 1.1.7/schema-11 baseline, redacted protocol fixtures, lost-release watchdog | Implemented + Static | CI + complete hardware RC |
-| `0.5.2` | URL-aware core-client reuse and runtime dedicated-WebSocket fallback | Implemented + Static; tests authored | Unit + CI + both event sources on hardware |
-| `0.5.3` | Linux HA test harness and broad integration coverage | Harness and expanded tests implemented | Passing CI coverage above 95% |
-| `0.5.4` | Redacted diagnostics and bounded runtime telemetry | Implemented + Static; privacy-contract test authored | Unit + diagnostics privacy review |
+| `0.5.1` | matter.js 1.1.7/schema-11 baseline, redacted protocol fixtures, lost-release watchdog | Implemented + Static + Unit + CI | Complete hardware RC |
+| `0.5.2` | URL-aware core-client reuse and runtime dedicated-WebSocket fallback | Implemented + Static + Unit + CI | Both event sources on hardware |
+| `0.5.3` | Linux HA test harness and broad integration coverage | 39 tests passed in CI; total coverage 51% | CI coverage above 95% |
+| `0.5.4` | Redacted diagnostics and bounded runtime telemetry | Implemented + Static + Unit + CI | Live diagnostics privacy review |
 | `0.5.5` | Measured fast-scroll optimization, only if telemetry demonstrates need | Evidence-based no-op documented | Hardware soak test without lost delta |
-| `0.5.6` | Binding copy flow and mode presets | Implemented + Static; tests authored | Unit + config-flow UI hardware check |
-| `0.5.7` | Degraded-state System Health and actionable Repairs | Implemented + Static; failure tests authored | Unit + failure-injection checks in HA |
+| `0.5.6` | Binding copy flow and mode presets | Implemented + Static + Unit + CI | Config-flow UI hardware check |
+| `0.5.7` | Degraded-state System Health and actionable Repairs | Implemented + Static + Unit + CI | Live failure-injection checks in HA |
 
-“Implemented” in this table does not close a package. None of these packages is
-released, CI-verified for the active working tree, or hardware-verified. The
-exact live validation record is in `PROJECT_STATUS.md`.
+“Implemented” in this table does not close a package. The snapshot is
+CI-verified but none of these packages is stable-released or hardware-verified.
+The exact live validation record is in `PROJECT_STATUS.md`.
 
 The remote is user-driven and may legitimately remain untouched for days.
 Therefore absence of events alone must not create a Repair. System Health may

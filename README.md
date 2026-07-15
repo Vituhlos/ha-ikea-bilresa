@@ -12,8 +12,8 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 integration currently drops.
 
 > **Status:** latest release v0.5.0; the dirty development tree contains
-> additional statically verified work. Unit, current-tree CI, and complete
-> BILRESA hardware verification are still pending.
+> additional work with passing Linux Unit/CI checks. The >95% coverage target
+> and complete BILRESA hardware verification are still pending.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared

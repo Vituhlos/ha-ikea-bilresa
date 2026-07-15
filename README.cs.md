@@ -16,8 +16,8 @@ události v reálném čase**, které vestavěná Matter integrace v Home Assist
 zahazuje.
 
 > **Stav:** poslední vydání je v0.5.0; dirty vývojový strom obsahuje další
-> staticky ověřenou práci. Unit testy, CI aktuálního stromu a kompletní ověření
-> na skutečné BILRESE zatím čekají.
+> práci se zelenými Linux Unit/CI kontrolami. Cíl pokrytí >95 % a kompletní
+> ověření na skutečné BILRESE zatím čekají.
 >
 > Malý patch release train `0.5.1`–`0.5.7` je v
 > [docs/ROADMAP.md](docs/ROADMAP.md).
