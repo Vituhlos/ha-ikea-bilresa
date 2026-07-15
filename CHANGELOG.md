@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Editing a light binding now updates in place instead of reloading the config
   entry — no reconnect.
 
+### Fixed
+- A button press now briefly suppresses trailing scroll events, so pressing to
+  turn a light off while dimming isn't immediately undone by the wheel's
+  trailing rotation batch.
+
 ### Planned
 - Submission to the HACS default store and a brand icon.
 

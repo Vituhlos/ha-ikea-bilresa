@@ -73,6 +73,10 @@ _CLICK_SERVICE = {"toggle": "toggle", CLICK_ON: "turn_on", CLICK_OFF: "turn_off"
 # How long our tracked target stays authoritative before we resync from state.
 _RESYNC_AFTER = 3.0
 
+# After a button press, ignore scroll events briefly so trailing rotation events
+# (the wheel keeps emitting its batch for ~1 s) can't override a press-to-off.
+_SUPPRESS_ROTATE_AFTER_PRESS = 0.8
+
 
 def _pct_to_units(pct: float) -> int:
     return round(pct / 100 * 255)
@@ -105,6 +109,7 @@ class LightBinding:
         self._tracked: float | None = None
         self._saturation = 100.0
         self._last = 0.0
+        self._suppress_rotate_until = 0.0
 
     @callback
     def async_attach(self) -> Callable[[], None]:
@@ -118,8 +123,11 @@ class LightBinding:
     @callback
     def _handle_action(self, action: WheelAction) -> None:
         if action.type == ACTION_ROTATE:
+            if time.monotonic() < self._suppress_rotate_until:
+                return
             self._rotate(action)
         elif action.type == ACTION_PRESS:
+            self._hold_off_rotation()
             if action.presses == 1:
                 self._single_press()
             elif action.presses == 2:
@@ -127,7 +135,12 @@ class LightBinding:
             elif action.presses == 3:
                 self._toggle(self._triple_target)
         elif action.type == ACTION_HOLD:
+            self._hold_off_rotation()
             self._toggle(self._hold_target)
+
+    @callback
+    def _hold_off_rotation(self) -> None:
+        self._suppress_rotate_until = time.monotonic() + _SUPPRESS_ROTATE_AFTER_PRESS
 
     # -- rotation ---------------------------------------------------------
 
