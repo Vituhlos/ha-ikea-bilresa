@@ -136,11 +136,15 @@ def decode_event(
     if node_event.get("cluster_id") != CLUSTER_SWITCH:
         return None
     endpoint_id = node_event.get("endpoint_id")
+    if endpoint_id is None:
+        return None
     switch = wheel.endpoints.get(endpoint_id)
     if switch is None:
         return None
 
     event_id = node_event.get("event_id")
+    if event_id is None:
+        return None
     data = node_event.get("data") or {}
     if not isinstance(data, dict):
         data = {}

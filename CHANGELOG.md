@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   ("Channel 1 scrolled up", "Channel 2 held", …) without writing YAML.
 - A **smooth-dimming blueprint** (`blueprints/automation/ikea_bilresa/`) for
   automation-based setups.
+- **Strict typing**: a `py.typed` marker plus a **mypy** type-check job in CI.
 
 ### Changed
 - Editing a light binding now updates in place instead of reloading the config

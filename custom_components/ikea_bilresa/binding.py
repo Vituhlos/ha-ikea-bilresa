@@ -191,9 +191,11 @@ class LightBinding:
         now = time.monotonic()
         recent = self._tracked is not None and (now - self._last) < _RESYNC_AFTER
         self._last = now
-        if not recent:
-            self._tracked = current if current is not None else fallback
-        return self._tracked
+        if recent and self._tracked is not None:
+            return self._tracked
+        value = current if current is not None else fallback
+        self._tracked = value
+        return value
 
     @staticmethod
     def _delta(step_pct: float, span: float, notches: int, up: bool) -> float:

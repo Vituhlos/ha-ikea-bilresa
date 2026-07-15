@@ -112,7 +112,8 @@ class BilresaCoordinator:
     def _handle_node_event(self, data: dict) -> None:
         if data.get("cluster_id") != CLUSTER_SWITCH:
             return
-        wheel = self.wheels.get(data.get("node_id"))
+        node_id = data.get("node_id")
+        wheel = self.wheels.get(node_id) if node_id is not None else None
         if wheel is None:
             return
         decoded = decode_event(wheel, data)

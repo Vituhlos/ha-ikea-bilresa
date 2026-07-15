@@ -25,3 +25,9 @@ known-first-party = ["custom_components"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true
+check_untyped_defs = true
+files = ["custom_components/ikea_bilresa"]

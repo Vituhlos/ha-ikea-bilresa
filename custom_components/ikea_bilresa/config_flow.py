@@ -76,7 +76,7 @@ async def _async_can_connect(hass: HomeAssistant, url: str) -> bool:
     return isinstance(message, dict) and "sdk_version" in message
 
 
-class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):
+class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Single-instance parent flow. Auto-detects the Matter Server URL."""
 
     VERSION = 1
