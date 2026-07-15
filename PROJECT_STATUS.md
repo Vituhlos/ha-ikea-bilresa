@@ -32,10 +32,10 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.5` was published
-  from CI-verified commit `4ad3fd8`; it adds targeted fast-press latency tracing
-  and Claude's per-wheel availability diagnostics to the RC.4 runtime. Draft PR
-  #1 remains open and `main` has not been merged.
+- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.8` was published
+  from CI-verified commit `b50e17c`; it contains the Phase 0 technical spike,
+  the mobile-safe panel header and an idempotent browser custom-element guard.
+  Draft PR #1 remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -236,18 +236,19 @@ labels, WCAG 2.2 AA contrast, reduced motion, and anything about what Home
 Assistant will actually register or serve. Prototype layout evidence is not
 Implemented, Static, Unit, CI, HA UI or Hardware.
 
-No panel code has been started. The technical spike remains open.
+No production panel implementation has been started. The disposable Phase 0
+delivery spike described below is implemented; it must not become the real
+panel.
 
 The documented delivery sequence is additive and provisional: a read-only panel
 in planning package `0.5.8`, binding editing in `0.5.9`, workflow polish in
 `0.5.10`, and carefully selected expansion afterward. A stored-configuration or
 subentry-model migration still requires a minor version under `ROADMAP.md`.
 
-This is **design documentation only**. No frontend, WebSocket API, runtime
-behavior, binding storage, Home Assistant deployment or hardware behavior was
-changed or verified. The physical `v0.5.7` checklist remains the release gate;
-see `Single best next action` below for the current priority, which is not the
-panel.
+The design direction above remains **design documentation only**. The separate
+technical spike below changes frontend delivery and a read-only WebSocket API,
+but does not implement the designed panel or change Matter, binding storage or
+hardware behavior. The physical `v0.5.7` checklist remains open.
 
 ### Panel `0.5.8` Phase 0 technical spike (Claude Code, 2026-07-15)
 
@@ -273,8 +274,8 @@ Observed live on 2026-07-15 against Home Assistant 2026.7.2:
 - the subscription pushed twice across that reload (disconnect + reconnect),
   proving the push path, not merely that subscribing does not raise.
 
-**Defect found and fixed in the working tree, NOT yet deployed: the spike trapped
-the owner in the companion app.** A custom panel owns the whole viewport; Home
+**Defect found after RC.6: the spike trapped the owner in the companion app.** A
+custom panel owns the whole viewport; Home
 Assistant draws no app header. On a narrow screen the sidebar's only door is that
 header's menu button, so a panel without one cannot be left except by a system
 back gesture. Invisible on a desktop, where the sidebar is already on screen. The
@@ -283,10 +284,6 @@ and composed, as `ha-menu-button` does), and `PANEL_DESIGN.md` now carries this
 as a requirement for **every** layer and state of the real panel — the wheel
 detail's back affordance goes to the grid and is not a substitute for the way out
 to Home Assistant.
-
-The header fix is Implemented + Static only. It has not been deployed, because
-cache-busting keys on the integration version: it needs an `rc.7` (or a manual
-file replacement plus a hard browser refresh) to reach a browser.
 
 Codex then hardened the candidate for RC.7 without changing its navigation
 contract: the app header is semantic, the menu is a native button with a 48 px
@@ -310,8 +307,49 @@ python -m pytest -q                                 15 collection errors:
 ```
 
 The pytest result remains **Unit not run locally**, not a failure or pass. Linux
-CI is required for the authored regression test and the existing suite. The
-header remains not deployed and not verified on a real phone at this point.
+CI supplied the Unit gate. Exact commit `cae5aef` passed GitHub Actions run
+`29438976760`: HACS validation, hassfest, Ruff, mypy and 135 tests on Python
+3.14.6; total coverage was 70%. Prerelease `v0.5.7-rc.7` was published, HACS
+installed it after a valid configuration check and Home Assistant restarted
+normally. The loaded manifest and HACS both reported RC.7.
+
+That deployment smoke test exposed a second frontend-lifecycle defect in an
+already-open desktop tab: loading the cache-busted RC.7 module while RC.6's
+`ikea-bilresa-panel` custom element remained registered raised
+`CustomElementRegistry: the name ... has already been used`. The published RC.7
+tag was not rewritten. RC.8 adds `customElements.get()` guarding around the
+registration; a full page/WebView reload is still needed to replace an existing
+class because the web platform does not permit custom-element redefinition.
+
+RC.8 validation and deployment results:
+
+```text
+manifest/strings/en/cs JSON parsing                 passed
+node --check ikea_bilresa_panel.js                  passed
+double cache-busted ES-module import                passed; one definition
+python -m compileall -q custom_components tests     passed
+ruff format --check custom_components tests         passed (33 files)
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (17 source files)
+git diff --check                                    passed (CRLF warnings only)
+```
+
+- exact commit `b50e17c` passed GitHub Actions run `29439486506`: HACS
+  validation, hassfest, Ruff, mypy and 136 tests on Python 3.14.6; total
+  coverage was 70%;
+- prerelease `v0.5.7-rc.8` was published without altering RC.7;
+- the Home Assistant configuration check was valid, HACS explicitly installed
+  RC.8 and Home Assistant restarted normally;
+- HACS and the running integration manifest both reported RC.8; the entry was
+  `loaded` through `core_matter_client`, with two wheels, three bindings, zero
+  fallbacks and no fallback reason;
+- the post-restart exact-domain system-log search returned no BILRESA or panel
+  error.
+
+This establishes Implemented + Static + Unit + CI + Released and a successful
+non-hardware HA deployment smoke test for the mobile header and registration
+guard. The header itself is **not Hardware/real-phone verified** until the owner
+opens RC.8 in the companion app and uses its menu button.
 
 Still owed before Phase 0 can be called closed:
 
@@ -992,9 +1030,9 @@ aggregation and Matter lifecycle recovery; the frontend must not parse logs or
 open a separate Matter connection.
 
 This section is **Planning only**. None of L1-L4 is Implemented, Static, Unit,
-CI, Hardware or Released. The current dirty Phase 0 companion-app header fix
-must be preserved and completed as a separate coherent candidate before latency
-runtime work begins.
+CI, Hardware or Released. The Phase 0 companion-app header and registration
+guard are secured separately in deployed RC.8; latency runtime work must not be
+mixed into their real-phone verification.
 
 - The seven packages are stacked in one dirty tree; release them only in small,
   owner-tested patch snapshots rather than pretending all gates passed at once.
@@ -1012,20 +1050,20 @@ runtime work begins.
 
 ## Single best next action
 
-Finish the current Phase 0 dirty work without mixing in runtime behavior:
-validate the companion-app header fix, preserve Claude Code's handoff, and—only
-after owner authorization—deliver it as its own cache-busted candidate for a
-real-phone exit test. After that exact revision is secured, begin L1 in
-`docs/LATENCY_ROADMAP.md`; do not start Instant or the Latency Lab before the
-measurement contract exists. R4 remains deferred.
+Open the deployed RC.8 panel in the real Home Assistant companion app, fully
+reload/reopen the frontend once, tap the 48 px menu button and confirm that the
+Home Assistant sidebar opens without a panel error. After recording that result,
+begin L1 in `docs/LATENCY_ROADMAP.md`; do not start Instant or the Latency Lab
+before the measurement contract exists. R4 remains deferred.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
 2. Re-check HEAD, branch, status and full relevant diff.
 3. Preserve every dirty and untracked file.
-4. Unit + CI are established for exact commit `4ad3fd8`; Hardware applies only
-   to the explicitly recorded RC.3/RC.5 observations, not the entire checklist.
+4. Unit + CI for the current RC are established for exact commit `b50e17c`;
+   Hardware applies only to the explicitly recorded RC.3/RC.5 observations, not
+   the mobile header or the entire checklist.
 5. The current authorization covers this stabilization PR, an RC release and a
    controlled HA deployment. It does not authorize unrelated repository or HA
    changes.
