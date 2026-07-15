@@ -271,3 +271,29 @@ verdict: `PASS`, `PASS WITH LIMITATIONS`, or `FAIL`.
 
 This is a deployment baseline only. No physical press or rotation was performed
 against RC.4 yet, so every RC.4-specific Hardware item remains open.
+
+### 2026-07-15 - `v0.5.7-rc.5` fast-response timing
+
+- Release commit `4ad3fd8` passed exact-revision CI run `29434960588` with
+  hassfest, HACS validation, Ruff, mypy, 122 tests and 69% total coverage.
+- HACS installed exactly `v0.5.7-rc.5` after a valid configuration check; Home
+  Assistant Core 2026.7.2 restarted with two wheels, three current bindings,
+  `core_matter_client` and no fallback reason.
+- The tested firmware `1.9.15` wheel's channel-2 binding was confirmed in Fast
+  response mode. DEBUG was scoped only to
+  `custom_components.ikea_bilresa.binding`.
+- Five normal single presses produced the following elapsed-time ranges from
+  receipt of raw `ShortRelease`: service dispatch 0.1-0.4 ms,
+  `MultiPressComplete` 2.9-12.0 ms, and first target-state acknowledgement
+  86.9-111.2 ms.
+- Mean timing was approximately 0.2 ms to dispatch, 6.0 ms to completion and
+  95.5 ms to target acknowledgement. Each trace completed as one press, no
+  duplicate binding action was observed, and no integration/system error was
+  present.
+
+**PASS WITH LIMITATIONS:** the fast binding path dispatches exactly once and
+immediately after `ShortRelease`, but completion follows only about 6 ms later
+on this firmware. The remaining perceived delay is not in the binding dispatch
+path. Physical release-to-Matter delivery and actual relay actuation are not
+observable from HA timestamps, and firmware `1.8.7` has not yet been measured
+with the same trace.

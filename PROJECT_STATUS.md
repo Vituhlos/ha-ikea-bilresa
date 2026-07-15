@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-15 by Claude Code**
+Last updated: **2026-07-15 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -32,10 +32,10 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.4` was published
-  from CI-verified commit `36f9c1c`; it adds the post-rc.3 runtime polish to the
-  seven work packages, overview cleanup and serial-independent Matter device
-  linking. Draft PR #1 remains open and `main` has not been merged.
+- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.5` was published
+  from CI-verified commit `4ad3fd8`; it adds targeted fast-press latency tracing
+  and Claude's per-wheel availability diagnostics to the RC.4 runtime. Draft PR
+  #1 remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -796,6 +796,40 @@ deployment smoke test for RC.4. It does not establish Hardware for the fast
 button path, trailing-scroll protection, time-based acceleration,
 resynchronization or event compatibility.
 
+### `v0.5.7-rc.5` fast-press timing result
+
+The owner approved targeted instrumentation and deployment after RC.4 history
+showed inconsistent perceived single-press latency. Commit `4ad3fd8` adds a
+DEBUG-only, privacy-safe trace for `ShortRelease`, service dispatch,
+`MultiPressComplete` and the first click-target state change. It logs only a
+trace sequence, channel, stage, elapsed milliseconds and press count; no node,
+entity or household identifiers are emitted. Outside DEBUG the trace is
+inactive. Claude's preceding `cab14e0` per-wheel diagnostics commit was
+preserved unchanged in the same pushed snapshot.
+
+- exact-revision CI run `29434960588` passed hassfest, HACS validation, Ruff,
+  mypy and 122 tests on Python 3.14.6; total coverage was 69%;
+- prerelease `v0.5.7-rc.5` was published and HACS installed it after a valid
+  configuration preflight; Home Assistant restarted normally;
+- post-restart the integration was loaded through `core_matter_client`, with two
+  wheels, three current bindings and no fallback reason; the tested firmware
+  `1.9.15` channel-2 binding retained `button_response=fast`;
+- DEBUG was enabled only for `custom_components.ikea_bilresa.binding`;
+- the owner's final five normal single presses produced service dispatch in
+  0.1-0.4 ms, completion in 2.9-12.0 ms, and target-state acknowledgement in
+  86.9-111.2 ms after `ShortRelease`;
+- averages were approximately 0.2 ms to dispatch, 6.0 ms to completion and
+  95.5 ms to target acknowledgement; no integration/system error was present.
+
+This Hardware-verifies exactly-once fast-path dispatch and the listed internal
+timing stages for the firmware `1.9.15` wheel/channel/binding. It shows that the
+completion-aware path adds only about 6 ms after `ShortRelease` on this device,
+so fast mode cannot materially improve the remaining perceived delay here. The
+unmeasured portions are physical release to Matter `ShortRelease` delivery and
+actual Shelly relay actuation versus its later HA state acknowledgement. DEBUG
+remains enabled for the binding module for short-term follow-up measurement; do
+not leave it enabled indefinitely during heavy rotation testing.
+
 ## Known risks and decisions
 
 - The seven packages are stacked in one dirty tree; release them only in small,
@@ -814,17 +848,18 @@ resynchronization or event compatibility.
 
 ## Single best next action
 
-Edit one existing single-press-only binding to select Fast response, then perform
-the focused RC.4 HA UI and physical checks for R1-R3/R5-R8. R4 remains deferred;
-none of the new runtime polish is Hardware-verified yet.
+Decide from the RC.5 evidence whether fast response should remain a user-facing
+option/default: on firmware `1.9.15` it saves only about 6 ms after
+`ShortRelease`. Before changing the product default, repeat the same focused
+measurement on firmware `1.8.7`. R4 remains deferred.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
 2. Re-check HEAD, branch, status and full relevant diff.
 3. Preserve every dirty and untracked file.
-4. Unit + CI are established only for exact commit `7bc523b`; do not infer HA
-   deployment or Hardware from them.
+4. Unit + CI are established for exact commit `4ad3fd8`; Hardware applies only
+   to the explicitly recorded RC.3/RC.5 observations, not the entire checklist.
 5. The current authorization covers this stabilization PR, an RC release and a
    controlled HA deployment. It does not authorize unrelated repository or HA
    changes.
