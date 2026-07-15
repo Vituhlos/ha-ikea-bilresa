@@ -20,13 +20,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   takes bigger steps).
 - Binding **double-press / triple-press / hold** actions — each optionally
   toggles its own entity.
+- **Device triggers** — build automations from the wheel's device page
+  ("Channel 1 scrolled up", "Channel 2 held", …) without writing YAML.
+- A **smooth-dimming blueprint** (`blueprints/automation/ikea_bilresa/`) for
+  automation-based setups.
 
 ### Changed
 - Editing a light binding now updates in place instead of reloading the config
   entry — no reconnect.
 
 ### Planned
-- A smooth-dimming **blueprint** built on the clean scroll events.
+- Submission to the HACS default store and a brand icon.
 
 ## [0.5.0] - 2026-07-14
 

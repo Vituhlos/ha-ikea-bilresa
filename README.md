@@ -233,8 +233,12 @@ logger:
 - [x] **GUI light bindings** (config subentries) — map a wheel channel to a light
       and let the integration drive brightness directly, no YAML. *(0.3)*
 - [x] Minimum-brightness floor and a separate button target entity. *(0.4)*
-- [ ] Smooth-dimming **blueprint** (for automation-based setups).
-- [ ] Per-binding acceleration and button double/triple/hold actions.
+- [x] CI, unit tests and diagnostics. *(0.5)*
+- [x] Hot add/remove of wheels, connection sensor, in-place binding updates. *(next)*
+- [x] Scroll modes (brightness / colour temperature / colour), acceleration,
+      maximum brightness, double/triple/hold actions. *(next)*
+- [x] **Device triggers** and a **smooth-dimming blueprint**. *(next)*
+- [ ] HACS default store submission and a brand icon.
 
 ## Limitations
 

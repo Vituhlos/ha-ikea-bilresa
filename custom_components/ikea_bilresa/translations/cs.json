@@ -100,5 +100,21 @@
       "title": "Matter Server je nedostupný",
       "description": "IKEA BILRESA se nemůže připojit k Matter Serveru na {url}. Kolečka nebudou reagovat, dokud se spojení neobnoví. Zkontroluj, že add-on Matter Server běží."
     }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "rotate_up": "{subtype} otočeno nahoru",
+      "rotate_down": "{subtype} otočeno dolů",
+      "press": "{subtype} stisknuto",
+      "double_press": "{subtype} dvojstisk",
+      "triple_press": "{subtype} trojstisk",
+      "hold": "{subtype} podrženo",
+      "release": "{subtype} uvolněno"
+    },
+    "trigger_subtype": {
+      "channel_1": "Kanál 1",
+      "channel_2": "Kanál 2",
+      "channel_3": "Kanál 3"
+    }
   }
 }

@@ -229,8 +229,12 @@ logger:
 - [x] **GUI bindings na světla** (config subentries) — namapuj kanál kolečka na
       světlo a integrace řídí jas přímo, bez YAML. *(0.3)*
 - [x] Minimální práh jasu a samostatný cíl tlačítka. *(0.4)*
-- [ ] Blueprint na **plynulé stmívání** (pro setupy postavené na automatizacích).
-- [ ] Per binding: akcelerace a akce tlačítka double/triple/hold.
+- [x] CI, unit testy a diagnostics. *(0.5)*
+- [x] Hot add/remove koleček, senzor připojení, in-place bindingy. *(další)*
+- [x] Režimy scrollu (jas / teplota bílé / barva), akcelerace, max jas,
+      akce double/triple/hold. *(další)*
+- [x] **Device triggers** a **blueprint na plynulé stmívání**. *(další)*
+- [ ] Zařazení do HACS default store a brand icon.
 
 ## Omezení
 

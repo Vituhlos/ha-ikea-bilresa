@@ -100,5 +100,21 @@
       "title": "Cannot reach the Matter Server",
       "description": "IKEA BILRESA cannot connect to the Matter Server at {url}. Scroll wheels won't respond until the connection is restored. Check that the Matter Server add-on is running."
     }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "rotate_up": "{subtype} scrolled up",
+      "rotate_down": "{subtype} scrolled down",
+      "press": "{subtype} pressed",
+      "double_press": "{subtype} double-pressed",
+      "triple_press": "{subtype} triple-pressed",
+      "hold": "{subtype} held",
+      "release": "{subtype} released"
+    },
+    "trigger_subtype": {
+      "channel_1": "Channel 1",
+      "channel_2": "Channel 2",
+      "channel_3": "Channel 3"
+    }
   }
 }

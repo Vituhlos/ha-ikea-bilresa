@@ -1,0 +1,87 @@
+blueprint:
+  name: IKEA BILRESA – smooth dimming
+  description: >
+    Dim a light in real time with one channel of an IKEA BILRESA scroll wheel,
+    using the `ikea_bilresa` integration's event entity. Scrolling changes
+    brightness by the notch count (with a transition so it ramps smoothly
+    between the wheel's batched updates); a single press toggles the light.
+
+    Prefer no YAML at all? The integration also offers turnkey GUI "light
+    bindings" — this blueprint is for automation-based setups.
+  domain: automation
+  source_url: https://github.com/Vituhlos/ha-ikea-bilresa/blob/main/blueprints/automation/ikea_bilresa/smooth_dimming.yaml
+  input:
+    wheel_channel:
+      name: Wheel channel
+      description: The "Channel N" event entity of your BILRESA wheel.
+      selector:
+        entity:
+          integration: ikea_bilresa
+          domain: event
+    target_light:
+      name: Light
+      description: The light to dim.
+      selector:
+        target:
+          entity:
+            domain: light
+    step:
+      name: Brightness step per notch (%)
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 25
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+    transition:
+      name: Transition (s)
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.1
+          unit_of_measurement: s
+          mode: slider
+
+mode: parallel
+max: 20
+
+triggers:
+  - trigger: state
+    entity_id: !input wheel_channel
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.to_state is not none
+         and trigger.to_state.attributes.event_type
+              in ['rotate_up', 'rotate_down', 'press'] }}
+
+actions:
+  - variables:
+      event_type: "{{ trigger.to_state.attributes.event_type }}"
+      notches: "{{ trigger.to_state.attributes.notches | default(1) | int }}"
+      step: !input step
+      transition: !input transition
+  - choose:
+      - conditions: "{{ event_type == 'rotate_up' }}"
+        sequence:
+          - action: light.turn_on
+            target: !input target_light
+            data:
+              brightness_step_pct: "{{ notches * step }}"
+              transition: "{{ transition }}"
+      - conditions: "{{ event_type == 'rotate_down' }}"
+        sequence:
+          - action: light.turn_on
+            target: !input target_light
+            data:
+              brightness_step_pct: "{{ -(notches * step) }}"
+              transition: "{{ transition }}"
+      - conditions: "{{ event_type == 'press' }}"
+        sequence:
+          - action: light.toggle
+            target: !input target_light

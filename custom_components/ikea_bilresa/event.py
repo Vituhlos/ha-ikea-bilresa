@@ -83,10 +83,11 @@ class BilresaChannelEvent(EventEntity):
         self._channel = channel
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}"
         self._attr_name = f"Channel {channel}"
+        # Always carry our own identifier (used by device triggers); when the
+        # wheel reports a serial, also merge onto the core-Matter device.
+        identifiers = {(DOMAIN, str(wheel.node_id))}
         if wheel.serial:
-            identifiers = {("matter", f"serial_{wheel.serial}")}
-        else:
-            identifiers = {(DOMAIN, str(wheel.node_id))}
+            identifiers.add(("matter", f"serial_{wheel.serial}"))
         self._attr_device_info = DeviceInfo(
             identifiers=identifiers,
             manufacturer="IKEA of Sweden",
