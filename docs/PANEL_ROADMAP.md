@@ -1,6 +1,7 @@
 # BILRESA panel implementation roadmap
 
-Status: **approved planning baseline; implementation not started**
+Status: **Read-only phases released; Phase 4 and the `0.5.9` binding editor are
+implemented with local Static + Python/frontend Unit gates**
 
 This roadmap turns `PANEL_DESIGN.md` into small implementation packages with
 explicit gates. It is the execution contract for the owner, Codex and Claude
@@ -242,6 +243,17 @@ comparison passes against the selected target in all required states.
 
 ### Phase 4 - wheel detail and live test
 
+Candidate status on 2026-07-16: **Implemented + Static + Python/frontend Unit;
+CI, HA UI and Hardware pending.** The detail, rail, channel action rows, opt-in
+live subscription and simple wheel diagnostics exist. The later `0.5.9`
+candidate closes GAP-2/GAP-3 with structured binding results and per-action
+Home Assistant dispatch status. The public action event still carries the
+calculated delta rather than the original cumulative Matter count.
+
+The simple wheel-status diagnostics requested with the detail are included here
+from the existing overview contract. Phase 5 still owns expanded technical
+details, the standard diagnostics link, release documentation and RC gates.
+
 Deliverables:
 
 - the 256 px wheel rail, switching wheels in one click, dropped below 620 px;
@@ -288,7 +300,11 @@ Exit gate:
 
 ## Package `0.5.9` - binding editor
 
-Do not start until the read-only panel is stable and hardware-verified.
+Owner override on 2026-07-16: implementation proceeded before the deferred
+physical-wheel gate so the integration and panel can be completed first.
+
+Status: **Phases 1-3 implemented with local Static + Python/frontend Unit;
+CI and HA UI deployment pending.**
 
 ### Phase 1 - mutation contract
 

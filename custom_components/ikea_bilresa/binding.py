@@ -17,7 +17,7 @@ setting feels consistent across every kind of target.
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 import logging
 import time
@@ -25,7 +25,10 @@ from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, State, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -85,6 +88,7 @@ from .const import (
     ROLE_BUTTON,
     ROLE_SCROLL_DOWN,
     ROLE_SCROLL_UP,
+    SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
     SWITCH_EVENT_NAMES,
     mode_supports_target,
@@ -204,6 +208,23 @@ class LightBinding:
         self._latency_trace_sequence = 0
         self._latency_trace_started_at: float | None = None
         self._latency_trace_target_seen = False
+        self._active_action: WheelAction | None = None
+        self._ramp_action: WheelAction | None = None
+
+    @property
+    def node_id(self) -> int:
+        """Matter node ID used only inside the integration runtime."""
+        return self._node_id
+
+    @property
+    def channel(self) -> int:
+        """Physical channel this binding listens to."""
+        return self._channel
+
+    @callback
+    def test_action(self, action: WheelAction) -> None:
+        """Run a panel-requested action through the normal binding path."""
+        self._handle_action(action)
 
     @callback
     def async_attach(self) -> Callable[[], None]:
@@ -250,37 +271,57 @@ class LightBinding:
 
     @callback
     def _handle_action(self, action: WheelAction) -> None:
-        if self._ramp_unsub is not None and action.type in (
-            ACTION_ROTATE,
-            ACTION_PRESS,
-        ):
-            # Any new gesture supersedes a hold whose release may have been lost.
-            self._stop_ramp(change_direction=False)
-        if action.type == ACTION_ROTATE:
-            self._rotate(action)
-        elif action.type == ACTION_PRESS:
-            self._hold_off_rotation()
-            if self._fast_press_started is not None:
-                # The binding already ran one immediate single-press action.
-                # MultiPressComplete still reaches event entities/device
-                # triggers, but must not execute the binding a second time.
-                self._log_latency_stage("multi_press_complete", presses=action.presses)
-                self._fast_press_started = None
-                return
-            if action.presses == 1:
-                self._single_press()
-            elif action.presses == 2:
-                self._toggle(self._double_target)
-            elif action.presses == 3:
-                self._toggle(self._triple_target)
-        elif action.type == ACTION_HOLD:
-            self._hold_off_rotation()
-            if self._hold_action == HOLD_RAMP:
-                self._start_ramp()
-            elif self._hold_action == HOLD_TOGGLE:
-                self._toggle(self._hold_target)
-        elif action.type == ACTION_RELEASE and self._hold_action == HOLD_RAMP:
-            self._stop_ramp(change_direction=True)
+        previous_action = self._active_action
+        self._active_action = action
+        try:
+            if self._ramp_unsub is not None and action.type in (
+                ACTION_ROTATE,
+                ACTION_PRESS,
+            ):
+                # Any new gesture supersedes a hold whose release may have been lost.
+                self._stop_ramp(change_direction=False)
+            if action.type == ACTION_ROTATE:
+                self._rotate(action)
+            elif action.type == ACTION_PRESS:
+                self._hold_off_rotation()
+                if self._fast_press_started is not None:
+                    # The binding already ran one immediate single-press action.
+                    # MultiPressComplete still reaches event entities/device
+                    # triggers, but must not execute the binding a second time.
+                    self._log_latency_stage(
+                        "multi_press_complete", presses=action.presses
+                    )
+                    self._fast_press_started = None
+                    self._report_activity(
+                        "completed",
+                        result={"kind": "press", "action": "already_dispatched"},
+                    )
+                    return
+                if action.presses == 1:
+                    self._single_press()
+                elif action.presses == 2:
+                    self._toggle(self._double_target)
+                elif action.presses == 3:
+                    self._toggle(self._triple_target)
+                else:
+                    self._report_activity("skipped", reason="unsupported_press_count")
+            elif action.type == ACTION_HOLD:
+                self._hold_off_rotation()
+                if self._hold_action == HOLD_RAMP:
+                    self._start_ramp()
+                elif self._hold_action == HOLD_TOGGLE:
+                    self._toggle(self._hold_target)
+                else:
+                    self._report_activity("skipped", reason="hold_not_configured")
+            elif action.type == ACTION_RELEASE and self._hold_action == HOLD_RAMP:
+                self._stop_ramp(change_direction=True)
+                self._report_activity(
+                    "completed", result={"kind": "hold", "action": "ramp_stopped"}
+                )
+            else:
+                self._report_activity("skipped", reason="gesture_not_configured")
+        finally:
+            self._active_action = previous_action
 
     @callback
     def _handle_connection_change(self) -> None:
@@ -366,7 +407,19 @@ class LightBinding:
         if self._ramp_unsub is not None:
             self._stop_ramp(change_direction=False)
         self._hold_off_rotation()
-        self._single_press()
+        previous_action = self._active_action
+        self._active_action = WheelAction(
+            node_id=self._node_id,
+            wheel_name="",
+            channel=self._channel,
+            endpoint_id=0,
+            type=ACTION_PRESS,
+            presses=1,
+        )
+        try:
+            self._single_press()
+        finally:
+            self._active_action = previous_action
 
     def _start_latency_trace(self, now: float) -> None:
         """Start a privacy-safe fast-press trace only while DEBUG is enabled."""
@@ -412,6 +465,64 @@ class LightBinding:
         )
         self._suppress_scroll_until = time.monotonic() + _TRAILING_GESTURE_TIMEOUT
 
+    @callback
+    def _report_activity(
+        self,
+        status: str,
+        *,
+        result: dict[str, Any] | None = None,
+        reason: str | None = None,
+        action: WheelAction | None = None,
+    ) -> None:
+        """Publish one privacy-bounded execution update for the panel."""
+        current = action or self._active_action
+        if current is None:
+            return
+        dispatched = (
+            True
+            if status == "accepted"
+            else False
+            if status
+            in {
+                "failed",
+                "skipped",
+            }
+            else None
+        )
+        async_dispatcher_send(
+            self.hass,
+            SIGNAL_BINDING_ACTIVITY,
+            {
+                "action_id": current.action_id,
+                "node_id": self._node_id,
+                "channel": self._channel,
+                "type": current.type,
+                "direction": current.direction,
+                "notches": current.notches,
+                "presses": current.presses,
+                "source": current.source,
+                "result": result,
+                "dispatch_status": status,
+                "dispatched": dispatched,
+                "reason": reason,
+            },
+        )
+
+    @staticmethod
+    def _value_result(
+        kind: str,
+        before: float | int,
+        after: float | int,
+        unit: str,
+    ) -> dict[str, Any]:
+        """Build the structured result rendered by the live-test view."""
+        return {
+            "kind": kind,
+            "before": before,
+            "after": after,
+            "unit": unit,
+        }
+
     # -- rotation ---------------------------------------------------------
 
     @callback
@@ -441,7 +552,13 @@ class LightBinding:
 
     @callback
     def _rotate_by(self, notches: int, up: bool) -> None:
-        if not self._mode_target_valid or self._available_state(self._target) is None:
+        if not self._mode_target_valid:
+            self._report_activity("skipped", reason="mode_target_mismatch")
+            self._tracked = None
+            self._stop_ramp(change_direction=False)
+            return
+        if self._available_state(self._target) is None:
+            self._report_activity("skipped", reason="target_unavailable")
             self._tracked = None
             self._stop_ramp(change_direction=False)
             return
@@ -471,7 +588,9 @@ class LightBinding:
             or not self._mode_target_valid
             or self._available_state(self._target) is None
         ):
+            self._report_activity("skipped", reason="ramp_unavailable")
             return
+        self._ramp_action = self._active_action
         self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
         self._ramp_unsub = async_track_time_interval(
             self.hass, self._ramp_tick, _RAMP_INTERVAL
@@ -482,7 +601,12 @@ class LightBinding:
 
     @callback
     def _ramp_tick(self, _now) -> None:
-        self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+        previous_action = self._active_action
+        self._active_action = self._ramp_action
+        try:
+            self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+        finally:
+            self._active_action = previous_action
 
     @callback
     def _ramp_watchdog(self, _now) -> None:
@@ -504,6 +628,7 @@ class LightBinding:
             self._ramp_watchdog_unsub = None
         if change_direction:
             self._ramp_up = not self._ramp_up
+        self._ramp_action = None
 
     def _accelerate(self, notches: int, direction: str | None = None) -> int:
         if self._accel <= 0:
@@ -573,6 +698,7 @@ class LightBinding:
         current = state.attributes.get(ATTR_BRIGHTNESS) if state_on else 0
         tracked = self._resync(current, 0)
         if not state_on and tracked <= 0 and not up:
+            self._report_activity("skipped", reason="light_already_off")
             return  # don't switch a light on by scrolling down
 
         if not state_on and up:
@@ -586,7 +712,17 @@ class LightBinding:
         elif target <= self._min_units:
             if self._min_units <= 0:
                 self._tracked = 0
-                self._call("light", "turn_off", {ATTR_TRANSITION: self._transition})
+                self._call(
+                    "light",
+                    "turn_off",
+                    {ATTR_TRANSITION: self._transition},
+                    result=self._value_result(
+                        "brightness",
+                        round(tracked / 255 * 100),
+                        0,
+                        "%",
+                    ),
+                )
                 return
             target = self._min_units
         self._tracked = target
@@ -594,6 +730,12 @@ class LightBinding:
             "light",
             "turn_on",
             {ATTR_BRIGHTNESS: round(target), ATTR_TRANSITION: self._transition},
+            result=self._value_result(
+                "brightness",
+                round(tracked / 255 * 100),
+                round(target / 255 * 100),
+                "%",
+            ),
         )
 
     @callback
@@ -613,6 +755,9 @@ class LightBinding:
             "light",
             "turn_on",
             {ATTR_COLOR_TEMP_KELVIN: round(target), ATTR_TRANSITION: self._transition},
+            result=self._value_result(
+                "color_temperature", round(tracked), round(target), "K"
+            ),
         )
 
     @callback
@@ -633,6 +778,7 @@ class LightBinding:
                 ATTR_HS_COLOR: [round(hue, 1), self._saturation],
                 ATTR_TRANSITION: self._transition,
             },
+            result=self._value_result("hue", round(tracked, 1), round(hue, 1), "°"),
         )
 
     @callback
@@ -643,7 +789,14 @@ class LightBinding:
         tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
         target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
         self._tracked = target
-        self._call("media_player", "volume_set", {"volume_level": round(target, 3)})
+        self._call(
+            "media_player",
+            "volume_set",
+            {"volume_level": round(target, 3)},
+            result=self._value_result(
+                "volume", round(tracked * 100), round(target * 100), "%"
+            ),
+        )
 
     @callback
     def _rotate_cover(self, notches: int, up: bool) -> None:
@@ -655,7 +808,12 @@ class LightBinding:
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
         self._tracked = target
-        self._call("cover", "set_cover_position", {"position": target})
+        self._call(
+            "cover",
+            "set_cover_position",
+            {"position": target},
+            result=self._value_result("cover_position", round(tracked), target, "%"),
+        )
 
     @callback
     def _rotate_temperature(self, notches: int, up: bool) -> None:
@@ -671,7 +829,17 @@ class LightBinding:
         target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
         target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
         self._tracked = target
-        self._call("climate", "set_temperature", {"temperature": round(target, 2)})
+        self._call(
+            "climate",
+            "set_temperature",
+            {"temperature": round(target, 2)},
+            result=self._value_result(
+                "temperature",
+                round(tracked, 2),
+                round(target, 2),
+                str(state.attributes.get("unit_of_measurement") or "°"),
+            ),
+        )
 
     @callback
     def _rotate_fan(self, notches: int, up: bool) -> None:
@@ -683,7 +851,12 @@ class LightBinding:
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
         self._tracked = target
-        self._call("fan", "set_percentage", {"percentage": target})
+        self._call(
+            "fan",
+            "set_percentage",
+            {"percentage": target},
+            result=self._value_result("fan_speed", round(tracked), target, "%"),
+        )
 
     @callback
     def _rotate_number(self, notches: int, up: bool) -> None:
@@ -701,11 +874,27 @@ class LightBinding:
         target = min(max_n, max(min_n, round(target / num_step) * num_step))
         self._tracked = target
         domain = self._target.split(".", 1)[0]
-        self._call(domain, "set_value", {"value": round(target, 4)})
+        self._call(
+            domain,
+            "set_value",
+            {"value": round(target, 4)},
+            result=self._value_result(
+                "number",
+                round(tracked, 4),
+                round(target, 4),
+                str(state.attributes.get("unit_of_measurement") or ""),
+            ),
+        )
 
     def _lit_state(self) -> State | None:
         state = self._available_state(self._target)
-        return state if state is not None and state.state == "on" else None
+        if state is None:
+            self._report_activity("skipped", reason="target_unavailable")
+            return None
+        if state.state != "on":
+            self._report_activity("skipped", reason="light_is_off")
+            return None
+        return state
 
     def _available_state(self, entity_id: str) -> State | None:
         """Return an available state and log only availability transitions."""
@@ -732,43 +921,144 @@ class LightBinding:
     def _single_press(self) -> None:
         if self._scenes:
             scene = self._scenes[self._scene_index]
-            if self._call_entity("scene", "turn_on", scene):
+            if self._call_entity(
+                "scene",
+                "turn_on",
+                scene,
+                result={
+                    "kind": "scene",
+                    "action": "activate",
+                    "target": scene,
+                    "position": self._scene_index + 1,
+                    "total": len(self._scenes),
+                },
+            ):
                 self._scene_index = (self._scene_index + 1) % len(self._scenes)
             return
         if self._click == CLICK_NONE:
+            self._report_activity("skipped", reason="short_press_not_configured")
             return
         service = _CLICK_SERVICE.get(self._click, "toggle")
-        self._call_entity("homeassistant", service, self._click_target)
+        self._call_entity(
+            "homeassistant",
+            service,
+            self._click_target,
+            result={
+                "kind": "entity_action",
+                "action": service,
+                "target": self._click_target,
+            },
+        )
 
     @callback
     def _toggle(self, target: str | None) -> None:
         if target:
-            self._call_entity("homeassistant", "toggle", target)
+            self._call_entity(
+                "homeassistant",
+                "toggle",
+                target,
+                result={
+                    "kind": "entity_action",
+                    "action": "toggle",
+                    "target": target,
+                },
+            )
+            return
+        self._report_activity("skipped", reason="target_not_configured")
 
     # -- service helpers --------------------------------------------------
 
     @callback
-    def _call(self, domain: str, service: str, data: dict[str, Any]) -> None:
+    def _call(
+        self,
+        domain: str,
+        service: str,
+        data: dict[str, Any],
+        *,
+        result: dict[str, Any],
+    ) -> None:
         if self._available_state(self._target) is None:
+            self._report_activity("skipped", result=result, reason="target_unavailable")
             return
         transition = _as_float(data.get(ATTR_TRANSITION)) or 0.0
         self._command_authoritative_until = (
             time.monotonic() + transition + _STATE_ECHO_MARGIN
         )
         payload = {ATTR_ENTITY_ID: self._target, **data}
+        action = self._active_action
+        self._report_activity("pending", result=result, action=action)
+        service_call = self.hass.services.async_call(
+            domain, service, payload, blocking=False
+        )
         self.hass.async_create_task(
-            self.hass.services.async_call(domain, service, payload, blocking=False)
+            self._async_dispatch_service(
+                domain,
+                service,
+                service_call,
+                result=result,
+                action=action,
+            )
         )
 
     @callback
-    def _call_entity(self, domain: str, service: str, entity_id: str) -> bool:
+    def _call_entity(
+        self,
+        domain: str,
+        service: str,
+        entity_id: str,
+        *,
+        result: dict[str, Any],
+    ) -> bool:
         if self._available_state(entity_id) is None:
+            self._report_activity("skipped", result=result, reason="target_unavailable")
             return False
         if entity_id == self._click_target:
             self._log_latency_stage("service_dispatch")
+        action = self._active_action
+        self._report_activity("pending", result=result, action=action)
+        service_call = self.hass.services.async_call(
+            domain, service, {ATTR_ENTITY_ID: entity_id}, blocking=False
+        )
         self.hass.async_create_task(
-            self.hass.services.async_call(
-                domain, service, {ATTR_ENTITY_ID: entity_id}, blocking=False
+            self._async_dispatch_service(
+                domain,
+                service,
+                service_call,
+                result=result,
+                action=action,
             )
         )
         return True
+
+    async def _async_dispatch_service(
+        self,
+        domain: str,
+        service: str,
+        service_call: Awaitable[Any],
+        *,
+        result: dict[str, Any],
+        action: WheelAction | None,
+    ) -> None:
+        """Report whether Home Assistant accepted this exact service action.
+
+        ``blocking=False`` preserves the tuned dispatch latency. ``accepted``
+        means Home Assistant validated and scheduled the service call; it is not
+        a claim that the target device physically changed.
+        """
+        try:
+            await service_call
+        except Exception as err:
+            _LOGGER.warning(
+                "BILRESA service dispatch failed: %s.%s (%s)",
+                domain,
+                service,
+                type(err).__name__,
+            )
+            self._report_activity(
+                "failed",
+                result=result,
+                reason=type(err).__name__,
+                action=action,
+            )
+            return
+        self._report_activity("accepted", result=result, action=action)

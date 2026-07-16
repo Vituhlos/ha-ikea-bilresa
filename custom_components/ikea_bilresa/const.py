@@ -230,6 +230,8 @@ FALLBACK_MAX_KELVIN = 6500
 # --- dispatcher signals -------------------------------------------------
 SIGNAL_WHEELS_UPDATED = f"{DOMAIN}_wheels_updated"
 SIGNAL_CONNECTION = f"{DOMAIN}_connection"
+SIGNAL_BINDINGS_UPDATED = f"{DOMAIN}_bindings_updated"
+SIGNAL_BINDING_ACTIVITY = f"{DOMAIN}_binding_activity"
 
 # --- repair issues ------------------------------------------------------
 ISSUE_CANNOT_CONNECT = "cannot_connect"

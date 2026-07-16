@@ -1,4 +1,4 @@
-"""Phase 2: the read-only API must leak nothing and leak no subscriptions."""
+"""Panel API privacy, subscription lifecycle and binding mutation tests."""
 
 from __future__ import annotations
 
@@ -6,17 +6,28 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from custom_components.ikea_bilresa.const import (
+    CONF_CHANNEL,
+    CONF_MODE,
+    CONF_NODE_ID,
+    CONF_TARGET,
     DOMAIN,
     EVENT_BILRESA,
+    SIGNAL_BINDINGS_UPDATED,
     SIGNAL_CONNECTION,
     SIGNAL_WHEELS_UPDATED,
+    SUBENTRY_BINDING,
 )
 from custom_components.ikea_bilresa.panel_api import (
     TYPE_ACTIVITY_SUBSCRIBE,
+    TYPE_BINDING_DELETE,
+    TYPE_BINDING_SAVE,
+    TYPE_BINDING_TEST,
     TYPE_OVERVIEW,
     TYPE_OVERVIEW_SUBSCRIBE,
     async_register_commands,
     ws_activity_subscribe,
+    ws_binding_delete,
+    ws_binding_save,
     ws_overview,
     ws_overview_subscribe,
 )
@@ -39,7 +50,10 @@ def _hass(*, loaded: bool = True) -> SimpleNamespace:
         config_entries=SimpleNamespace(
             async_loaded_entries=lambda domain: (
                 [entry] if loaded and domain == DOMAIN else []
-            )
+            ),
+            async_add_subentry=MagicMock(),
+            async_update_subentry=MagicMock(),
+            async_remove_subentry=MagicMock(),
         ),
     )
 
@@ -98,7 +112,11 @@ def test_overview_subscription_listens_to_both_signals(monkeypatch) -> None:
         _hass(), connection, {"id": 5, "type": TYPE_OVERVIEW_SUBSCRIBE}
     )
 
-    assert set(signals) == {SIGNAL_CONNECTION, SIGNAL_WHEELS_UPDATED}
+    assert set(signals) == {
+        SIGNAL_CONNECTION,
+        SIGNAL_WHEELS_UPDATED,
+        SIGNAL_BINDINGS_UPDATED,
+    }
 
 
 def test_overview_subscription_unwinds_every_listener(monkeypatch) -> None:
@@ -123,7 +141,7 @@ def test_overview_subscription_unwinds_every_listener(monkeypatch) -> None:
     ws_overview_subscribe(
         _hass(), connection, {"id": 5, "type": TYPE_OVERVIEW_SUBSCRIBE}
     )
-    assert len(handed_out) == 2
+    assert len(handed_out) == 3
 
     connection.subscriptions[5]()
 
@@ -176,6 +194,10 @@ def _fire(hass, connection, monkeypatch, data) -> None:
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.panel_api.websocket_api.event_message",
         lambda mid, payload: {"id": mid, "event": payload},
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api.async_dispatcher_connect",
+        lambda *_args: MagicMock(),
     )
     ws_activity_subscribe(hass, connection, {"id": 7, "type": TYPE_ACTIVITY_SUBSCRIBE})
     forward = hass.bus.async_listen.call_args.args[1]
@@ -255,14 +277,21 @@ def test_activity_ignores_a_malformed_event(monkeypatch) -> None:
     connection.send_message.assert_not_called()
 
 
-def test_activity_subscription_is_handed_to_home_assistant() -> None:
+def test_activity_subscription_unwinds_bus_and_binding_listener(monkeypatch) -> None:
     hass, connection = _hass(), _connection()
-    handle = MagicMock()
-    hass.bus.async_listen.return_value = handle
+    bus_handle = MagicMock()
+    binding_handle = MagicMock()
+    hass.bus.async_listen.return_value = bus_handle
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api.async_dispatcher_connect",
+        lambda *_args: binding_handle,
+    )
 
     ws_activity_subscribe(hass, connection, {"id": 7, "type": TYPE_ACTIVITY_SUBSCRIBE})
 
-    assert connection.subscriptions[7] is handle
+    connection.subscriptions[7]()
+    bus_handle.assert_called_once()
+    binding_handle.assert_called_once()
 
 
 # -- registration ----------------------------------------------------------
@@ -280,12 +309,145 @@ def test_commands_register_once(monkeypatch) -> None:
     async_register_commands(hass)
     async_register_commands(hass)
 
-    assert register.call_count == 3  # overview, overview/subscribe, activity
+    assert register.call_count == 6
 
 
-def test_there_is_no_write_command() -> None:
-    """0.5.8 is read-only. A mutation path must not appear by accident."""
+def test_write_surface_is_limited_to_binding_mutations_and_tests() -> None:
+    """The panel must not gain arbitrary config-entry or Matter mutation."""
     import custom_components.ikea_bilresa.panel_api as api
 
     exported = {name for name in dir(api) if name.startswith("ws_")}
-    assert exported == {"ws_overview", "ws_overview_subscribe", "ws_activity_subscribe"}
+    assert exported == {
+        "ws_activity_subscribe",
+        "ws_binding_delete",
+        "ws_binding_save",
+        "ws_binding_test",
+        "ws_overview",
+        "ws_overview_subscribe",
+    }
+
+
+def _mutation_hass(subentries=None):
+    wheel = SimpleNamespace(name="Wheel")
+    entry = SimpleNamespace(
+        subentries=subentries or {},
+        runtime_data=SimpleNamespace(
+            wheels={NODE_A: wheel},
+            connected=True,
+            event_source="core_matter_client",
+        ),
+    )
+    hass = _hass()
+    hass.config = SimpleNamespace(language="en")
+    hass.config_entries.async_loaded_entries = lambda domain: (
+        [entry] if domain == DOMAIN else []
+    )
+    return hass, entry
+
+
+def _stored_binding(revision_data=None):
+    return SimpleNamespace(
+        subentry_id="binding-1",
+        subentry_type=SUBENTRY_BINDING,
+        title="Wheel · Channel 1",
+        unique_id=None,
+        data={
+            CONF_NODE_ID: str(NODE_A),
+            CONF_CHANNEL: "1",
+            CONF_TARGET: "light.office",
+            CONF_MODE: "brightness",
+            **(revision_data or {}),
+        },
+    )
+
+
+def test_binding_save_rejects_stale_revision(monkeypatch) -> None:
+    subentry = _stored_binding()
+    hass, _entry = _mutation_hass({subentry.subentry_id: subentry})
+    connection = _connection()
+
+    ws_binding_save(
+        hass,
+        connection,
+        {
+            "id": 20,
+            "type": TYPE_BINDING_SAVE,
+            "wheel": wheel_key(NODE_A),
+            "channel": 1,
+            "binding_id": subentry.subentry_id,
+            "expected_revision": "stale",
+            "data": {CONF_TARGET: "light.office", CONF_MODE: "brightness"},
+        },
+    )
+
+    result = connection.send_result.call_args.args[1]
+    assert result["ok"] is False
+    assert result["error"] == "conflict"
+    hass.config_entries.async_update_subentry.assert_not_called()
+
+
+def test_binding_save_creates_only_normalized_subentry(monkeypatch) -> None:
+    hass, _entry = _mutation_hass()
+    connection = _connection()
+    created = {}
+
+    def _subentry(**kwargs):
+        item = SimpleNamespace(subentry_id="new", **kwargs)
+        created["item"] = item
+        return item
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api.ConfigSubentry", _subentry
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api._binding_title",
+        lambda *_args: "Wheel · Channel 1",
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api.async_dispatcher_send", MagicMock()
+    )
+
+    ws_binding_save(
+        hass,
+        connection,
+        {
+            "id": 21,
+            "type": TYPE_BINDING_SAVE,
+            "wheel": wheel_key(NODE_A),
+            "channel": 1,
+            "data": {
+                CONF_TARGET: "light.office",
+                CONF_MODE: "brightness",
+            },
+        },
+    )
+
+    result = connection.send_result.call_args.args[1]
+    assert result["ok"] is True
+    assert dict(created["item"].data)[CONF_NODE_ID] == str(NODE_A)
+    assert dict(created["item"].data)[CONF_CHANNEL] == "1"
+    hass.config_entries.async_add_subentry.assert_called_once()
+
+
+def test_binding_delete_requires_latest_revision() -> None:
+    subentry = _stored_binding()
+    hass, _entry = _mutation_hass({subentry.subentry_id: subentry})
+    connection = _connection()
+
+    ws_binding_delete(
+        hass,
+        connection,
+        {
+            "id": 22,
+            "type": TYPE_BINDING_DELETE,
+            "binding_id": subentry.subentry_id,
+            "expected_revision": "stale",
+        },
+    )
+
+    assert connection.send_result.call_args.args[1]["error"] == "conflict"
+    hass.config_entries.async_remove_subentry.assert_not_called()
+
+
+def test_binding_test_command_is_registered() -> None:
+    assert TYPE_BINDING_TEST.endswith("/binding/test")

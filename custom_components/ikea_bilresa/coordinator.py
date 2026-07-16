@@ -25,6 +25,7 @@ from .const import (
     DOMAIN,
     EVENT_BILRESA,
     ISSUE_CANNOT_CONNECT,
+    SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
     SIGNAL_WHEELS_UPDATED,
     SUBENTRY_BINDING,
@@ -59,6 +60,8 @@ class BilresaCoordinator:
         self._source_switch_lock = asyncio.Lock()
         self._stopping = False
         self._binding_unsubs: list[Callable[[], None]] = []
+        self._binding_keys: set[tuple[int, int]] = set()
+        self._bindings: dict[tuple[int, int], LightBinding] = {}
         self._disconnect_timer: Callable[[], None] | None = None
         self._event_counts: Counter[str] = Counter()
         self._ignored_counts: Counter[str] = Counter()
@@ -159,6 +162,9 @@ class BilresaCoordinator:
                 continue
             binding = LightBinding(self.hass, dict(subentry.data))
             self._binding_unsubs.append(binding.async_attach())
+            key = (binding.node_id, binding.channel)
+            self._binding_keys.add(key)
+            self._bindings[key] = binding
         if self._binding_unsubs:
             _LOGGER.debug("Attached %s light binding(s)", len(self._binding_unsubs))
 
@@ -167,6 +173,17 @@ class BilresaCoordinator:
         for unsub in self._binding_unsubs:
             unsub()
         self._binding_unsubs.clear()
+        self._binding_keys.clear()
+        self._bindings.clear()
+
+    @callback
+    def test_binding_action(self, action: WheelAction) -> bool:
+        """Execute a synthetic panel test through one configured binding."""
+        binding = self._bindings.get((action.node_id, action.channel or 0))
+        if binding is None:
+            return False
+        binding.test_action(action)
+        return True
 
     # -- event handling ---------------------------------------------------
 
@@ -248,6 +265,18 @@ class BilresaCoordinator:
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )
+        if (action.node_id, action.channel) not in self._binding_keys:
+            async_dispatcher_send(
+                self.hass,
+                SIGNAL_BINDING_ACTIVITY,
+                {
+                    **event_data,
+                    "dispatch_status": "not_configured",
+                    "dispatched": False,
+                    "result": None,
+                    "reason": "binding_not_configured",
+                },
+            )
 
     # -- discovery (initial dump + hot add/remove) ------------------------
 

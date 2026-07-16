@@ -1,58 +1,60 @@
 /**
- * BILRESA panel — Phase 3 frontend shell and overview grid.
+ * BILRESA panel — wheel overview, live activity and binding editor.
  *
- * Layout is the two-layer model in PANEL_DESIGN.md: a grid of wheel cards as the
- * landing layer. The wheel detail and its 256px rail are Phase 4 and are not
- * here; a card opens a placeholder that says so.
+ * The layout follows PANEL_DESIGN.md's two-layer model: the landing view is a
+ * grid of every wheel, while an opened wheel gets a measured 256px switcher rail
+ * plus Channels, Live test and Diagnostics views. The rail disappears below
+ * 620px and the detail's two-column content collapses on its own 700px pane
+ * width, not on the window width.
  *
- * ## Why this looks like Home Assistant and not like a design
+ * This file deliberately stays dependency-free. It uses Home Assistant tokens,
+ * authenticated WebSocket commands and textContent only. Binding mutations are
+ * narrow, admin-only and revision-checked; the browser never connects to Matter.
  *
- * It is built from Home Assistant's own design tokens, read from the frontend
- * source rather than guessed:
- *
- *   --ha-space-1..20      4px..80px in 4px steps. HA's own styling guidance
- *                         forbids hard-coded pixels in spacing; every gap,
- *                         padding and inset below is a token.
- *   --ha-font-size-*      xs 10 / s 12 / m 14 / l 16 / xl 20 / 2xl 24 ...
- *   --ha-font-weight-*    light 300 / normal 400 / medium 500 / bold 700
- *   --ha-line-height-*    condensed 1.2 / normal 1.6 / expanded 2
- *   --ha-card-*           border-radius, border-width, border-color
- *
- * Every one of these carries a fallback, because a custom theme may not define
- * the newer tokens and a panel that collapses on an old theme is worse than one
- * that is slightly off.
- *
- * Note what is NOT here: no gradient, no invented icon, no decorative bar, no
- * chosen font. PANEL_DESIGN.md rejects all of it, and the earlier mockups were
- * thrown out for exactly that. A panel that looks designed looks foreign.
- *
- * ## The colour rule, which is not cosmetic
- *
- * **Accent carries state, never text.** HA's own accent tokens fail WCAG AA as
- * text on a light card: --primary-color is 2.63:1, --success-color 3.30:1,
- * --warning-color 1.96:1. Measured, not assumed; PANEL_DESIGN.md has the table.
- * So colour lives on the status dot and the card border, and every word is
- * --primary-text-color. --secondary-text-color clears AA by only 0.31, so it
- * may sit on an untinted card surface and nowhere else.
- *
- * ## Shadow DOM
- *
- * Styles are scoped to the component, per HA's guidance. Custom properties
- * inherit through the boundary, so themes still reach in. `hass-toggle-menu`
- * must be `composed` to get out.
+ * Accent carries state, never words. Home Assistant's default accent tokens do
+ * not pass WCAG AA as normal text on a light card, so labels stay on the primary
+ * text colour and state is paired with dots, borders, weight and explicit copy.
  */
 
 const OVERVIEW = "ikea_bilresa/overview";
 const OVERVIEW_SUBSCRIBE = "ikea_bilresa/overview/subscribe";
+const ACTIVITY_SUBSCRIBE = "ikea_bilresa/activity/subscribe";
+const BINDING_SAVE = "ikea_bilresa/binding/save";
+const BINDING_DELETE = "ikea_bilresa/binding/delete";
+const BINDING_TEST = "ikea_bilresa/binding/test";
+const ACTIVITY_LIMIT = 8;
 
-// Only icons whose Material Design Icons paths are certain. mdi:knob, which
-// event.py uses for the wheel, is deliberately absent rather than approximated:
-// PANEL_DESIGN.md requires standard MDI, and an invented path is not one.
-// Resolving real icons needs ha-svg-icon or the @mdi/js package — an open Phase
-// 3 decision, not something to fake in the meantime.
+const MODE_DOMAINS = {
+  brightness: ["light"],
+  color_temp: ["light"],
+  color: ["light"],
+  volume: ["media_player"],
+  cover_position: ["cover"],
+  temperature: ["climate"],
+  fan_speed: ["fan"],
+  number: ["number", "input_number"],
+};
+
+const DEFAULT_BINDING = {
+  mode: "brightness",
+  step: 3,
+  acceleration: 0,
+  min_brightness: 1,
+  max_brightness: 100,
+  transition: 1,
+  click_action: "toggle",
+  button_response: "multi_press",
+  hold_action: "toggle",
+  scenes: [],
+};
+
+// Material Design Icons paths already used as standard chrome. The product icon
+// remains absent rather than approximated with an invented path.
 const ICON = {
   menu: "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z",
   chevron: "M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z",
+  back: "M20,11H7.83L13.42,5.41L12,4L4,12L12,20L13.42,18.59L7.83,13H20V11Z",
+  check: "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z",
   alert:
     "M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z",
   refresh:
@@ -62,8 +64,6 @@ const ICON = {
 const STYLES = `
   :host {
     display: block;
-    /* Local aliases so every fallback is written once. A custom theme that
-       predates HA's token rename must still render a usable panel. */
     --_bg: var(--primary-background-color, #fafafa);
     --_card: var(--ha-card-background, var(--card-background-color, #fff));
     --_border: var(--ha-card-border-color, var(--divider-color, #e0e0e0));
@@ -71,25 +71,36 @@ const STYLES = `
     --_ink: var(--primary-text-color, #212121);
     --_ink-dim: var(--secondary-text-color, #727272);
     --_divider: var(--divider-color, rgba(0, 0, 0, 0.12));
+    --_selected: var(
+      --secondary-background-color,
+      color-mix(in srgb, var(--_ink) 8%, var(--_card))
+    );
     --_space-1: var(--ha-space-1, 4px);
     --_space-2: var(--ha-space-2, 8px);
     --_space-3: var(--ha-space-3, 12px);
     --_space-4: var(--ha-space-4, 16px);
+    --_space-5: var(--ha-space-5, 20px);
     --_space-6: var(--ha-space-6, 24px);
+    --_space-8: var(--ha-space-8, 32px);
     --_font: var(--ha-font-family-body, Roboto, Noto, sans-serif);
     --_fast: var(--ha-animation-duration-fast, 120ms);
+    --_rail-width: 256px;
 
-    font-family: var(--_font);
-    color: var(--_ink);
+    min-block-size: 100vh;
+    min-block-size: 100dvh;
     background: var(--_bg);
-    min-block-size: 100%;
+    color: var(--_ink);
+    font-family: var(--_font);
   }
 
-  /* The panel owns its app header; HA draws none. Without it a narrow screen
-     has no way back to the sidebar. The safe-area inset is ADDED to the bar
-     (content-box) — subtracting it would just shorten the bar and leave the
-     button under an iPhone's notch. Both learned on a real phone. */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  /* The safe-area inset is added to the 56px bar. A border-box header would
+     consume the inset and put the exit control under an iPhone notch. */
   header {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: var(--_space-2);
@@ -101,9 +112,6 @@ const STYLES = `
       max(var(--_space-4), env(safe-area-inset-right, 0px));
     background: var(--app-header-background-color, var(--primary-color, #03a9f4));
     color: var(--app-header-text-color, var(--text-primary-color, #fff));
-    position: sticky;
-    inset-block-start: 0;
-    z-index: 1;
   }
   header h1 {
     margin: 0;
@@ -111,9 +119,13 @@ const STYLES = `
     font-weight: var(--ha-font-weight-normal, 400);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
-  /* With no menu button the title would sit against the edge; the button's own
-     box is what spaces it on narrow screens. */
   header h1:first-child { padding-inline-start: var(--_space-3); }
+
+  button { font-family: inherit; }
+  button:focus-visible {
+    outline: 2px solid var(--_ink);
+    outline-offset: 2px;
+  }
 
   .icon-button {
     flex: 0 0 auto;
@@ -130,16 +142,27 @@ const STYLES = `
   }
   .icon-button:hover { background: rgba(255, 255, 255, 0.12); }
   .icon-button:focus-visible {
-    outline: 2px solid currentColor;
+    outline-color: var(--_ink);
     outline-offset: -4px;
+    background: var(--_card);
+    color: var(--_ink);
   }
   .icon-button svg { inline-size: 24px; block-size: 24px; fill: currentColor; }
 
-  main { padding: var(--_space-4); }
-  @media (max-width: 600px) { main { padding: var(--_space-2); } }
+  main {
+    padding-block: var(--_space-4) max(var(--_space-4), env(safe-area-inset-bottom, 0px));
+    padding-inline:
+      max(var(--_space-4), env(safe-area-inset-left, 0px))
+      max(var(--_space-4), env(safe-area-inset-right, 0px));
+  }
+  @media (max-width: 600px) {
+    main {
+      padding-inline:
+        max(var(--_space-2), env(safe-area-inset-left, 0px))
+        max(var(--_space-2), env(safe-area-inset-right, 0px));
+    }
+  }
 
-  /* Summary. Small and quiet: PANEL_DESIGN.md wants it actionable, not a
-     dashboard of its own. */
   .summary {
     display: flex;
     flex-wrap: wrap;
@@ -147,8 +170,8 @@ const STYLES = `
     gap: var(--_space-2);
     margin-block-end: var(--_space-4);
     padding-inline: var(--_space-1);
-    font-size: var(--ha-font-size-m, 14px);
     color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
   }
   .summary .sep { opacity: 0.4; }
 
@@ -159,25 +182,20 @@ const STYLES = `
     margin-block-end: var(--_space-4);
     padding: var(--_space-3) var(--_space-4);
     border: var(--ha-card-border-width, 1px) solid var(--_border);
-    border-inline-start: 4px solid var(--warning-color, #ffa600);
     border-radius: var(--_radius);
     background: var(--_card);
+    color: var(--_ink);
     font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-normal, 1.6);
   }
-  /* The stripe carries the warning; the words stay readable. HA's warning
-     orange is 1.96:1 on a light card and cannot be text. */
   .banner svg {
     flex: 0 0 auto;
     inline-size: 20px;
     block-size: 20px;
     margin-block-start: 2px;
-    fill: var(--warning-color, #ffa600);
+    fill: currentColor;
   }
 
-  /* auto-FIT, not auto-fill: auto-fill keeps empty tracks alive and leaves a
-     phantom card-shaped hole beside two wheels on a wide screen, which reads as
-     a failed load. The max stops two cards stretching into slabs. */
   .grid {
     display: grid;
     gap: var(--_space-4);
@@ -200,12 +218,7 @@ const STYLES = `
     cursor: pointer;
     transition: border-color var(--_fast) ease-in-out;
   }
-  .wheel:hover { border-color: var(--primary-color, #03a9f4); }
-  .wheel:focus-visible {
-    outline: 2px solid var(--primary-color, #03a9f4);
-    outline-offset: 2px;
-  }
-  @media (prefers-reduced-motion: reduce) { .wheel { transition: none; } }
+  .wheel:hover { border-color: var(--_ink); }
 
   .wheel-head {
     display: flex;
@@ -214,37 +227,41 @@ const STYLES = `
     padding: var(--_space-4) var(--_space-4) var(--_space-3);
   }
   .wheel-name {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
     font-size: var(--ha-font-size-l, 16px);
     font-weight: var(--ha-font-weight-medium, 500);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
   .wheel-sub {
     margin-block-start: var(--_space-1);
-    font-size: var(--ha-font-size-s, 12px);
     color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
   }
+
   .status {
     display: inline-flex;
     align-items: center;
     gap: var(--_space-2);
     margin-inline-start: auto;
     flex: 0 0 auto;
-    font-size: var(--ha-font-size-s, 12px);
-    /* The dot is the colour. The word is readable. */
     color: var(--_ink);
+    font-size: var(--ha-font-size-s, 12px);
   }
   .dot {
     inline-size: 8px;
     block-size: 8px;
+    flex: 0 0 auto;
     border-radius: 50%;
     background: var(--_ink-dim);
   }
-  .dot[data-state="connected"] { background: var(--success-color, #43a047); }
-  .dot[data-state="unavailable"] { background: var(--_ink-dim); }
+  .dot[data-state="connected"],
+  .dot[data-state="success"] { background: var(--success-color, #43a047); }
+  .dot[data-state="unavailable"],
+  .dot[data-state="failed"] { background: var(--_ink-dim); }
   .dot[data-state="unknown"] {
-    background: transparent;
     border: 2px solid var(--_ink-dim);
-    box-sizing: border-box;
+    background: transparent;
   }
 
   .channels { border-block-start: 1px solid var(--_divider); }
@@ -263,42 +280,386 @@ const STYLES = `
     display: grid;
     place-items: center;
     border-radius: 50%;
-    /* NOT --secondary-background-color: it is #202020 against a #1c1c1c card in
-       the dark theme, i.e. 1.05:1, and the badge vanishes. */
     background: color-mix(in srgb, var(--_ink) 16%, var(--_card));
     font-size: var(--ha-font-size-xs, 10px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
   .channel-text { min-inline-size: 0; flex: 1; }
+  .channel-behaviour,
+  .channel-target {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .channel-behaviour {
     font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-condensed, 1.2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
-  .channel-target {
-    font-size: var(--ha-font-size-s, 12px);
-    color: var(--_ink-dim);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .channel-target { color: var(--_ink-dim); font-size: var(--ha-font-size-s, 12px); }
   .channel[data-state="empty"] .channel-behaviour {
     color: var(--_ink-dim);
     font-style: italic;
   }
-  .channel-warn {
-    flex: 0 0 auto;
-    inline-size: 16px;
-    block-size: 16px;
-    fill: var(--warning-color, #ffa600);
-  }
+  .channel-warn,
   .channel > svg:last-child {
     flex: 0 0 auto;
     inline-size: 18px;
     block-size: 18px;
-    fill: var(--_ink-dim);
+    fill: var(--_ink);
+  }
+
+  .detail-shell {
+    display: grid;
+    grid-template-columns: var(--_rail-width) minmax(0, 1fr);
+    gap: var(--_space-4);
+    align-items: start;
+  }
+  .rail {
+    position: sticky;
+    inset-block-start: calc(56px + env(safe-area-inset-top, 0px) + var(--_space-4));
+    max-block-size: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - var(--_space-8));
+    overflow: auto;
+    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_card);
+  }
+  .rail-title {
+    padding: var(--_space-4);
+    border-block-end: 1px solid var(--_divider);
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .rail ul { margin: 0; padding: var(--_space-2); list-style: none; }
+  .rail li + li { margin-block-start: var(--_space-1); }
+  .rail-wheel {
+    inline-size: 100%;
+    min-block-size: 48px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--_space-2);
+    padding: var(--_space-2) var(--_space-3);
+    border: 0;
+    border-radius: var(--ha-border-radius-md, 8px);
+    background: transparent;
+    color: var(--_ink);
+    text-align: start;
+    cursor: pointer;
+  }
+  .rail-wheel:hover { background: color-mix(in srgb, var(--_ink) 6%, transparent); }
+  .rail-wheel[aria-current="page"] {
+    background: var(--_selected);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .rail-copy { min-inline-size: 0; }
+  .rail-name,
+  .rail-area {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rail-name { font-size: var(--ha-font-size-m, 14px); }
+  .rail-area {
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+    font-weight: var(--ha-font-weight-normal, 400);
+  }
+  .rail-wheel[aria-current="page"] .rail-area { color: var(--_ink); }
+  .rail-check { inline-size: 18px; block-size: 18px; fill: var(--_ink); }
+
+  .detail-pane { min-inline-size: 0; container-type: inline-size; }
+  .detail-top {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--_space-3);
+    margin-block-end: var(--_space-4);
+  }
+  .back-button {
+    min-block-size: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--_space-2);
+    padding-inline: var(--_space-3);
+    border: 0;
+    border-radius: var(--ha-border-radius-md, 8px);
+    background: transparent;
+    color: var(--_ink);
+    font-size: var(--ha-font-size-m, 14px);
+    cursor: pointer;
+  }
+  .back-button:hover { background: color-mix(in srgb, var(--_ink) 6%, transparent); }
+  .back-button svg { inline-size: 20px; block-size: 20px; fill: currentColor; }
+  .detail-heading { min-inline-size: 0; padding-block-start: var(--_space-2); }
+  .detail-heading h2 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--ha-font-size-2xl, 24px);
+    font-weight: var(--ha-font-weight-normal, 400);
+    line-height: var(--ha-line-height-condensed, 1.2);
+  }
+  .detail-meta {
+    margin-block-start: var(--_space-1);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+  }
+
+  .tabs {
+    display: flex;
+    gap: var(--_space-1);
+    overflow-x: auto;
+    margin-block-end: var(--_space-4);
+    border-block-end: 1px solid var(--_divider);
+  }
+  .tab {
+    position: relative;
+    min-block-size: 44px;
+    flex: 0 0 auto;
+    padding-inline: var(--_space-4);
+    border: 0;
+    background: transparent;
+    color: var(--_ink);
+    font-size: var(--ha-font-size-m, 14px);
+    cursor: pointer;
+  }
+  .tab:hover { background: color-mix(in srgb, var(--_ink) 6%, transparent); }
+  .tab[aria-selected="true"] { font-weight: var(--ha-font-weight-medium, 500); }
+  .tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: var(--_space-3);
+    inset-block-end: 0;
+    block-size: 3px;
+    background: var(--primary-color, #03a9f4);
+  }
+  .tab-panel { min-inline-size: 0; }
+
+  .section-head { margin-block-end: var(--_space-4); }
+  .section-head h3 {
+    margin: 0;
+    font-size: var(--ha-font-size-xl, 20px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    line-height: var(--ha-line-height-condensed, 1.2);
+  }
+  .section-head p {
+    max-inline-size: 70ch;
+    margin: var(--_space-1) 0 0;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
+  }
+
+  .channel-grid,
+  .diagnostic-grid,
+  .live-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--_space-4);
+  }
+  .detail-card {
+    min-inline-size: 0;
+    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_card);
+    box-shadow: var(--ha-card-box-shadow, none);
+  }
+  .detail-card h4 {
+    margin: 0;
+    padding: var(--_space-4);
+    border-block-end: 1px solid var(--_divider);
+    font-size: var(--ha-font-size-l, 16px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .facts { margin: 0; padding: var(--_space-2) var(--_space-4); }
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: var(--_space-3);
+    padding-block: var(--_space-2);
+  }
+  .fact + .fact { border-block-start: 1px solid var(--_divider); }
+  .fact dt { color: var(--_ink-dim); font-size: var(--ha-font-size-s, 12px); }
+  .fact dd {
+    min-inline-size: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-align: end;
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .fact dd[data-state="warning"] { font-weight: var(--ha-font-weight-medium, 500); }
+
+  .card-actions,
+  .form-actions,
+  .test-actions,
+  .delete-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--_space-2);
+    padding: var(--_space-3) var(--_space-4);
+    border-block-start: 1px solid var(--_divider);
+  }
+  .action-button {
+    min-block-size: 40px;
+    padding-inline: var(--_space-4);
+    border: 1px solid var(--_border);
+    border-radius: var(--ha-border-radius-md, 8px);
+    background: transparent;
+    color: var(--_ink);
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    cursor: pointer;
+  }
+  .action-button:hover { background: var(--_selected); }
+  .action-button[data-primary="true"] {
+    border-color: var(--primary-color, var(--_ink));
+    background: var(--primary-color, var(--_ink));
+    color: var(--text-primary-color, var(--_card));
+  }
+  .action-button[data-danger="true"] {
+    border-color: var(--error-color, var(--_ink));
+    color: var(--error-color, var(--_ink));
+  }
+  .action-button:disabled { cursor: wait; opacity: 0.65; }
+
+  .binding-form {
+    display: grid;
+    gap: var(--_space-4);
+    padding: var(--_space-4);
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--_space-4);
+  }
+  .field {
+    min-inline-size: 0;
+    display: grid;
+    align-content: start;
+    gap: var(--_space-1);
+  }
+  .field[data-wide="true"] { grid-column: 1 / -1; }
+  .field label,
+  .field-label {
+    color: var(--_ink);
+    font-size: var(--ha-font-size-s, 12px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .field input,
+  .field select {
+    min-inline-size: 0;
+    inline-size: 100%;
+    min-block-size: 44px;
+    padding: var(--_space-2) var(--_space-3);
+    border: 1px solid var(--_border);
+    border-radius: var(--ha-border-radius-md, 8px);
+    background: var(--_card);
+    color: var(--_ink);
+    font: inherit;
+  }
+  .field select[multiple] { min-block-size: 132px; }
+  .field input:focus-visible,
+  .field select:focus-visible {
+    outline: 2px solid var(--_ink);
+    outline-offset: 2px;
+  }
+  .field-help,
+  .field-error,
+  .form-message {
+    font-size: var(--ha-font-size-s, 12px);
+    line-height: var(--ha-line-height-normal, 1.6);
+  }
+  .field-help { color: var(--_ink-dim); }
+  .field-error { color: var(--_ink); font-weight: var(--ha-font-weight-medium, 500); }
+  .form-message {
+    margin: 0;
+    padding: var(--_space-3);
+    border: 1px solid var(--_border);
+    border-radius: var(--ha-border-radius-md, 8px);
+  }
+  .advanced {
+    border-block-start: 1px solid var(--_divider);
+    padding-block-start: var(--_space-3);
+  }
+  .advanced summary {
+    min-block-size: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .advanced .form-grid { padding-block-start: var(--_space-3); }
+  .delete-confirm { color: var(--_ink); }
+  .delete-confirm span { flex: 1 1 220px; }
+  .test-panel { grid-column: 1 / -1; }
+  .test-panel p {
+    margin: 0;
+    padding: var(--_space-4);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
+  }
+
+  .live-layout { align-items: start; }
+  .live-output { padding: var(--_space-6); }
+  .live-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--_space-2);
+    margin-block-end: var(--_space-4);
+    color: var(--_ink);
+    font-size: var(--ha-font-size-s, 12px);
+  }
+  .live-result {
+    overflow-wrap: anywhere;
+    font-size: var(--ha-font-size-2xl, 24px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    line-height: var(--ha-line-height-condensed, 1.2);
+  }
+  .live-explanation {
+    max-inline-size: 62ch;
+    margin-block-start: var(--_space-2);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
+  }
+  .dispatch {
+    display: flex;
+    align-items: center;
+    gap: var(--_space-2);
+    margin-block-start: var(--_space-4);
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .gesture-caption {
+    margin-block-start: var(--_space-3);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+  }
+  .waiting-title {
+    font-size: var(--ha-font-size-l, 16px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+
+  .recent h4 { padding-block-end: var(--_space-3); }
+  .recent ol { margin: 0; padding: 0; list-style: none; }
+  .recent li {
+    padding: var(--_space-3) var(--_space-4);
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .recent li + li { border-block-start: 1px solid var(--_divider); }
+  .recent time {
+    display: block;
+    margin-block-start: var(--_space-1);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+  }
+
+  .recovery { grid-column: 1 / -1; }
+  .recovery p {
+    margin: 0;
+    padding: var(--_space-4);
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
   }
 
   .placeholder {
@@ -306,8 +667,8 @@ const STYLES = `
     place-items: center;
     gap: var(--_space-3);
     padding: var(--_space-6) var(--_space-4);
-    text-align: center;
     color: var(--_ink-dim);
+    text-align: center;
     font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-normal, 1.6);
   }
@@ -317,39 +678,53 @@ const STYLES = `
     font-weight: var(--ha-font-weight-medium, 500);
   }
   .placeholder button {
+    min-block-size: 44px;
     display: inline-flex;
     align-items: center;
     gap: var(--_space-2);
-    min-block-size: 40px;
     padding-inline: var(--_space-4);
     border: 1px solid var(--_border);
     border-radius: var(--ha-border-radius-md, 8px);
     background: transparent;
     color: var(--_ink);
-    font: inherit;
     font-size: var(--ha-font-size-m, 14px);
     font-weight: var(--ha-font-weight-medium, 500);
     cursor: pointer;
   }
   .placeholder button:hover { background: var(--_divider); }
-  .placeholder button:focus-visible {
-    outline: 2px solid var(--primary-color, #03a9f4);
-    outline-offset: 2px;
-  }
-  .placeholder button svg {
-    inline-size: 18px;
-    block-size: 18px;
-    fill: var(--state-icon-color, #44739e);
-  }
+  .placeholder button svg { inline-size: 18px; block-size: 18px; fill: currentColor; }
 
-  /* Skeletons, not a spinner: the grid's shape is known before its data, so
-     hold the layout rather than flashing an empty screen and reflowing. */
   .skeleton {
+    block-size: 168px;
     border: var(--ha-card-border-width, 1px) solid var(--_border);
     border-radius: var(--_radius);
     background: var(--_card);
-    block-size: 168px;
     opacity: 0.5;
+  }
+
+  @container (max-width: 700px) {
+    .channel-grid,
+    .diagnostic-grid,
+    .live-layout,
+    .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .field[data-wide="true"] { grid-column: auto; }
+  }
+
+  @media (max-width: 619px) {
+    .detail-shell { grid-template-columns: minmax(0, 1fr); }
+    .rail { display: none; }
+    .detail-top { display: block; }
+    .detail-heading { padding: var(--_space-2) var(--_space-3) 0; }
+    .detail-heading h2 { font-size: var(--ha-font-size-xl, 20px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 `;
 
@@ -368,8 +743,7 @@ const svg = (path, cls) => {
 const el = (tag, cls, text) => {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
-  // Always textContent. Wheel names, areas and target labels are strings the
-  // user chose; PANEL_ROADMAP.md's frontend floor forbids rendering them as HTML.
+  // Names, areas and targets are user-controlled. Never interpret them as HTML.
   if (text !== undefined) node.textContent = text;
   return node;
 };
@@ -383,6 +757,21 @@ class IkeaBilresaPanel extends HTMLElement {
     this._unsub = null;
     this._started = false;
     this._open = null;
+    this._view = "channels";
+    this._activities = [];
+    this._activityUnsub = null;
+    this._activityPending = false;
+    this._activityError = false;
+    this._activityEpoch = 0;
+    this._editingChannel = null;
+    this._editorData = null;
+    this._editorBinding = null;
+    this._editorErrors = {};
+    this._editorBusy = false;
+    this._editorMessage = null;
+    this._deleteConfirm = false;
+    this._testBusy = false;
+    this._testMessage = null;
   }
 
   set hass(hass) {
@@ -391,13 +780,11 @@ class IkeaBilresaPanel extends HTMLElement {
       this._started = true;
       this._render();
       this._connect();
+      if (this._view === "live" && this._open) this._startActivity();
     }
   }
 
   set narrow(narrow) {
-    // HA re-sets this on every resize across the breakpoint, and the menu button
-    // appears and disappears with it. Storing it without re-rendering leaves a
-    // desktop-sized header on a phone until something else happens to repaint.
     const changed = this._narrow !== narrow;
     this._narrow = narrow;
     if (changed && this._started) this._render();
@@ -407,14 +794,6 @@ class IkeaBilresaPanel extends HTMLElement {
     this._panel = panel;
   }
 
-  /**
-   * Strings come from the panel's config, localized by Python from
-   * panel_strings.py. They are NOT duplicated here: the roadmap requires English
-   * and Czech to stay aligned, and a second copy in JavaScript is how they drift.
-   *
-   * The key itself is the fallback. If a label is somehow missing, an English
-   * word is better than a blank, and a raw key is at least searchable.
-   */
   _t(key, placeholders) {
     const labels = this._panel?.config?.labels || {};
     let value = labels[key];
@@ -440,13 +819,18 @@ class IkeaBilresaPanel extends HTMLElement {
       this._unsub = await this._hass.connection.subscribeMessage(
         (snapshot) => {
           this._snapshot = snapshot;
+          if (
+            this._open &&
+            !snapshot.wheels.some((wheel) => wheel.key === this._open)
+          ) {
+            this._stopActivity();
+          }
           this._render();
         },
         { type: OVERVIEW_SUBSCRIBE },
       );
     } catch (err) {
-      // A failed subscription is degraded, not fatal: the snapshot already
-      // rendered, it just will not update itself.
+      // The existing snapshot remains useful; only its automatic updates stopped.
       this._error = this._message(err);
       this._render();
     }
@@ -467,41 +851,129 @@ class IkeaBilresaPanel extends HTMLElement {
       this._unsub();
       this._unsub = null;
     }
+    this._stopActivity();
     this._snapshot = null;
     this._error = null;
     this._render();
     await this._connect();
   }
 
-  /**
-   * HA removes the element when the panel is left. Without this the overview
-   * subscription outlives the view and a closed panel keeps receiving pushes —
-   * the leak PANEL_ROADMAP.md's "unsubscribe on view close" rule is about.
-   */
   disconnectedCallback() {
     if (this._unsub) {
       this._unsub();
       this._unsub = null;
     }
+    this._stopActivity();
     this._started = false;
   }
 
-  /**
-   * Home Assistant's own ha-menu-button shows itself only when
-   *
-   *   kioskMode === false && (narrow || dockedSidebar === "always_hidden")
-   *
-   * On a desktop with the sidebar on screen it renders nothing, because HA's
-   * sidebar already has its own collapse control — a second hamburger is one
-   * button too many, which is exactly how this looked on first deploy.
-   *
-   * The button is still mandatory when it IS narrow: the sidebar is collapsed
-   * there and this is its only door.
-   *
-   * Kiosk mode is not checked. It lives in a private frontend store with no
-   * public API, and a stray button under kiosk is a smaller problem than a
-   * trapped user without one.
-   */
+  async _startActivity() {
+    if (
+      this._activityUnsub ||
+      this._activityPending ||
+      this._view !== "live" ||
+      !this._open
+    ) {
+      return;
+    }
+
+    const epoch = ++this._activityEpoch;
+    this._activityPending = true;
+    this._activityError = false;
+    this._render();
+    try {
+      const unsub = await this._hass.connection.subscribeMessage(
+        (activity) => {
+          if (
+            epoch !== this._activityEpoch ||
+            this._view !== "live" ||
+            activity.wheel !== this._open
+          ) {
+            return;
+          }
+          const receivedAt = new Date().toISOString();
+          const index = activity.action_id
+            ? this._activities.findIndex(
+                (item) => item.action_id === activity.action_id,
+              )
+            : -1;
+          if (index >= 0) {
+            const current = this._activities[index];
+            this._activities = [
+              {
+                ...current,
+                ...activity,
+                received_at: current.received_at || receivedAt,
+                updated_at: receivedAt,
+              },
+              ...this._activities.filter((_, itemIndex) => itemIndex !== index),
+            ].slice(0, ACTIVITY_LIMIT);
+          } else {
+            this._activities = [
+              { ...activity, received_at: receivedAt, updated_at: receivedAt },
+              ...this._activities,
+            ].slice(0, ACTIVITY_LIMIT);
+          }
+          this._render();
+        },
+        { type: ACTIVITY_SUBSCRIBE },
+      );
+
+      if (
+        epoch !== this._activityEpoch ||
+        this._view !== "live" ||
+        !this._open
+      ) {
+        unsub();
+        return;
+      }
+      this._activityUnsub = unsub;
+    } catch (_err) {
+      if (epoch === this._activityEpoch) this._activityError = true;
+    } finally {
+      if (epoch === this._activityEpoch) {
+        this._activityPending = false;
+        this._render();
+      }
+    }
+  }
+
+  _stopActivity() {
+    this._activityEpoch += 1;
+    if (this._activityUnsub) {
+      this._activityUnsub();
+      this._activityUnsub = null;
+    }
+    this._activityPending = false;
+  }
+
+  _setView(view) {
+    if (view === this._view) return;
+    if (this._view === "live") this._stopActivity();
+    this._view = view;
+    this._activityError = false;
+    this._render();
+    if (view === "live") this._startActivity();
+  }
+
+  _openWheel(key) {
+    if (key !== this._open) {
+      this._activities = [];
+      this._closeEditor();
+    }
+    this._open = key;
+    this._render();
+  }
+
+  _backToOverview() {
+    this._stopActivity();
+    this._view = "channels";
+    this._open = null;
+    this._activities = [];
+    this._closeEditor();
+    this._render();
+  }
+
   _showMenuButton() {
     return Boolean(this._narrow) || this._hass?.dockedSidebar === "always_hidden";
   }
@@ -528,19 +1000,31 @@ class IkeaBilresaPanel extends HTMLElement {
     const s = this._snapshot;
     const wrap = el("div", "summary");
     const connected = s.wheels.filter(
-      (w) => w.availability === "connected",
+      (wheel) => wheel.availability === "connected",
     ).length;
-    const unknown = s.wheels.filter((w) => w.availability === "unknown").length;
+    const unknown = s.wheels.filter(
+      (wheel) => wheel.availability === "unknown",
+    ).length;
+    const unavailable = s.wheels.length - connected - unknown;
 
-    wrap.appendChild(el("span", null, this._t("summary_connected", { count: connected })));
-    const away = s.wheels.length - connected - unknown;
-    if (away > 0) {
+    wrap.appendChild(
+      el("span", null, this._t("summary_connected", { count: connected })),
+    );
+    if (unavailable > 0) {
       wrap.appendChild(el("span", "sep", "·"));
-      wrap.appendChild(el("span", null, this._t("summary_unavailable", { count: away })));
+      wrap.appendChild(
+        el(
+          "span",
+          null,
+          this._t("summary_unavailable", { count: unavailable }),
+        ),
+      );
     }
     if (unknown > 0) {
       wrap.appendChild(el("span", "sep", "·"));
-      wrap.appendChild(el("span", null, this._t("summary_unknown", { count: unknown })));
+      wrap.appendChild(
+        el("span", null, this._t("summary_unknown", { count: unknown })),
+      );
     }
     wrap.appendChild(el("span", "sep", "·"));
     wrap.appendChild(
@@ -554,31 +1038,45 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _banner(text) {
-    const b = el("div", "banner");
-    b.appendChild(svg(ICON.alert));
-    b.appendChild(el("span", null, text));
-    return b;
+    const banner = el("div", "banner");
+    banner.setAttribute("role", "status");
+    banner.appendChild(svg(ICON.alert));
+    banner.appendChild(el("span", null, text));
+    return banner;
   }
 
-  _channel(channel) {
+  _status(availability) {
+    const status = el("span", "status");
+    const dot = el("span", "dot");
+    dot.dataset.state = availability;
+    status.appendChild(dot);
+    status.appendChild(el("span", null, this._t(availability)));
+    return status;
+  }
+
+  _overviewChannel(channel) {
     const configured = channel.profile !== null && channel.profile !== undefined;
     const row = el("div", "channel");
     row.dataset.state = configured ? "ok" : "empty";
     row.appendChild(el("span", "channel-n", String(channel.channel)));
 
     const text = el("span", "channel-text");
-    const behaviour = el(
-      "div",
-      "channel-behaviour",
-      channel.behaviour || (configured ? channel.profile : this._t("not_configured")),
+    text.appendChild(
+      el(
+        "div",
+        "channel-behaviour",
+        channel.behaviour ||
+          (configured ? channel.profile : this._t("not_configured")),
+      ),
     );
-    text.appendChild(behaviour);
     text.appendChild(
       el(
         "div",
         "channel-target",
         channel.target_missing
-          ? this._t("target_unavailable", { target: channel.target_label || "" })
+          ? this._t("target_unavailable", {
+              target: channel.target_label || this._t("target_none"),
+            })
           : channel.target_label || this._t("add_binding"),
       ),
     );
@@ -595,10 +1093,7 @@ class IkeaBilresaPanel extends HTMLElement {
       "aria-label",
       `${wheel.name}${wheel.area ? `, ${wheel.area}` : ""}`,
     );
-    card.addEventListener("click", () => {
-      this._open = wheel.key;
-      this._render();
-    });
+    card.addEventListener("click", () => this._openWheel(wheel.key));
 
     const head = el("div", "wheel-head");
     const names = el("span");
@@ -606,38 +1101,1054 @@ class IkeaBilresaPanel extends HTMLElement {
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
     names.appendChild(el("div", "wheel-sub", meta.join(" · ")));
     head.appendChild(names);
-
-    const status = el("span", "status");
-    const dot = el("span", "dot");
-    dot.dataset.state = wheel.availability;
-    status.appendChild(dot);
-    status.appendChild(el("span", null, this._t(wheel.availability)));
-    head.appendChild(status);
+    head.appendChild(this._status(wheel.availability));
     card.appendChild(head);
 
     const channels = el("div", "channels");
-    for (const channel of wheel.channels) channels.appendChild(this._channel(channel));
+    for (const channel of wheel.channels) {
+      channels.appendChild(this._overviewChannel(channel));
+    }
     card.appendChild(channels);
     return card;
   }
 
-  /**
-   * EventEntity does not restore state, so a wheel that has not been touched
-   * since Home Assistant restarted has no last activity. That is "no activity
-   * yet" and must never read as a fault.
-   */
   _activityLabel(wheel) {
     if (!wheel.last_activity) return this._t("no_activity");
     const when = new Date(wheel.last_activity);
     if (Number.isNaN(when.getTime())) return null;
-    const label = this._hass?.localize
-      ? null
-      : when.toLocaleString(this._hass?.language || undefined);
     const suffix =
-      wheel.last_active_channel !== null && wheel.last_active_channel !== undefined
-        ? ` · ${this._t("last_on_channel", { channel: wheel.last_active_channel })}`
+      wheel.last_active_channel !== null &&
+      wheel.last_active_channel !== undefined
+        ? ` · ${this._t("last_on_channel", {
+            channel: wheel.last_active_channel,
+          })}`
         : "";
-    return `${label || when.toLocaleString()}${suffix}`;
+    return `${this._formatDate(when)}${suffix}`;
+  }
+
+  _formatDate(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat(this._hass?.language || undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  }
+
+  _formatTime(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat(this._hass?.language || undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(date);
+  }
+
+  _rail() {
+    const aside = el("aside", "rail");
+    const nav = el("nav");
+    nav.setAttribute("aria-label", this._t("wheel_switcher"));
+    nav.appendChild(el("div", "rail-title", this._t("wheel_switcher")));
+    const list = el("ul");
+    for (const wheel of this._snapshot.wheels) {
+      const item = el("li");
+      const button = el("button", "rail-wheel");
+      button.type = "button";
+      if (wheel.key === this._open) button.setAttribute("aria-current", "page");
+      button.setAttribute(
+        "aria-label",
+        [
+          wheel.name,
+          wheel.area || this._t("detail_area_none"),
+          this._t(wheel.availability),
+        ].join(", "),
+      );
+      button.appendChild(this._statusDot(wheel.availability));
+      const copy = el("span", "rail-copy");
+      copy.appendChild(el("span", "rail-name", wheel.name));
+      copy.appendChild(
+        el(
+          "span",
+          "rail-area",
+          [
+            wheel.area || this._t("detail_area_none"),
+            this._t(wheel.availability),
+          ].join(" · "),
+        ),
+      );
+      button.appendChild(copy);
+      if (wheel.key === this._open) button.appendChild(svg(ICON.check, "rail-check"));
+      button.addEventListener("click", () => this._openWheel(wheel.key));
+      item.appendChild(button);
+      list.appendChild(item);
+    }
+    nav.appendChild(list);
+    aside.appendChild(nav);
+    return aside;
+  }
+
+  _statusDot(state) {
+    const dot = el("span", "dot");
+    dot.dataset.state = state;
+    dot.setAttribute("aria-hidden", "true");
+    return dot;
+  }
+
+  _detailTop(wheel) {
+    const top = el("div", "detail-top");
+    const back = el("button", "back-button");
+    back.id = "back-to-overview";
+    back.type = "button";
+    back.appendChild(svg(ICON.back));
+    back.appendChild(el("span", null, this._t("back")));
+    back.addEventListener("click", () => this._backToOverview());
+    top.appendChild(back);
+
+    const heading = el("div", "detail-heading");
+    heading.appendChild(el("h2", null, wheel.name));
+    const meta = [
+      wheel.area || this._t("detail_area_none"),
+      this._activityLabel(wheel),
+    ].filter(Boolean);
+    heading.appendChild(el("div", "detail-meta", meta.join(" · ")));
+    top.appendChild(heading);
+    return top;
+  }
+
+  _tabs(wheel) {
+    const views = ["channels", "live", "diagnostics"];
+    const tabs = el("div", "tabs");
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", this._t("detail_views"));
+    views.forEach((view, index) => {
+      const tab = el("button", "tab", this._t(`tab_${view}`));
+      tab.id = `tab-${wheel.key}-${view}`;
+      tab.type = "button";
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", String(this._view === view));
+      tab.setAttribute("aria-controls", `panel-${wheel.key}-${view}`);
+      tab.tabIndex = this._view === view ? 0 : -1;
+      tab.addEventListener("click", () => this._setView(view));
+      tab.addEventListener("keydown", (event) => {
+        let next = null;
+        if (event.key === "ArrowRight") next = (index + 1) % views.length;
+        if (event.key === "ArrowLeft") {
+          next = (index - 1 + views.length) % views.length;
+        }
+        if (event.key === "Home") next = 0;
+        if (event.key === "End") next = views.length - 1;
+        if (next === null) return;
+        event.preventDefault();
+        const all = tabs.querySelectorAll('[role="tab"]');
+        all[next]?.focus();
+      });
+      tabs.appendChild(tab);
+    });
+    return tabs;
+  }
+
+  _sectionHead(title, body) {
+    const head = el("div", "section-head");
+    head.appendChild(el("h3", null, title));
+    if (body) head.appendChild(el("p", null, body));
+    return head;
+  }
+
+  _fact(label, value, state) {
+    const row = el("div", "fact");
+    row.appendChild(el("dt", null, label));
+    const description = el("dd", null, value);
+    if (state) description.dataset.state = state;
+    row.appendChild(description);
+    return row;
+  }
+
+  _closeEditor() {
+    this._editingChannel = null;
+    this._editorData = null;
+    this._editorBinding = null;
+    this._editorErrors = {};
+    this._editorBusy = false;
+    this._editorMessage = null;
+    this._deleteConfirm = false;
+  }
+
+  _startEditor(channel) {
+    this._editingChannel = channel.channel;
+    this._editorBinding = channel.binding || null;
+    this._editorData = {
+      ...DEFAULT_BINDING,
+      ...(channel.binding?.data || {}),
+      scenes: [...(channel.binding?.data?.scenes || [])],
+    };
+    this._editorErrors = {};
+    this._editorMessage = null;
+    this._deleteConfirm = false;
+    this._render();
+  }
+
+  _entityRecords(domains) {
+    const allowed = new Set(domains);
+    return Object.values(this._hass?.states || {})
+      .filter((state) => allowed.has(state.entity_id.split(".", 1)[0]))
+      .sort((left, right) => {
+        const leftName =
+          left.attributes?.friendly_name || left.entity_id;
+        const rightName =
+          right.attributes?.friendly_name || right.entity_id;
+        return leftName.localeCompare(rightName);
+      });
+  }
+
+  _fieldError(name) {
+    const code = this._editorErrors[name];
+    return code ? this._t(`validation_${code}`) : null;
+  }
+
+  _fieldShell(name, label, help, wide = false) {
+    const wrap = el("div", "field");
+    if (wide) wrap.dataset.wide = "true";
+    const labelNode = el("label", null, label);
+    labelNode.htmlFor = `binding-${this._open}-${this._editingChannel}-${name}`;
+    wrap.appendChild(labelNode);
+    if (help) wrap.appendChild(el("span", "field-help", help));
+    return wrap;
+  }
+
+  _selectField(name, label, options, { optional = false, help, wide = false } = {}) {
+    const wrap = this._fieldShell(name, label, help, wide);
+    const select = el("select");
+    select.id = `binding-${this._open}-${this._editingChannel}-${name}`;
+    select.name = name;
+    if (optional) {
+      const empty = el("option", null, this._t("target_none"));
+      empty.value = "";
+      select.appendChild(empty);
+    } else {
+      select.required = true;
+    }
+    for (const option of options) {
+      const item = el("option", null, option.label);
+      item.value = option.value;
+      select.appendChild(item);
+    }
+    select.value = this._editorData[name] ?? "";
+    select.addEventListener("change", () => {
+      this._editorData[name] = select.value || undefined;
+      delete this._editorErrors[name];
+      this._editorMessage = null;
+      this._render();
+    });
+    wrap.appendChild(select);
+    const error = this._fieldError(name);
+    if (error) {
+      const errorNode = el("span", "field-error", error);
+      errorNode.id = `${select.id}-error`;
+      select.setAttribute("aria-describedby", errorNode.id);
+      wrap.appendChild(errorNode);
+    }
+    return wrap;
+  }
+
+  _entityField(name, label, domains, { optional = false, help, wide = false } = {}) {
+    const current = this._editorData[name];
+    const records = this._entityRecords(domains);
+    const options = records.map((state) => ({
+      value: state.entity_id,
+      label: `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
+    }));
+    if (current && !options.some((option) => option.value === current)) {
+      options.unshift({ value: current, label: current });
+    }
+    return this._selectField(name, label, options, { optional, help, wide });
+  }
+
+  _numberField(name, label, min, max, step, unit) {
+    const wrap = this._fieldShell(
+      name,
+      label,
+      unit ? this._t("field_unit", { unit }) : null,
+    );
+    const input = el("input");
+    input.id = `binding-${this._open}-${this._editingChannel}-${name}`;
+    input.name = name;
+    input.type = "number";
+    input.required = true;
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(this._editorData[name] ?? "");
+    input.addEventListener("input", () => {
+      this._editorData[name] = Number(input.value);
+      delete this._editorErrors[name];
+      this._editorMessage = null;
+    });
+    wrap.appendChild(input);
+    const error = this._fieldError(name);
+    if (error) wrap.appendChild(el("span", "field-error", error));
+    return wrap;
+  }
+
+  _scenesField() {
+    const wrap = this._fieldShell(
+      "scenes",
+      this._t("field_scenes"),
+      this._t("field_scenes_help"),
+      true,
+    );
+    const select = el("select");
+    select.id = `binding-${this._open}-${this._editingChannel}-scenes`;
+    select.multiple = true;
+    const selected = new Set(this._editorData.scenes || []);
+    for (const state of this._entityRecords(["scene"])) {
+      const option = el(
+        "option",
+        null,
+        `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
+      );
+      option.value = state.entity_id;
+      option.selected = selected.has(state.entity_id);
+      select.appendChild(option);
+    }
+    select.addEventListener("change", () => {
+      this._editorData.scenes = [...select.selectedOptions].map(
+        (option) => option.value,
+      );
+      this._editorMessage = null;
+    });
+    wrap.appendChild(select);
+    return wrap;
+  }
+
+  async _refreshSnapshot() {
+    this._snapshot = await this._hass.callWS({ type: OVERVIEW });
+  }
+
+  async _saveBinding(wheel, channel) {
+    if (this._editorBusy) return;
+    this._editorBusy = true;
+    this._editorErrors = {};
+    this._editorMessage = null;
+    this._render();
+    try {
+      const response = await this._hass.callWS({
+        type: BINDING_SAVE,
+        wheel: wheel.key,
+        channel: channel.channel,
+        data: this._editorData,
+        binding_id: this._editorBinding?.id,
+        expected_revision: this._editorBinding?.revision,
+      });
+      if (!response.ok) {
+        if (response.error === "validation") {
+          this._editorErrors = response.fields || {};
+          this._editorMessage = this._t("binding_validation_failed");
+        } else if (response.error === "conflict") {
+          this._editorBinding = response.binding;
+          this._editorData = {
+            ...DEFAULT_BINDING,
+            ...(response.binding?.data || {}),
+          };
+          this._editorMessage = this._t("binding_conflict");
+        } else {
+          this._editorMessage = this._t(`binding_error_${response.error}`);
+        }
+        return;
+      }
+      await this._refreshSnapshot();
+      const refreshedWheel = this._snapshot.wheels.find(
+        (item) => item.key === wheel.key,
+      );
+      const refreshedChannel = refreshedWheel?.channels.find(
+        (item) => item.channel === channel.channel,
+      );
+      this._editorBinding = refreshedChannel?.binding || response.binding;
+      this._editorData = {
+        ...DEFAULT_BINDING,
+        ...(this._editorBinding?.data || {}),
+      };
+      this._editorMessage = this._t("binding_saved");
+    } catch (err) {
+      this._editorMessage = this._t("binding_save_failed", {
+        error: this._message(err),
+      });
+    } finally {
+      this._editorBusy = false;
+      this._render();
+    }
+  }
+
+  async _deleteBinding() {
+    if (this._editorBusy || !this._editorBinding) return;
+    this._editorBusy = true;
+    this._editorMessage = null;
+    this._render();
+    try {
+      const response = await this._hass.callWS({
+        type: BINDING_DELETE,
+        binding_id: this._editorBinding.id,
+        expected_revision: this._editorBinding.revision,
+      });
+      if (!response.ok) {
+        if (response.error === "conflict") {
+          this._editorBinding = response.binding;
+          this._editorData = {
+            ...DEFAULT_BINDING,
+            ...(response.binding?.data || {}),
+          };
+          this._editorMessage = this._t("binding_conflict");
+        } else {
+          this._editorMessage = this._t(`binding_error_${response.error}`);
+        }
+        return;
+      }
+      await this._refreshSnapshot();
+      this._closeEditor();
+    } catch (err) {
+      this._editorMessage = this._t("binding_delete_failed", {
+        error: this._message(err),
+      });
+    } finally {
+      this._editorBusy = false;
+      this._render();
+    }
+  }
+
+  _bindingForm(wheel, channel) {
+    const form = el("form", "binding-form");
+    form.setAttribute("aria-label", this._t("binding_editor_title", {
+      channel: channel.channel,
+    }));
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this._saveBinding(wheel, channel);
+    });
+
+    if (this._editorMessage) {
+      const message = el("p", "form-message", this._editorMessage);
+      message.setAttribute("role", "status");
+      form.appendChild(message);
+    }
+
+    const primary = el("div", "form-grid");
+    primary.appendChild(
+      this._selectField(
+        "mode",
+        this._t("field_mode"),
+        Object.keys(MODE_DOMAINS).map((mode) => ({
+          value: mode,
+          label: this._t(`mode_${mode}`),
+        })),
+      ),
+    );
+    primary.appendChild(
+      this._entityField(
+        "target",
+        this._t("field_target"),
+        MODE_DOMAINS[this._editorData.mode] || [],
+        { wide: true },
+      ),
+    );
+    primary.appendChild(
+      this._numberField("step", this._t("field_step"), 1, 25, 1, "%"),
+    );
+    primary.appendChild(
+      this._numberField(
+        "transition",
+        this._t("field_transition"),
+        0,
+        5,
+        0.1,
+        "s",
+      ),
+    );
+    primary.appendChild(
+      this._selectField(
+        "click_action",
+        this._t("field_click_action"),
+        ["toggle", "on", "off", "none"].map((action) => ({
+          value: action,
+          label: this._t(`click_${action}`),
+        })),
+      ),
+    );
+    primary.appendChild(
+      this._entityField(
+        "click_target",
+        this._t("field_click_target"),
+        ["light", "switch"],
+        { optional: true },
+      ),
+    );
+    primary.appendChild(
+      this._selectField(
+        "hold_action",
+        this._t("field_hold_action"),
+        ["toggle", "ramp", "none"].map((action) => ({
+          value: action,
+          label: this._t(`hold_${action}`),
+        })),
+      ),
+    );
+    if (this._editorData.hold_action === "toggle") {
+      primary.appendChild(
+        this._entityField(
+          "hold_target",
+          this._t("field_hold_target"),
+          ["light", "switch"],
+          { optional: true },
+        ),
+      );
+    }
+    primary.appendChild(this._scenesField());
+    form.appendChild(primary);
+
+    const advanced = el("details", "advanced");
+    const summary = el("summary", null, this._t("advanced_options"));
+    advanced.appendChild(summary);
+    const advancedGrid = el("div", "form-grid");
+    advancedGrid.appendChild(
+      this._selectField(
+        "button_response",
+        this._t("field_button_response"),
+        ["multi_press", "fast"].map((response) => ({
+          value: response,
+          label: this._t(`button_response_${response}`),
+        })),
+      ),
+    );
+    advancedGrid.appendChild(
+      this._numberField(
+        "acceleration",
+        this._t("field_acceleration"),
+        0,
+        100,
+        5,
+        "%",
+      ),
+    );
+    advancedGrid.appendChild(
+      this._numberField(
+        "min_brightness",
+        this._t("field_min_brightness"),
+        0,
+        50,
+        1,
+        "%",
+      ),
+    );
+    advancedGrid.appendChild(
+      this._numberField(
+        "max_brightness",
+        this._t("field_max_brightness"),
+        1,
+        100,
+        1,
+        "%",
+      ),
+    );
+    advancedGrid.appendChild(
+      this._entityField(
+        "double_press_target",
+        this._t("field_double_target"),
+        ["light", "switch"],
+        { optional: true },
+      ),
+    );
+    advancedGrid.appendChild(
+      this._entityField(
+        "triple_press_target",
+        this._t("field_triple_target"),
+        ["light", "switch"],
+        { optional: true },
+      ),
+    );
+    advanced.appendChild(advancedGrid);
+    form.appendChild(advanced);
+
+    const actions = el("div", "form-actions");
+    const save = el("button", "action-button", this._t("save_binding"));
+    save.type = "submit";
+    save.dataset.primary = "true";
+    save.disabled = this._editorBusy;
+    actions.appendChild(save);
+    const cancel = el("button", "action-button", this._t("cancel_edit"));
+    cancel.type = "button";
+    cancel.disabled = this._editorBusy;
+    cancel.addEventListener("click", () => {
+      this._closeEditor();
+      this._render();
+    });
+    actions.appendChild(cancel);
+    if (this._editorBinding) {
+      const remove = el("button", "action-button", this._t("delete_binding"));
+      remove.type = "button";
+      remove.dataset.danger = "true";
+      remove.disabled = this._editorBusy;
+      remove.addEventListener("click", () => {
+        this._deleteConfirm = true;
+        this._render();
+      });
+      actions.appendChild(remove);
+    }
+    form.appendChild(actions);
+
+    if (this._deleteConfirm) {
+      const confirm = el("div", "delete-confirm");
+      confirm.setAttribute("role", "alert");
+      confirm.appendChild(el("span", null, this._t("delete_binding_confirm")));
+      const deleteButton = el(
+        "button",
+        "action-button",
+        this._t("delete_binding"),
+      );
+      deleteButton.type = "button";
+      deleteButton.dataset.danger = "true";
+      deleteButton.addEventListener("click", () => this._deleteBinding());
+      confirm.appendChild(deleteButton);
+      const keep = el("button", "action-button", this._t("keep_binding"));
+      keep.type = "button";
+      keep.addEventListener("click", () => {
+        this._deleteConfirm = false;
+        this._render();
+      });
+      confirm.appendChild(keep);
+      form.appendChild(confirm);
+    }
+    return form;
+  }
+
+  _channelDetail(wheel, channel) {
+    const configured = channel.profile !== null && channel.profile !== undefined;
+    const card = el("article", "detail-card");
+    card.appendChild(
+      el("h4", null, this._t("channel_title", { channel: channel.channel })),
+    );
+    const facts = el("dl", "facts");
+    if (!configured) {
+      facts.appendChild(
+        this._fact(this._t("channel_binding"), this._t("not_configured")),
+      );
+    } else {
+      for (const action of channel.actions || []) {
+        let value = action.action_label;
+        if (action.target_label) {
+          const target = action.target_missing
+            ? this._t("target_unavailable", { target: action.target_label })
+            : action.target_label;
+          value = `${value} · ${target}`;
+        }
+        facts.appendChild(
+          this._fact(
+            action.gesture_label,
+            value,
+            action.target_missing ? "warning" : null,
+          ),
+        );
+      }
+    }
+    card.appendChild(facts);
+    if (this._editingChannel === channel.channel) {
+      card.appendChild(this._bindingForm(wheel, channel));
+    } else {
+      const actions = el("div", "card-actions");
+      const edit = el(
+        "button",
+        "action-button",
+        this._t(configured ? "edit_binding" : "add_binding"),
+      );
+      edit.type = "button";
+      edit.addEventListener("click", () => this._startEditor(channel));
+      actions.appendChild(edit);
+      card.appendChild(actions);
+    }
+    return card;
+  }
+
+  _channelsView(wheel) {
+    const wrap = el("div");
+    wrap.appendChild(
+      this._sectionHead(
+        this._t("detail_channels_heading"),
+        this._t("detail_channels_intro"),
+      ),
+    );
+    const grid = el("div", "channel-grid");
+    for (const channel of wheel.channels) {
+      grid.appendChild(this._channelDetail(wheel, channel));
+    }
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  _gestureLabel(activity) {
+    const channel = activity.channel ?? "?";
+    if (activity.gesture === "rotate") {
+      const direction = this._t(
+        activity.direction === "down" ? "direction_down" : "direction_up",
+      );
+      return this._t("gesture_rotate", {
+        channel,
+        direction,
+        delta: activity.notches ?? 0,
+      });
+    }
+    if (activity.gesture === "press") {
+      const key =
+        activity.presses === 2
+          ? "gesture_press_double"
+          : activity.presses === 3
+            ? "gesture_press_triple"
+            : "gesture_press_single";
+      return this._t(key, { channel });
+    }
+    if (activity.gesture === "hold") return this._t("gesture_hold", { channel });
+    if (activity.gesture === "release") {
+      return this._t("gesture_release", { channel });
+    }
+    return this._t("gesture_unknown", { channel });
+  }
+
+  _dispatchLabel(activity) {
+    const labels = {
+      accepted: ["success", "dispatch_accepted"],
+      pending: ["unknown", "dispatch_pending"],
+      failed: ["failed", "dispatch_failed"],
+      skipped: ["failed", "dispatch_skipped"],
+      not_configured: ["failed", "dispatch_not_configured"],
+      completed: ["success", "dispatch_completed"],
+      received: ["unknown", "dispatch_received"],
+    };
+    return (
+      labels[activity.dispatch_status] ||
+      (activity.dispatched === true
+        ? ["success", "dispatch_accepted"]
+        : activity.dispatched === false
+          ? ["failed", "dispatch_failed"]
+          : ["unknown", "dispatch_unknown"])
+    );
+  }
+
+  _formatResult(result) {
+    if (!result) return this._t("result_unavailable");
+    if (
+      result.before !== undefined &&
+      result.after !== undefined
+    ) {
+      const unit = result.unit ? ` ${result.unit}` : "";
+      return `${result.before}${unit} → ${result.after}${unit}`;
+    }
+    if (result.kind === "scene") {
+      return this._t("result_scene", {
+        position: result.position,
+        total: result.total,
+        target: result.target,
+      });
+    }
+    if (result.kind === "entity_action") {
+      return this._t("result_entity_action", {
+        action: this._t(`service_${result.action}`),
+        target: result.target,
+      });
+    }
+    if (result.kind === "hold") return this._t("result_ramp_stopped");
+    if (result.kind === "press" && result.action === "already_dispatched") {
+      return this._t("result_fast_press_complete");
+    }
+    return JSON.stringify(result);
+  }
+
+  async _testBinding(wheel, channel, gesture, extra = {}) {
+    if (this._testBusy) return;
+    this._testBusy = true;
+    this._testMessage = null;
+    this._render();
+    try {
+      const response = await this._hass.callWS({
+        type: BINDING_TEST,
+        wheel: wheel.key,
+        channel,
+        gesture,
+        ...extra,
+      });
+      if (!response.ok) {
+        this._testMessage = this._t(`binding_error_${response.error}`);
+      }
+    } catch (err) {
+      this._testMessage = this._t("binding_test_failed", {
+        error: this._message(err),
+      });
+    } finally {
+      this._testBusy = false;
+      this._render();
+    }
+  }
+
+  _testPanel(wheel) {
+    const panel = el("section", "detail-card test-panel");
+    panel.appendChild(el("h4", null, this._t("test_controls_heading")));
+    panel.appendChild(el("p", null, this._t("test_controls_intro")));
+    if (this._testMessage) {
+      const message = el("p", "form-message", this._testMessage);
+      message.setAttribute("role", "status");
+      panel.appendChild(message);
+    }
+    for (const channel of wheel.channels.filter((item) => item.binding)) {
+      const actions = el("div", "test-actions");
+      actions.setAttribute(
+        "aria-label",
+        this._t("test_channel", { channel: channel.channel }),
+      );
+      const tests = [
+        ["test_rotate_down", "rotate", { direction: "down", notches: 1 }],
+        ["test_rotate_up", "rotate", { direction: "up", notches: 1 }],
+        ["test_single", "press", { presses: 1 }],
+        ["test_double", "press", { presses: 2 }],
+        ["test_triple", "press", { presses: 3 }],
+        ["test_hold", "hold", {}],
+        ["test_release", "release", {}],
+      ];
+      actions.appendChild(
+        el(
+          "strong",
+          null,
+          this._t("channel_title", { channel: channel.channel }),
+        ),
+      );
+      for (const [label, gesture, extra] of tests) {
+        const button = el("button", "action-button", this._t(label));
+        button.type = "button";
+        button.disabled = this._testBusy;
+        button.addEventListener("click", () =>
+          this._testBinding(wheel, channel.channel, gesture, extra),
+        );
+        actions.appendChild(button);
+      }
+      panel.appendChild(actions);
+    }
+    if (!wheel.channels.some((item) => item.binding)) {
+      panel.appendChild(el("p", null, this._t("test_no_bindings")));
+    }
+    return panel;
+  }
+
+  _liveView(wheel) {
+    const wrap = el("div");
+    wrap.appendChild(this._sectionHead(this._t("tab_live")));
+    if (this._activityError) wrap.appendChild(this._banner(this._t("live_error")));
+
+    const layout = el("div", "live-layout");
+    const output = el("section", "detail-card live-output");
+    output.setAttribute("aria-live", "polite");
+    output.setAttribute("aria-atomic", "true");
+    const listening = el("div", "live-status");
+    listening.appendChild(this._statusDot(this._activityError ? "unknown" : "success"));
+    listening.appendChild(
+      el(
+        "span",
+        null,
+        this._t(this._activityError ? "live_stopped" : "live_listening"),
+      ),
+    );
+    output.appendChild(listening);
+
+    const latest = this._activities[0];
+    if (!latest) {
+      output.appendChild(el("div", "waiting-title", this._t("live_waiting_title")));
+      output.appendChild(
+        el("div", "live-explanation", this._t("live_waiting_body")),
+      );
+    } else {
+      const result = this._formatResult(latest.result);
+      output.appendChild(el("div", "live-result", result));
+      if (latest.result === null || latest.result === undefined) {
+        output.appendChild(
+          el(
+            "div",
+            "live-explanation",
+            this._t("result_unavailable_detail"),
+          ),
+        );
+      }
+      const [dispatchState, dispatchKey] = this._dispatchLabel(latest);
+      const dispatch = el("div", "dispatch");
+      dispatch.appendChild(this._statusDot(dispatchState));
+      dispatch.appendChild(el("span", null, this._t(dispatchKey)));
+      output.appendChild(dispatch);
+      output.appendChild(el("div", "gesture-caption", this._gestureLabel(latest)));
+      if (latest.source === "panel_test") {
+        output.appendChild(
+          el("div", "gesture-caption", this._t("source_panel_test")),
+        );
+      }
+    }
+    layout.appendChild(output);
+
+    if (this._activities.length) {
+      const recent = el("section", "detail-card recent");
+      recent.appendChild(el("h4", null, this._t("live_recent")));
+      const list = el("ol");
+      for (const activity of this._activities) {
+        const item = el("li");
+        item.appendChild(el("span", null, this._gestureLabel(activity)));
+        const time = el("time", null, this._formatTime(activity.received_at));
+        time.dateTime = activity.received_at;
+        item.appendChild(time);
+        list.appendChild(item);
+      }
+      recent.appendChild(list);
+      layout.appendChild(recent);
+    }
+    layout.appendChild(this._testPanel(wheel));
+    wrap.appendChild(layout);
+    return wrap;
+  }
+
+  _sourceLabel(source) {
+    if (source === "core_matter_client") return this._t("source_core");
+    if (source === "dedicated_websocket") return this._t("source_fallback");
+    if (source === "unloaded") return this._t("source_unloaded");
+    return source;
+  }
+
+  _recoveryKey(wheel) {
+    if (!this._snapshot.matter_connected) return "recovery_matter";
+    if (wheel.availability === "unavailable") return "recovery_unavailable";
+    if (wheel.availability === "unknown" || !wheel.linked_to_matter) {
+      return "recovery_unknown";
+    }
+    return "recovery_ok";
+  }
+
+  _diagnosticsView(wheel) {
+    const wrap = el("div");
+    wrap.appendChild(
+      this._sectionHead(
+        this._t("diagnostics_heading"),
+        this._t("diagnostics_intro"),
+      ),
+    );
+    const grid = el("div", "diagnostic-grid");
+
+    const status = el("section", "detail-card");
+    status.appendChild(el("h4", null, this._t("diagnostics_heading")));
+    const facts = el("dl", "facts");
+    facts.appendChild(
+      this._fact(
+        this._t("diagnostic_availability"),
+        this._t(wheel.availability),
+      ),
+    );
+    facts.appendChild(
+      this._fact(
+        this._t("diagnostic_matter"),
+        this._t(
+          this._snapshot.matter_connected ? "matter_connected" : "matter_offline",
+        ),
+      ),
+    );
+    facts.appendChild(
+      this._fact(
+        this._t("diagnostic_source"),
+        this._sourceLabel(this._snapshot.event_source),
+      ),
+    );
+    facts.appendChild(
+      this._fact(
+        this._t("diagnostic_link"),
+        this._t(
+          wheel.linked_to_matter ? "diagnostic_linked" : "diagnostic_not_linked",
+        ),
+      ),
+    );
+    status.appendChild(facts);
+    grid.appendChild(status);
+
+    const activity = el("section", "detail-card");
+    activity.appendChild(el("h4", null, this._t("detail_last_activity")));
+    const activityFacts = el("dl", "facts");
+    activityFacts.appendChild(
+      this._fact(
+        this._t("detail_last_activity"),
+        wheel.last_activity
+          ? this._formatDate(wheel.last_activity)
+          : this._t("no_activity"),
+      ),
+    );
+    activityFacts.appendChild(
+      this._fact(
+        this._t("detail_last_channel"),
+        wheel.last_active_channel ?? this._t("detail_no_last_channel"),
+      ),
+    );
+    activityFacts.appendChild(
+      this._fact(
+        this._t("diagnostic_contract"),
+        String(this._snapshot.contract_version),
+      ),
+    );
+    activity.appendChild(activityFacts);
+    grid.appendChild(activity);
+
+    const recovery = el("section", "detail-card recovery");
+    recovery.appendChild(el("h4", null, this._t("recovery_heading")));
+    recovery.appendChild(el("p", null, this._t(this._recoveryKey(wheel))));
+    grid.appendChild(recovery);
+
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  _detailPanel(wheel) {
+    const panel = el("section", "tab-panel");
+    panel.id = `panel-${wheel.key}-${this._view}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", `tab-${wheel.key}-${this._view}`);
+    if (this._view === "live") panel.appendChild(this._liveView(wheel));
+    else if (this._view === "diagnostics") {
+      panel.appendChild(this._diagnosticsView(wheel));
+    } else panel.appendChild(this._channelsView(wheel));
+    return panel;
+  }
+
+  _detail(wheel) {
+    const outer = el("div");
+    if (!this._snapshot.matter_connected) {
+      outer.appendChild(this._banner(this._t("banner_matter_offline")));
+    } else if (this._error) {
+      outer.appendChild(this._banner(this._t("banner_updates_stopped")));
+    }
+
+    const shell = el("div", "detail-shell");
+    shell.appendChild(this._rail());
+    const pane = el("div", "detail-pane");
+    pane.appendChild(this._detailTop(wheel));
+    pane.appendChild(this._tabs(wheel));
+    pane.appendChild(this._detailPanel(wheel));
+    shell.appendChild(pane);
+    outer.appendChild(shell);
+    return outer;
+  }
+
+  _missingWheel() {
+    const wrap = el("div");
+    wrap.appendChild(
+      this._placeholder(
+        this._t("wheel_missing_title"),
+        this._t("wheel_missing_body"),
+        false,
+      ),
+    );
+    const row = el("div", "placeholder");
+    const back = el("button");
+    back.type = "button";
+    back.appendChild(svg(ICON.back));
+    back.appendChild(el("span", null, this._t("back")));
+    back.addEventListener("click", () => this._backToOverview());
+    row.appendChild(back);
+    wrap.appendChild(row);
+    return wrap;
   }
 
   _placeholder(title, body, retry) {
@@ -645,7 +2156,7 @@ class IkeaBilresaPanel extends HTMLElement {
     wrap.appendChild(el("div", "title", title));
     wrap.appendChild(el("div", null, body));
     if (retry) {
-      const button = el("button", null);
+      const button = el("button");
       button.type = "button";
       button.appendChild(svg(ICON.refresh));
       button.appendChild(el("span", null, this._t("retry")));
@@ -661,31 +2172,13 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     if (!this._snapshot) {
       const grid = el("div", "grid");
-      for (let i = 0; i < 2; i++) grid.appendChild(el("div", "skeleton"));
+      for (let i = 0; i < 2; i += 1) grid.appendChild(el("div", "skeleton"));
       return grid;
     }
     if (this._open) {
-      // Phase 4 builds the detail and its 256px wheel rail. Navigation exists
-      // now so the grid's job is complete and testable; the destination is not
-      // pretending to be finished.
-      const wheel = this._snapshot.wheels.find((w) => w.key === this._open);
-      const wrap = el("div");
-      const back = el("button", null);
-      back.type = "button";
-      back.textContent = `← ${this._t("back")}`;
-      back.addEventListener("click", () => {
-        this._open = null;
-        this._render();
-      });
-      wrap.appendChild(
-        this._placeholder(
-          wheel ? wheel.name : "", this._t("detail_soon"), false,
-        ),
-      );
-      const row = el("div", "placeholder");
-      row.appendChild(back);
-      wrap.appendChild(row);
-      return wrap;
+      const wheel = this._snapshot.wheels.find((item) => item.key === this._open);
+      if (!wheel) return this._missingWheel();
+      return this._detail(wheel);
     }
     if (!this._snapshot.wheels.length) {
       return this._placeholder(
@@ -703,8 +2196,8 @@ class IkeaBilresaPanel extends HTMLElement {
     } else if (this._error) {
       wrap.appendChild(this._banner(this._t("banner_updates_stopped")));
     }
-    const missing = this._snapshot.wheels.filter((w) =>
-      w.channels.some((c) => c.target_missing),
+    const missing = this._snapshot.wheels.filter((wheel) =>
+      wheel.channels.some((channel) => channel.target_missing),
     );
     if (missing.length) {
       wrap.appendChild(
@@ -721,11 +2214,13 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _render() {
+    const focused = this.shadowRoot.activeElement?.id || null;
     const style = document.createElement("style");
     style.textContent = STYLES;
     const main = el("main");
     main.appendChild(this._body());
     this.shadowRoot.replaceChildren(style, this._header(), main);
+    if (focused) this.shadowRoot.getElementById(focused)?.focus({ preventScroll: true });
   }
 }
 

@@ -47,6 +47,8 @@ python -m compileall -q custom_components tests
 ruff format --check custom_components tests
 ruff check custom_components tests
 mypy custom_components/ikea_bilresa
+node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js
+node --test tests/panel_frontend.test.mjs
 git diff --check
 ```
 
@@ -67,6 +69,7 @@ GitHub Actions is the canonical Linux environment for:
 - hassfest manifest/string validation;
 - HACS structural validation (even while store publication is deferred);
 - Ruff, mypy, and pytest.
+- the dependency-free panel syntax and frontend lifecycle tests on Node 22.
 
 CI success means only **CI**, not **Hardware**.
 

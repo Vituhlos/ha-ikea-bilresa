@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.1] - 2026-07-16
+
+### Added
+- The panel now opens a full wheel detail with the measured 256 px
+  wheel switcher, channel behavior cards, an opt-in Live test and a simple
+  privacy-safe diagnostics view. The rail drops below 620 px and the detail
+  columns respond to the pane's own width.
+- Channel detail shows the stored behavior for rotation, short/double/triple
+  press, hold and release, including their separate targets and unavailable
+  target warnings. The panel contract is now version 3.
+- Administrators can create, edit and delete binding subentries directly from
+  the panel. The write API is limited to bindings, shares validation with the
+  native config flow and requires an optimistic-concurrency revision for update
+  and deletion.
+- Live test correlates each gesture with the binding's structured calculated
+  result and reports whether Home Assistant accepted, rejected or skipped the
+  exact service action.
+- Explicit panel test controls run rotation, single/double/triple press,
+  hold and release through the real binding runtime without requiring physical
+  access to a wheel.
+- A dependency-free Node frontend test gate verifies that live activity is
+  filtered to the opened wheel, bounded to eight entries and unsubscribed even
+  when a subscription finishes after the user leaves the view.
+
+### Notes
+- `accepted` means Home Assistant validated and scheduled the service call. It
+  does not claim that the physical target device changed.
+- Matter decoding and device batching are unchanged. Binding dispatch remains
+  non-blocking; the new reporting observes the existing call rather than waiting
+  for a target-device round trip.
+- Physical BILRESA verification is intentionally deferred. Panel-driven tests
+  cover the binding and Home Assistant service path, not Matter radio delivery.
+
 ## [0.5.7-rc.11] - 2026-07-16
 
 ### Added

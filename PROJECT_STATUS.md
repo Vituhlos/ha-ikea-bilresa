@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-16 by Claude Code**
+Last updated: **2026-07-16 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -27,17 +27,17 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: clean after the final CI-status commit described below. Preserve
-  any later changes and always verify with `git status --short`.
+- Working tree: dirty with the `0.5.9-rc.1` panel/editor candidate described
+  below, based on `0c0e11f`. Preserve every listed change and always verify with
+  `git status --short`.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.8` was published
-  from CI-verified commit `b50e17c`; it contains the Phase 0 technical spike, a
-  panel header and an idempotent browser custom-element guard. That header was
-  recorded here as "mobile-safe"; it is not. On a notched iPhone its menu button
-  sits under the notch. Fixed in the working tree, unreleased.
-  Draft PR #1 remains open and `main` has not been merged.
+- Latest stable release remains `v0.5.0`. Per the owner's 2026-07-16 report,
+  panel Phases 0-3 are published as `v0.5.7-rc.11` and running. The
+  `v0.5.9-rc.1` candidate has owner authorization for commit, push, release and
+  controlled HACS deployment in this task. Draft PR #1 remains open and `main`
+  has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -324,9 +324,10 @@ Status: **Implemented + Static. Unit not run locally. Not released** — needs a
 
 ### Panel `0.5.8` Phase 3 frontend shell and overview grid (Claude Code, 2026-07-16)
 
-Status: **Implemented + Static. Unit not run locally. CI has not run. Not
-deployed, and nobody has looked at it.** Phase 3's exit gate wants a visual
-comparison in all required states; none of that has happened.
+Status: **Released and running as part of `v0.5.7-rc.11`, per owner report.**
+The original Phase 3 visual exit gate was not recorded independently; the local
+Phase 4 browser checks below supersede the placeholder view but do not establish
+HA UI or Hardware.
 
 The Phase 0 stub is replaced by the real overview: the grid of wheel cards from
 `PANEL_DESIGN.md`'s two-layer model, reading `ikea_bilresa/overview` and its
@@ -388,6 +389,115 @@ Owed before Phase 3 closes: the visual comparison in every required state, dark
 and one non-default theme, Czech/English expansion, keyboard-only and
 screen-reader passes, 320px, and a contrast pass against the real thing rather
 than against a prototype.
+
+### Panel `0.5.9` binding editor and correlated action results (Codex, 2026-07-16)
+
+Status before publication: **Implemented + Static + Python Unit + frontend Unit.
+CI, HA UI deployment and Hardware pending.** The owner explicitly authorized a
+`v0.5.9-rc.1` commit, push, prerelease and controlled HACS deployment.
+
+This candidate turns the Phase 4 detail into a functional administrator surface:
+
+- binding create/update/delete uses a narrow WebSocket API that cannot mutate
+  wheels, Matter devices, entities or unrelated config entries;
+- native config flow and panel share `binding_config.py` normalization and
+  semantic validation;
+- updates and deletion require a deterministic revision token, so a stale tab
+  receives a conflict instead of overwriting a newer subentry;
+- the panel editor exposes rotation mode/target, step, transition, acceleration,
+  brightness limits, short/double/triple press, response policy, hold action and
+  scene cycling;
+- GAP-2 is closed by structured per-action results such as brightness
+  `before/after/unit`;
+- GAP-3 is closed by an action correlation ID and dispatch states
+  `pending/accepted/failed/skipped/not_configured/completed`;
+- `accepted` means Home Assistant validated and scheduled the non-blocking
+  service action. It is deliberately not described as physical-device success;
+- panel test buttons run rotate, single/double/triple press, hold and release
+  through the same `LightBinding` runtime without a physical wheel;
+- physical Matter delivery remains a separate deferred Hardware gate.
+
+Read-only Home Assistant MCP inspection before publication confirmed the loaded
+`v0.5.7-rc.11` entry and four real binding subentries. All four store
+`node_id`/`channel` as strings, contain `mode` and omit `binding_profile`, matching
+the candidate's model and validator.
+
+Validation:
+
+```text
+ruff format --check custom_components tests         passed
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (20 source files)
+python -m compileall -q custom_components tests     passed
+node --check <panel asset>                          passed
+node --test tests/panel_frontend.test.mjs           passed (5 tests)
+pytest on Python 3.14 + HA 2026.7.2                  passed (196 tests)
+git diff --check                                    passed
+```
+
+The normal Home Assistant pytest plugin imports Unix-only `fcntl` on Windows.
+The local suite therefore ran with plugin auto-loading disabled and
+`pytest_asyncio.plugin` loaded explicitly; the repository's own 196 tests all
+passed. Exact-revision Linux CI remains the authoritative plugin/hassfest/HACS
+gate.
+
+### Panel `0.5.8` Phase 4 wheel detail, live test and diagnostics (Codex, 2026-07-16)
+
+Status: **Superseded by the `0.5.9-rc.1` candidate above.** The read-only detail
+and measured layout remain its foundation.
+
+The working tree is based on `0c0e11f`. It implements the read-only wheel detail
+without touching `binding.py`, the dispatch path, stored configuration or any
+Matter listener:
+
+- exact 256 px wheel rail, hidden below 620 px, with one-click wheel switching,
+  readable status words and a back affordance at every width;
+- detail columns collapse from the measured **detail pane** width at 700 px,
+  not from the browser window width;
+- Channels, Live test and Diagnostics tabs with ARIA roles, roving keyboard
+  focus, focus restoration and reduced-motion handling;
+- channel action rows from a new contract-v2 read model. It mirrors persisted
+  bindings correctly: `node_id` and `channel` remain strings and the stored mode
+  is `CONF_MODE`; no nonexistent `binding_profile` field is assumed;
+- opt-in activity subscription only while Live test is selected, filtered to
+  the opened wheel, bounded to eight rows and reliably unsubscribed when the
+  user leaves the view or disconnects;
+- result-first live presentation that explicitly says the calculated result and
+  dispatch outcome are unavailable when the API returns `null`;
+- simple read-only wheel diagnostics from the existing overview contract,
+  including availability, event source, link state and recovery guidance.
+
+GAP-2 and GAP-3 were intentionally left open in this read-only phase and are
+closed only by the separately versioned `0.5.9` candidate above. The public
+activity event still does not contain the original cumulative Matter count.
+
+Local browser QA used a temporary standalone harness and a new browser tab after
+each frontend redefinition. The harness and browser artifacts were deleted.
+Measured results: the rail was exactly 256 px at a 1024 px viewport; the detail
+pane was 720 px; both detail columns were 352 px; 320 px and 380 px views hid the
+rail, used one column and had zero horizontal overflow. Light mobile and dark
+desktop states, live activity, diagnostics, tab semantics and heading hierarchy
+were inspected. This is **not** evidence for HA UI, a non-default theme, the
+iPhone notch/safe area, a screen reader or physical BILRESA hardware.
+
+That intermediate Phase 4 validation record is superseded by the complete
+`0.5.9-rc.1` validation block above.
+
+Changed files:
+
+- `.github/workflows/ci.yml`
+- `CHANGELOG.md`
+- `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`
+- `custom_components/ikea_bilresa/panel_models.py`
+- `custom_components/ikea_bilresa/panel_strings.py`
+- `docs/DEVELOPMENT.md`
+- `docs/PANEL_DESIGN.md`
+- `docs/PANEL_ROADMAP.md`
+- `PROJECT_STATUS.md`
+- `tests/panel_frontend.test.mjs`
+- `tests/test_panel.py`
+- `tests/test_panel_models.py`
+- `tests/test_panel_strings.py`
 
 ### Panel `0.5.8` Phase 2 authenticated read-only API (Claude Code, 2026-07-16)
 
@@ -747,20 +857,15 @@ MCP diagnostics before any frontend exists.
 tested as a list of strings, not as behaviour. It now exercises the function and
 asserts the new fields did not reopen the redaction policy.
 
-**GAP-2 — live-test result string — OPEN.** The "brightness 42 -> 58%" line.
-Bindings call a service and never report what they computed. Producing it
-means either reading the target's state after dispatch (racy,
-domain-specific) or having the
-binding surface its result — which touches `binding.py` dispatch and needs its
-own package and hardware gate. `PANEL_DESIGN.md` makes this string the hero of
-the Live test view, so that view's headline is currently unbuildable. If it is
-built, the live subscription is opt-in: the binding must check whether anyone is
-watching before doing any work, or it will cost latency in the exact path
-`rc.4` just optimised.
+**GAP-2 — live-test result string — RESOLVED in the `0.5.9-rc.1` candidate.**
+Bindings publish structured calculated `before`, `after`, `unit` results on an
+internal dispatcher signal. Reporting is unconditional constant work and never
+checks whether a panel is watching.
 
-**GAP-3 — per-action dispatch outcome — OPEN.** The counter
-`telemetry.actions_dispatched` is global; a failing service call is not
-attributed to the gesture that caused it.
+**GAP-3 — per-action dispatch outcome — RESOLVED in the `0.5.9-rc.1`
+candidate.** Every decoded or synthetic action has a correlation ID. The
+non-blocking HA service coroutine reports accepted/failed for that exact action;
+skipped and local-only completion states remain distinct.
 
 Two corrections worth recording, because both are easy to get wrong again:
 
@@ -1338,20 +1443,20 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Open the deployed RC.8 panel in the real Home Assistant companion app, fully
-reload/reopen the frontend once, tap the 48 px menu button and confirm that the
-Home Assistant sidebar opens without a panel error. After recording that result,
-begin L1 in `docs/LATENCY_ROADMAP.md`; do not start Instant or the Latency Lab
-before the measurement contract exists. R4 remains deferred.
+Publish the owner-authorized `v0.5.9-rc.1`, require exact-revision CI, install
+that tag through HACS after a valid configuration preflight, restart Home
+Assistant and open the panel in a new browser tab. Verify overview/detail,
+binding edit conflict handling and panel-driven tests. Physical-wheel validation
+is deliberately deferred by owner direction.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Re-check HEAD, branch, status and full relevant diff.
+2. Start from `0c0e11f`, then re-check HEAD, branch, status and the full
+   `0.5.9-rc.1` diff before changing anything.
 3. Preserve every dirty and untracked file.
-4. Unit + CI for the current RC are established for exact commit `b50e17c`;
-   Hardware applies only to the explicitly recorded RC.3/RC.5 observations, not
-   the mobile header or the entire checklist.
-5. The current authorization covers this stabilization PR, an RC release and a
-   controlled HA deployment. It does not authorize unrelated repository or HA
-   changes.
+4. Local Static, Python Unit and frontend Unit are established. CI, HA UI
+   deployment and Hardware are pending until the publication record below is
+   updated.
+5. Owner authorization covers the `v0.5.9-rc.1` commit, push, prerelease and
+   controlled HACS deployment in this task.

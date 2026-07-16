@@ -12,6 +12,7 @@ from custom_components.ikea_bilresa.binding import LightBinding
 from custom_components.ikea_bilresa.const import (
     ACTION_PRESS,
     ACTION_RELEASE,
+    ACTION_ROTATE,
     BUTTON_RESPONSE_FAST,
     BUTTON_RESPONSE_MULTI_PRESS,
     CONF_ACCELERATION,
@@ -39,10 +40,15 @@ def _monotonic_values(*values: float):
 
 def _binding(monkeypatch, **overrides) -> tuple[LightBinding, Mock, Mock]:
     state = SimpleNamespace(state="on", attributes={"brightness": 128})
+
+    def _close_task(coro):
+        coro.close()
+        return Mock()
+
     hass = SimpleNamespace(
         states=SimpleNamespace(get=Mock(return_value=state)),
         services=SimpleNamespace(async_call=Mock(return_value=object())),
-        async_create_task=Mock(),
+        async_create_task=Mock(side_effect=_close_task),
     )
     interval_unsub = Mock()
     watchdog_unsub = Mock()
@@ -57,6 +63,9 @@ def _binding(monkeypatch, **overrides) -> tuple[LightBinding, Mock, Mock]:
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.binding.async_track_state_change_event",
         lambda *_args: Mock(),
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_send", Mock()
     )
     data = {
         CONF_NODE_ID: 101,
@@ -443,6 +452,59 @@ def test_rotate_up_from_off_uses_predictable_configured_floor(monkeypatch) -> No
 
     payload = binding.hass.services.async_call.call_args.args[2]
     assert payload["brightness"] == 8
+
+
+def test_brightness_reports_calculated_result_before_dispatch(monkeypatch) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
+    updates = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_send",
+        lambda _hass, _signal, payload: updates.append(payload),
+    )
+    action = _action(ACTION_ROTATE)
+    action.direction = DIRECTION_UP
+    action.notches = 1
+    binding._active_action = action
+
+    binding._rotate_brightness(1, True)
+
+    pending = updates[-1]
+    assert pending["action_id"] == action.action_id
+    assert pending["dispatch_status"] == "pending"
+    assert pending["result"] == {
+        "kind": "brightness",
+        "before": 50,
+        "after": 53,
+        "unit": "%",
+    }
+
+
+@pytest.mark.asyncio
+async def test_service_dispatch_reports_acceptance_for_exact_action(
+    monkeypatch,
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
+    updates = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_send",
+        lambda _hass, _signal, payload: updates.append(payload),
+    )
+    action = _action(ACTION_PRESS, presses=1)
+
+    async def accepted():
+        return None
+
+    await binding._async_dispatch_service(
+        "homeassistant",
+        "toggle",
+        accepted(),
+        result={"kind": "entity_action"},
+        action=action,
+    )
+
+    assert updates[-1]["action_id"] == action.action_id
+    assert updates[-1]["dispatch_status"] == "accepted"
+    assert updates[-1]["dispatched"] is True
 
 
 def test_external_state_change_invalidates_tracked_target(monkeypatch) -> None:

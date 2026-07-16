@@ -22,6 +22,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
+from .binding_config import binding_errors, normalize_binding_data
 from .const import (
     BINDING_PROFILE_CLIMATE,
     BINDING_PROFILE_COVER,
@@ -72,7 +73,6 @@ from .const import (
     MODES,
     SUBENTRY_BINDING,
     TARGET_DOMAINS,
-    mode_supports_target,
 )
 from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
@@ -219,14 +219,14 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
     @callback
     def _validate_binding(user_input: dict[str, Any]) -> dict[str, str]:
         """Reject response policies whose configured actions cannot run."""
-        errors: dict[str, str] = {}
-        if not mode_supports_target(user_input[CONF_MODE], user_input[CONF_TARGET]):
-            errors[CONF_TARGET] = "mode_target_mismatch"
-        if user_input.get(CONF_BUTTON_RESPONSE) == BUTTON_RESPONSE_FAST and (
-            user_input.get(CONF_DOUBLE_TARGET) or user_input.get(CONF_TRIPLE_TARGET)
-        ):
-            errors[CONF_BUTTON_RESPONSE] = "fast_response_conflicts_with_multi_press"
-        return errors
+        normalized = normalize_binding_data(
+            user_input,
+            # Unit tests exercise semantic validation without the selector
+            # identity fields; the real form always supplies both.
+            node_id=user_input.get(CONF_NODE_ID, "0"),
+            channel=user_input.get(CONF_CHANNEL, "1"),
+        )
+        return binding_errors(normalized)
 
     @callback
     def _setup_schema(self) -> vol.Schema:

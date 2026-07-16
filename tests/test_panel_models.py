@@ -7,11 +7,16 @@ from unittest.mock import MagicMock
 
 from custom_components.ikea_bilresa.const import (
     CONF_CHANNEL,
+    CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_TARGET,
+    CONF_HOLD_ACTION,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_SCENES,
     CONF_TARGET,
+    CONF_TRIPLE_TARGET,
+    HOLD_RAMP,
     MODE_BRIGHTNESS,
     MODE_VOLUME,
     SUBENTRY_BINDING,
@@ -55,7 +60,9 @@ def _subentry(node_id: int, channel: int, **data) -> SimpleNamespace:
     empty. Fixtures that agree with the code prove nothing.
     """
     return SimpleNamespace(
+        subentry_id=f"binding-{node_id}-{channel}",
         subentry_type=SUBENTRY_BINDING,
+        title=f"Wheel · Channel {channel}",
         data={CONF_NODE_ID: str(node_id), CONF_CHANNEL: str(channel), **data},
     )
 
@@ -185,8 +192,13 @@ def test_unconfigured_channel_is_reported_not_omitted(monkeypatch) -> None:
     channels = async_overview_snapshot(_hass(), entry)["wheels"][0]["channels"]
 
     assert channels[0]["profile"] == MODE_BRIGHTNESS
+    assert channels[0]["binding"]["id"] == f"binding-{NODE_A}-1"
+    assert channels[0]["binding"]["data"][CONF_MODE] == MODE_BRIGHTNESS
+    assert CONF_NODE_ID not in channels[0]["binding"]["data"]
+    assert CONF_CHANNEL not in channels[0]["binding"]["data"]
     assert channels[1]["profile"] is None
     assert channels[1]["behaviour"] is None
+    assert channels[1]["binding"] is None
 
 
 def test_a_binding_for_another_wheel_is_not_borrowed(monkeypatch) -> None:
@@ -245,6 +257,88 @@ def test_a_dead_click_target_flags_the_channel(monkeypatch) -> None:
     assert channels[0]["target_missing"] is True
 
 
+def test_detail_actions_mirror_the_stored_binding(monkeypatch) -> None:
+    """The detail describes runtime inputs without importing or executing it."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_MODE: MODE_BRIGHTNESS,
+                    CONF_TARGET: "light.main",
+                    CONF_CLICK_ACTION: "off",
+                    CONF_CLICK_TARGET: "switch.click",
+                    CONF_DOUBLE_TARGET: "switch.double",
+                    CONF_TRIPLE_TARGET: "switch.triple",
+                    CONF_HOLD_ACTION: HOLD_RAMP,
+                },
+            )
+        ],
+    )
+    hass = _hass(
+        {
+            "light.main": _state("on", "Main light"),
+            "switch.click": _state("on", "Bedside switch"),
+            "switch.double": _state("off", "Reading switch"),
+            "switch.triple": _state("off", "Movie switch"),
+        }
+    )
+
+    actions = async_overview_snapshot(hass, entry)["wheels"][0]["channels"][0][
+        "actions"
+    ]
+    by_gesture = {action["gesture"]: action for action in actions}
+
+    assert list(by_gesture) == [
+        "rotation",
+        "short_press",
+        "double_press",
+        "triple_press",
+        "hold",
+        "release",
+    ]
+    assert by_gesture["rotation"]["action_label"] == "Adjust target"
+    assert by_gesture["rotation"]["target_label"] == "Main light"
+    assert by_gesture["short_press"]["action_label"] == "Turn off"
+    assert by_gesture["short_press"]["target_label"] == "Bedside switch"
+    assert by_gesture["double_press"]["target_label"] == "Reading switch"
+    assert by_gesture["triple_press"]["target_label"] == "Movie switch"
+    assert by_gesture["hold"]["action_label"] == "Ramp target"
+    assert by_gesture["release"]["action_label"] == "Stop ramp"
+
+
+def test_missing_secondary_action_target_flags_the_channel(monkeypatch) -> None:
+    """Unavailable double/triple/hold targets must not hide in the detail."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_MODE: MODE_BRIGHTNESS,
+                    CONF_TARGET: "light.ok",
+                    CONF_DOUBLE_TARGET: "switch.gone",
+                },
+            )
+        ],
+    )
+    hass = _hass({"light.ok": _state("on", "Main light")})
+
+    channel = async_overview_snapshot(hass, entry)["wheels"][0]["channels"][0]
+    double = next(
+        action for action in channel["actions"] if action["gesture"] == "double_press"
+    )
+
+    assert channel["target_missing"] is True
+    assert double["target_missing"] is True
+    assert double["target_label"] == "switch.gone"
+
+
 def test_scene_binding_reports_its_count(monkeypatch) -> None:
     _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
     entry = _entry(
@@ -261,11 +355,22 @@ def test_scene_binding_reports_its_count(monkeypatch) -> None:
             )
         ],
     )
-    hass = _hass({"light.a": _state("on", "Lamp")})
+    hass = _hass(
+        {
+            "light.a": _state("on", "Lamp"),
+            "scene.a": _state("scening", "Evening"),
+            "scene.b": _state("scening", "Reading"),
+            "scene.c": _state("scening", "Movie"),
+        }
+    )
 
     channels = async_overview_snapshot(hass, entry)["wheels"][0]["channels"]
 
     assert channels[1]["behaviour"] == "Scenes (3)"
+    short_press = channels[1]["actions"][1]
+    assert short_press["gesture"] == "short_press"
+    assert short_press["action_label"] == "Cycle scenes"
+    assert short_press["target_label"] == "Evening / Reading / Movie"
 
 
 # -- last activity ---------------------------------------------------------
@@ -473,6 +578,12 @@ def test_behaviour_labels_follow_the_instance_language(monkeypatch) -> None:
     assert english["wheels"][0]["channels"][0]["behaviour"] == "Smooth dimming"
     # the entity's own name is the user's and is never translated
     assert czech["wheels"][0]["channels"][0]["target_label"] == "Lampa"
+    assert czech["wheels"][0]["channels"][0]["actions"][0]["action_label"] == (
+        "Upravit cíl"
+    )
+    assert english["wheels"][0]["channels"][0]["actions"][0]["action_label"] == (
+        "Adjust target"
+    )
 
 
 def test_an_unknown_instance_language_falls_back_to_english(monkeypatch) -> None:

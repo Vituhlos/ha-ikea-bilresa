@@ -1,4 +1,4 @@
-"""Phase 0 spike: panel registration must be safe, idempotent and removable."""
+"""Panel delivery and frontend-contract regression tests."""
 
 from __future__ import annotations
 
@@ -225,9 +225,12 @@ def test_panel_asset_keeps_accent_off_text() -> None:
     # the status label sits on the ink colour, with the dot beside it
     assert ".status {" in asset
     assert '.dot[data-state="connected"]' in asset
-    # the warning banner colours its stripe and icon, never its text
-    assert "border-inline-start: 4px solid var(--warning-color" in asset
-    assert "fill: var(--warning-color" in asset
+    # HA's warning token fails even the 3:1 non-text threshold on a light card.
+    # The warning is carried by the alert shape and explicit copy, both in the
+    # readable ink colour, rather than by orange words or a decorative stripe.
+    assert ".banner svg" in asset
+    assert "fill: currentColor;" in asset
+    assert "border-inline-start:" not in asset
 
 
 def test_panel_asset_never_renders_user_strings_as_html() -> None:
@@ -254,3 +257,101 @@ def test_panel_asset_grid_does_not_leave_a_phantom_column() -> None:
     # the declaration, not the word: the comment above it explains why auto-fill
     # was rejected, and a bare substring check would fail on its own reasoning
     assert "repeat(auto-fill," not in asset
+
+
+def test_panel_detail_keeps_the_measured_rail_and_pane_breakpoints() -> None:
+    """The rail width and pane threshold came from measured layout evidence."""
+    asset = _asset()
+
+    assert "--_rail-width: 256px;" in asset
+    assert "grid-template-columns: var(--_rail-width) minmax(0, 1fr);" in asset
+    assert "@media (max-width: 619px)" in asset
+    assert ".rail { display: none; }" in asset
+    # This must be a container query on the detail pane, never a window query.
+    assert ".detail-pane { min-inline-size: 0; container-type: inline-size; }" in asset
+    assert "@container (max-width: 700px)" in asset
+    assert "@media (max-width: 700px)" not in asset
+
+
+def test_panel_detail_tabs_follow_the_aria_keyboard_contract() -> None:
+    """Tabs need roles, relationships, roving focus and arrow-key navigation."""
+    asset = _asset()
+
+    assert 'setAttribute("role", "tablist")' in asset
+    assert 'setAttribute("role", "tab")' in asset
+    assert 'setAttribute("role", "tabpanel")' in asset
+    assert 'setAttribute("aria-selected", String(this._view === view))' in asset
+    assert 'setAttribute("aria-controls", `panel-${wheel.key}-${view}`)' in asset
+    assert 'setAttribute("aria-labelledby", `tab-${wheel.key}-${this._view}`)' in asset
+    for key in ("ArrowRight", "ArrowLeft", "Home", "End"):
+        assert f'event.key === "{key}"' in asset
+
+
+def test_live_activity_is_opt_in_bounded_and_unsubscribed() -> None:
+    """Only the Live test view may listen, and leaving it must stop immediately."""
+    asset = _asset()
+
+    assert 'const ACTIVITY_SUBSCRIBE = "ikea_bilresa/activity/subscribe";' in asset
+    assert 'this._view !== "live"' in asset
+    assert "{ type: ACTIVITY_SUBSCRIBE }" in asset
+    assert ".slice(0, ACTIVITY_LIMIT)" in asset
+    assert 'if (this._view === "live") this._stopActivity();' in asset
+    assert "this._activityUnsub();" in asset
+    assert "this._activityEpoch += 1;" in asset
+
+
+def test_live_activity_renders_structured_runtime_outcomes_without_call_service() -> (
+    None
+):
+    """Binding results come from the backend; the browser never bypasses it."""
+    asset = _asset()
+
+    assert 'this._t("result_unavailable")' in asset
+    assert "result.before" in asset
+    assert "result.after" in asset
+    assert "activity.dispatch_status" in asset
+    assert "dispatch_accepted" in asset
+    assert "dispatch_pending" in asset
+    assert "binding.py" not in asset
+    assert "callService" not in asset
+
+
+def test_binding_editor_uses_revision_checked_websocket_mutations() -> None:
+    """Panel writes stay inside the narrow binding API."""
+    asset = _asset()
+
+    assert 'const BINDING_SAVE = "ikea_bilresa/binding/save";' in asset
+    assert 'const BINDING_DELETE = "ikea_bilresa/binding/delete";' in asset
+    assert 'const BINDING_TEST = "ikea_bilresa/binding/test";' in asset
+    assert "expected_revision: this._editorBinding?.revision" in asset
+    assert "binding_id: this._editorBinding?.id" in asset
+    assert 'this._t("binding_conflict")' in asset
+    assert 'this._t("delete_binding_confirm")' in asset
+
+
+def test_panel_detail_has_a_back_path_at_every_width() -> None:
+    """The rail may disappear on mobile; the back control may not."""
+    asset = _asset()
+
+    assert 'back.id = "back-to-overview"' in asset
+    assert 'back.type = "button"' in asset
+    assert "back.appendChild(svg(ICON.back))" in asset
+    assert "this._backToOverview()" in asset
+
+
+def test_panel_preserves_focus_across_live_renders() -> None:
+    """A new physical event must not silently throw keyboard focus away."""
+    asset = _asset()
+
+    assert "const focused = this.shadowRoot.activeElement?.id || null;" in asset
+    assert "getElementById(focused)?.focus({ preventScroll: true })" in asset
+
+
+def test_channel_detail_uses_the_versioned_read_model_actions() -> None:
+    """Gesture rows come from panel_models, never from frontend guesses."""
+    asset = _asset()
+
+    assert "for (const action of channel.actions || [])" in asset
+    assert "action.gesture_label" in asset
+    assert "action.action_label" in asset
+    assert "action.target_missing" in asset

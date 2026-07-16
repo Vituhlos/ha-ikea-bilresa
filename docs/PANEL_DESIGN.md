@@ -1,6 +1,7 @@
 # BILRESA panel product design
 
-Status: **concept only; not implemented**
+Status: **implemented through the `0.5.9-rc.1` candidate; HA UI deployment
+validation pending and physical-wheel validation deferred**
 
 This document defines the intended product and technical direction for a
 future first-party BILRESA panel inside Home Assistant. It is the handoff for

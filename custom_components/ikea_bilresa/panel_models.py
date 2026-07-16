@@ -30,14 +30,28 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from .binding_config import binding_revision, editor_data
 from .const import (
+    CLICK_NONE,
+    CLICK_OFF,
+    CLICK_ON,
+    CLICK_TOGGLE,
     CONF_CHANNEL,
+    CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_TARGET,
+    CONF_HOLD_ACTION,
+    CONF_HOLD_TARGET,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_SCENES,
     CONF_TARGET,
+    CONF_TRIPLE_TARGET,
+    DEFAULT_CLICK_ACTION,
+    DEFAULT_HOLD_ACTION,
     DOMAIN,
+    HOLD_RAMP,
+    HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_COLOR,
     MODE_COLOR_TEMP,
@@ -52,7 +66,7 @@ from .device_link import WheelAvailability, resolve_matter_device, wheel_availab
 from .model import BilresaWheel
 from .panel_strings import localize
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 3
 
 # Deliberately short: this is an addressing token, not a secret. Long enough not
 # to collide across a household, short enough to read in a bug report.
@@ -76,6 +90,26 @@ def wheel_key(node_id: int) -> str:
 
 
 @dataclass(slots=True)
+class GestureSummary:
+    """One physical gesture and the configured action it maps to."""
+
+    gesture: str
+    gesture_label: str
+    action_label: str
+    target_label: str | None = None
+    target_missing: bool = False
+
+
+@dataclass(slots=True)
+class BindingEditor:
+    """Editable binding data with an optimistic-concurrency token."""
+
+    id: str
+    revision: str
+    data: dict[str, Any]
+
+
+@dataclass(slots=True)
 class ChannelSummary:
     """One channel of one wheel, as a human reads it."""
 
@@ -84,6 +118,8 @@ class ChannelSummary:
     behaviour: str | None = None
     target_label: str | None = None
     target_missing: bool = False
+    actions: list[GestureSummary] = field(default_factory=list)
+    binding: BindingEditor | None = None
 
 
 @dataclass(slots=True)
@@ -164,9 +200,9 @@ def _as_int(value: Any) -> int | None:
 
 
 @callback
-def _binding_by_channel(entry: Any, node_id: int) -> dict[int, dict[str, Any]]:
+def _binding_by_channel(entry: Any, node_id: int) -> dict[int, Any]:
     """Index this wheel's binding subentries by channel."""
-    bindings: dict[int, dict[str, Any]] = {}
+    bindings: dict[int, Any] = {}
     for subentry in entry.subentries.values():
         if subentry.subentry_type != SUBENTRY_BINDING:
             continue
@@ -175,7 +211,7 @@ def _binding_by_channel(entry: Any, node_id: int) -> dict[int, dict[str, Any]]:
             continue
         channel = _as_int(data.get(CONF_CHANNEL))
         if channel is not None:
-            bindings[channel] = data
+            bindings[channel] = subentry
     return bindings
 
 
@@ -217,11 +253,125 @@ def _behaviour_label(data: dict[str, Any], language: str | None) -> str | None:
     return str(mode) if mode else localize(language, "configured")
 
 
+_CLICK_KEYS = {
+    CLICK_TOGGLE: "action_toggle",
+    CLICK_ON: "action_turn_on",
+    CLICK_OFF: "action_turn_off",
+    CLICK_NONE: "action_none",
+}
+
+
+def _gesture_summary(
+    hass: HomeAssistant,
+    language: str | None,
+    gesture: str,
+    action_key: str,
+    target: str | None = None,
+) -> GestureSummary:
+    """Build one localized read-only gesture row."""
+    return GestureSummary(
+        gesture=gesture,
+        gesture_label=localize(language, f"binding_gesture_{gesture}"),
+        action_label=localize(language, action_key),
+        target_label=_entity_label(hass, target),
+        target_missing=_target_missing(hass, target),
+    )
+
+
+def _gesture_summaries(
+    hass: HomeAssistant, data: dict[str, Any], language: str | None
+) -> list[GestureSummary]:
+    """Describe binding behavior without importing or executing binding.py.
+
+    The defaults mirror ``BindingRuntime.__init__``. This is presentation only:
+    it never decides whether an action runs and never calls a service.
+    """
+    target = data.get(CONF_TARGET)
+    click_target = data.get(CONF_CLICK_TARGET) or target
+    double_target = data.get(CONF_DOUBLE_TARGET)
+    triple_target = data.get(CONF_TRIPLE_TARGET)
+    hold_target = data.get(CONF_HOLD_TARGET)
+    hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
+    scenes = list(data.get(CONF_SCENES) or [])
+
+    summaries = [
+        _gesture_summary(
+            hass,
+            language,
+            "rotation",
+            "action_adjust",
+            target,
+        )
+    ]
+
+    if scenes:
+        scene_labels = [
+            label for scene in scenes if (label := _entity_label(hass, scene))
+        ]
+        summaries.append(
+            GestureSummary(
+                gesture="short_press",
+                gesture_label=localize(language, "binding_gesture_short_press"),
+                action_label=localize(language, "action_cycle_scenes"),
+                target_label=" / ".join(scene_labels) or None,
+                target_missing=any(_target_missing(hass, scene) for scene in scenes),
+            )
+        )
+    else:
+        click_action = data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION)
+        summaries.append(
+            _gesture_summary(
+                hass,
+                language,
+                "short_press",
+                _CLICK_KEYS.get(click_action, "action_toggle"),
+                None if click_action == CLICK_NONE else click_target,
+            )
+        )
+
+    summaries.extend(
+        (
+            _gesture_summary(
+                hass,
+                language,
+                "double_press",
+                "action_toggle" if double_target else "action_none",
+                double_target,
+            ),
+            _gesture_summary(
+                hass,
+                language,
+                "triple_press",
+                "action_toggle" if triple_target else "action_none",
+                triple_target,
+            ),
+        )
+    )
+
+    if hold_action == HOLD_RAMP:
+        summaries.append(
+            _gesture_summary(hass, language, "hold", "action_ramp", target)
+        )
+        summaries.append(
+            _gesture_summary(hass, language, "release", "action_stop_ramp", target)
+        )
+    elif hold_action == HOLD_TOGGLE and hold_target:
+        summaries.append(
+            _gesture_summary(hass, language, "hold", "action_toggle", hold_target)
+        )
+        summaries.append(_gesture_summary(hass, language, "release", "action_none"))
+    else:
+        # HOLD_NONE and a toggle without a target both execute nothing.
+        summaries.append(_gesture_summary(hass, language, "hold", "action_none"))
+        summaries.append(_gesture_summary(hass, language, "release", "action_none"))
+    return summaries
+
+
 @callback
 def _channel_summaries(
     hass: HomeAssistant,
     wheel: BilresaWheel,
-    bindings: dict[int, dict[str, Any]],
+    bindings: dict[int, Any],
     language: str | None,
 ) -> list[ChannelSummary]:
     """One summary per channel the device itself reports.
@@ -236,13 +386,15 @@ def _channel_summaries(
     )
     summaries: list[ChannelSummary] = []
     for channel in channels:
-        data = bindings.get(channel)
-        if data is None:
+        subentry = bindings.get(channel)
+        if subentry is None:
             summaries.append(ChannelSummary(channel=channel))
             continue
+        data = dict(subentry.data)
         target = data.get(CONF_TARGET)
         # The click target defaults to the scroll target, mirroring binding.py.
         click_target = data.get(CONF_CLICK_TARGET) or target
+        actions = _gesture_summaries(hass, data, language)
         summaries.append(
             ChannelSummary(
                 channel=channel,
@@ -251,7 +403,19 @@ def _channel_summaries(
                 behaviour=_behaviour_label(data, language),
                 target_label=_entity_label(hass, target),
                 target_missing=(
-                    _target_missing(hass, target) or _target_missing(hass, click_target)
+                    _target_missing(hass, target)
+                    or _target_missing(hass, click_target)
+                    or any(action.target_missing for action in actions)
+                ),
+                actions=actions,
+                binding=(
+                    BindingEditor(
+                        id=subentry.subentry_id,
+                        revision=binding_revision(subentry),
+                        data=editor_data(data),
+                    )
+                    if hasattr(subentry, "subentry_id") and hasattr(subentry, "title")
+                    else None
                 ),
             )
         )

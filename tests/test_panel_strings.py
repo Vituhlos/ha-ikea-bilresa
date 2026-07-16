@@ -116,5 +116,9 @@ def test_the_frontend_does_not_hard_code_user_facing_english() -> None:
         "No activity yet",
         "Try again",
         "Open Home Assistant sidebar",
+        "Live test",
+        "Calculated result not reported",
+        "Dispatch outcome not reported",
+        "Recommended action",
     ):
         assert f'"{phrase}"' not in body, f"hard-coded in the frontend: {phrase}"
