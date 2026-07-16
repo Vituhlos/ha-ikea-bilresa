@@ -47,7 +47,9 @@ class IkeaBilresaPanel extends HTMLElement {
 
   async _probe() {
     try {
-      this._info = await this._hass.callWS({ type: "ikea_bilresa/spike/info" });
+      // Phase 2 replaced the spike's throwaway commands with the real contract.
+      // The stub now reads the same snapshot the future grid will.
+      this._info = await this._hass.callWS({ type: "ikea_bilresa/overview" });
       this._render();
     } catch (err) {
       this._error = String(err && err.message ? err.message : err);
@@ -61,7 +63,7 @@ class IkeaBilresaPanel extends HTMLElement {
           this._pushes += 1;
           this._render();
         },
-        { type: "ikea_bilresa/spike/subscribe" },
+        { type: "ikea_bilresa/overview/subscribe" },
       );
     } catch (err) {
       this._error = String(err && err.message ? err.message : err);
@@ -228,9 +230,19 @@ class IkeaBilresaPanel extends HTMLElement {
         ],
         ["narrow", String(this._narrow)],
         ["ws request", "ok"],
-        ["integration loaded", String(this._info.loaded)],
-        ["matter connected", String(this._info.connected)],
-        ["wheels discovered", String(this._info.wheel_count)],
+        ["contract version", String(this._info.contract_version)],
+        ["matter connected", String(this._info.matter_connected)],
+        ["event source", String(this._info.event_source)],
+        ["wheels discovered", String((this._info.wheels || []).length)],
+        [
+          "channels summarised",
+          String(
+            (this._info.wheels || []).reduce(
+              (n, w) => n + (w.channels || []).length,
+              0,
+            ),
+          ),
+        ],
         ["subscription pushes", String(this._pushes)],
       ];
       for (const [key, value] of rows) {

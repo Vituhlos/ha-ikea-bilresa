@@ -252,6 +252,66 @@ technical spike below changes frontend delivery and a read-only WebSocket API,
 but does not implement the designed panel or change Matter, binding storage or
 hardware behavior. The physical `v0.5.7` checklist remains open.
 
+### Panel `0.5.8` Phase 2 authenticated read-only API (Claude Code, 2026-07-16)
+
+Status: **Implemented + Static. Unit not run locally. CI has not run. Not
+deployed.** Phase 2's exit gate also wants a reviewed payload redaction and proof
+that a disconnected frontend cannot affect Matter listening or binding dispatch;
+the design gives the latter by construction (see below), but neither has been
+observed in a running Home Assistant.
+
+`panel_api.py` rewritten. The Phase 0 spike's two `.../spike/...` commands are
+**deleted, not extended**, exactly as that package said they would be. Three
+commands replace them, all admin-only, all read-only:
+
+- `ikea_bilresa/overview` — one snapshot from `panel_models`;
+- `ikea_bilresa/overview/subscribe` — pushes a fresh snapshot on
+  `SIGNAL_CONNECTION` and `SIGNAL_WHEELS_UPDATED`;
+- `ikea_bilresa/activity/subscribe` — live gestures, opt-in, live-test view only.
+
+This gives `panel_models.async_overview_snapshot` its caller; it is no longer
+dead code. `tests/test_panel_api.py` rewritten: 13 tests covering unload,
+cleanup, multiple clients, malformed events, redaction, and that no write command
+exists.
+
+Decisions and their reasons:
+
+- **Live activity listens to the public `ikea_bilresa_event` bus event**, not the
+  coordinator. A bus listener runs *after* the action has been dispatched, so the
+  panel being open cannot change gesture timing or binding latency — the concern
+  that shaped `rc.4`/`rc.5`. No coordinator change was needed, and the earlier
+  worry about a "someone is watching" flag turned out to be unnecessary.
+- **The bus payload carries `node_id`, `wheel_name` and `endpoint_id`; all three
+  are stripped.** The wheel is addressed by its opaque key. Tested.
+- **`result` and `dispatched` are sent as `null`** — GAP-2 and GAP-3, still open.
+  The live-test view can show the gesture and nothing about whether it landed,
+  which is the opposite of what `PANEL_DESIGN.md` wants as its hero. Null is the
+  honest answer; do not fill it with a guess.
+- **No queue, so no backlog to bound.** Each event goes straight to the socket
+  and is dropped. Rotation is rate-limited by the device's own 0.5–1 s batching.
+  The roadmap asks for coalescing; there is nothing to coalesce because nothing
+  accumulates.
+- **The overview subscription must never be driven per gesture.** Rebuilding the
+  whole snapshot per notch is exactly the unbounded work the roadmap warns about.
+  That is what the activity subscription is for.
+- **An unloaded integration returns an empty snapshot**, not an error: a browser
+  can hold the sidebar open across an unload, and "nothing here" is renderable.
+
+The Phase 0 stub JS now calls `ikea_bilresa/overview` instead of the deleted
+spike commands, so it keeps working as a smoke check until Phase 3 replaces it.
+**A deployed `rc.8` browser tab will break against this** — it still calls
+`.../spike/info`. That is intended: those commands were never contract.
+
+```text
+python -m compileall -q custom_components tests     passed
+ruff format --check / ruff check                    passed
+mypy custom_components/ikea_bilresa                 passed (18 source files)
+node --check <panel asset>                          passed
+git diff --check                                    passed
+python -m pytest -q                                 Unit not run
+  ModuleNotFoundError: No module named 'homeassistant' (Windows/3.13)
+```
+
 ### Panel `0.5.8` Phase 1 backend read model (Claude Code, 2026-07-16)
 
 Status: **Implemented + Static. Unit not run locally. CI has not run. Not
