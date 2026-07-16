@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.9] - 2026-07-16
+
+### Changed
+- The panel's icons are now the Material Symbols (MD3) rounded set, bundled
+  directly into the integration rather than depending on the Material Symbols
+  HACS integration being installed. So the panel has the MD3 look for everyone,
+  with no runtime dependency and no blank icons. The wheel is a filled dial.
+
 ## [0.5.9-rc.8] - 2026-07-16
 
 ### Fixed
