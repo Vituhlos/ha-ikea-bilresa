@@ -15,11 +15,10 @@ jaké má na originálním IKEA hubu DIRIGERA — tím, že reaguje na **`MultiP
 události v reálném čase**, které vestavěná Matter integrace v Home Assistantu
 zahazuje.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.9-rc.1 přidává
-> administrátorský panel s detailem koleček, živými výsledky propojení,
-> testováním akcí z panelu a revizně chráněným vytvářením, úpravou a mazáním
-> propojení. Je určený pro cílené ověření v Home Assistantu před stabilním
-> vydáním.
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.9-rc.2 ladí
+> administrátorský panel podle prvních skutečných screenshotů z Home Assistanta.
+> Zachovává detail koleček, živé výsledky propojení, testování akcí z panelu a
+> revizně chráněné vytváření, úpravu a mazání propojení z v0.5.9-rc.1.
 >
 > Malý patch release train `0.5.1`–`0.5.7` je v
 > [docs/ROADMAP.md](docs/ROADMAP.md).

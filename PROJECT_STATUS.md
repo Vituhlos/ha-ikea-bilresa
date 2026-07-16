@@ -27,15 +27,16 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: dirty with the post-`v0.5.9-rc.1` visual correction described
-  below, based on deployment-record commit `b438a6b`. Runtime commit `c3c5c2f`
-  remains the released and deployed RC.1 tag target.
+- Working tree: clean after the `v0.5.9-rc.2` panel visual correction and
+  deployment record. Runtime commit `f0a4171` is pushed on
+  `agent/stabilize-0.5-x`; `v0.5.9-rc.1` remains on `c3c5c2f`.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
 - Latest stable release remains `v0.5.0`. Panel Phases 0-3 were published as
-  `v0.5.7-rc.11`; the functional editor/detail candidate is now published and
-  deployed as `v0.5.9-rc.1`. Draft PR #1 remains open and `main` has not been
+  `v0.5.7-rc.11`; the functional editor/detail candidate was published as
+  `v0.5.9-rc.1`, and the real-screenshot visual polish is now published and
+  deployed as `v0.5.9-rc.2`. Draft PR #1 remains open and `main` has not been
   merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
@@ -470,9 +471,8 @@ the manual panel checks below before promoting the RC.
 
 ### Post-RC.1 panel visual correction (Codex, 2026-07-16)
 
-Status: **Implemented and locally validated as the `0.5.9-rc.2` candidate.
-Not yet committed, CI-verified, released or deployed. Visual comparison
-pending.**
+Status: **Implemented + Static + Unit + CI + Released + deployed to Home
+Assistant as `v0.5.9-rc.2`. Browser visual comparison pending.**
 
 Owner screenshots from the real Home Assistant page established that the RC.1
 data model and functions work, but the composition did not reach the selected
@@ -524,6 +524,27 @@ git diff --check                                            passed (CRLF warning
 The focused design QA record is `design-qa.md`. Browser-rendered visual QA
 remains blocked until the deployed custom element is opened in a fresh Home
 Assistant tab and screenshots are captured.
+
+Publication and deployment results for `v0.5.9-rc.2`:
+
+- runtime commit `f0a4171` (`Refine BILRESA panel visual hierarchy`) was pushed
+  to `agent/stabilize-0.5-x`;
+- exact-revision GitHub Actions run `29485117546` passed frontend checks, HACS
+  validation, hassfest, Ruff, mypy and Unit tests;
+- prerelease `v0.5.9-rc.2` was published from exact commit `f0a4171`:
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.5.9-rc.2;
+- pre-deployment Home Assistant config check was valid;
+- HACS installed exactly `v0.5.9-rc.2`;
+- Home Assistant restarted and the integration returned to `loaded`;
+- System Health reported Matter connected via `core_matter_client`, no fallback
+  reason, two discovered wheels and four configured bindings;
+- HACS still reported installed version `v0.5.9-rc.2` after restart;
+- config-entry diagnostics still showed four binding subentries. Stored
+  `channel` values remained strings, `mode` was present, and no
+  `binding_profile` field was present;
+- system-log search for `ikea_bilresa` returned no entries. Raw log search
+  showed only Home Assistant's standard custom-integration loader warning, and
+  no `custom_components.ikea_bilresa` error lines.
 
 ### Panel `0.5.8` Phase 4 wheel detail, live test and diagnostics (Codex, 2026-07-16)
 
@@ -1527,17 +1548,16 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Commit, push, wait for exact-revision CI, publish `v0.5.9-rc.2`, install it via
-HACS and restart Home Assistant. Then open the panel in a new tab and capture
-the same four real-HA states at matching desktop viewports, plus 320/380 px
-mobile and one dark-theme pass. Physical-wheel validation remains deliberately
-deferred by owner direction.
+Open the deployed `v0.5.9-rc.2` panel in a new browser tab and capture the same
+four real-HA states at matching desktop viewports, plus 320/380 px mobile and
+one dark-theme pass. Physical-wheel validation remains deliberately deferred by
+owner direction.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from deployment-record commit `b438a6b` plus the locally validated
-   `0.5.9-rc.2` visual correction recorded above; then re-check HEAD, branch and
+2. Start from the pushed `v0.5.9-rc.2` runtime commit `f0a4171` plus the
+   deployment-record follow-up in this file; then re-check HEAD, branch and
    status.
 3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
 4. Static, Python Unit, frontend Unit, exact-revision CI, release and backend
