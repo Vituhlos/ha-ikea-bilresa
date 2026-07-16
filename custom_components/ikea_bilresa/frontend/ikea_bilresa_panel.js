@@ -71,21 +71,24 @@ const ICON = {
     "M13 5C15.21 5 17 6.79 17 9C17 10.5 16.2 11.77 15 12.46V11.24C15.61 10.69 16 9.89 16 9C16 7.34 14.66 6 13 6S10 7.34 10 9C10 9.89 10.39 10.69 11 11.24V12.46C9.8 11.77 9 10.5 9 9C9 6.79 10.79 5 13 5M20 20.5C19.97 21.32 19.32 21.97 18.5 22H13C12.62 22 12.26 21.85 12 21.57L8 17.37L8.74 16.6C8.93 16.39 9.2 16.28 9.5 16.28H9.7L12 18V9C12 8.45 12.45 8 13 8S14 8.45 14 9V13.47L15.21 13.6L19.15 15.79C19.68 16.03 20 16.56 20 17.14V20.5M20 2H4C2.9 2 2 2.9 2 4V12C2 13.11 2.9 14 4 14H8V12L4 12L4 4H20L20 12H18V14H20V13.96L20.04 14C21.13 14 22 13.09 22 12V4C22 2.9 21.11 2 20 2Z",
   hold:
     "M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M9,12.44V9A2,2 0 0,1 11,7A2,2 0 0,1 13,9V12.44C14.19,11.75 15,10.47 15,9A4,4 0 0,0 11,5A4,4 0 0,0 7,9C7,10.47 7.81,11.75 9,12.44Z",
+  // mdi:record-circle-outline — a ring with a centre dot, reads as a rotary dial
+  // for the wheel, replacing the volume-knob glyph the owner disliked.
+  wheel:
+    "M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z",
 };
 
 // Maps the stable gesture key from panel_models to a real MDI glyph. Keys match
 // GestureSummary.gesture: rotation / short_press / double_press / triple_press /
 // hold / release. Presses share one icon; hold and release share another.
-// [Material Symbols rounded name, MDI fallback name] per stable gesture key.
-// Material Symbols names use hyphens (verified against beecho01/material-symbols),
-// MDI names use hyphens too — but they are different vocabularies, hence pairs.
+// Inline SVG path per stable gesture key. Presses share one glyph; hold and
+// release share another.
 const GESTURE_ICON = {
-  rotation: ["rotate-right", "rotate-right"],
-  short_press: ["touch-app", "gesture-tap-button"],
-  double_press: ["touch-app", "gesture-tap-button"],
-  triple_press: ["touch-app", "gesture-tap-button"],
-  hold: ["back-hand", "gesture-tap-hold"],
-  release: ["back-hand", "gesture-tap-hold"],
+  rotation: ICON.rotateRight,
+  short_press: ICON.press,
+  double_press: ICON.press,
+  triple_press: ICON.press,
+  hold: ICON.hold,
+  release: ICON.hold,
 };
 
 const STYLES = `
@@ -276,17 +279,17 @@ const STYLES = `
   .wheel-names { min-inline-size: 0; }
   /* The device glyph. --state-icon-color is HA's own entity-icon colour and
      clears the 3:1 non-text bar; an icon may carry it where a word may not. */
-  /* ha-icon renders its glyph in its own shadow root, so it is coloured via
-     the color property (currentColor) and sized via --mdc-icon-size. */
   .device-glyph {
     flex: 0 0 auto;
-    color: var(--state-icon-color, #44739e);
-    --mdc-icon-size: 34px;
+    inline-size: 34px;
+    block-size: 34px;
+    fill: var(--state-icon-color, #44739e);
   }
   .rail-glyph {
     flex: 0 0 auto;
-    color: var(--state-icon-color, #44739e);
-    --mdc-icon-size: 22px;
+    inline-size: 22px;
+    block-size: 22px;
+    fill: var(--state-icon-color, #44739e);
   }
   .wheel-name {
     display: block;
@@ -628,8 +631,9 @@ const STYLES = `
   }
   .gesture-glyph {
     flex: 0 0 auto;
-    color: var(--state-icon-color, #44739e);
-    --mdc-icon-size: 18px;
+    inline-size: 18px;
+    block-size: 18px;
+    fill: var(--state-icon-color, #44739e);
   }
   .channel-action-value {
     overflow-wrap: anywhere;
@@ -1030,36 +1034,10 @@ const svg = (path, cls) => {
   return node;
 };
 
-// Material Symbols (the MD3 icon set, HACS: beecho01/material-symbols) registers
-// its prefixes on window.customIconsets / customIcons. If the m3 rounded style is
-// present we use it; otherwise we fall back to plain MDI, which is always there.
-// So the panel looks MD3 where the user installed it, and never ships a blank
-// icon to anyone who did not — no hard dependency, which keeps the integration
-// portable and HACS-submittable.
-let _materialSymbols;
-const hasMaterialSymbols = () => {
-  if (_materialSymbols === undefined) {
-    const sets = window.customIconsets || {};
-    const icons = window.customIcons || {};
-    _materialSymbols = Boolean(
-      sets.m3r || sets.m3rf || sets.m3o || icons.m3r || icons.m3rf || icons.m3o,
-    );
-  }
-  return _materialSymbols;
-};
-
-// Resolves one logical icon to an <ha-icon>, preferring the MD3 rounded name and
-// falling back to the MDI name. ha-icon resolves whichever iconset is registered,
-// so no icon paths are hard-coded here.
-const icon = (m3name, mdiName, cls) => {
-  const node = document.createElement("ha-icon");
-  node.setAttribute(
-    "icon",
-    hasMaterialSymbols() ? `m3r:${m3name}` : `mdi:${mdiName}`,
-  );
-  if (cls) node.className = cls;
-  return node;
-};
+// ha-icon does not reliably render inside a custom panel's shadow root (the
+// element is not always upgraded there), so icons are inline SVG with real paths,
+// which always render. MD3 (Material Symbols) via ha-icon was tried and came back
+// blank; the reliable path is inline MDI, and MDI has clean glyphs.
 
 const el = (tag, cls, text) => {
   const node = document.createElement(tag);
@@ -1416,9 +1394,7 @@ class IkeaBilresaPanel extends HTMLElement {
     card.addEventListener("click", () => this._openWheel(wheel.key));
 
     const head = el("span", "wheel-head");
-    head.appendChild(
-      icon("trip-origin", "record-circle-outline", "device-glyph"),
-    );
+    head.appendChild(svg(ICON.wheel, "device-glyph"));
     const names = el("span", "wheel-names");
     names.appendChild(el("span", "wheel-name", wheel.name));
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
@@ -1494,9 +1470,7 @@ class IkeaBilresaPanel extends HTMLElement {
           this._t(wheel.availability),
         ].join(", "),
       );
-      button.appendChild(
-        icon("trip-origin", "record-circle-outline", "rail-glyph"),
-      );
+      button.appendChild(svg(ICON.wheel, "rail-glyph"));
       button.appendChild(this._statusDot(wheel.availability));
       const copy = el("span", "rail-copy");
       copy.appendChild(el("span", "rail-name", wheel.name));
@@ -2102,8 +2076,9 @@ class IkeaBilresaPanel extends HTMLElement {
         const item = el("li", "channel-action");
         if (action.target_missing) item.dataset.state = "warning";
         const label = el("span", "channel-action-label");
-        const [m3, mdiName] = GESTURE_ICON[action.gesture] || GESTURE_ICON.short_press;
-        label.appendChild(icon(m3, mdiName, "gesture-glyph"));
+        label.appendChild(
+          svg(GESTURE_ICON[action.gesture] || ICON.press, "gesture-glyph"),
+        );
         label.appendChild(el("span", null, action.gesture_label));
         item.appendChild(label);
         item.appendChild(el("span", "channel-action-value", value));

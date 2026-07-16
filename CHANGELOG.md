@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.8] - 2026-07-16
+
+### Fixed
+- Panel icons render again. rc.6/rc.7 switched to ha-icon to use Material
+  Symbols, but ha-icon does not reliably upgrade inside a custom panel's shadow
+  root, so every icon went blank. Reverted to inline SVG, which always renders.
+  The wheel glyph is now a rotary dial (record-circle-outline) instead of the
+  volume-knob icon.
+
 ## [0.5.9-rc.7] - 2026-07-16
 
 ### Changed
