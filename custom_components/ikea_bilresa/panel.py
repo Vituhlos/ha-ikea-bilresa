@@ -1,13 +1,4 @@
-"""Panel lifecycle: static asset registration and the sidebar entry.
-
-**This is the `0.5.8` Phase 0 technical spike, not the panel.** Its only job is
-to answer the question `PANEL_ROADMAP.md` says must be answered before any
-production frontend work: can this integration register, serve, cache-bust and
-unregister one local asset on the supported Home Assistant, through the same
-HACS install path, without breaking setup when it fails?
-
-The asset it serves is deliberately a stub. Nothing here should survive into the
-real panel unchanged.
+"""Panel lifecycle: frontend assets, custom icon provider and sidebar entry.
 
 Two Home Assistant constraints shaped this module, and both are easy to trip on:
 
@@ -39,19 +30,29 @@ _LOGGER = logging.getLogger(__name__)
 PANEL_URL_PATH = "ikea-bilresa"
 PANEL_WEBCOMPONENT = "ikea-bilresa-panel"
 PANEL_TITLE = "IKEA BILRESA"
-PANEL_ICON = "mdi:knob"
+PANEL_ICON = "bilresa:scroll-wheel"
 
 STATIC_URL_PATH = "/ikea_bilresa_frontend"
 FRONTEND_DIR = "frontend"
 PANEL_FILENAME = "ikea_bilresa_panel.js"
+ICONSET_FILENAME = "bilresa_icons.js"
 
 _STATIC_REGISTERED = f"{DOMAIN}_static_registered"
+_ICONSET_URL = f"{DOMAIN}_iconset_url"
 
 
-def _panel_asset_path(hass: HomeAssistant) -> Path:
-    return Path(hass.config.path("custom_components", DOMAIN, FRONTEND_DIR)) / (
-        PANEL_FILENAME
-    )
+def _frontend_asset_path(hass: HomeAssistant, filename: str) -> Path:
+    return Path(hass.config.path("custom_components", DOMAIN, FRONTEND_DIR, filename))
+
+
+def _remove_iconset_url(hass: HomeAssistant) -> None:
+    """Stop advertising the global icon module without breaking unload."""
+    if not (iconset_url := hass.data.pop(_ICONSET_URL, None)):
+        return
+    try:
+        frontend.remove_extra_js_url(hass, iconset_url)
+    except Exception:  # noqa: BLE001 - frontend cleanup must never break unload
+        _LOGGER.exception("Failed to remove the BILRESA icon provider URL")
 
 
 async def async_setup_panel(hass: HomeAssistant) -> bool:
@@ -62,13 +63,17 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
     setup. Gesture processing and bindings do not depend on any of this.
     """
     try:
-        asset = _panel_asset_path(hass)
+        panel_asset = _frontend_asset_path(hass, PANEL_FILENAME)
+        iconset_asset = _frontend_asset_path(hass, ICONSET_FILENAME)
         # Path.is_file() hits the filesystem; never do that on the event loop.
-        if not await hass.async_add_executor_job(asset.is_file):
+        assets_exist = await hass.async_add_executor_job(
+            lambda: panel_asset.is_file() and iconset_asset.is_file()
+        )
+        if not assets_exist:
             _LOGGER.warning(
-                "BILRESA panel asset is missing at %s; continuing without a "
-                "panel. Wheels, bindings and events are unaffected",
-                asset,
+                "BILRESA frontend assets are incomplete at %s; continuing "
+                "without a panel. Wheels, bindings and events are unaffected",
+                panel_asset.parent,
             )
             return False
 
@@ -77,7 +82,7 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
                 [
                     StaticPathConfig(
                         STATIC_URL_PATH,
-                        str(asset.parent),
+                        str(panel_asset.parent),
                         # Safe to cache hard: the module URL carries the
                         # integration version, so an upgrade changes the URL.
                         cache_headers=True,
@@ -91,6 +96,14 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
         # Cache-busting. Without this an upgrade leaves browsers on the old
         # bundle until a hard refresh, which looks exactly like a broken panel.
         module_url = f"{STATIC_URL_PATH}/{PANEL_FILENAME}?v={integration.version}"
+        iconset_url = f"{STATIC_URL_PATH}/{ICONSET_FILENAME}?v={integration.version}"
+
+        # The sidebar is rendered before the panel module is opened. Register a
+        # small global module first so bilresa:scroll-wheel can resolve there.
+        if hass.data.get(_ICONSET_URL) != iconset_url:
+            _remove_iconset_url(hass)
+            frontend.add_extra_js_url(hass, iconset_url)
+            hass.data[_ICONSET_URL] = iconset_url
 
         await panel_custom.async_register_panel(
             hass,
@@ -117,6 +130,7 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
             },
         )
     except Exception:  # noqa: BLE001 - a panel must never break setup
+        _remove_iconset_url(hass)
         _LOGGER.exception("Failed to register the BILRESA panel; continuing without it")
         return False
 
@@ -132,3 +146,4 @@ def async_remove_panel(hass: HomeAssistant) -> None:
     even when registration was skipped or failed.
     """
     frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
+    _remove_iconset_url(hass)

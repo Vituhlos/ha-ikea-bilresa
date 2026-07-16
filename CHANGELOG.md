@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.11] - 2026-07-16
+
+### Changed
+- The approved optical V2 BILRESA glyph is now the integration's shared visual
+  identity: a bundled `bilresa:scroll-wheel` provider supplies the Home
+  Assistant sidebar icon, and the panel uses the same primary and secondary
+  paths for wheel cards and the switcher rail.
+- Channel actions now use distinct Material Symbols Rounded gestures for both
+  rotation directions and single, double and triple press. Hold and release are
+  rendered as one long-press sequence instead of inventing a separate release
+  logo.
+
+### Notes
+- The icon provider and gesture paths are bundled with the integration. They do
+  not depend on the Material Symbols custom integration being installed.
+
 ## [0.5.9-rc.10] - 2026-07-16
 
 ### Changed

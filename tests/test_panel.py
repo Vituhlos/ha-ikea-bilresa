@@ -7,6 +7,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.ikea_bilresa.panel import (
+    ICONSET_FILENAME,
+    PANEL_ICON,
     PANEL_URL_PATH,
     STATIC_URL_PATH,
     async_remove_panel,
@@ -21,6 +23,16 @@ def _asset() -> str:
         / "ikea_bilresa"
         / "frontend"
         / "ikea_bilresa_panel.js"
+    ).read_text(encoding="utf-8")
+
+
+def _iconset_asset() -> str:
+    return (
+        Path(__file__).parents[1]
+        / "custom_components"
+        / "ikea_bilresa"
+        / "frontend"
+        / ICONSET_FILENAME
     ).read_text(encoding="utf-8")
 
 
@@ -51,6 +63,16 @@ def _patch(monkeypatch, hass, *, register=None) -> MagicMock:
         "custom_components.ikea_bilresa.panel.panel_custom.async_register_panel",
         registrar,
     )
+    hass._add_extra_js_url = MagicMock()
+    hass._remove_extra_js_url = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel.frontend.add_extra_js_url",
+        hass._add_extra_js_url,
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel.frontend.remove_extra_js_url",
+        hass._remove_extra_js_url,
+    )
     return registrar
 
 
@@ -64,7 +86,12 @@ async def test_registers_panel_with_a_cache_busted_module_url(monkeypatch) -> No
     kwargs = registrar.await_args.kwargs
     assert kwargs["module_url"] == f"{STATIC_URL_PATH}/ikea_bilresa_panel.js?v=9.9.9"
     assert kwargs["frontend_url_path"] == PANEL_URL_PATH
+    assert kwargs["sidebar_icon"] == PANEL_ICON == "bilresa:scroll-wheel"
     assert kwargs["require_admin"] is True
+    hass._add_extra_js_url.assert_called_once_with(
+        hass,
+        f"{STATIC_URL_PATH}/{ICONSET_FILENAME}?v=9.9.9",
+    )
 
 
 async def test_missing_asset_does_not_break_setup(monkeypatch) -> None:
@@ -76,6 +103,7 @@ async def test_missing_asset_does_not_break_setup(monkeypatch) -> None:
 
     registrar.assert_not_awaited()
     hass.http.async_register_static_paths.assert_not_awaited()
+    hass._add_extra_js_url.assert_not_called()
 
 
 async def test_registration_failure_does_not_break_setup(monkeypatch) -> None:
@@ -84,6 +112,10 @@ async def test_registration_failure_does_not_break_setup(monkeypatch) -> None:
     _patch(monkeypatch, hass, register=AsyncMock(side_effect=RuntimeError("boom")))
 
     assert await async_setup_panel(hass) is False
+    hass._remove_extra_js_url.assert_called_once_with(
+        hass,
+        f"{STATIC_URL_PATH}/{ICONSET_FILENAME}?v=9.9.9",
+    )
 
 
 async def test_static_path_is_registered_only_once(monkeypatch) -> None:
@@ -95,6 +127,7 @@ async def test_static_path_is_registered_only_once(monkeypatch) -> None:
     await async_setup_panel(hass)
 
     hass.http.async_register_static_paths.assert_awaited_once()
+    hass._add_extra_js_url.assert_called_once()
 
 
 async def test_reload_re_registers_the_panel_itself(monkeypatch) -> None:
@@ -119,6 +152,25 @@ def test_remove_is_quiet_when_the_panel_never_registered(monkeypatch) -> None:
 
     remover.assert_called_once()
     assert remover.call_args.kwargs["warn_if_unknown"] is False
+
+
+async def test_remove_stops_advertising_the_icon_provider(monkeypatch) -> None:
+    """Unload removes the extra module URL as well as the sidebar entry."""
+    hass = _hass()
+    _patch(monkeypatch, hass)
+    remover = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel.frontend.async_remove_panel", remover
+    )
+
+    await async_setup_panel(hass)
+    async_remove_panel(hass)
+
+    remover.assert_called_once()
+    hass._remove_extra_js_url.assert_called_once_with(
+        hass,
+        f"{STATIC_URL_PATH}/{ICONSET_FILENAME}?v=9.9.9",
+    )
 
 
 def test_panel_asset_has_an_accessible_mobile_exit() -> None:
@@ -150,6 +202,41 @@ def test_panel_asset_has_an_accessible_mobile_exit() -> None:
     # decorative icons must stay out of the accessibility tree
     assert 'setAttribute("aria-hidden", "true")' in asset
     assert 'setAttribute("focusable", "false")' in asset
+
+
+def test_bilresa_icon_provider_uses_the_selected_v2_geometry() -> None:
+    """The sidebar provider must expose the approved two-path product glyph."""
+    iconset = _iconset_asset()
+    panel = _asset()
+
+    assert "window.customIcons.bilresa = { getIcon, getIconList };" in iconset
+    assert "window.customIconsets.bilresa = getIcon;" in iconset
+    assert 'name === "scroll-wheel"' in iconset
+    assert "secondaryPath:" in iconset
+    assert "M13.05 1.35" in iconset
+    # Same distinctive source geometry in the panel prevents identity drift.
+    assert "M11.3 1.4" in iconset
+    assert "M11.3 1.4" in panel
+    assert ".secondary-path { opacity: 0.32; }" in panel
+
+
+def test_panel_uses_distinct_material_rounded_gestures() -> None:
+    """Press count belongs in the glyph; release is the end of a hold sequence."""
+    asset = _asset()
+
+    assert 'const MATERIAL_VIEWBOX = "0 -960 960 960";' in asset
+    for gesture in (
+        "rotate_left",
+        "rotate_right",
+        "short_press",
+        "double_press",
+        "triple_press",
+        "hold",
+    ):
+        assert f"{gesture}: {{" in asset
+    assert 'el("li", "channel-action gesture-sequence")' in asset
+    assert 'el("span", "gesture-sequence-end")' in asset
+    assert "gestureGlyph(action.gesture)" in asset
 
 
 def test_panel_header_clears_the_notch() -> None:
@@ -419,7 +506,8 @@ def test_channel_detail_uses_the_versioned_read_model_actions() -> None:
     """Gesture rows come from panel_models, never from frontend guesses."""
     asset = _asset()
 
-    assert "for (const action of channel.actions || [])" in asset
+    assert "const summaries = channel.actions || [];" in asset
+    assert "const action = summaries[index];" in asset
     assert "action.gesture_label" in asset
     assert "action.action_label" in asset
     assert "action.target_missing" in asset

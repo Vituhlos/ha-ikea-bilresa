@@ -48,7 +48,7 @@ ruff format --check custom_components tests
 ruff check custom_components tests
 mypy custom_components/ikea_bilresa
 node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js
-node --test tests/panel_frontend.test.mjs
+node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs
 git diff --check
 ```
 

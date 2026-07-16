@@ -51,7 +51,7 @@ jobs:
         with:
           node-version: "22"
       - run: node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js
-      - run: node --test tests/panel_frontend.test.mjs
+      - run: node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs
 
   tests:
     name: Unit tests

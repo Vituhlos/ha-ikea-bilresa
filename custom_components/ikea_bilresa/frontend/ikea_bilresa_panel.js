@@ -48,8 +48,8 @@ const DEFAULT_BINDING = {
   scenes: [],
 };
 
-// Material Design Icons paths already used as standard chrome. The product icon
-// remains absent rather than approximated with an invented path.
+// Material Design Icons remain the standard chrome. Product identity and
+// gestures use the separately approved BILRESA / Material Rounded geometry.
 const ICON = {
   menu: "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z",
   chevron: "M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z",
@@ -59,37 +59,78 @@ const ICON = {
     "M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z",
   refresh:
     "M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z",
-  // rotateRight / press / hold below carry Material Symbols rounded (MD3) paths
-  // (change-circle, touch-app, back-hand), bundled from beecho01/material-symbols.
-  // knob/rotateLeft are unused leftovers kept only to avoid churn.
-  knob: "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M13 10H11V4.1C11.3 4 11.7 4 12 4S12.7 4 13 4.1V10Z",
-  rotateRight:
-    "M12.075 15.475q-.725.025-1.387-.237t-1.163-.763t-.763-1.125t-.262-1.325q0-.25.025-.487t.1-.463q.1-.3-.012-.6t-.388-.425q-.3-.125-.587 0t-.388.425q-.125.375-.187.75T7 12q0 1 .388 1.913t1.087 1.612q.675.7 1.588 1.075t1.887.4l-.425.425q-.225.225-.225.525t.225.525t.525.225t.525-.225l1.6-1.6q.3-.3.3-.7t-.3-.7l-1.6-1.6q-.225-.225-.525-.225t-.525.225t-.225.525t.225.525zM11.9 8.5q.725 0 1.4.263t1.175.762t.763 1.125t.262 1.325q0 .25-.025.487t-.1.463q-.1.3.013.612t.387.438q.3.125.588 0t.387-.425q.125-.375.188-.763T17 12q0-1-.363-1.912T15.55 8.45q-.7-.7-1.612-1.062t-1.888-.363l.45-.45q.2-.225.2-.525t-.225-.525t-.525-.225t-.525.225l-1.6 1.6q-.3.3-.3.7t.3.7l1.6 1.6q.225.225.525.225t.525-.225t.225-.525t-.225-.525zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8",
-  rotateLeft:
-    "M13,4.07V1L8.45,5.55L13,10V6.09C15.84,6.57 18,9.03 18,12C18,14.97 15.84,17.43 13,17.91V19.93C16.95,19.44 20,16.08 20,12C20,7.92 16.95,4.56 13,4.07M7.1,18.32C8.26,19.22 9.61,19.76 11,19.93V17.9C10.13,17.75 9.29,17.41 8.54,16.87L7.1,18.32M6.09,13H4.07C4.24,14.39 4.79,15.73 5.69,16.89L7.1,15.47C6.58,14.72 6.23,13.88 6.09,13M7.11,8.53L5.7,7.11C4.8,8.27 4.24,9.61 4.07,11H6.09C6.23,10.13 6.58,9.28 7.11,8.53Z",
-  press:
-    "M10.475 22q-.7 0-1.312-.3t-1.038-.85L3.1 14.475q-.2-.225-.175-.537t.225-.513q.5-.525 1.2-.625t1.3.275L7.5 14.2V6q0-.425.288-.712T8.5 5t.725.288t.3.712v10q0 .575-.513.863T8 16.85l-.9-.55l2.6 3.325q.15.175.35.275t.425.1H16q.825 0 1.413-.587T18 18v-4q0-.425-.288-.712T17 13h-4.475q-.425 0-.712-.288T11.525 12t.288-.712t.712-.288H17q1.25 0 2.125.875T20 14v4q0 1.65-1.175 2.825T16 22zm1.5-13q-.425 0-.712-.288T10.975 8q0-.05.125-.5q.2-.35.3-.712T11.5 6q0-1.25-.875-2.125T8.5 3t-2.125.875T5.5 6q0 .425.1.788t.3.712q.075.125.1.25t.025.25q0 .425-.275.713T5.05 9q-.275 0-.512-.15t-.363-.375q-.325-.55-.5-1.175T3.5 6q0-2.075 1.463-3.537T8.5 1t3.538 1.463T13.5 6q0 .675-.175 1.3t-.5 1.175q-.125.225-.35.375t-.5.15",
-  hold:
-    "M12.8 23q-2.05 0-3.85-.937T6 19.45l-4.425-6.5q-.175-.25-.137-.537t.237-.488q.5-.525 1.238-.6t1.337.35l2.75 1.9V4q0-.425.288-.712T8 3t.713.288T9 4v11.5q0 .6-.537.888t-1.038-.063L5.3 14.85l2.375 3.45q.875 1.275 2.225 1.988t2.9.712q2.575 0 4.388-1.812T19 14.8V5q0-.425.288-.712T20 4t.713.288T21 5v9.8q0 3.425-2.387 5.813T12.8 23M12 1q.425 0 .713.288T13 2v9q0 .425-.288.713T12 12t-.712-.288T11 11V2q0-.425.288-.712T12 1m4 1q.425 0 .713.288T17 3v8q0 .425-.288.713T16 12t-.712-.288T15 11V3q0-.425.288-.712T16 2m-3.85 14.5",
-  // Material Symbols rounded (MD3), fiber-smart-record — a filled dial. Bundled
-  // directly from beecho01/material-symbols so the panel has the MD3 look with
-  // no runtime dependency on that iconset being installed.
-  wheel:
-    "M9 19q-2.925 0-4.962-2.037T2 12t2.038-4.962T9 5t4.963 2.038T16 12t-2.037 4.963T9 19m8.5-.475q-.575.2-1.037-.038T16 17.6q0-.275.188-.525t.462-.35q1.5-.5 2.425-1.8T20 12t-.925-2.925t-2.425-1.8q-.275-.1-.462-.35T16 6.4q0-.625.45-.875t1.025-.05Q19.5 6.2 20.75 7.988T22 12t-1.25 4t-3.25 2.525M9 17q2.075 0 3.538-1.463T14 12t-1.463-3.537T9 7T5.463 8.463T4 12t1.463 3.538T9 17",
 };
 
-// Maps the stable gesture key from panel_models to a real MDI glyph. Keys match
-// GestureSummary.gesture: rotation / short_press / double_press / triple_press /
-// hold / release. Presses share one icon; hold and release share another.
-// Inline SVG path per stable gesture key. Presses share one glyph; hold and
-// release share another.
+const BILRESA_ICON = Object.freeze({
+  viewBox: "0 0 24 24",
+  path: `M11.3 1.4
+    C15.05 1.4 17.65 4.18 17.65 7.9
+    V15.5
+    C17.65 19.72 15.02 22.35 11.3 22.35
+    C7.58 22.35 4.95 19.72 4.95 15.5
+    V7.9
+    C4.95 4.18 7.55 1.4 11.3 1.4Z
+    M11.3 2.65
+    C8.27 2.65 6.2 4.95 6.2 7.98
+    V15.38
+    C6.2 18.85 8.38 21.1 11.3 21.1
+    C14.22 21.1 16.4 18.85 16.4 15.38
+    V7.98
+    C16.4 4.95 14.33 2.65 11.3 2.65Z
+    M11 2.1
+    A5.2 5.8 0 1 1 11 13.7
+    A5.2 5.8 0 1 1 11 2.1Z
+    M11 3.2
+    A4.1 4.7 0 1 0 11 12.6
+    A4.1 4.7 0 1 0 11 3.2Z
+    M10.23 16.08
+    A0.58 0.58 0 1 1 9.07 16.08
+    A0.58 0.58 0 1 1 10.23 16.08Z
+    M11.63 16.08
+    A0.58 0.58 0 1 1 10.47 16.08
+    A0.58 0.58 0 1 1 11.63 16.08Z
+    M13.03 16.08
+    A0.58 0.58 0 1 1 11.87 16.08
+    A0.58 0.58 0 1 1 13.03 16.08Z`,
+  secondaryPath: `M13.05 1.35
+    C16.45 1.85 18.65 4.55 18.65 8.15
+    V15.48
+    C18.65 19.28 16.3 21.9 12.95 22.55
+    L12.68 21.22
+    C14.95 20.75 16.42 18.62 16.42 15.36
+    V8
+    C16.42 5.1 15.2 2.75 13.05 1.35Z`,
+});
+
+const MATERIAL_VIEWBOX = "0 -960 960 960";
+
+// Official Material Symbols Rounded paths. Counts are part of the glyph, so a
+// triple press cannot be mistaken for a normal press when labels are skimmed.
 const GESTURE_ICON = {
-  rotation: ICON.rotateRight,
-  short_press: ICON.press,
-  double_press: ICON.press,
-  triple_press: ICON.press,
-  hold: ICON.hold,
-  release: ICON.hold,
+  rotate_left: {
+    viewBox: MATERIAL_VIEWBOX,
+    path: "M170-478q-21 0-33.5-15t-7.5-35q6-25 16-48t23-45q10-17 29.5-19t34.5 12q9 9 11 22.5t-5 24.5q-10 17-17.5 35.5T208-508q-3 13-14.5 21.5T170-478Zm268 348q0 22-15 34t-35 7q-24-7-47-16.5T295-128q-17-10-19-29.5t12-34.5q9-9 22.5-11t24.5 5q17 10 35.5 17.5T408-168q13 3 21.5 14.5T438-130ZM232-248q-15 14-34.5 12T168-255q-13-23-22.5-46T129-348q-5-20 7-35t34-15q13 0 24 8.5t14 21.5q5 19 12.5 37.5T238-295q7 11 5 25t-11 22ZM567-90q-20 5-34.5-7T518-130q0-13 8.5-24t21.5-14q92-24 151-98.5T758-438q0-117-81.5-198.5T478-718h-8l36 36q11 11 11 28t-11 28q-11 11-28 11t-28-11L346-730q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l103-104q12-11 29-11t28 11q12 12 12 29t-11 28l-35 35h6q150 0 255 105t105 255q0 124-76 220T567-90Z",
+  },
+  rotate_right: {
+    viewBox: MATERIAL_VIEWBOX,
+    path: "M790-478q-12 0-23.5-8.5T752-508q-5-19-12.5-37.5T722-581q-7-11-5-24.5t11-22.5q15-14 34.5-12t29.5 19q13 22 23 45t16 48q5 20-7.5 35T790-478ZM522-130q0-12 8.5-23.5T552-168q19-5 37.5-12.5T625-198q11-7 24.5-5t22.5 11q14 15 12 34.5T665-128q-23 13-46 22.5T572-89q-20 5-35-7t-15-34Zm206-118q-9-8-11-22t5-25q10-17 17.5-35.5T752-368q3-13 14-21.5t24-8.5q22 0 34 15t7 35q-7 24-16.5 47T792-255q-10 17-29.5 19T728-248ZM393-90q-119-32-195-128t-76-220q0-150 105-255t255-105h6l-35-35q-11-11-11-28t12-29q11-11 28-11t29 11l103 104q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L510-626q-11 11-28 11t-28-11q-11-11-11-28t11-28l36-36h-8q-117 0-198.5 81.5T202-438q0 97 59 171.5T412-168q13 3 21.5 14t8.5 24q0 21-14.5 33T393-90Z",
+  },
+  short_press: {
+    viewBox: MATERIAL_VIEWBOX,
+    path: "M419-80q-28 0-52.5-12T325-126L124-381q-8-9-7-21.5t9-20.5q20-21 48-25t52 11l74 45v-328q0-17 11.5-28.5T340-760q17 0 29 11.5t12 28.5v400q0 23-20.5 34.5T320-286l-36-22 104 133q6 7 14 11t17 4h221q33 0 56.5-23.5T720-240v-160q0-17-11.5-28.5T680-440H501q-17 0-28.5-11.5T461-480q0-17 11.5-28.5T501-520h179q50 0 85 35t35 85v160q0 66-47 113T640-80H419Zm83-260Zm-23-260q-17 0-28.5-11.5T439-640q0-2 5-20 8-14 12-28.5t4-31.5q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 17 4 31.5t12 28.5q3 5 4 10t1 10q0 17-11 28.5T202-600q-11 0-20.5-6T167-621q-13-22-20-47t-7-52q0-83 58.5-141.5T340-920q83 0 141.5 58.5T540-720q0 27-7 52t-20 47q-5 9-14 15t-20 6Z",
+  },
+  double_press: {
+    viewBox: MATERIAL_VIEWBOX,
+    path: "M638-600q-17 0-28-11.5T599-640q0-4 5-20 8-14 12-29t4-31q0-20-5.5-39.5T595-794q-6-7-10-15.5t-4-17.5q0-15 10.5-26t25.5-11q13 0 23.5 6.5T659-841q22 25 31.5 56.5T700-720q0 26-6.5 51.5T673-620q-5 9-14.5 14.5T638-600ZM419-80q-28 0-52.5-12T325-126L124-381q-8-9-7-21.5t9-20.5q20-21 48-25t52 11l74 45v-328q0-17 11.5-28.5T340-760q17 0 29 11.5t12 28.5v400q0 23-20.5 34.5T320-286l-36-22 104 133q6 7 14 11t17 4h221q33 0 56.5-23.5T720-240v-160q0-17-11.5-28.5T680-440H501q-17 0-28.5-11.5T461-480q0-17 11.5-28.5T501-520h179q50 0 85 35t35 85v160q0 66-47 113T640-80H419Zm83-260Zm-23-260q-17 0-28.5-11.5T439-640q0-2 5-20 8-14 12-28.5t4-31.5q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 17 4 31.5t12 28.5q3 5 4 10t1 10q0 17-11 28.5T202-600q-11 0-20.5-6T167-621q-13-22-20-47t-7-52q0-83 58.5-141.5T340-920q83 0 141.5 58.5T540-720q0 27-7 52t-20 47q-5 9-14 15t-20 6Z",
+  },
+  triple_press: {
+    viewBox: MATERIAL_VIEWBOX,
+    path: "M798-600q-17 0-28-11.5T759-640q0-4 5-20 8-14 12-29t4-31q0-20-5.5-39.5T755-794q-6-7-10-15.5t-4-17.5q0-15 10.5-26t25.5-11q13 0 23.5 6.5T819-841q22 25 31.5 56.5T860-720q0 26-6.5 51.5T833-620q-5 9-14.5 14.5T798-600Zm-160 0q-17 0-28-11.5T599-640q0-4 5-20 8-14 12-29t4-31q0-20-5.5-39.5T595-794q-6-7-10-15.5t-4-17.5q0-15 10.5-26t25.5-11q13 0 23.5 6.5T659-841q22 25 31.5 56.5T700-720q0 26-6.5 51.5T673-620q-5 9-14.5 14.5T638-600ZM419-80q-28 0-52.5-12T325-126L124-381q-8-9-7-21.5t9-20.5q20-21 48-25t52 11l74 45v-328q0-17 11.5-28.5T340-760q17 0 29 11.5t12 28.5v400q0 23-20.5 34.5T320-286l-36-22 104 133q6 7 14 11t17 4h221q33 0 56.5-23.5T720-240v-160q0-17-11.5-28.5T680-440H501q-17 0-28.5-11.5T461-480q0-17 11.5-28.5T501-520h179q50 0 85 35t35 85v160q0 66-47 113T640-80H419Zm83-260Zm-23-260q-17 0-28.5-11.5T439-640q0-2 5-20 8-14 12-28.5t4-31.5q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 17 4 31.5t12 28.5q3 5 4 10t1 10q0 17-11 28.5T202-600q-11 0-20.5-6T167-621q-13-22-20-47t-7-52q0-83 58.5-141.5T340-920q83 0 141.5 58.5T540-720q0 27-7 52t-20 47q-5 9-14 15t-20 6Z",
+  },
+  hold: {
+    viewBox: MATERIAL_VIEWBOX,
+    path: "M419-80q-28 0-52.5-12T325-126L124-381q-8-9-7-21.5t9-20.5q20-21 48-25t52 11l74 45v-328q0-17 11.5-28.5T340-760q17 0 29 11.5t12 28.5v400q0 23-20.5 34.5T320-286l-36-22 104 133q6 7 14 11t17 4h221q33 0 56.5-23.5T720-240v-160q0-17-11.5-28.5T680-440H501q-17 0-28.5-11.5T461-480q0-17 11.5-28.5T501-520h179q50 0 85 35t35 85v160q0 66-47 113T640-80H419Zm83-260ZM340-820q-42 0-71 29t-29 71v136q0 12-11 17.5t-20-2.5q-32-28-50.5-67T140-720q0-83 58.5-141.5T340-920q83 0 141.5 58.5T540-720q0 45-18 83.5T472-570q-9 8-20 3t-11-18v-135q0-42-30-71t-71-29Z",
+  },
 };
 
 const STYLES = `
@@ -287,13 +328,17 @@ const STYLES = `
     inline-size: 32px;
     block-size: 32px;
     color: var(--state-icon-color, #44739e);
+    fill: currentColor;
   }
   .rail-glyph {
     flex: 0 0 auto;
     inline-size: 22px;
     block-size: 22px;
     color: var(--state-icon-color, #44739e);
+    fill: currentColor;
   }
+  .device-glyph .secondary-path,
+  .rail-glyph .secondary-path { opacity: 0.32; }
   .wheel-name {
     display: block;
     min-inline-size: 0;
@@ -637,6 +682,51 @@ const STYLES = `
     inline-size: 18px;
     block-size: 18px;
     fill: var(--state-icon-color, #44739e);
+  }
+  .gesture-glyph-pair {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: var(--_space-1);
+  }
+  .gesture-sequence {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .gesture-sequence-rail {
+    position: relative;
+    display: grid;
+    grid-template-rows: repeat(2, minmax(28px, 1fr));
+    place-items: center;
+    align-self: stretch;
+  }
+  .gesture-sequence-rail::before {
+    position: absolute;
+    inset-block: 18px;
+    inline-size: 2px;
+    background: var(--_divider);
+    content: "";
+  }
+  .gesture-sequence-rail .gesture-glyph {
+    z-index: 1;
+    background: var(--_card);
+  }
+  .gesture-sequence-end {
+    z-index: 1;
+    inline-size: 10px;
+    block-size: 10px;
+    border: 2px solid var(--state-icon-color, #44739e);
+    border-radius: 50%;
+    background: var(--_card);
+  }
+  .gesture-sequence-copy {
+    display: grid;
+    gap: var(--_space-3);
+  }
+  .gesture-sequence-line {
+    display: grid;
+    grid-template-columns: minmax(9ch, 0.9fr) minmax(0, 1.5fr);
+    gap: var(--_space-3);
+    align-items: start;
+    min-inline-size: 0;
   }
   .channel-action-value {
     overflow-wrap: anywhere;
@@ -1008,6 +1098,8 @@ const STYLES = `
       padding-inline: var(--_space-4);
     }
     .channel-action { grid-template-columns: minmax(0, 1fr); }
+    .gesture-sequence { grid-template-columns: 24px minmax(0, 1fr); }
+    .gesture-sequence-line { grid-template-columns: minmax(0, 1fr); }
     .live-output {
       min-block-size: 280px;
       padding: var(--_space-6) var(--_space-4);
@@ -1025,15 +1117,28 @@ const STYLES = `
   }
 `;
 
-const svg = (path, cls) => {
-  const node = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  node.setAttribute("viewBox", "0 0 24 24");
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const svg = (icon, cls) => {
+  const data =
+    typeof icon === "string"
+      ? { path: icon, viewBox: "0 0 24 24" }
+      : icon;
+  const node = document.createElementNS(SVG_NS, "svg");
+  node.setAttribute("viewBox", data.viewBox || "0 0 24 24");
   node.setAttribute("aria-hidden", "true");
   node.setAttribute("focusable", "false");
   if (cls) node.setAttribute("class", cls);
-  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  p.setAttribute("d", path);
-  node.appendChild(p);
+  const primary = document.createElementNS(SVG_NS, "path");
+  primary.setAttribute("d", data.path);
+  primary.setAttribute("class", "primary-path");
+  node.appendChild(primary);
+  if (data.secondaryPath) {
+    const secondary = document.createElementNS(SVG_NS, "path");
+    secondary.setAttribute("d", data.secondaryPath);
+    secondary.setAttribute("class", "secondary-path");
+    node.appendChild(secondary);
+  }
   return node;
 };
 
@@ -1041,43 +1146,25 @@ const svg = (path, cls) => {
 // element is not always upgraded there), so icons are inline SVG with real paths,
 // which always render.
 
-// A bespoke glyph of the BILRESA itself, drawn from the device's real shape
-// rather than traced from a photo (a photo trace reads as noise at 22px): the
-// upright rounded body, the large scroll wheel near the top, and the three
-// channel dots below. currentColor drives both the outline and the dots, so the
-// surrounding class colours it like any other glyph.
-const SVG_NS = "http://www.w3.org/2000/svg";
-const bilresaIcon = (cls) => {
-  const s = document.createElementNS(SVG_NS, "svg");
-  s.setAttribute("viewBox", "0 0 24 24");
-  s.setAttribute("aria-hidden", "true");
-  s.setAttribute("focusable", "false");
-  if (cls) s.setAttribute("class", cls);
-  const body = document.createElementNS(SVG_NS, "rect");
-  for (const [k, v] of Object.entries({
-    x: "6.6", y: "2", width: "10.8", height: "20", rx: "5.4",
-    fill: "none", stroke: "currentColor", "stroke-width": "1.4",
-  })) {
-    body.setAttribute(k, v);
+// The panel uses the exact same V2 geometry as bilresa:scroll-wheel in the
+// global provider. Inline SVG remains intentional: it renders reliably inside
+// this dependency-free custom panel's shadow root.
+const bilresaIcon = (cls) => svg(BILRESA_ICON, cls);
+
+const gestureGlyph = (gesture) => {
+  if (gesture === "rotation") {
+    const pair = el("span", "gesture-glyph-pair");
+    pair.setAttribute("aria-hidden", "true");
+    pair.appendChild(svg(GESTURE_ICON.rotate_left, "gesture-glyph"));
+    pair.appendChild(svg(GESTURE_ICON.rotate_right, "gesture-glyph"));
+    return pair;
   }
-  s.appendChild(body);
-  const wheel = document.createElementNS(SVG_NS, "circle");
-  for (const [k, v] of Object.entries({
-    cx: "12", cy: "8.7", r: "4.2",
-    fill: "none", stroke: "currentColor", "stroke-width": "1.4",
-  })) {
-    wheel.setAttribute(k, v);
+  if (gesture === "release") {
+    const endpoint = el("span", "gesture-sequence-end");
+    endpoint.setAttribute("aria-hidden", "true");
+    return endpoint;
   }
-  s.appendChild(wheel);
-  for (const cx of ["9.9", "12", "14.1"]) {
-    const dot = document.createElementNS(SVG_NS, "circle");
-    dot.setAttribute("cx", cx);
-    dot.setAttribute("cy", "16.7");
-    dot.setAttribute("r", "0.85");
-    dot.setAttribute("fill", "currentColor");
-    s.appendChild(dot);
-  }
-  return s;
+  return svg(GESTURE_ICON[gesture] || GESTURE_ICON.short_press, "gesture-glyph");
 };
 
 const el = (tag, cls, text) => {
@@ -2106,7 +2193,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
     if (configured && (channel.actions || []).length) {
       const actions = el("ul", "channel-action-list");
-      for (const action of channel.actions || []) {
+      const actionValue = (action) => {
         let value = action.action_label;
         if (action.target_label) {
           const target = action.target_missing
@@ -2114,15 +2201,51 @@ class IkeaBilresaPanel extends HTMLElement {
             : action.target_label;
           value = `${value} · ${target}`;
         }
+        return value;
+      };
+      const summaries = channel.actions || [];
+      for (let index = 0; index < summaries.length; index += 1) {
+        const action = summaries[index];
+        const release = summaries[index + 1];
+
+        if (action.gesture === "hold" && release?.gesture === "release") {
+          const item = el("li", "channel-action gesture-sequence");
+          if (action.target_missing || release.target_missing) {
+            item.dataset.state = "warning";
+          }
+
+          const rail = el("span", "gesture-sequence-rail");
+          rail.setAttribute("aria-hidden", "true");
+          rail.appendChild(svg(GESTURE_ICON.hold, "gesture-glyph"));
+          rail.appendChild(el("span", "gesture-sequence-end"));
+          item.appendChild(rail);
+
+          const copy = el("span", "gesture-sequence-copy");
+          for (const step of [action, release]) {
+            const line = el("span", "gesture-sequence-line");
+            line.appendChild(
+              el("span", "channel-action-label", step.gesture_label),
+            );
+            line.appendChild(
+              el("span", "channel-action-value", actionValue(step)),
+            );
+            copy.appendChild(line);
+          }
+          item.appendChild(copy);
+          actions.appendChild(item);
+          index += 1;
+          continue;
+        }
+
         const item = el("li", "channel-action");
         if (action.target_missing) item.dataset.state = "warning";
         const label = el("span", "channel-action-label");
-        label.appendChild(
-          svg(GESTURE_ICON[action.gesture] || ICON.press, "gesture-glyph"),
-        );
+        label.appendChild(gestureGlyph(action.gesture));
         label.appendChild(el("span", null, action.gesture_label));
         item.appendChild(label);
-        item.appendChild(el("span", "channel-action-value", value));
+        item.appendChild(
+          el("span", "channel-action-value", actionValue(action)),
+        );
         actions.appendChild(item);
       }
       card.appendChild(actions);
