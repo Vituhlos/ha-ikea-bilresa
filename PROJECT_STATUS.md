@@ -27,17 +27,19 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: clean after the `v0.5.9-rc.2` panel visual correction and
-  deployment record. Runtime commit `f0a4171` is pushed on
-  `agent/stabilize-0.5-x`; `v0.5.9-rc.1` remains on `c3c5c2f`.
+- Working tree: dirty with the `v0.5.9-rc.3` panel visual follow-up described
+  below. The latest deployed Home Assistant version remains `v0.5.9-rc.2`.
+  Runtime commit `f0a4171` is the `v0.5.9-rc.2` tag target;
+  `v0.5.9-rc.1` remains on `c3c5c2f`.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
 - Latest stable release remains `v0.5.0`. Panel Phases 0-3 were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
-  `v0.5.9-rc.1`, and the real-screenshot visual polish is now published and
-  deployed as `v0.5.9-rc.2`. Draft PR #1 remains open and `main` has not been
-  merged.
+  `v0.5.9-rc.1`, and the first real-screenshot visual polish is published and
+  deployed as `v0.5.9-rc.2`. A second screenshot follow-up is implemented as a
+  local `v0.5.9-rc.3` candidate. Draft PR #1 remains open and `main` has not
+  been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -545,6 +547,49 @@ Publication and deployment results for `v0.5.9-rc.2`:
 - system-log search for `ikea_bilresa` returned no entries. Raw log search
   showed only Home Assistant's standard custom-integration loader warning, and
   no `custom_components.ikea_bilresa` error lines.
+
+### RC.2 screenshot follow-up for detail polish (Codex, 2026-07-16)
+
+Status: **Implemented + Static + Unit locally as the `0.5.9-rc.3` candidate.
+Not yet committed, CI-verified, released or deployed. Browser visual comparison
+pending.**
+
+Owner screenshots from the deployed `v0.5.9-rc.2` panel showed two remaining
+detail-screen issues:
+
+- desktop still showed two "Back to all wheels" controls because the in-pane
+  mobile back button had both `display: none` and a later `display: inline-flex`
+  in the same CSS rule;
+- channel detail still felt bulky and hard to scan because each configured
+  channel rendered a wide table-like 3 x 2 gesture matrix.
+
+The working-tree correction:
+
+- keeps desktop back navigation only in the 256 px rail and shows the in-pane
+  back button only below the mobile rail-collapse breakpoint;
+- replaces the channel gesture matrix with compact per-channel cards and a
+  vertical gesture list;
+- moves edit/add binding actions into each channel card footer so the card
+  reads content-first instead of form-first.
+
+No Matter, binding storage, WebSocket schema or dispatch behavior changes are
+part of this correction.
+
+Local validation for the `0.5.9-rc.3` candidate passed on Windows/Python 3.14:
+
+```text
+ruff format custom_components tests                         no changes
+ruff format --check custom_components tests                 passed (38 files)
+ruff check custom_components tests                          passed
+mypy custom_components/ikea_bilresa                         passed (20 files)
+python -m compileall -q custom_components tests             passed
+node --check custom_components/.../ikea_bilresa_panel.js    passed
+node --test tests/panel_frontend.test.mjs                   6 passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest -q
+  -p pytest_asyncio.plugin                                  201 passed
+manifest/strings/en/cs JSON parsing                         passed
+git diff --check                                            passed (CRLF warnings only)
+```
 
 ### Panel `0.5.8` Phase 4 wheel detail, live test and diagnostics (Codex, 2026-07-16)
 
@@ -1548,17 +1593,18 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Open the deployed `v0.5.9-rc.2` panel in a new browser tab and capture the same
-four real-HA states at matching desktop viewports, plus 320/380 px mobile and
-one dark-theme pass. Physical-wheel validation remains deliberately deferred by
-owner direction.
+Commit, push, wait for exact-revision CI, publish `v0.5.9-rc.3`, install it via
+HACS and restart Home Assistant. Then open the panel in a new tab and capture
+the same real-HA states, especially the wheel detail channels screen, plus
+320/380 px mobile and one dark-theme pass. Physical-wheel validation remains
+deliberately deferred by owner direction.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from the pushed `v0.5.9-rc.2` runtime commit `f0a4171` plus the
-   deployment-record follow-up in this file; then re-check HEAD, branch and
-   status.
+2. Start from the pushed `v0.5.9-rc.2` deployment-record commit `73c7137` plus
+   the locally implemented `v0.5.9-rc.3` detail polish recorded above; then
+   re-check HEAD, branch and status.
 3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
 4. Static, Python Unit, frontend Unit, exact-revision CI, release and backend
    deployment smoke are established. Visual HA UI and Hardware remain pending.

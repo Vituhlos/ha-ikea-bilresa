@@ -7,8 +7,8 @@
   - `docs/images/panel/04-selected-combined-direction.png` for desktop detail
     proportions and live-result hierarchy;
   - owner-provided real Home Assistant screenshots from 2026-07-16 for the RC.1
-    implementation defects.
-- Implementation screenshot: unavailable for the post-RC.1 working tree.
+    and RC.2 implementation defects.
+- Implementation screenshot: unavailable for the post-RC.2 working tree.
 - Intended viewport: desktop 1320-1665 px matching the supplied HA screenshots,
   followed by 380 px and 320 px mobile checks.
 - State: overview, channels, idle/active live test, healthy diagnostics.
@@ -58,6 +58,25 @@ Blocked for the same reason. Required focused regions after deployment:
 
 ### Post-fix evidence
 
+RC.2 was captured by the owner in Home Assistant. It confirmed the overview was
+closer, but the detail still had two desktop back controls and the channel view
+still read as a heavy table.
+
+### Iteration 2 - RC.2 owner screenshots
+
+- P1: desktop still showed both rail and in-pane "Back to all wheels" controls.
+- P1: channel detail felt bulky and hard to scan because gestures were presented
+  as a wide 3 x 2 matrix.
+
+### Working-tree fixes after RC.2
+
+- Removed the accidental desktop display rule from the in-pane back button; it
+  now appears only below the rail-collapse breakpoint.
+- Replaced the channel gesture matrix with compact per-channel cards and a
+  vertical gesture list.
+
+### Post-RC.3 evidence
+
 Not yet captured. The custom panel must be packaged, installed, opened in a new
 Home Assistant tab and screenshotted at matching states and viewports.
 
@@ -77,7 +96,7 @@ Home Assistant tab and screenshotted at matching states and viewports.
 ## Remaining blocker
 
 The current task surface cannot control the authenticated Home Assistant browser
-or capture the post-fix implementation. Static and unit checks cannot replace
+or capture the post-RC.3 implementation. Static and unit checks cannot replace
 visual comparison.
 
 final result: blocked

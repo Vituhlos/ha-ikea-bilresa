@@ -277,12 +277,30 @@ def test_panel_detail_puts_desktop_back_navigation_inside_the_rail() -> None:
     """The desktop detail must not create a third column before the wheel title."""
     asset = _asset()
     rail = asset.split("  _rail() {", 1)[1].split("  _statusDot(", 1)[0]
+    back_rule = asset.split("  .back-button {", 1)[1].split("  .back-button:hover", 1)[
+        0
+    ]
 
     assert 'el("button", "rail-back")' in rail
     assert "this._backToOverview()" in rail
     assert ".back-button {\n    display: none;" in asset
+    assert "display: inline-flex;" not in back_rule
     assert "@media (max-width: 619px)" in asset
     assert ".back-button { display: inline-flex; }" in asset
+
+
+def test_panel_channel_detail_is_card_list_not_a_table_grid() -> None:
+    """The detail needs to scan as channel cards, not as a spreadsheet."""
+    asset = _asset()
+    channel = asset.split("  _channelDetail(wheel, channel) {", 1)[1].split(
+        "  _channelsView(wheel) {", 1
+    )[0]
+
+    assert 'el("div", "channel-grid")' in asset
+    assert 'el("ul", "channel-action-list")' in channel
+    assert 'el("li", "channel-action")' in channel
+    assert 'el("div", "gesture-grid")' not in channel
+    assert 'el("div", "channel-detail-footer")' in channel
 
 
 def test_overview_rows_do_not_promise_per_channel_navigation() -> None:

@@ -434,7 +434,6 @@ const STYLES = `
   .back-button {
     display: none;
     min-block-size: 44px;
-    display: inline-flex;
     align-items: center;
     gap: var(--_space-2);
     padding-inline: var(--_space-3);
@@ -512,28 +511,32 @@ const STYLES = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--_space-4);
   }
-  .channel-stack {
+  .channel-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--_space-4);
+  }
+  .channel-detail {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    min-block-size: 100%;
     overflow: hidden;
     border: var(--ha-card-border-width, 1px) solid var(--_border);
     border-radius: var(--_radius);
     background: var(--_card);
+    box-shadow: var(--ha-card-box-shadow, none);
   }
-  .channel-detail {
-    min-inline-size: 0;
-    background: var(--_card);
-  }
-  .channel-detail + .channel-detail { border-block-start: 1px solid var(--_divider); }
   .channel-detail-head {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--_space-4);
-    min-block-size: 88px;
-    padding: var(--_space-4) var(--_space-5);
+    align-items: start;
+    gap: var(--_space-3);
+    padding: var(--_space-4);
   }
   .channel-detail-number {
-    inline-size: 36px;
-    block-size: 36px;
+    inline-size: 32px;
+    block-size: 32px;
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -556,30 +559,43 @@ const STYLES = `
     color: var(--_ink);
     font-weight: var(--ha-font-weight-medium, 500);
   }
-  .gesture-grid {
+  .channel-action-list {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1px;
+    gap: 0;
+    margin: 0;
+    padding: 0;
     border-block-start: 1px solid var(--_divider);
-    background: var(--_divider);
+    list-style: none;
   }
-  .gesture-item {
+  .channel-action {
+    display: grid;
+    grid-template-columns: minmax(9ch, 0.9fr) minmax(0, 1.5fr);
+    gap: var(--_space-3);
+    align-items: start;
     min-inline-size: 0;
-    padding: var(--_space-3) var(--_space-5);
+    padding: var(--_space-3) var(--_space-4);
     background: var(--_card);
   }
-  .gesture-label {
+  .channel-action + .channel-action { border-block-start: 1px solid var(--_divider); }
+  .channel-action-label {
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-s, 12px);
+    line-height: var(--ha-line-height-normal, 1.4);
   }
-  .gesture-value {
-    margin-block-start: var(--_space-1);
+  .channel-action-value {
     overflow-wrap: anywhere;
     font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.45);
   }
-  .gesture-item[data-state="warning"] .gesture-value {
+  .channel-action[data-state="warning"] .channel-action-value {
     font-weight: var(--ha-font-weight-medium, 500);
   }
+  .channel-detail-footer {
+    margin-block-start: auto;
+    padding: var(--_space-3) var(--_space-4);
+    border-block-start: 1px solid var(--_divider);
+  }
+  .channel-detail-footer .action-button { inline-size: 100%; justify-content: center; }
   .channel-detail .binding-form {
     border-block-start: 1px solid var(--_divider);
   }
@@ -918,7 +934,7 @@ const STYLES = `
     .diagnostic-grid,
     .live-layout,
     .form-grid { grid-template-columns: minmax(0, 1fr); }
-    .gesture-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .channel-grid { grid-template-columns: minmax(0, 1fr); }
     .field[data-wide="true"] { grid-column: auto; }
   }
 
@@ -935,11 +951,7 @@ const STYLES = `
       grid-template-columns: auto minmax(0, 1fr);
       padding-inline: var(--_space-4);
     }
-    .channel-detail-head > .action-button {
-      grid-column: 1 / -1;
-      inline-size: 100%;
-    }
-    .gesture-grid { grid-template-columns: minmax(0, 1fr); }
+    .channel-action { grid-template-columns: minmax(0, 1fr); }
     .live-output {
       min-block-size: 280px;
       padding: var(--_space-6) var(--_space-4);
@@ -1989,20 +2001,10 @@ class IkeaBilresaPanel extends HTMLElement {
     copy.appendChild(el("div", "channel-detail-summary", summary));
     head.appendChild(copy);
 
-    if (this._editingChannel !== channel.channel) {
-      const edit = el(
-        "button",
-        "action-button",
-        this._t(configured ? "edit_binding" : "add_binding"),
-      );
-      edit.type = "button";
-      edit.addEventListener("click", () => this._startEditor(channel));
-      head.appendChild(edit);
-    }
     card.appendChild(head);
 
     if (configured && (channel.actions || []).length) {
-      const gestures = el("div", "gesture-grid");
+      const actions = el("ul", "channel-action-list");
       for (const action of channel.actions || []) {
         let value = action.action_label;
         if (action.target_label) {
@@ -2011,17 +2013,28 @@ class IkeaBilresaPanel extends HTMLElement {
             : action.target_label;
           value = `${value} · ${target}`;
         }
-        const item = el("div", "gesture-item");
+        const item = el("li", "channel-action");
         if (action.target_missing) item.dataset.state = "warning";
-        item.appendChild(el("div", "gesture-label", action.gesture_label));
-        item.appendChild(el("div", "gesture-value", value));
-        gestures.appendChild(item);
+        item.appendChild(el("span", "channel-action-label", action.gesture_label));
+        item.appendChild(el("span", "channel-action-value", value));
+        actions.appendChild(item);
       }
-      card.appendChild(gestures);
+      card.appendChild(actions);
     }
 
     if (this._editingChannel === channel.channel) {
       card.appendChild(this._bindingForm(wheel, channel));
+    } else {
+      const footer = el("div", "channel-detail-footer");
+      const edit = el(
+        "button",
+        "action-button",
+        this._t(configured ? "edit_binding" : "add_binding"),
+      );
+      edit.type = "button";
+      edit.addEventListener("click", () => this._startEditor(channel));
+      footer.appendChild(edit);
+      card.appendChild(footer);
     }
     return card;
   }
@@ -2034,7 +2047,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._t("detail_channels_intro"),
       ),
     );
-    const grid = el("div", "channel-stack");
+    const grid = el("div", "channel-grid");
     for (const channel of wheel.channels) {
       grid.appendChild(this._channelDetail(wheel, channel));
     }

@@ -11,8 +11,8 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.2 refines the
-> administrator panel after the first real Home Assistant screenshots. It keeps
+> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.3 refines the
+> administrator panel after real Home Assistant screenshot review. It keeps
 > the v0.5.9-rc.1 wheel detail, correlated live binding results, panel-driven
 > action tests and revision-checked binding create/edit/delete.
 

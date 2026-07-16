@@ -307,11 +307,14 @@ summarize the behavior of:
 
 Technical endpoint and cluster information belongs only in expanded diagnostics.
 
-The production layout groups all three channels into one continuous surface.
-Each channel has a numbered heading, a one-line behavior/target summary, and a
-responsive gesture grid. An unconfigured channel stays compact instead of
-occupying the same visual weight as a fully configured one. Editing expands
-inside that channel without moving the user to a separate administration page.
+The production layout presents all three channels as compact, independently
+scannable cards. Each channel has a numbered heading, a one-line
+behavior/target summary and a short vertical gesture list. Avoid table-like
+3 x 2 gesture matrices on desktop; they make the wheel feel like an
+administration grid rather than a control surface. An unconfigured channel stays
+compact instead of occupying the same visual weight as a fully configured one.
+Editing expands inside that channel without moving the user to a separate
+administration page.
 
 ### Guided binding editor
 

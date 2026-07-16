@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.3] - 2026-07-16
+
+### Fixed
+- The wheel detail no longer shows two "Back to all wheels" controls on desktop.
+  The rail keeps the desktop back action; the in-pane back action is only shown
+  when the rail collapses on mobile.
+
+### Changed
+- Channel detail is now a compact card grid instead of a table-like full-width
+  gesture matrix. Each channel shows its behavior and target first, then a short
+  scan-friendly gesture list, with edit/add actions in the card footer.
+
+### Notes
+- This is a frontend polish release based on real Home Assistant screenshots.
+  Matter event decoding, binding storage, WebSocket contracts and dispatch
+  behavior are unchanged from `0.5.9-rc.2`.
+
 ## [0.5.9-rc.2] - 2026-07-16
 
 ### Changed
