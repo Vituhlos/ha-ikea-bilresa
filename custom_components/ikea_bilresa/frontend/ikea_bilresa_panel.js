@@ -59,6 +59,18 @@ const ICON = {
     "M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z",
   refresh:
     "M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z",
+  // Real Material Design Icons paths (mdi:knob, rotate-right/left,
+  // gesture-tap-button, gesture-tap-hold), fetched not invented. mdi:knob is the
+  // same icon event.py gives the wheel, so the panel and the device agree.
+  knob: "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M13 10H11V4.1C11.3 4 11.7 4 12 4S12.7 4 13 4.1V10Z",
+  rotateRight:
+    "M16.89,15.5L18.31,16.89C19.21,15.73 19.76,14.39 19.93,13H17.91C17.77,13.87 17.43,14.72 16.89,15.5M13,17.9V19.92C14.39,19.75 15.74,19.21 16.9,18.31L15.46,16.87C14.71,17.41 13.87,17.76 13,17.9M19.93,11C19.76,9.61 19.21,8.27 18.31,7.11L16.89,8.53C17.43,9.28 17.77,10.13 17.91,11M15.55,5.55L11,1V4.07C7.06,4.56 4,7.92 4,12C4,16.08 7.05,19.44 11,19.93V17.91C8.16,17.43 6,14.97 6,12C6,9.03 8.16,6.57 11,6.09V10L15.55,5.55Z",
+  rotateLeft:
+    "M13,4.07V1L8.45,5.55L13,10V6.09C15.84,6.57 18,9.03 18,12C18,14.97 15.84,17.43 13,17.91V19.93C16.95,19.44 20,16.08 20,12C20,7.92 16.95,4.56 13,4.07M7.1,18.32C8.26,19.22 9.61,19.76 11,19.93V17.9C10.13,17.75 9.29,17.41 8.54,16.87L7.1,18.32M6.09,13H4.07C4.24,14.39 4.79,15.73 5.69,16.89L7.1,15.47C6.58,14.72 6.23,13.88 6.09,13M7.11,8.53L5.7,7.11C4.8,8.27 4.24,9.61 4.07,11H6.09C6.23,10.13 6.58,9.28 7.11,8.53Z",
+  press:
+    "M13 5C15.21 5 17 6.79 17 9C17 10.5 16.2 11.77 15 12.46V11.24C15.61 10.69 16 9.89 16 9C16 7.34 14.66 6 13 6S10 7.34 10 9C10 9.89 10.39 10.69 11 11.24V12.46C9.8 11.77 9 10.5 9 9C9 6.79 10.79 5 13 5M20 20.5C19.97 21.32 19.32 21.97 18.5 22H13C12.62 22 12.26 21.85 12 21.57L8 17.37L8.74 16.6C8.93 16.39 9.2 16.28 9.5 16.28H9.7L12 18V9C12 8.45 12.45 8 13 8S14 8.45 14 9V13.47L15.21 13.6L19.15 15.79C19.68 16.03 20 16.56 20 17.14V20.5M20 2H4C2.9 2 2 2.9 2 4V12C2 13.11 2.9 14 4 14H8V12L4 12L4 4H20L20 12H18V14H20V13.96L20.04 14C21.13 14 22 13.09 22 12V4C22 2.9 21.11 2 20 2Z",
+  hold:
+    "M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M9,12.44V9A2,2 0 0,1 11,7A2,2 0 0,1 13,9V12.44C14.19,11.75 15,10.47 15,9A4,4 0 0,0 11,5A4,4 0 0,0 7,9C7,10.47 7.81,11.75 9,12.44Z",
 };
 
 const STYLES = `
@@ -246,7 +258,21 @@ const STYLES = `
     min-block-size: 88px;
     padding: var(--_space-5) var(--_space-6);
   }
-  .wheel-head > span:first-child { min-inline-size: 0; }
+  .wheel-names { min-inline-size: 0; }
+  /* The device glyph. --state-icon-color is HA's own entity-icon colour and
+     clears the 3:1 non-text bar; an icon may carry it where a word may not. */
+  .device-glyph {
+    flex: 0 0 auto;
+    inline-size: 36px;
+    block-size: 36px;
+    fill: var(--state-icon-color, #44739e);
+  }
+  .rail-glyph {
+    flex: 0 0 auto;
+    inline-size: 22px;
+    block-size: 22px;
+    fill: var(--state-icon-color, #44739e);
+  }
   .wheel-name {
     display: block;
     min-inline-size: 0;
@@ -1336,7 +1362,8 @@ class IkeaBilresaPanel extends HTMLElement {
     card.addEventListener("click", () => this._openWheel(wheel.key));
 
     const head = el("span", "wheel-head");
-    const names = el("span");
+    head.appendChild(svg(ICON.knob, "device-glyph"));
+    const names = el("span", "wheel-names");
     names.appendChild(el("span", "wheel-name", wheel.name));
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
     names.appendChild(el("span", "wheel-sub", meta.join(" · ")));
@@ -1411,6 +1438,7 @@ class IkeaBilresaPanel extends HTMLElement {
           this._t(wheel.availability),
         ].join(", "),
       );
+      button.appendChild(svg(ICON.knob, "rail-glyph"));
       button.appendChild(this._statusDot(wheel.availability));
       const copy = el("span", "rail-copy");
       copy.appendChild(el("span", "rail-name", wheel.name));

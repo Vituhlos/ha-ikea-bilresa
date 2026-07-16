@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.4] - 2026-07-16
+
+### Changed
+- The panel's wheel cards and rail now carry the BILRESA wheel icon, the first
+  step of a visual pass bringing the panel closer to the agreed design mockup.
+  Icons are real Material Design Icons and carry Home Assistant's own entity-icon
+  colour; no coloured text was introduced.
+
 ## [0.5.9-rc.3] - 2026-07-16
 
 ### Fixed
