@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.6] - 2026-07-16
+
+### Changed
+- Panel icons now use Material Symbols (MD3) when that HACS integration is
+  installed, and fall back to Material Design Icons otherwise. No hard
+  dependency: users without Material Symbols still see MDI, so the panel stays
+  portable. The wheel glyph is no longer the volume-knob icon.
+
 ## [0.5.9-rc.5] - 2026-07-16
 
 ### Changed
