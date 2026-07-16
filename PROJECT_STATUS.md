@@ -780,8 +780,16 @@ behaviour change and needs its own hardware gate.
 
 Files: `custom_components/ikea_bilresa/device_link.py`,
 `custom_components/ikea_bilresa/diagnostics.py`, `tests/test_device_link.py`,
-`tests/test_diagnostics.py`. The panel contract draft lives outside this
-repository at `bilresa-panel-lab/contract.ts` and is not a build dependency.
+`tests/test_diagnostics.py`.
+
+**The out-of-repo lab is stale — do not read it as current.**
+`bilresa-panel-lab/contract.ts` was the contract *draft*; `panel_models.py` is
+the contract now, and the draft is wrong where they disagree: it never knew that
+`node_id`/`channel` are stored as strings, and it keys behaviour off
+`binding_profile`, which is never persisted. `compare.html` settled the grid vs
+master-detail question and its styling predates HA's design tokens. Both did
+their job and neither is maintained. The panel lives entirely in
+`custom_components/ikea_bilresa/` — there is nothing to port in.
 
 ```text
 python -m compileall -q custom_components tests     passed
