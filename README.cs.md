@@ -15,7 +15,7 @@ jaké má na originálním IKEA hubu DIRIGERA — tím, že reaguje na **`MultiP
 události v reálném čase**, které vestavěná Matter integrace v Home Assistantu
 zahazuje.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.7-rc.9 obsahuje
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.7-rc.10 obsahuje
 > runtime vylepšení ověřená v CI a navíc technický spike budoucího panelu,
 > přístupný jen administrátorovi, nyní s bezpečným otevřením postranní nabídky
 > Home Assistantu na mobilu. Je určený pro cílené ověření v Home Assistantu a

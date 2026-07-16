@@ -11,7 +11,7 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** latest stable release v0.5.0; prerelease v0.5.7-rc.9 contains the
+> **Status:** latest stable release v0.5.0; prerelease v0.5.7-rc.10 contains the
 > CI-verified runtime polish plus an admin-only technical spike for a future
 > panel, now with a mobile-safe Home Assistant sidebar control. It is intended
 > for focused Home Assistant UI and physical BILRESA testing before a stable

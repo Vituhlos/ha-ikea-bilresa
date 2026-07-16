@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.10] - 2026-07-16
+
+### Fixed
+- **The panel's grid reported every configured channel as "Not configured".**
+  Bindings store their wheel and channel as text, and the grid compared them as
+  numbers, so it matched none of them. It also read the behaviour from a field
+  that only exists while the binding is being created and is never saved.
+  Channels now show what they actually do — "Smooth dimming", "Volume",
+  "Cover position" — and the entity they control.
+- The panel no longer draws its own menu button beside Home Assistant's sidebar
+  control on desktop. It appears only when the sidebar is collapsed or hidden,
+  matching Home Assistant's own behaviour, and now follows a window resize.
+
+### Notes
+- No Matter event decoding, gesture timing, binding behaviour or stored
+  configuration changed. Bindings themselves always worked; only the panel's
+  description of them was wrong.
+
 ## [0.5.7-rc.9] - 2026-07-16
 
 ### Added
