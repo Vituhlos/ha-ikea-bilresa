@@ -73,6 +73,18 @@ const ICON = {
     "M10,9A1,1 0 0,1 11,8A1,1 0 0,1 12,9V13.47L13.21,13.6L18.15,15.79C18.68,16.03 19,16.56 19,17.14V21.5C18.97,22.32 18.32,22.97 17.5,23H11C10.62,23 10.26,22.85 10,22.57L5.1,18.37L5.84,17.6C6.03,17.39 6.3,17.28 6.58,17.28H6.8L10,19V9M9,12.44V9A2,2 0 0,1 11,7A2,2 0 0,1 13,9V12.44C14.19,11.75 15,10.47 15,9A4,4 0 0,0 11,5A4,4 0 0,0 7,9C7,10.47 7.81,11.75 9,12.44Z",
 };
 
+// Maps the stable gesture key from panel_models to a real MDI glyph. Keys match
+// GestureSummary.gesture: rotation / short_press / double_press / triple_press /
+// hold / release. Presses share one icon; hold and release share another.
+const GESTURE_ICON = {
+  rotation: ICON.rotateRight,
+  short_press: ICON.press,
+  double_press: ICON.press,
+  triple_press: ICON.press,
+  hold: ICON.hold,
+  release: ICON.hold,
+};
+
 const STYLES = `
   :host {
     display: block;
@@ -604,9 +616,18 @@ const STYLES = `
   }
   .channel-action + .channel-action { border-block-start: 1px solid var(--_divider); }
   .channel-action-label {
+    display: flex;
+    align-items: center;
+    gap: var(--_space-2);
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-s, 12px);
     line-height: var(--ha-line-height-normal, 1.4);
+  }
+  .gesture-glyph {
+    flex: 0 0 auto;
+    inline-size: 16px;
+    block-size: 16px;
+    fill: var(--state-icon-color, #44739e);
   }
   .channel-action-value {
     overflow-wrap: anywhere;
@@ -2043,7 +2064,10 @@ class IkeaBilresaPanel extends HTMLElement {
         }
         const item = el("li", "channel-action");
         if (action.target_missing) item.dataset.state = "warning";
-        item.appendChild(el("span", "channel-action-label", action.gesture_label));
+        const label = el("span", "channel-action-label");
+        label.appendChild(svg(GESTURE_ICON[action.gesture] || ICON.press, "gesture-glyph"));
+        label.appendChild(el("span", null, action.gesture_label));
+        item.appendChild(label);
         item.appendChild(el("span", "channel-action-value", value));
         actions.appendChild(item);
       }

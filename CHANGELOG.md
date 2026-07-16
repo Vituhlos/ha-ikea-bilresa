@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.5] - 2026-07-16
+
+### Changed
+- The channel behaviour rows now carry a gesture icon (rotation, press, hold),
+  continuing the visual pass toward the design mockup. Real Material Design
+  Icons, keyed off the stable gesture type, in Home Assistant's entity-icon
+  colour; no coloured text.
+
 ## [0.5.9-rc.4] - 2026-07-16
 
 ### Changed
