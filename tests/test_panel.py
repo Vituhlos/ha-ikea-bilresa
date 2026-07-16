@@ -273,6 +273,32 @@ def test_panel_detail_keeps_the_measured_rail_and_pane_breakpoints() -> None:
     assert "@media (max-width: 700px)" not in asset
 
 
+def test_panel_detail_puts_desktop_back_navigation_inside_the_rail() -> None:
+    """The desktop detail must not create a third column before the wheel title."""
+    asset = _asset()
+    rail = asset.split("  _rail() {", 1)[1].split("  _statusDot(", 1)[0]
+
+    assert 'el("button", "rail-back")' in rail
+    assert "this._backToOverview()" in rail
+    assert ".back-button {\n    display: none;" in asset
+    assert "@media (max-width: 619px)" in asset
+    assert ".back-button { display: inline-flex; }" in asset
+
+
+def test_overview_rows_do_not_promise_per_channel_navigation() -> None:
+    """Only the wheel card opens detail, so channel rows must not draw chevrons."""
+    asset = _asset()
+    channel = asset.split("  _overviewChannel(channel) {", 1)[1].split(
+        "  _wheel(wheel) {", 1
+    )[0]
+    wheel = asset.split("  _wheel(wheel) {", 1)[1].split(
+        "  _activityLabel(wheel) {", 1
+    )[0]
+
+    assert "ICON.chevron" not in channel
+    assert 'svg(ICON.chevron, "wheel-open")' in wheel
+
+
 def test_panel_detail_tabs_follow_the_aria_keyboard_contract() -> None:
     """Tabs need roles, relationships, roving focus and arrow-key navigation."""
     asset = _asset()
@@ -298,6 +324,30 @@ def test_live_activity_is_opt_in_bounded_and_unsubscribed() -> None:
     assert 'if (this._view === "live") this._stopActivity();' in asset
     assert "this._activityUnsub();" in asset
     assert "this._activityEpoch += 1;" in asset
+
+
+def test_live_test_leads_with_result_and_hides_synthetic_controls() -> None:
+    """Physical feedback is primary; target-changing panel tests are secondary."""
+    asset = _asset()
+
+    assert 'el("section", "detail-card live-output")' in asset
+    assert 'el("div", "live-result", result)' in asset
+    assert 'el("section", "detail-card live-channels")' in asset
+    assert 'el("details", "detail-card test-panel")' in asset
+    assert 'el("summary", null, this._t("test_controls_heading"))' in asset
+
+
+def test_diagnostics_hides_internal_contract_under_technical_details() -> None:
+    """The default diagnostic surface stays human-readable."""
+    asset = _asset()
+    diagnostics = asset.split("  _diagnosticsView(wheel) {", 1)[1].split(
+        "  _detailPanel(wheel) {", 1
+    )[0]
+
+    assert 'el("section", "detail-card health-hero")' in diagnostics
+    assert 'el("details", "detail-card technical-details")' in diagnostics
+    assert 'this._t("diagnostic_technical_details")' in diagnostics
+    assert 'this._t("diagnostic_contract")' in diagnostics
 
 
 def test_live_activity_renders_structured_runtime_outcomes_without_call_service() -> (

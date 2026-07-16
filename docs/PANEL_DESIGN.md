@@ -240,6 +240,10 @@ Below it, show a responsive grid with one primary card for each physical
 BILRESA wheel. Constrain the grid's maximum width rather than letting cards
 stretch across an arbitrarily wide window: at 1280 px with two wheels the
 prototype left a dangling empty third column, which reads as a failed load.
+The production overview therefore uses a centered 1120 px maximum content
+width and `auto-fit` columns with a 400 px comfortable minimum: two wheels fill
+the desktop composition, while narrower panes collapse naturally without
+keeping phantom tracks.
 Each card should contain:
 
 - user-assigned device name and area;
@@ -270,6 +274,12 @@ open one, and switches to another wheel in one click. It deliberately does not
 show channel summaries — there is no room, and that is the overview's job. A
 back affordance returns to the grid.
 
+On desktop the back affordance belongs at the top of the rail, above the wheel
+switcher. Placing it between the rail and the wheel heading creates a false
+third column and makes two navigation systems compete. Below 620 px the rail is
+absent, so the same back action moves above the wheel heading inside the detail
+pane.
+
 Below 620 px the rail is dropped; the detail becomes a full-width page reached
 by drill-down, and the back affordance is the only way back to the grid.
 
@@ -296,6 +306,12 @@ summarize the behavior of:
 - selected Home Assistant targets.
 
 Technical endpoint and cluster information belongs only in expanded diagnostics.
+
+The production layout groups all three channels into one continuous surface.
+Each channel has a numbered heading, a one-line behavior/target summary, and a
+responsive gesture grid. An unconfigured channel stays compact instead of
+occupying the same visual weight as a fully configured one. Editing expands
+inside that channel without moving the user to a separate administration page.
 
 ### Guided binding editor
 
@@ -362,6 +378,11 @@ Entering live test must not itself control a Matter device or synthesize a
 hardware gesture. Any future action-preview or target-test control must be
 explicit, clearly labelled and protected against accidental actuation.
 
+The production layout keeps the large outcome surface on the left and a compact
+configured-channel/recent-activity column on the right. Panel-driven synthetic
+tests are secondary, collapsed by default, and explicitly warn that they may
+change real target entities.
+
 ### Diagnostics
 
 The default diagnostic view should remain understandable:
@@ -380,6 +401,12 @@ Expanded technical details may include:
 - bounded recent event metadata without private identifiers;
 - hold watchdog state;
 - a link to the standard redacted Home Assistant diagnostics download.
+
+The default diagnostics view begins with one human-readable health statement.
+Connection and recent activity remain visible; internal contract versions and
+similar implementation details stay inside a collapsed `Technical details`
+section. A full-width recovery card is shown only when there is an action to
+take.
 
 Recent raw activity should be bounded and kept in memory unless a separately
 justified requirement proves persistence is necessary. Do not write every

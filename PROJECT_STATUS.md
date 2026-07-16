@@ -27,9 +27,9 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: clean after the `0.5.9-rc.1` panel/editor publication. Runtime
-  commit `c3c5c2f` is pushed on `agent/stabilize-0.5-x`; the release tag remains
-  on that exact CI-verified commit.
+- Working tree: dirty with the post-`v0.5.9-rc.1` visual correction described
+  below, based on deployment-record commit `b438a6b`. Runtime commit `c3c5c2f`
+  remains the released and deployed RC.1 tag target.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
@@ -467,6 +467,63 @@ Publication and deployment:
 The callable browser-control surface was unavailable in this task, so no visual
 claim is made for the freshly loaded custom element. Open a new tab and perform
 the manual panel checks below before promoting the RC.
+
+### Post-RC.1 panel visual correction (Codex, 2026-07-16)
+
+Status: **Implemented and locally validated as the `0.5.9-rc.2` candidate.
+Not yet committed, CI-verified, released or deployed. Visual comparison
+pending.**
+
+Owner screenshots from the real Home Assistant page established that the RC.1
+data model and functions work, but the composition did not reach the selected
+visual direction:
+
+- the desktop back action sat between the 256 px rail and wheel heading,
+  creating a false third column;
+- the overview occupied a small left-aligned strip on a wide screen;
+- three equally weighted channel cards read like a generic administration form;
+- the idle live-test result was visually minor while synthetic test buttons
+  dominated the page;
+- diagnostics exposed `Panel contract` in the default view and repeated its
+  heading.
+
+The working-tree correction:
+
+- moves desktop `Back to all wheels` into the rail while keeping the in-pane
+  back action below 620 px;
+- centers the overview in a 1120 px maximum frame with two comfortable
+  `auto-fit` columns;
+- removes misleading per-channel chevrons from overview cards;
+- renders channels as one continuous surface with numbered summaries and a
+  responsive gesture grid;
+- makes the human-readable calculated result the live-test hero, with configured
+  channels and recent activity in a secondary column;
+- collapses target-changing panel tests by default;
+- leads diagnostics with one health statement and moves internal contract data
+  under collapsed technical details.
+
+No Matter, binding storage, WebSocket schema or dispatch behavior changes are
+part of this correction.
+
+Local validation for the `0.5.9-rc.2` candidate passed on Windows/Python 3.14:
+
+```text
+ruff format custom_components tests                         no changes
+ruff format --check custom_components tests                 passed (38 files)
+ruff check custom_components tests                          passed
+mypy custom_components/ikea_bilresa                         passed (20 files)
+python -m compileall -q custom_components tests             passed
+node --check custom_components/.../ikea_bilresa_panel.js    passed
+node --test tests/panel_frontend.test.mjs                   6 passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest -q
+  -p pytest_asyncio.plugin                                  200 passed
+manifest/strings/en/cs JSON parsing                         passed
+git diff --check                                            passed (CRLF warnings only)
+```
+
+The focused design QA record is `design-qa.md`. Browser-rendered visual QA
+remains blocked until the deployed custom element is opened in a fresh Home
+Assistant tab and screenshots are captured.
 
 ### Panel `0.5.8` Phase 4 wheel detail, live test and diagnostics (Codex, 2026-07-16)
 
@@ -1470,17 +1527,18 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Open the deployed panel in a new browser tab. Verify overview/detail at desktop
-and phone widths, create/edit/delete using a disposable test binding, exercise
-conflict handling with two tabs, and run panel-driven tests only against a target
-whose state changes are safe. Physical-wheel validation remains deliberately
+Commit, push, wait for exact-revision CI, publish `v0.5.9-rc.2`, install it via
+HACS and restart Home Assistant. Then open the panel in a new tab and capture
+the same four real-HA states at matching desktop viewports, plus 320/380 px
+mobile and one dark-theme pass. Physical-wheel validation remains deliberately
 deferred by owner direction.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from runtime commit `c3c5c2f` plus the deployment-record commit that
-   follows it; then re-check HEAD, branch and status before changing anything.
+2. Start from deployment-record commit `b438a6b` plus the locally validated
+   `0.5.9-rc.2` visual correction recorded above; then re-check HEAD, branch and
+   status.
 3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
 4. Static, Python Unit, frontend Unit, exact-revision CI, release and backend
    deployment smoke are established. Visual HA UI and Hardware remain pending.

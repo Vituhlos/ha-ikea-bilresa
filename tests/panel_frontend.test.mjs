@@ -181,3 +181,24 @@ test("panel tests use the binding websocket command", async () => {
     notches: 1,
   });
 });
+
+test("structured results lead with the human-readable outcome", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        result_kind_brightness: "Jas",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._formatResult({
+      kind: "brightness",
+      before: 42,
+      after: 58,
+      unit: "%",
+    }),
+    "Jas 42 → 58 %",
+  );
+});

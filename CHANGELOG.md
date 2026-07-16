@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.2] - 2026-07-16
+
+### Changed
+- Refined the BILRESA panel visual hierarchy from the first real Home Assistant
+  screenshots: the overview is centered and wider, the desktop back action lives
+  inside the wheel rail, channel detail reads as one continuous surface, Live
+  test makes the calculated result dominant, explicit target-changing tests are
+  collapsed by default, and Diagnostics now hides internal contract data behind
+  technical details.
+
+### Notes
+- This is a frontend and copy polish release. Matter event decoding, binding
+  storage, WebSocket contracts and dispatch behavior are unchanged from
+  `0.5.9-rc.1`.
+
 ## [0.5.9-rc.1] - 2026-07-16
 
 ### Added

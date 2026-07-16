@@ -71,6 +71,10 @@ const STYLES = `
     --_ink: var(--primary-text-color, #212121);
     --_ink-dim: var(--secondary-text-color, #727272);
     --_divider: var(--divider-color, rgba(0, 0, 0, 0.12));
+    --_surface-subtle: var(
+      --secondary-background-color,
+      color-mix(in srgb, var(--_ink) 4%, var(--_card))
+    );
     --_selected: var(
       --secondary-background-color,
       color-mix(in srgb, var(--_ink) 8%, var(--_card))
@@ -85,6 +89,7 @@ const STYLES = `
     --_font: var(--ha-font-family-body, Roboto, Noto, sans-serif);
     --_fast: var(--ha-animation-duration-fast, 120ms);
     --_rail-width: 256px;
+    --_overview-max: 1120px;
 
     min-block-size: 100vh;
     min-block-size: 100dvh;
@@ -125,6 +130,10 @@ const STYLES = `
   button:focus-visible {
     outline: 2px solid var(--_ink);
     outline-offset: 2px;
+  }
+  summary:focus-visible {
+    outline: 2px solid var(--_ink);
+    outline-offset: -3px;
   }
 
   .icon-button {
@@ -175,6 +184,11 @@ const STYLES = `
   }
   .summary .sep { opacity: 0.4; }
 
+  .overview {
+    max-inline-size: var(--_overview-max);
+    margin-inline: auto;
+  }
+
   .banner {
     display: flex;
     align-items: flex-start;
@@ -199,14 +213,14 @@ const STYLES = `
   .grid {
     display: grid;
     gap: var(--_space-4);
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 400px));
-    justify-content: start;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
   }
 
   .wheel {
     display: flex;
     flex-direction: column;
     inline-size: 100%;
+    overflow: hidden;
     padding: 0;
     border: var(--ha-card-border-width, 1px) solid var(--_border);
     border-radius: var(--_radius);
@@ -216,27 +230,36 @@ const STYLES = `
     font: inherit;
     text-align: start;
     cursor: pointer;
-    transition: border-color var(--_fast) ease-in-out;
+    transition:
+      border-color var(--_fast) ease-in-out,
+      background-color var(--_fast) ease-in-out;
   }
-  .wheel:hover { border-color: var(--_ink); }
+  .wheel:hover {
+    border-color: var(--_ink);
+    background: var(--_surface-subtle);
+  }
 
   .wheel-head {
     display: flex;
-    align-items: baseline;
-    gap: var(--_space-2);
-    padding: var(--_space-4) var(--_space-4) var(--_space-3);
+    align-items: center;
+    gap: var(--_space-3);
+    min-block-size: 88px;
+    padding: var(--_space-5) var(--_space-6);
   }
+  .wheel-head > span:first-child { min-inline-size: 0; }
   .wheel-name {
+    display: block;
     min-inline-size: 0;
     overflow-wrap: anywhere;
-    font-size: var(--ha-font-size-l, 16px);
+    font-size: var(--ha-font-size-xl, 20px);
     font-weight: var(--ha-font-weight-medium, 500);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
   .wheel-sub {
-    margin-block-start: var(--_space-1);
+    display: block;
+    margin-block-start: var(--_space-2);
     color: var(--_ink-dim);
-    font-size: var(--ha-font-size-s, 12px);
+    font-size: var(--ha-font-size-m, 14px);
   }
 
   .status {
@@ -246,7 +269,7 @@ const STYLES = `
     margin-inline-start: auto;
     flex: 0 0 auto;
     color: var(--_ink);
-    font-size: var(--ha-font-size-s, 12px);
+    font-size: var(--ha-font-size-m, 14px);
   }
   .dot {
     inline-size: 8px;
@@ -264,47 +287,57 @@ const STYLES = `
     background: transparent;
   }
 
-  .channels { border-block-start: 1px solid var(--_divider); }
+  .channels {
+    display: block;
+    border-block-start: 1px solid var(--_divider);
+  }
   .channel {
     display: flex;
     align-items: center;
     gap: var(--_space-3);
-    padding: var(--_space-2) var(--_space-4);
+    min-block-size: 64px;
+    padding: var(--_space-3) var(--_space-6);
     border-block-end: 1px solid var(--_divider);
+    background: var(--_card);
   }
   .channel:last-child { border-block-end: 0; }
   .channel-n {
     flex: 0 0 auto;
-    inline-size: 22px;
-    block-size: 22px;
+    inline-size: 28px;
+    block-size: 28px;
     display: grid;
     place-items: center;
     border-radius: 50%;
     background: color-mix(in srgb, var(--_ink) 16%, var(--_card));
-    font-size: var(--ha-font-size-xs, 10px);
+    font-size: var(--ha-font-size-s, 12px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
   .channel-text { min-inline-size: 0; flex: 1; }
   .channel-behaviour,
   .channel-target {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .channel-behaviour {
-    font-size: var(--ha-font-size-m, 14px);
+    font-size: var(--ha-font-size-l, 16px);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
-  .channel-target { color: var(--_ink-dim); font-size: var(--ha-font-size-s, 12px); }
+  .channel-target {
+    margin-block-start: var(--_space-1);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+  }
   .channel[data-state="empty"] .channel-behaviour {
     color: var(--_ink-dim);
     font-style: italic;
   }
   .channel-warn,
-  .channel > svg:last-child {
+  .wheel-open {
     flex: 0 0 auto;
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: 20px;
+    block-size: 20px;
     fill: var(--_ink);
   }
 
@@ -323,8 +356,30 @@ const STYLES = `
     border-radius: var(--_radius);
     background: var(--_card);
   }
+  .rail-back {
+    inline-size: 100%;
+    min-block-size: 52px;
+    display: flex;
+    align-items: center;
+    gap: var(--_space-2);
+    padding-inline: var(--_space-4);
+    border: 0;
+    border-block-end: 1px solid var(--_divider);
+    background: transparent;
+    color: var(--_ink);
+    text-align: start;
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    cursor: pointer;
+  }
+  .rail-back:hover { background: var(--_surface-subtle); }
+  .rail-back svg {
+    inline-size: 20px;
+    block-size: 20px;
+    fill: currentColor;
+  }
   .rail-title {
-    padding: var(--_space-4);
+    padding: var(--_space-4) var(--_space-4) var(--_space-2);
     border-block-end: 1px solid var(--_divider);
     font-size: var(--ha-font-size-m, 14px);
     font-weight: var(--ha-font-weight-medium, 500);
@@ -373,9 +428,11 @@ const STYLES = `
     display: flex;
     align-items: flex-start;
     gap: var(--_space-3);
-    margin-block-end: var(--_space-4);
+    min-block-size: 72px;
+    margin-block-end: var(--_space-2);
   }
   .back-button {
+    display: none;
     min-block-size: 44px;
     display: inline-flex;
     align-items: center;
@@ -394,14 +451,14 @@ const STYLES = `
   .detail-heading h2 {
     margin: 0;
     overflow-wrap: anywhere;
-    font-size: var(--ha-font-size-2xl, 24px);
+    font-size: var(--ha-font-size-3xl, 30px);
     font-weight: var(--ha-font-weight-normal, 400);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
   .detail-meta {
-    margin-block-start: var(--_space-1);
+    margin-block-start: var(--_space-2);
     color: var(--_ink-dim);
-    font-size: var(--ha-font-size-s, 12px);
+    font-size: var(--ha-font-size-m, 14px);
   }
 
   .tabs {
@@ -449,12 +506,82 @@ const STYLES = `
     line-height: var(--ha-line-height-normal, 1.6);
   }
 
-  .channel-grid,
   .diagnostic-grid,
   .live-layout {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--_space-4);
+  }
+  .channel-stack {
+    overflow: hidden;
+    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_card);
+  }
+  .channel-detail {
+    min-inline-size: 0;
+    background: var(--_card);
+  }
+  .channel-detail + .channel-detail { border-block-start: 1px solid var(--_divider); }
+  .channel-detail-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--_space-4);
+    min-block-size: 88px;
+    padding: var(--_space-4) var(--_space-5);
+  }
+  .channel-detail-number {
+    inline-size: 36px;
+    block-size: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--_selected);
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .channel-detail-copy { min-inline-size: 0; }
+  .channel-detail-title {
+    font-size: var(--ha-font-size-l, 16px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .channel-detail-summary {
+    margin-block-start: var(--_space-1);
+    overflow-wrap: anywhere;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .channel-detail[data-state="warning"] .channel-detail-summary {
+    color: var(--_ink);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .gesture-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    border-block-start: 1px solid var(--_divider);
+    background: var(--_divider);
+  }
+  .gesture-item {
+    min-inline-size: 0;
+    padding: var(--_space-3) var(--_space-5);
+    background: var(--_card);
+  }
+  .gesture-label {
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+  }
+  .gesture-value {
+    margin-block-start: var(--_space-1);
+    overflow-wrap: anywhere;
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .gesture-item[data-state="warning"] .gesture-value {
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .channel-detail .binding-form {
+    border-block-start: 1px solid var(--_divider);
   }
   .detail-card {
     min-inline-size: 0;
@@ -500,7 +627,7 @@ const STYLES = `
     border-block-start: 1px solid var(--_divider);
   }
   .action-button {
-    min-block-size: 40px;
+    min-block-size: 44px;
     padding-inline: var(--_space-4);
     border: 1px solid var(--_border);
     border-radius: var(--ha-border-radius-md, 8px);
@@ -591,28 +718,51 @@ const STYLES = `
   .advanced .form-grid { padding-block-start: var(--_space-3); }
   .delete-confirm { color: var(--_ink); }
   .delete-confirm span { flex: 1 1 220px; }
-  .test-panel { grid-column: 1 / -1; }
+  .test-panel {
+    grid-column: 1 / -1;
+    overflow: hidden;
+  }
+  .test-panel > summary {
+    min-block-size: 56px;
+    display: flex;
+    align-items: center;
+    padding: var(--_space-3) var(--_space-4);
+    cursor: pointer;
+    font-size: var(--ha-font-size-l, 16px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .test-panel > summary:hover { background: var(--_surface-subtle); }
   .test-panel p {
     margin: 0;
     padding: var(--_space-4);
+    border-block-start: 1px solid var(--_divider);
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-normal, 1.6);
   }
 
-  .live-layout { align-items: start; }
-  .live-output { padding: var(--_space-6); }
+  .live-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    align-items: start;
+  }
+  .live-output {
+    min-block-size: 360px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--_space-8);
+  }
   .live-status {
     display: inline-flex;
     align-items: center;
     gap: var(--_space-2);
-    margin-block-end: var(--_space-4);
+    margin-block-end: var(--_space-6);
     color: var(--_ink);
     font-size: var(--ha-font-size-s, 12px);
   }
   .live-result {
     overflow-wrap: anywhere;
-    font-size: var(--ha-font-size-2xl, 24px);
+    font-size: var(--ha-font-size-4xl, 36px);
     font-weight: var(--ha-font-weight-medium, 500);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
@@ -627,19 +777,46 @@ const STYLES = `
     display: flex;
     align-items: center;
     gap: var(--_space-2);
-    margin-block-start: var(--_space-4);
-    font-size: var(--ha-font-size-m, 14px);
+    margin-block-start: var(--_space-5);
+    font-size: var(--ha-font-size-l, 16px);
   }
   .gesture-caption {
-    margin-block-start: var(--_space-3);
+    margin-block-start: var(--_space-4);
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-s, 12px);
   }
   .waiting-title {
-    font-size: var(--ha-font-size-l, 16px);
+    font-size: var(--ha-font-size-2xl, 24px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
 
+  .live-side {
+    display: grid;
+    gap: var(--_space-4);
+  }
+  .live-channels { overflow: hidden; }
+  .live-channel {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--_space-3);
+    min-block-size: 64px;
+    padding: var(--_space-3) var(--_space-4);
+  }
+  .live-channel + .live-channel { border-block-start: 1px solid var(--_divider); }
+  .live-channel-copy { min-inline-size: 0; }
+  .live-channel-title {
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .live-channel-summary {
+    margin-block-start: var(--_space-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+  }
   .recent h4 { padding-block-end: var(--_space-3); }
   .recent ol { margin: 0; padding: 0; list-style: none; }
   .recent li {
@@ -654,6 +831,27 @@ const STYLES = `
     font-size: var(--ha-font-size-s, 12px);
   }
 
+  .health-hero {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: var(--_space-3);
+    padding: var(--_space-5);
+  }
+  .health-hero .dot {
+    inline-size: 12px;
+    block-size: 12px;
+  }
+  .health-copy { min-inline-size: 0; }
+  .health-title {
+    font-size: var(--ha-font-size-xl, 20px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .health-body {
+    margin-block-start: var(--_space-1);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+  }
   .recovery { grid-column: 1 / -1; }
   .recovery p {
     margin: 0;
@@ -661,6 +859,20 @@ const STYLES = `
     font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-normal, 1.6);
   }
+  .technical-details {
+    grid-column: 1 / -1;
+    overflow: hidden;
+  }
+  .technical-details > summary {
+    min-block-size: 52px;
+    display: flex;
+    align-items: center;
+    padding-inline: var(--_space-4);
+    cursor: pointer;
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .technical-details > summary:hover { background: var(--_surface-subtle); }
 
   .placeholder {
     display: grid;
@@ -703,10 +915,10 @@ const STYLES = `
   }
 
   @container (max-width: 700px) {
-    .channel-grid,
     .diagnostic-grid,
     .live-layout,
     .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .gesture-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .field[data-wide="true"] { grid-column: auto; }
   }
 
@@ -714,8 +926,25 @@ const STYLES = `
     .detail-shell { grid-template-columns: minmax(0, 1fr); }
     .rail { display: none; }
     .detail-top { display: block; }
+    .back-button { display: inline-flex; }
     .detail-heading { padding: var(--_space-2) var(--_space-3) 0; }
     .detail-heading h2 { font-size: var(--ha-font-size-xl, 20px); }
+    .wheel-head { padding-inline: var(--_space-4); }
+    .channel { padding-inline: var(--_space-4); }
+    .channel-detail-head {
+      grid-template-columns: auto minmax(0, 1fr);
+      padding-inline: var(--_space-4);
+    }
+    .channel-detail-head > .action-button {
+      grid-column: 1 / -1;
+      inline-size: 100%;
+    }
+    .gesture-grid { grid-template-columns: minmax(0, 1fr); }
+    .live-output {
+      min-block-size: 280px;
+      padding: var(--_space-6) var(--_space-4);
+    }
+    .live-result { font-size: var(--ha-font-size-3xl, 30px); }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1056,14 +1285,14 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _overviewChannel(channel) {
     const configured = channel.profile !== null && channel.profile !== undefined;
-    const row = el("div", "channel");
+    const row = el("span", "channel");
     row.dataset.state = configured ? "ok" : "empty";
     row.appendChild(el("span", "channel-n", String(channel.channel)));
 
     const text = el("span", "channel-text");
     text.appendChild(
       el(
-        "div",
+        "span",
         "channel-behaviour",
         channel.behaviour ||
           (configured ? channel.profile : this._t("not_configured")),
@@ -1071,7 +1300,7 @@ class IkeaBilresaPanel extends HTMLElement {
     );
     text.appendChild(
       el(
-        "div",
+        "span",
         "channel-target",
         channel.target_missing
           ? this._t("target_unavailable", {
@@ -1082,7 +1311,6 @@ class IkeaBilresaPanel extends HTMLElement {
     );
     row.appendChild(text);
     if (channel.target_missing) row.appendChild(svg(ICON.alert, "channel-warn"));
-    row.appendChild(svg(ICON.chevron));
     return row;
   }
 
@@ -1095,16 +1323,17 @@ class IkeaBilresaPanel extends HTMLElement {
     );
     card.addEventListener("click", () => this._openWheel(wheel.key));
 
-    const head = el("div", "wheel-head");
+    const head = el("span", "wheel-head");
     const names = el("span");
-    names.appendChild(el("div", "wheel-name", wheel.name));
+    names.appendChild(el("span", "wheel-name", wheel.name));
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
-    names.appendChild(el("div", "wheel-sub", meta.join(" · ")));
+    names.appendChild(el("span", "wheel-sub", meta.join(" · ")));
     head.appendChild(names);
     head.appendChild(this._status(wheel.availability));
+    head.appendChild(svg(ICON.chevron, "wheel-open"));
     card.appendChild(head);
 
-    const channels = el("div", "channels");
+    const channels = el("span", "channels");
     for (const channel of wheel.channels) {
       channels.appendChild(this._overviewChannel(channel));
     }
@@ -1149,6 +1378,12 @@ class IkeaBilresaPanel extends HTMLElement {
     const aside = el("aside", "rail");
     const nav = el("nav");
     nav.setAttribute("aria-label", this._t("wheel_switcher"));
+    const back = el("button", "rail-back");
+    back.type = "button";
+    back.appendChild(svg(ICON.back));
+    back.appendChild(el("span", null, this._t("back")));
+    back.addEventListener("click", () => this._backToOverview());
+    nav.appendChild(back);
     nav.appendChild(el("div", "rail-title", this._t("wheel_switcher")));
     const list = el("ul");
     for (const wheel of this._snapshot.wheels) {
@@ -1721,16 +1956,53 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _channelDetail(wheel, channel) {
     const configured = channel.profile !== null && channel.profile !== undefined;
-    const card = el("article", "detail-card");
-    card.appendChild(
-      el("h4", null, this._t("channel_title", { channel: channel.channel })),
+    const missingTarget =
+      channel.target_missing ||
+      (channel.actions || []).some((action) => action.target_missing);
+    const card = el("article", "channel-detail");
+    card.dataset.state = missingTarget ? "warning" : configured ? "ready" : "empty";
+
+    const head = el("div", "channel-detail-head");
+    head.appendChild(
+      el("span", "channel-detail-number", String(channel.channel)),
     );
-    const facts = el("dl", "facts");
-    if (!configured) {
-      facts.appendChild(
-        this._fact(this._t("channel_binding"), this._t("not_configured")),
+    const copy = el("div", "channel-detail-copy");
+    copy.appendChild(
+      el(
+        "div",
+        "channel-detail-title",
+        this._t("channel_title", { channel: channel.channel }),
+      ),
+    );
+    let summary = this._t("not_configured");
+    if (configured) {
+      const target = channel.target_missing
+        ? this._t("target_unavailable", {
+            target: channel.target_label || this._t("target_none"),
+          })
+        : channel.target_label || this._t("target_none");
+      summary = [
+        channel.behaviour || channel.profile,
+        target,
+      ].filter(Boolean).join(" · ");
+    }
+    copy.appendChild(el("div", "channel-detail-summary", summary));
+    head.appendChild(copy);
+
+    if (this._editingChannel !== channel.channel) {
+      const edit = el(
+        "button",
+        "action-button",
+        this._t(configured ? "edit_binding" : "add_binding"),
       );
-    } else {
+      edit.type = "button";
+      edit.addEventListener("click", () => this._startEditor(channel));
+      head.appendChild(edit);
+    }
+    card.appendChild(head);
+
+    if (configured && (channel.actions || []).length) {
+      const gestures = el("div", "gesture-grid");
       for (const action of channel.actions || []) {
         let value = action.action_label;
         if (action.target_label) {
@@ -1739,29 +2011,17 @@ class IkeaBilresaPanel extends HTMLElement {
             : action.target_label;
           value = `${value} · ${target}`;
         }
-        facts.appendChild(
-          this._fact(
-            action.gesture_label,
-            value,
-            action.target_missing ? "warning" : null,
-          ),
-        );
+        const item = el("div", "gesture-item");
+        if (action.target_missing) item.dataset.state = "warning";
+        item.appendChild(el("div", "gesture-label", action.gesture_label));
+        item.appendChild(el("div", "gesture-value", value));
+        gestures.appendChild(item);
       }
+      card.appendChild(gestures);
     }
-    card.appendChild(facts);
+
     if (this._editingChannel === channel.channel) {
       card.appendChild(this._bindingForm(wheel, channel));
-    } else {
-      const actions = el("div", "card-actions");
-      const edit = el(
-        "button",
-        "action-button",
-        this._t(configured ? "edit_binding" : "add_binding"),
-      );
-      edit.type = "button";
-      edit.addEventListener("click", () => this._startEditor(channel));
-      actions.appendChild(edit);
-      card.appendChild(actions);
     }
     return card;
   }
@@ -1774,7 +2034,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._t("detail_channels_intro"),
       ),
     );
-    const grid = el("div", "channel-grid");
+    const grid = el("div", "channel-stack");
     for (const channel of wheel.channels) {
       grid.appendChild(this._channelDetail(wheel, channel));
     }
@@ -1832,12 +2092,20 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _formatResult(result) {
     if (!result) return this._t("result_unavailable");
-    if (
-      result.before !== undefined &&
-      result.after !== undefined
-    ) {
+    if (result.before !== undefined && result.after !== undefined) {
+      const labels = {
+        brightness: "result_kind_brightness",
+        color_temp: "result_kind_color_temperature",
+        color: "result_kind_color",
+        volume: "result_kind_volume",
+        cover_position: "result_kind_position",
+        temperature: "result_kind_temperature",
+        fan_speed: "result_kind_fan_speed",
+        number: "result_kind_value",
+      };
+      const label = this._t(labels[result.kind] || "result_kind_value");
       const unit = result.unit ? ` ${result.unit}` : "";
-      return `${result.before}${unit} → ${result.after}${unit}`;
+      return `${label} ${result.before} → ${result.after}${unit}`;
     }
     if (result.kind === "scene") {
       return this._t("result_scene", {
@@ -1886,8 +2154,8 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _testPanel(wheel) {
-    const panel = el("section", "detail-card test-panel");
-    panel.appendChild(el("h4", null, this._t("test_controls_heading")));
+    const panel = el("details", "detail-card test-panel");
+    panel.appendChild(el("summary", null, this._t("test_controls_heading")));
     panel.appendChild(el("p", null, this._t("test_controls_intro")));
     if (this._testMessage) {
       const message = el("p", "form-message", this._testMessage);
@@ -1931,6 +2199,46 @@ class IkeaBilresaPanel extends HTMLElement {
       panel.appendChild(el("p", null, this._t("test_no_bindings")));
     }
     return panel;
+  }
+
+  _liveChannels(wheel) {
+    const card = el("section", "detail-card live-channels");
+    card.appendChild(el("h4", null, this._t("live_channels_heading")));
+    for (const channel of wheel.channels) {
+      const row = el("div", "live-channel");
+      row.appendChild(
+        el("span", "channel-detail-number", String(channel.channel)),
+      );
+      const copy = el("div", "live-channel-copy");
+      copy.appendChild(
+        el(
+          "div",
+          "live-channel-title",
+          this._t("channel_title", { channel: channel.channel }),
+        ),
+      );
+      const configured =
+        channel.profile !== null && channel.profile !== undefined;
+      const target = channel.target_missing
+        ? this._t("target_unavailable", {
+            target: channel.target_label || this._t("target_none"),
+          })
+        : channel.target_label;
+      copy.appendChild(
+        el(
+          "div",
+          "live-channel-summary",
+          configured
+            ? [channel.behaviour || channel.profile, target]
+                .filter(Boolean)
+                .join(" · ")
+            : this._t("not_configured"),
+        ),
+      );
+      row.appendChild(copy);
+      card.appendChild(row);
+    }
+    return card;
   }
 
   _liveView(wheel) {
@@ -1985,6 +2293,8 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     layout.appendChild(output);
 
+    const side = el("div", "live-side");
+    side.appendChild(this._liveChannels(wheel));
     if (this._activities.length) {
       const recent = el("section", "detail-card recent");
       recent.appendChild(el("h4", null, this._t("live_recent")));
@@ -1998,8 +2308,9 @@ class IkeaBilresaPanel extends HTMLElement {
         list.appendChild(item);
       }
       recent.appendChild(list);
-      layout.appendChild(recent);
+      side.appendChild(recent);
     }
+    layout.appendChild(side);
     layout.appendChild(this._testPanel(wheel));
     wrap.appendChild(layout);
     return wrap;
@@ -2025,14 +2336,40 @@ class IkeaBilresaPanel extends HTMLElement {
     const wrap = el("div");
     wrap.appendChild(
       this._sectionHead(
-        this._t("diagnostics_heading"),
+        this._t("tab_diagnostics"),
         this._t("diagnostics_intro"),
       ),
     );
     const grid = el("div", "diagnostic-grid");
+    const recoveryKey = this._recoveryKey(wheel);
+    const healthy = recoveryKey === "recovery_ok";
+
+    const health = el("section", "detail-card health-hero");
+    health.appendChild(this._statusDot(healthy ? "success" : "unknown"));
+    const healthCopy = el("div", "health-copy");
+    healthCopy.appendChild(
+      el(
+        "div",
+        "health-title",
+        this._t(
+          healthy ? "diagnostic_health_ok" : "diagnostic_health_attention",
+        ),
+      ),
+    );
+    healthCopy.appendChild(
+      el(
+        "div",
+        "health-body",
+        this._t(healthy ? "diagnostic_health_ok_body" : recoveryKey),
+      ),
+    );
+    health.appendChild(healthCopy);
+    grid.appendChild(health);
 
     const status = el("section", "detail-card");
-    status.appendChild(el("h4", null, this._t("diagnostics_heading")));
+    status.appendChild(
+      el("h4", null, this._t("diagnostic_connection_heading")),
+    );
     const facts = el("dl", "facts");
     facts.appendChild(
       this._fact(
@@ -2066,7 +2403,9 @@ class IkeaBilresaPanel extends HTMLElement {
     grid.appendChild(status);
 
     const activity = el("section", "detail-card");
-    activity.appendChild(el("h4", null, this._t("detail_last_activity")));
+    activity.appendChild(
+      el("h4", null, this._t("diagnostic_activity_heading")),
+    );
     const activityFacts = el("dl", "facts");
     activityFacts.appendChild(
       this._fact(
@@ -2082,19 +2421,29 @@ class IkeaBilresaPanel extends HTMLElement {
         wheel.last_active_channel ?? this._t("detail_no_last_channel"),
       ),
     );
-    activityFacts.appendChild(
+    activity.appendChild(activityFacts);
+    grid.appendChild(activity);
+
+    if (!healthy) {
+      const recovery = el("section", "detail-card recovery");
+      recovery.appendChild(el("h4", null, this._t("recovery_heading")));
+      recovery.appendChild(el("p", null, this._t(recoveryKey)));
+      grid.appendChild(recovery);
+    }
+
+    const technical = el("details", "detail-card technical-details");
+    technical.appendChild(
+      el("summary", null, this._t("diagnostic_technical_details")),
+    );
+    const technicalFacts = el("dl", "facts");
+    technicalFacts.appendChild(
       this._fact(
         this._t("diagnostic_contract"),
         String(this._snapshot.contract_version),
       ),
     );
-    activity.appendChild(activityFacts);
-    grid.appendChild(activity);
-
-    const recovery = el("section", "detail-card recovery");
-    recovery.appendChild(el("h4", null, this._t("recovery_heading")));
-    recovery.appendChild(el("p", null, this._t(this._recoveryKey(wheel))));
-    grid.appendChild(recovery);
+    technical.appendChild(technicalFacts);
+    grid.appendChild(technical);
 
     wrap.appendChild(grid);
     return wrap;
@@ -2190,7 +2539,7 @@ class IkeaBilresaPanel extends HTMLElement {
       );
     }
 
-    const wrap = el("div");
+    const wrap = el("div", "overview");
     if (!this._snapshot.matter_connected) {
       wrap.appendChild(this._banner(this._t("banner_matter_offline")));
     } else if (this._error) {

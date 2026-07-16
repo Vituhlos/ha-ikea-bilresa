@@ -63,8 +63,8 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "banner_updates_stopped": "Live updates stopped. This view may be out of date.",
         "banner_target_missing": (
-            "A control binding points at something Home Assistant can no longer "
-            "find ({count})."
+            "Bindings on {count} wheels point to targets Home Assistant can no "
+            "longer find. Open a marked channel to repair it."
         ),
         # states
         "empty_title": "No BILRESA wheels found",
@@ -201,6 +201,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "dispatch_received": "Gesture received; calculating result",
         "dispatch_failed": "Action not dispatched",
         "dispatch_unknown": "Dispatch outcome not reported",
+        "result_kind_brightness": "Brightness",
+        "result_kind_color_temperature": "Colour temperature",
+        "result_kind_color": "Colour",
+        "result_kind_volume": "Volume",
+        "result_kind_position": "Position",
+        "result_kind_temperature": "Temperature",
+        "result_kind_fan_speed": "Fan speed",
+        "result_kind_value": "Value",
         "result_scene": "Scene {position}/{total} · {target}",
         "result_entity_action": "{action} · {target}",
         "result_ramp_stopped": "Hold ramp stopped",
@@ -232,6 +240,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_hold": "Channel {channel} · hold",
         "gesture_release": "Channel {channel} · release",
         "gesture_unknown": "Channel {channel} · activity received",
+        "live_channels_heading": "Configured channels",
         "live_recent": "Recent activity",
         # diagnostics
         "diagnostics_heading": "Wheel status",
@@ -245,6 +254,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "diagnostic_link": "Matter device link",
         "diagnostic_linked": "Linked",
         "diagnostic_not_linked": "Not linked",
+        "diagnostic_health_ok": "Wheel is ready",
+        "diagnostic_health_attention": "Wheel needs attention",
+        "diagnostic_health_ok_body": ("Matter and live event delivery are connected."),
+        "diagnostic_connection_heading": "Connection",
+        "diagnostic_activity_heading": "Activity",
+        "diagnostic_technical_details": "Technical details",
         "diagnostic_contract": "Panel contract",
         "source_core": "Home Assistant Matter client",
         "source_fallback": "Passive WebSocket fallback",
@@ -296,7 +311,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "Živé aktualizace se zastavily. Tento pohled může být zastaralý."
         ),
         "banner_target_missing": (
-            "Propojení míří na něco, co už Home Assistant nenajde ({count})."
+            "Počet koleček s nedostupným cílem propojení: {count}. Otevřete "
+            "označený kanál a propojení opravte."
         ),
         "empty_title": "Nenalezeno žádné kolečko BILRESA",
         "empty_connected": "Integrace je připojená, ale zatím nenašla žádné kolečko.",
@@ -425,6 +441,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "dispatch_received": "Gesto přijato; počítám výsledek",
         "dispatch_failed": "Akce nebyla odeslána",
         "dispatch_unknown": "Výsledek odeslání se nehlásí",
+        "result_kind_brightness": "Jas",
+        "result_kind_color_temperature": "Teplota barvy",
+        "result_kind_color": "Barva",
+        "result_kind_volume": "Hlasitost",
+        "result_kind_position": "Poloha",
+        "result_kind_temperature": "Teplota",
+        "result_kind_fan_speed": "Rychlost ventilátoru",
+        "result_kind_value": "Hodnota",
         "result_scene": "Scéna {position}/{total} · {target}",
         "result_entity_action": "{action} · {target}",
         "result_ramp_stopped": "Plynulá změna byla zastavena",
@@ -456,6 +480,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_hold": "Kanál {channel} · podržení",
         "gesture_release": "Kanál {channel} · uvolnění",
         "gesture_unknown": "Kanál {channel} · přijata aktivita",
+        "live_channels_heading": "Nastavené kanály",
         "live_recent": "Nedávná aktivita",
         "diagnostics_heading": "Stav kolečka",
         "diagnostics_intro": (
@@ -468,6 +493,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "diagnostic_link": "Propojení se zařízením Matter",
         "diagnostic_linked": "Propojeno",
         "diagnostic_not_linked": "Nepropojeno",
+        "diagnostic_health_ok": "Kolečko je připravené",
+        "diagnostic_health_attention": "Kolečko vyžaduje pozornost",
+        "diagnostic_health_ok_body": (
+            "Matter i živé doručování událostí jsou připojené."
+        ),
+        "diagnostic_connection_heading": "Připojení",
+        "diagnostic_activity_heading": "Aktivita",
+        "diagnostic_technical_details": "Technické podrobnosti",
         "diagnostic_contract": "Kontrakt panelu",
         "source_core": "Matter klient Home Assistantu",
         "source_fallback": "Pasivní záložní WebSocket",
