@@ -252,6 +252,73 @@ technical spike below changes frontend delivery and a read-only WebSocket API,
 but does not implement the designed panel or change Matter, binding storage or
 hardware behavior. The physical `v0.5.7` checklist remains open.
 
+### Panel `0.5.8` Phase 3 frontend shell and overview grid (Claude Code, 2026-07-16)
+
+Status: **Implemented + Static. Unit not run locally. CI has not run. Not
+deployed, and nobody has looked at it.** Phase 3's exit gate wants a visual
+comparison in all required states; none of that has happened.
+
+The Phase 0 stub is replaced by the real overview: the grid of wheel cards from
+`PANEL_DESIGN.md`'s two-layer model, reading `ikea_bilresa/overview` and its
+subscription. Loading, empty, ready, degraded and fatal states all exist. A card
+opens a Phase 4 placeholder — navigation is Phase 3's deliverable, the detail is
+not.
+
+**How the styling was decided, because "make it look like HA" is not a method.**
+The tokens were read out of the Home Assistant frontend source, not remembered:
+
+- `--ha-space-1`..`20` (4–80px in 4px steps). HA's own agent skill for frontend
+  styling — `.agents/skills/ha-frontend-styling/SKILL.md` in `home-assistant/frontend`,
+  a better source than anything local — forbids hard-coded pixels in spacing and
+  raw hex in component styles. Every gap and pad here is a token.
+- `--ha-font-size-*` (xs 10 … 5xl 40), `--ha-font-weight-*`, `--ha-line-height-*`.
+- `ha-card` now defaults to **`box-shadow: none` with a 1px
+  `--ha-card-border-color` border**. The earlier prototype used shadows; that is
+  no longer HA's look.
+- Every token has a fallback: a theme predating the rename must still render.
+
+**The `frontend-design` skill was loaded and deliberately not followed.** It
+calls for a bold distinctive aesthetic — unusual fonts, gradients, asymmetry,
+"unforgettable". That is precisely what `PANEL_DESIGN.md` rejects and what got
+the original mockups thrown out. Here, not looking AI-generated means being
+indistinguishable from Home Assistant, so HA's design system is the answer and
+inventing one is the failure mode.
+
+Decisions worth keeping:
+
+- **No invented icons.** `mdi:knob`, which `event.py` uses for the wheel, is
+  absent rather than approximated — an invented path is not "standard MDI".
+  Resolving real icons needs `ha-svg-icon` or `@mdi/js`; open Phase 3 item.
+- **Shadow DOM**, per HA's scoping guidance. Custom properties inherit through
+  it; `hass-toggle-menu` needs `composed` to get out.
+- **Skeletons, not a spinner**: the grid's shape is known before its data.
+- Accent on the dot, the stripe and the border; never on a word. Same measured
+  reason as everywhere else in this program.
+
+**Deviation from the roadmap, on purpose:** it wants TypeScript + Lit + Vite with
+a CI bundle-reproducibility check. This is a dependency-free custom element
+instead. Reasons: the overview re-renders only on a low-rate subscription, so
+Lit's diffing buys little; a whole JS toolchain plus a committed bundle is a
+large, unverifiable addition while `pytest` cannot even run locally; and the
+Phase 0 spike proved plain module delivery works, which a Vite bundle would have
+to re-prove. **This is a decision to revisit at Phase 4, not a settled one** —
+the wheel detail with its rail, tabs and live stream is where templating starts
+paying for itself.
+
+```text
+python -m compileall -q custom_components tests     passed
+ruff format --check / ruff check                    passed
+mypy custom_components/ikea_bilresa                 passed (18 source files)
+node --check <panel asset>                          passed
+git diff --check                                    passed
+python -m pytest -q                                 Unit not run
+```
+
+Owed before Phase 3 closes: the visual comparison in every required state, dark
+and one non-default theme, Czech/English expansion, keyboard-only and
+screen-reader passes, 320px, and a contrast pass against the real thing rather
+than against a prototype.
+
 ### Panel `0.5.8` Phase 2 authenticated read-only API (Claude Code, 2026-07-16)
 
 Status: **Implemented + Static. Unit not run locally. CI has not run. Not

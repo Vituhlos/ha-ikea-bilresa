@@ -14,6 +14,16 @@ from custom_components.ikea_bilresa.panel import (
 )
 
 
+def _asset() -> str:
+    return (
+        Path(__file__).parents[1]
+        / "custom_components"
+        / "ikea_bilresa"
+        / "frontend"
+        / "ikea_bilresa_panel.js"
+    ).read_text(encoding="utf-8")
+
+
 def _hass(*, asset_exists: bool = True) -> SimpleNamespace:
     async def _add_executor_job(func, *args):
         return func(*args)
@@ -121,17 +131,20 @@ def test_panel_asset_has_an_accessible_mobile_exit() -> None:
         / "ikea_bilresa_panel.js"
     ).read_text(encoding="utf-8")
 
-    assert 'document.createElement("header")' in asset
+    assert 'el("header")' in asset
     assert 'menu.type = "button"' in asset
     assert 'aria-label", "Open Home Assistant sidebar"' in asset
-    assert 'aria-hidden="true" focusable="false"' in asset
     assert (
         'new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })'
         in asset
     )
+    # a 48px target, and a focus ring so it is reachable without a touchscreen
     assert "inline-size: 48px" in asset
     assert "block-size: 48px" in asset
-    assert ".bilresa-panel-menu:focus-visible" in asset
+    assert ".icon-button:focus-visible" in asset
+    # decorative icons must stay out of the accessibility tree
+    assert 'setAttribute("aria-hidden", "true")' in asset
+    assert 'setAttribute("focusable", "false")' in asset
 
 
 def test_panel_header_clears_the_notch() -> None:
@@ -170,3 +183,69 @@ def test_panel_asset_registration_is_browser_idempotent() -> None:
     registration = 'customElements.define("ikea-bilresa-panel", IkeaBilresaPanel);'
     assert guard in asset
     assert asset.index(guard) < asset.index(registration)
+
+
+def test_panel_asset_uses_home_assistant_design_tokens() -> None:
+    """It must look like Home Assistant because it IS Home Assistant's system.
+
+    HA's own frontend styling guidance forbids hard-coded pixels in spacing and
+    raw hex in component styles. Every value here should come from a token, with
+    a fallback so a theme predating the token rename still renders.
+    """
+    asset = _asset()
+
+    for token in (
+        "--ha-space-",
+        "--ha-font-size-",
+        "--ha-font-weight-",
+        "--ha-line-height-",
+        "--ha-card-border-color",
+        "--ha-card-border-radius",
+    ):
+        assert token in asset, token
+    # every alias carries a fallback
+    assert "var(--ha-space-4, 16px)" in asset
+    assert "var(--primary-text-color, #212121)" in asset
+
+
+def test_panel_asset_keeps_accent_off_text() -> None:
+    """Measured, not stylistic: HA's accents fail AA as text on a light card.
+
+    --primary-color is 2.63:1 and --warning-color 1.96:1. Colour may carry state
+    on a dot, a border or a stripe; the words must be --primary-text-color. A
+    regression here is invisible on screen and fails the Phase 3 gate.
+    """
+    asset = _asset()
+
+    # the status label sits on the ink colour, with the dot beside it
+    assert ".status {" in asset
+    assert '.dot[data-state="connected"]' in asset
+    # the warning banner colours its stripe and icon, never its text
+    assert "border-inline-start: 4px solid var(--warning-color" in asset
+    assert "fill: var(--warning-color" in asset
+
+
+def test_panel_asset_never_renders_user_strings_as_html() -> None:
+    """Wheel names, areas and target labels are strings the user chose."""
+    asset = _asset()
+
+    assert "innerHTML" not in asset
+    assert "node.textContent = text" in asset
+
+
+def test_panel_asset_unsubscribes_when_the_view_closes() -> None:
+    """A subscription that outlives the panel keeps pushing into a dead view."""
+    asset = _asset()
+
+    assert "disconnectedCallback()" in asset
+    assert "this._unsub()" in asset
+
+
+def test_panel_asset_grid_does_not_leave_a_phantom_column() -> None:
+    """auto-fill keeps empty tracks alive; beside two wheels that reads broken."""
+    asset = _asset()
+
+    assert "repeat(auto-fit," in asset
+    # the declaration, not the word: the comment above it explains why auto-fill
+    # was rejected, and a bare substring check would fail on its own reasoning
+    assert "repeat(auto-fill," not in asset
