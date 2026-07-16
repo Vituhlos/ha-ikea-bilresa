@@ -27,17 +27,16 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: dirty with the `0.5.9-rc.1` panel/editor candidate described
-  below, based on `0c0e11f`. Preserve every listed change and always verify with
-  `git status --short`.
+- Working tree: clean after the `0.5.9-rc.1` panel/editor publication. Runtime
+  commit `c3c5c2f` is pushed on `agent/stabilize-0.5-x`; the release tag remains
+  on that exact CI-verified commit.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Per the owner's 2026-07-16 report,
-  panel Phases 0-3 are published as `v0.5.7-rc.11` and running. The
-  `v0.5.9-rc.1` candidate has owner authorization for commit, push, release and
-  controlled HACS deployment in this task. Draft PR #1 remains open and `main`
-  has not been merged.
+- Latest stable release remains `v0.5.0`. Panel Phases 0-3 were published as
+  `v0.5.7-rc.11`; the functional editor/detail candidate is now published and
+  deployed as `v0.5.9-rc.1`. Draft PR #1 remains open and `main` has not been
+  merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -61,6 +60,21 @@ Read-only MCP checks succeeded earlier in this task:
 During that earlier read-only phase no Home Assistant state was changed. The
 running custom integration was an older deployed copy and did not validate the
 working tree. MCP does not replace physical BILRESA input.
+
+On 2026-07-16 the owner-authorized `v0.5.9-rc.1` deployment completed:
+
+- the pre-restart Home Assistant configuration check was valid;
+- HACS installed exactly `v0.5.9-rc.1` into
+  `/config/custom_components/ikea_bilresa`;
+- Home Assistant restarted and the `ikea_bilresa` entry returned to `loaded`;
+- all four existing binding subentries remained present;
+- live diagnostics confirmed stored `node_id` and `channel` values are strings,
+  all four bindings contain `mode`, and none contains `binding_profile`;
+- no matching `ikea_bilresa` system-log entry was present after restart.
+
+This is deployment smoke evidence, not a physical-wheel Hardware result. The
+frontend must be opened in a new browser tab before visual/manual validation
+because an existing custom element cannot be redefined in a running tab.
 
 After owner authorization, HACS explicitly installed `v0.5.7-rc.1` and Home
 Assistant was restarted with a valid preflight config check. Non-hardware smoke
@@ -392,9 +406,8 @@ than against a prototype.
 
 ### Panel `0.5.9` binding editor and correlated action results (Codex, 2026-07-16)
 
-Status before publication: **Implemented + Static + Python Unit + frontend Unit.
-CI, HA UI deployment and Hardware pending.** The owner explicitly authorized a
-`v0.5.9-rc.1` commit, push, prerelease and controlled HACS deployment.
+Status: **Implemented + Static + Python Unit + frontend Unit + CI + Released +
+deployed backend smoke. Visual HA UI and Hardware pending.**
 
 This candidate turns the Phase 4 detail into a functional administrator surface:
 
@@ -440,6 +453,20 @@ The local suite therefore ran with plugin auto-loading disabled and
 `pytest_asyncio.plugin` loaded explicitly; the repository's own 196 tests all
 passed. Exact-revision Linux CI remains the authoritative plugin/hassfest/HACS
 gate.
+
+Publication and deployment:
+
+- runtime commit `c3c5c2f965041efad8cd08b7b252cddea468a687`;
+- GitHub Actions run `29482215403` passed Unit tests, mypy, Ruff, hassfest, HACS
+  validation and frontend checks;
+- prerelease `v0.5.9-rc.1` was published from that exact commit;
+- HACS installed that exact version after a valid config check;
+- Home Assistant restarted, the integration loaded, four stored bindings were
+  preserved and no matching system-log error was present.
+
+The callable browser-control surface was unavailable in this task, so no visual
+claim is made for the freshly loaded custom element. Open a new tab and perform
+the manual panel checks below before promoting the RC.
 
 ### Panel `0.5.8` Phase 4 wheel detail, live test and diagnostics (Codex, 2026-07-16)
 
@@ -1443,20 +1470,19 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Publish the owner-authorized `v0.5.9-rc.1`, require exact-revision CI, install
-that tag through HACS after a valid configuration preflight, restart Home
-Assistant and open the panel in a new browser tab. Verify overview/detail,
-binding edit conflict handling and panel-driven tests. Physical-wheel validation
-is deliberately deferred by owner direction.
+Open the deployed panel in a new browser tab. Verify overview/detail at desktop
+and phone widths, create/edit/delete using a disposable test binding, exercise
+conflict handling with two tabs, and run panel-driven tests only against a target
+whose state changes are safe. Physical-wheel validation remains deliberately
+deferred by owner direction.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from `0c0e11f`, then re-check HEAD, branch, status and the full
-   `0.5.9-rc.1` diff before changing anything.
-3. Preserve every dirty and untracked file.
-4. Local Static, Python Unit and frontend Unit are established. CI, HA UI
-   deployment and Hardware are pending until the publication record below is
-   updated.
-5. Owner authorization covers the `v0.5.9-rc.1` commit, push, prerelease and
-   controlled HACS deployment in this task.
+2. Start from runtime commit `c3c5c2f` plus the deployment-record commit that
+   follows it; then re-check HEAD, branch and status before changing anything.
+3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
+4. Static, Python Unit, frontend Unit, exact-revision CI, release and backend
+   deployment smoke are established. Visual HA UI and Hardware remain pending.
+5. Do not mutate real bindings or run target-changing panel tests unless the
+   owner identifies a safe binding/target for that check.
