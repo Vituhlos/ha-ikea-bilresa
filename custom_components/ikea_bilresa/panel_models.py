@@ -31,13 +31,21 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
-    CONF_BINDING_PROFILE,
     CONF_CHANNEL,
     CONF_CLICK_TARGET,
+    CONF_MODE,
     CONF_NODE_ID,
     CONF_SCENES,
     CONF_TARGET,
     DOMAIN,
+    MODE_BRIGHTNESS,
+    MODE_COLOR,
+    MODE_COLOR_TEMP,
+    MODE_COVER,
+    MODE_FAN,
+    MODE_NUMBER,
+    MODE_TEMPERATURE,
+    MODE_VOLUME,
     SUBENTRY_BINDING,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
@@ -131,6 +139,29 @@ def _target_missing(hass: HomeAssistant, entity_id: str | None) -> bool:
     return state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
 
+def _as_int(value: Any) -> int | None:
+    """Coerce a stored selector value to int, or None if it is not one.
+
+    **Stored bindings hold `node_id` and `channel` as strings**, not ints: they
+    come from config-flow selectors, and `"1"` is what lands in the subentry.
+    Comparing them to `wheel.node_id`, which really is an int, silently matches
+    nothing — every binding disappears and every channel reads "not configured".
+
+    Do not "simplify" this to a direct comparison. It was written after the grid
+    shipped claiming four configured channels were empty.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 @callback
 def _binding_by_channel(entry: Any, node_id: int) -> dict[int, dict[str, Any]]:
     """Index this wheel's binding subentries by channel."""
@@ -139,27 +170,52 @@ def _binding_by_channel(entry: Any, node_id: int) -> dict[int, dict[str, Any]]:
         if subentry.subentry_type != SUBENTRY_BINDING:
             continue
         data = dict(subentry.data)
-        if data.get(CONF_NODE_ID) != node_id:
+        if _as_int(data.get(CONF_NODE_ID)) != node_id:
             continue
-        channel = data.get(CONF_CHANNEL)
-        if isinstance(channel, int):
+        channel = _as_int(data.get(CONF_CHANNEL))
+        if channel is not None:
             bindings[channel] = data
     return bindings
 
 
-def _behaviour_label(hass: HomeAssistant, data: dict[str, Any]) -> str | None:
+# What a rotation does, keyed by the binding's stored scroll mode.
+#
+# NOT keyed by CONF_BINDING_PROFILE: that is a config-flow-only field used to
+# pick sensible defaults, and it is **never written to the subentry**. Reading it
+# back returns None for every binding, which is how the first version of this
+# grid reported four configured channels as "not configured".
+_MODE_LABELS = {
+    MODE_BRIGHTNESS: "Smooth dimming",
+    MODE_COLOR_TEMP: "Colour temperature",
+    MODE_COLOR: "Colour",
+    MODE_VOLUME: "Volume",
+    MODE_COVER: "Cover position",
+    MODE_TEMPERATURE: "Temperature",
+    MODE_FAN: "Fan speed",
+    MODE_NUMBER: "Value",
+}
+
+
+def _behaviour_label(data: dict[str, Any]) -> str | None:
     """A short, human phrase for what this binding does.
 
-    Intentionally not localized here: the strings are placeholders until the
-    localization decision in `PANEL_ROADMAP.md`'s open list is made. Whatever
-    that decision is, it belongs on the Python side — the roadmap requires
-    English and Czech to stay aligned, and two copies of these phrases in two
-    languages in the frontend is how they drift.
+    Scenes take precedence because scene cycling overrides the normal
+    single-press action, which is what a user would notice first.
+
+    Intentionally not localized here: these are placeholders until the
+    localization decision in `PANEL_ROADMAP.md`'s open list is made. Whatever it
+    is, it belongs on the Python side — the roadmap requires English and Czech to
+    stay aligned, and two copies of these phrases in the frontend is how they
+    drift.
     """
     if scenes := data.get(CONF_SCENES):
         return f"Scenes ({len(scenes)})"
-    profile = data.get(CONF_BINDING_PROFILE)
-    return str(profile) if profile else None
+    mode = data.get(CONF_MODE)
+    if mode in _MODE_LABELS:
+        return _MODE_LABELS[mode]
+    # A binding exists but its mode is unrecognised — say so rather than let it
+    # read as unconfigured, which is a different and wrong thing.
+    return str(mode) if mode else "Configured"
 
 
 @callback
@@ -188,8 +244,9 @@ def _channel_summaries(
         summaries.append(
             ChannelSummary(
                 channel=channel,
-                profile=data.get(CONF_BINDING_PROFILE),
-                behaviour=_behaviour_label(hass, data),
+                # The stored scroll mode. CONF_BINDING_PROFILE is not persisted.
+                profile=data.get(CONF_MODE),
+                behaviour=_behaviour_label(data),
                 target_label=_entity_label(hass, target),
                 target_missing=(
                     _target_missing(hass, target) or _target_missing(hass, click_target)

@@ -252,6 +252,44 @@ technical spike below changes frontend delivery and a read-only WebSocket API,
 but does not implement the designed panel or change Matter, binding storage or
 hardware behavior. The physical `v0.5.7` checklist remains open.
 
+### Panel grid: two defects found on first sight (Claude Code, 2026-07-16)
+
+`rc.9` deployed and the grid rendered — with **every channel of every wheel
+reading "Not configured" while four bindings existed**. Two separate bugs, both
+in `panel_models.py`, both invisible to sixteen green tests.
+
+**1. Stored bindings hold `node_id` and `channel` as strings.** They come from
+config-flow selectors; a live diagnostics dump shows `"channel": "1"`. The code
+did `isinstance(channel, int)` and `data.get(CONF_NODE_ID) != node_id` against an
+int `wheel.node_id`, so every binding was silently dropped. Fixed with `_as_int`
+coercion.
+
+**2. `CONF_BINDING_PROFILE` is never written to the subentry.** It is a
+config-flow field for picking defaults. The stored field that describes behaviour
+is `CONF_MODE` (`brightness`, `volume`, `cover_position`, …). Reading the profile
+back returned `None` for every binding. Behaviour now maps from `CONF_MODE`, and
+an unrecognised mode reports itself rather than reading as unconfigured — those
+are different claims.
+
+**Why the tests missed both: the fixtures were invented to match the code's
+assumptions.** `const.py` was read for key *names* and the *types and presence*
+were guessed. Sixteen tests agreed with the guess. The fixtures now use the shape
+a real diagnostics dump showed, and `test_string_typed_subentry_still_matches_its_wheel`
+copies one live binding verbatim. A fixture that agrees with the code proves
+nothing about Home Assistant.
+
+Also fixed: the panel drew its own menu button on desktop, next to Home
+Assistant's own sidebar control — two hamburgers. HA's `ha-menu-button` shows
+itself only when `kioskMode === false && (narrow || dockedSidebar ===
+"always_hidden")`; the panel now follows the same rule. `narrow` also re-renders
+the header, since HA re-sets it on every resize across the breakpoint and a
+stored-but-unrendered value leaves a desktop header on a phone. Kiosk mode is not
+checked: it lives in a private frontend store, and a stray button under kiosk
+beats a trapped user without one.
+
+Status: **Implemented + Static. Unit not run locally. Not released** — needs an
+`rc.10` to reach a browser.
+
 ### Panel `0.5.8` Phase 3 frontend shell and overview grid (Claude Code, 2026-07-16)
 
 Status: **Implemented + Static. Unit not run locally. CI has not run. Not

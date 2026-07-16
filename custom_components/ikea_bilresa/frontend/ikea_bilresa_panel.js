@@ -111,6 +111,9 @@ const STYLES = `
     font-weight: var(--ha-font-weight-normal, 400);
     line-height: var(--ha-line-height-condensed, 1.2);
   }
+  /* With no menu button the title would sit against the edge; the button's own
+     box is what spaces it on narrow screens. */
+  header h1:first-child { padding-inline-start: var(--_space-3); }
 
   .icon-button {
     flex: 0 0 auto;
@@ -392,7 +395,12 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   set narrow(narrow) {
+    // HA re-sets this on every resize across the breakpoint, and the menu button
+    // appears and disappears with it. Storing it without re-rendering leaves a
+    // desktop-sized header on a phone until something else happens to repaint.
+    const changed = this._narrow !== narrow;
     this._narrow = narrow;
+    if (changed && this._started) this._render();
   }
 
   set panel(panel) {
@@ -458,18 +466,40 @@ class IkeaBilresaPanel extends HTMLElement {
     this._started = false;
   }
 
+  /**
+   * Home Assistant's own ha-menu-button shows itself only when
+   *
+   *   kioskMode === false && (narrow || dockedSidebar === "always_hidden")
+   *
+   * On a desktop with the sidebar on screen it renders nothing, because HA's
+   * sidebar already has its own collapse control — a second hamburger is one
+   * button too many, which is exactly how this looked on first deploy.
+   *
+   * The button is still mandatory when it IS narrow: the sidebar is collapsed
+   * there and this is its only door.
+   *
+   * Kiosk mode is not checked. It lives in a private frontend store with no
+   * public API, and a stray button under kiosk is a smaller problem than a
+   * trapped user without one.
+   */
+  _showMenuButton() {
+    return Boolean(this._narrow) || this._hass?.dockedSidebar === "always_hidden";
+  }
+
   _header() {
     const bar = el("header");
-    const menu = el("button", "icon-button");
-    menu.type = "button";
-    menu.setAttribute("aria-label", "Open Home Assistant sidebar");
-    menu.appendChild(svg(ICON.menu));
-    menu.addEventListener("click", () =>
-      this.dispatchEvent(
-        new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }),
-      ),
-    );
-    bar.appendChild(menu);
+    if (this._showMenuButton()) {
+      const menu = el("button", "icon-button");
+      menu.type = "button";
+      menu.setAttribute("aria-label", "Open Home Assistant sidebar");
+      menu.appendChild(svg(ICON.menu));
+      menu.addEventListener("click", () =>
+        this.dispatchEvent(
+          new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }),
+        ),
+      );
+      bar.appendChild(menu);
+    }
     bar.appendChild(el("h1", null, "IKEA BILRESA"));
     return bar;
   }

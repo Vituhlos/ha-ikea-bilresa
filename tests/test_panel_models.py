@@ -6,12 +6,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from custom_components.ikea_bilresa.const import (
-    CONF_BINDING_PROFILE,
     CONF_CHANNEL,
     CONF_CLICK_TARGET,
+    CONF_MODE,
     CONF_NODE_ID,
     CONF_SCENES,
     CONF_TARGET,
+    MODE_BRIGHTNESS,
+    MODE_VOLUME,
     SUBENTRY_BINDING,
 )
 from custom_components.ikea_bilresa.device_link import MatterDeviceLink
@@ -44,9 +46,17 @@ def _wheel(node_id: int, channels: tuple[int, ...] = (1, 2, 3)) -> BilresaWheel:
 
 
 def _subentry(node_id: int, channel: int, **data) -> SimpleNamespace:
+    """A subentry shaped like the ones Home Assistant actually stores.
+
+    node_id and channel are **strings** here on purpose: they come from
+    config-flow selectors, and a live diagnostics dump shows `"channel": "1"`.
+    The first version of these fixtures used ints, matched the code's wrong
+    assumption, and let a grid ship that reported every configured channel as
+    empty. Fixtures that agree with the code prove nothing.
+    """
     return SimpleNamespace(
         subentry_type=SUBENTRY_BINDING,
-        data={CONF_NODE_ID: node_id, CONF_CHANNEL: channel, **data},
+        data={CONF_NODE_ID: str(node_id), CONF_CHANNEL: str(channel), **data},
     )
 
 
@@ -164,16 +174,12 @@ def test_unconfigured_channel_is_reported_not_omitted(monkeypatch) -> None:
     _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
     entry = _entry(
         [_wheel(NODE_A)],
-        [
-            _subentry(
-                NODE_A, 1, **{CONF_BINDING_PROFILE: "light", CONF_TARGET: "light.a"}
-            )
-        ],
+        [_subentry(NODE_A, 1, **{CONF_MODE: MODE_BRIGHTNESS, CONF_TARGET: "light.a"})],
     )
 
     channels = async_overview_snapshot(_hass(), entry)["wheels"][0]["channels"]
 
-    assert channels[0]["profile"] == "light"
+    assert channels[0]["profile"] == MODE_BRIGHTNESS
     assert channels[1]["profile"] is None
     assert channels[1]["behaviour"] is None
 
@@ -183,14 +189,14 @@ def test_a_binding_for_another_wheel_is_not_borrowed(monkeypatch) -> None:
     _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
     entry = _entry(
         [_wheel(NODE_A), _wheel(NODE_B)],
-        [_subentry(NODE_B, 1, **{CONF_BINDING_PROFILE: "media", CONF_TARGET: "m.b"})],
+        [_subentry(NODE_B, 1, **{CONF_MODE: MODE_VOLUME, CONF_TARGET: "m.b"})],
     )
 
     result = async_overview_snapshot(_hass(), entry)
     by_key = {w["key"]: w for w in result["wheels"]}
 
     assert by_key[wheel_key(NODE_A)]["channels"][0]["profile"] is None
-    assert by_key[wheel_key(NODE_B)]["channels"][0]["profile"] == "media"
+    assert by_key[wheel_key(NODE_B)]["channels"][0]["profile"] == MODE_VOLUME
 
 
 def test_missing_target_is_flagged(monkeypatch) -> None:
@@ -199,7 +205,7 @@ def test_missing_target_is_flagged(monkeypatch) -> None:
         [_wheel(NODE_A)],
         [
             _subentry(
-                NODE_A, 1, **{CONF_BINDING_PROFILE: "light", CONF_TARGET: "light.gone"}
+                NODE_A, 1, **{CONF_MODE: MODE_BRIGHTNESS, CONF_TARGET: "light.gone"}
             )
         ],
     )
@@ -219,7 +225,7 @@ def test_a_dead_click_target_flags_the_channel(monkeypatch) -> None:
                 NODE_A,
                 1,
                 **{
-                    CONF_BINDING_PROFILE: "light",
+                    CONF_MODE: MODE_BRIGHTNESS,
                     CONF_TARGET: "light.ok",
                     CONF_CLICK_TARGET: "switch.gone",
                 },
@@ -243,7 +249,7 @@ def test_scene_binding_reports_its_count(monkeypatch) -> None:
                 NODE_A,
                 2,
                 **{
-                    CONF_BINDING_PROFILE: "scenes",
+                    CONF_MODE: MODE_BRIGHTNESS,
                     CONF_TARGET: "light.a",
                     CONF_SCENES: ["scene.a", "scene.b", "scene.c"],
                 },
@@ -352,3 +358,91 @@ def test_snapshot_is_deterministic(monkeypatch) -> None:
 
     assert first == second
     assert [w["key"] for w in first["wheels"]] == [wheel_key(NODE_A), wheel_key(NODE_B)]
+
+
+# -- regressions from the first live deploy --------------------------------
+
+
+def test_string_typed_subentry_still_matches_its_wheel(monkeypatch) -> None:
+    """The exact shape a live diagnostics dump showed, verbatim.
+
+    Home Assistant stored `"channel": "1"` and a string node_id. The grid
+    compared them against an int wheel.node_id, matched nothing, and reported
+    four configured channels as "not configured" on a real user's screen.
+    """
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    live = SimpleNamespace(
+        subentry_type=SUBENTRY_BINDING,
+        data={
+            "node_id": str(NODE_A),
+            "channel": "1",
+            "mode": "brightness",
+            "target": "light.main",
+            "step": 3,
+            "click_action": "toggle",
+            "button_response": "fast",
+        },
+    )
+    hass = _hass({"light.main": _state("on", "Main light")})
+
+    channels = async_overview_snapshot(hass, _entry([_wheel(NODE_A)], [live]))[
+        "wheels"
+    ][0]["channels"]
+
+    assert channels[0]["profile"] == "brightness"
+    assert channels[0]["behaviour"] == "Smooth dimming"
+    assert channels[0]["target_label"] == "Main light"
+
+
+def test_behaviour_comes_from_the_stored_mode(monkeypatch) -> None:
+    """binding_profile is a config-flow field and is never written to storage."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(NODE_A, 1, **{CONF_MODE: MODE_VOLUME, CONF_TARGET: "media.a"}),
+            _subentry(NODE_A, 2, **{CONF_MODE: "cover_position", CONF_TARGET: "c.a"}),
+        ],
+    )
+    hass = _hass(
+        {"media.a": _state("playing", "Speaker"), "c.a": _state("open", "Blind")}
+    )
+
+    channels = async_overview_snapshot(hass, entry)["wheels"][0]["channels"]
+
+    assert channels[0]["behaviour"] == "Volume"
+    assert channels[1]["behaviour"] == "Cover position"
+
+
+def test_a_binding_with_an_unknown_mode_is_not_called_unconfigured(
+    monkeypatch,
+) -> None:
+    """ "Configured but odd" and "not configured" are different claims."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [_subentry(NODE_A, 1, **{CONF_MODE: "something_new", CONF_TARGET: "x.y"})],
+    )
+    hass = _hass({"x.y": _state("on", "Thing")})
+
+    channels = async_overview_snapshot(hass, entry)["wheels"][0]["channels"]
+
+    assert channels[0]["behaviour"] == "something_new"
+    assert channels[0]["profile"] is not None
+
+
+def test_a_nonsense_channel_is_skipped_not_crashed(monkeypatch) -> None:
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            SimpleNamespace(
+                subentry_type=SUBENTRY_BINDING,
+                data={"node_id": str(NODE_A), "channel": "not-a-number"},
+            )
+        ],
+    )
+
+    channels = async_overview_snapshot(_hass(), entry)["wheels"][0]["channels"]
+
+    assert all(c["profile"] is None for c in channels)
