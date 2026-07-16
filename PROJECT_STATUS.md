@@ -27,18 +27,20 @@ earlier device-reference observations.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
-- Working tree: clean after the `v0.5.9-rc.3` panel visual follow-up and
-  deployment record. Runtime commit `ecacb21` is the `v0.5.9-rc.3` tag target;
-  `v0.5.9-rc.2` remains on `f0a4171` and `v0.5.9-rc.1` remains on `c3c5c2f`.
+- Icon implementation commit `f676bb7` is pushed on
+  `agent/stabilize-0.5-x`, tagged and released as `v0.5.9-rc.11`, and installed
+  through HACS. The working tree contains only this deployment-record/README
+  follow-up before its own commit.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. Panel Phases 0-3 were published as
+- Latest stable release remains `v0.5.0`. The latest prerelease is
+  `v0.5.9-rc.11`. Panel Phases 0-3 were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
-  deployed as `v0.5.9-rc.2`, and the duplicate-back/channel-detail follow-up is
-  now published and deployed as `v0.5.9-rc.3`. Draft PR #1 remains open and
-  `main` has not been merged.
+  deployed as `v0.5.9-rc.2`, the duplicate-back/channel-detail follow-up as
+  `v0.5.9-rc.3`, and the selected icon identity as `v0.5.9-rc.11`. Draft PR #1
+  remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
 
@@ -47,6 +49,65 @@ installation-specific identifiers. The working-tree version is now sanitized
 while retaining protocol facts. The sensitive version remains in commit
 history; do not publish another release until the owner decides whether and how
 to clean history. Never paste those identifiers into issues, logs or chat.
+
+## `0.5.9-rc.11` BILRESA icon identity (current working tree)
+
+The owner selected the optical V2 product glyph and Material Symbols Rounded
+gesture family on 2026-07-16. The current working tree implements that decision:
+
+- a small globally loaded `bilresa_icons.js` provider registers
+  `bilresa:scroll-wheel` through both the current `window.customIcons` contract
+  and the backward-compatible `window.customIconsets` contract;
+- the provider is registered before the sidebar panel entry and removed from
+  the advertised extra-module list on unload; panel failure remains non-fatal;
+- the sidebar icon changes from `mdi:knob` to `bilresa:scroll-wheel`;
+- wheel cards and the switcher rail use the same approved V2 primary path,
+  secondary path and `0 0 24 24` view box; the panel keeps the selected 0.32
+  secondary opacity;
+- channel actions use distinct Rounded paths for rotate left/right, single,
+  double and triple press; rotation is a paired glyph because the read model
+  exposes one combined left/right action;
+- hold and release render as one long-press sequence with an end marker, rather
+  than assigning release an unrelated standalone symbol;
+- manifest/cache-busting version is `0.5.9-rc.11`; no external Material Symbols
+  integration is required.
+
+Local validation for this working tree:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+python -m compileall -q custom_components tests     passed
+ruff format --check custom_components tests         passed
+ruff check custom_components tests                  passed
+mypy custom_components/ikea_bilresa                 passed (20 source files)
+node --check panel + icon provider                   passed
+Node frontend tests                                 9 passed
+Python tests on Windows Python 3.14                 204 passed
+git diff --check                                    passed (CRLF warnings only)
+Playwright desktop/mobile/overview visual fixture   passed; clean console
+```
+
+Exact-revision publication and deployment results:
+
+- commit `f676bb7` was pushed to `agent/stabilize-0.5-x` and updated draft PR
+  #1;
+- GitHub Actions run `29523574699` passed HACS validation, hassfest, Ruff, mypy,
+  204 Python tests and the frontend syntax/unit checks;
+- prerelease `v0.5.9-rc.11` was created from exact commit `f676bb7`;
+- Home Assistant configuration checks passed before and after the HACS download;
+- HACS installed exactly `v0.5.9-rc.11`, Home Assistant restarted, and the
+  integration returned to `loaded` with all four binding subentries preserved;
+- exact-domain system-log and error-log searches returned zero matches;
+- the running HA instance served `bilresa_icons.js` and the panel bundle with
+  HTTP 200; content checks confirmed the custom provider/V2 geometry, distinct
+  triple-press path and hold/release sequence;
+- automated capture of the real panel was unavailable because the optional
+  Puppet screenshot-engine add-on is not installed. It was not installed solely
+  for this check.
+
+This establishes **Implemented + Static + Unit + CI + Released** and a
+successful non-hardware Home Assistant deployment smoke test. Real-HA visual
+review in a fresh browser tab and physical-wheel Hardware remain pending.
 
 ## Home Assistant MCP observation
 
@@ -1612,19 +1673,19 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Open the deployed `v0.5.9-rc.3` panel in a new browser tab and capture the same
-real-HA states, especially the wheel detail channels screen, plus 320/380 px
-mobile and one dark-theme pass. Physical-wheel validation remains deliberately
-deferred by owner direction.
+Open the deployed `v0.5.9-rc.11` panel in a completely fresh browser tab (or
+fully close/reopen the companion app), then visually check the sidebar V2 icon,
+overview card, rotation pair, distinct double/triple press and the
+hold/release sequence. Existing tabs can retain the old custom element.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from the pushed `v0.5.9-rc.3` runtime commit `ecacb21` plus the
-   deployment-record follow-up in this file; then re-check HEAD, branch and
-   status.
+2. Start from implementation commit `f676bb7` plus the deployment-record
+   follow-up on `agent/stabilize-0.5-x`; then re-check HEAD, branch and status.
 3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
-4. Static, Python Unit, frontend Unit, exact-revision CI, release and backend
-   deployment smoke are established. Visual HA UI and Hardware remain pending.
+4. For the icon package, Static, Python Unit, frontend Unit, exact-revision CI,
+   release and backend deployment smoke are established. Real HA visual review
+   and Hardware remain pending.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.

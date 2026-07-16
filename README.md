@@ -11,10 +11,10 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.3 refines the
-> administrator panel after real Home Assistant screenshot review. It keeps
-> the v0.5.9-rc.1 wheel detail, correlated live binding results, panel-driven
-> action tests and revision-checked binding create/edit/delete.
+> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.11 adds the
+> approved BILRESA V2 icon to the Home Assistant sidebar and panel, plus distinct
+> Material Rounded gestures for rotation, single/double/triple press and the
+> hold/release sequence.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
