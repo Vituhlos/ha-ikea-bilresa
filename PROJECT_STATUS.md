@@ -29,8 +29,8 @@ earlier device-reference observations.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
 - Icon implementation commit `f676bb7` is pushed on
   `agent/stabilize-0.5-x`, tagged and released as `v0.5.9-rc.11`, and installed
-  through HACS. The working tree contains only this deployment-record/README
-  follow-up before its own commit.
+  through HACS. Its deployment record and README status are committed on the
+  same branch; the working tree is expected to be clean at handoff.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
