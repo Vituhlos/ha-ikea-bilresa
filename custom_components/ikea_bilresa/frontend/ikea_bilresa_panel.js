@@ -77,13 +77,15 @@ const ICON = {
 // GestureSummary.gesture: rotation / short_press / double_press / triple_press /
 // hold / release. Presses share one icon; hold and release share another.
 // [Material Symbols rounded name, MDI fallback name] per stable gesture key.
+// Material Symbols names use hyphens (verified against beecho01/material-symbols),
+// MDI names use hyphens too — but they are different vocabularies, hence pairs.
 const GESTURE_ICON = {
-  rotation: ["rotate_right", "rotate-right"],
-  short_press: ["touch_app", "gesture-tap-button"],
-  double_press: ["touch_app", "gesture-tap-button"],
-  triple_press: ["touch_app", "gesture-tap-button"],
-  hold: ["back_hand", "gesture-tap-hold"],
-  release: ["back_hand", "gesture-tap-hold"],
+  rotation: ["rotate-right", "rotate-right"],
+  short_press: ["touch-app", "gesture-tap-button"],
+  double_press: ["touch-app", "gesture-tap-button"],
+  triple_press: ["touch-app", "gesture-tap-button"],
+  hold: ["back-hand", "gesture-tap-hold"],
+  release: ["back-hand", "gesture-tap-hold"],
 };
 
 const STYLES = `
@@ -1415,7 +1417,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
     const head = el("span", "wheel-head");
     head.appendChild(
-      icon("radio_button_checked", "record-circle-outline", "device-glyph"),
+      icon("trip-origin", "record-circle-outline", "device-glyph"),
     );
     const names = el("span", "wheel-names");
     names.appendChild(el("span", "wheel-name", wheel.name));
@@ -1493,7 +1495,7 @@ class IkeaBilresaPanel extends HTMLElement {
         ].join(", "),
       );
       button.appendChild(
-        icon("radio_button_checked", "record-circle-outline", "rail-glyph"),
+        icon("trip-origin", "record-circle-outline", "rail-glyph"),
       );
       button.appendChild(this._statusDot(wheel.availability));
       const copy = el("span", "rail-copy");
