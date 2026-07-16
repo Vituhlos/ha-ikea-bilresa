@@ -280,17 +280,19 @@ const STYLES = `
   .wheel-names { min-inline-size: 0; }
   /* The device glyph. --state-icon-color is HA's own entity-icon colour and
      clears the 3:1 non-text bar; an icon may carry it where a word may not. */
+  /* The BILRESA glyph draws with currentColor (outline + dots), so it is
+     coloured via the color property, not fill. */
   .device-glyph {
     flex: 0 0 auto;
-    inline-size: 34px;
-    block-size: 34px;
-    fill: var(--state-icon-color, #44739e);
+    inline-size: 32px;
+    block-size: 32px;
+    color: var(--state-icon-color, #44739e);
   }
   .rail-glyph {
     flex: 0 0 auto;
     inline-size: 22px;
     block-size: 22px;
-    fill: var(--state-icon-color, #44739e);
+    color: var(--state-icon-color, #44739e);
   }
   .wheel-name {
     display: block;
@@ -1037,8 +1039,46 @@ const svg = (path, cls) => {
 
 // ha-icon does not reliably render inside a custom panel's shadow root (the
 // element is not always upgraded there), so icons are inline SVG with real paths,
-// which always render. MD3 (Material Symbols) via ha-icon was tried and came back
-// blank; the reliable path is inline MDI, and MDI has clean glyphs.
+// which always render.
+
+// A bespoke glyph of the BILRESA itself, drawn from the device's real shape
+// rather than traced from a photo (a photo trace reads as noise at 22px): the
+// upright rounded body, the large scroll wheel near the top, and the three
+// channel dots below. currentColor drives both the outline and the dots, so the
+// surrounding class colours it like any other glyph.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const bilresaIcon = (cls) => {
+  const s = document.createElementNS(SVG_NS, "svg");
+  s.setAttribute("viewBox", "0 0 24 24");
+  s.setAttribute("aria-hidden", "true");
+  s.setAttribute("focusable", "false");
+  if (cls) s.setAttribute("class", cls);
+  const body = document.createElementNS(SVG_NS, "rect");
+  for (const [k, v] of Object.entries({
+    x: "6.6", y: "2", width: "10.8", height: "20", rx: "5.4",
+    fill: "none", stroke: "currentColor", "stroke-width": "1.4",
+  })) {
+    body.setAttribute(k, v);
+  }
+  s.appendChild(body);
+  const wheel = document.createElementNS(SVG_NS, "circle");
+  for (const [k, v] of Object.entries({
+    cx: "12", cy: "8.7", r: "4.2",
+    fill: "none", stroke: "currentColor", "stroke-width": "1.4",
+  })) {
+    wheel.setAttribute(k, v);
+  }
+  s.appendChild(wheel);
+  for (const cx of ["9.9", "12", "14.1"]) {
+    const dot = document.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("cx", cx);
+    dot.setAttribute("cy", "16.7");
+    dot.setAttribute("r", "0.85");
+    dot.setAttribute("fill", "currentColor");
+    s.appendChild(dot);
+  }
+  return s;
+};
 
 const el = (tag, cls, text) => {
   const node = document.createElement(tag);
@@ -1395,7 +1435,7 @@ class IkeaBilresaPanel extends HTMLElement {
     card.addEventListener("click", () => this._openWheel(wheel.key));
 
     const head = el("span", "wheel-head");
-    head.appendChild(svg(ICON.wheel, "device-glyph"));
+    head.appendChild(bilresaIcon("device-glyph"));
     const names = el("span", "wheel-names");
     names.appendChild(el("span", "wheel-name", wheel.name));
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
@@ -1471,7 +1511,7 @@ class IkeaBilresaPanel extends HTMLElement {
           this._t(wheel.availability),
         ].join(", "),
       );
-      button.appendChild(svg(ICON.wheel, "rail-glyph"));
+      button.appendChild(bilresaIcon("rail-glyph"));
       button.appendChild(this._statusDot(wheel.availability));
       const copy = el("span", "rail-copy");
       copy.appendChild(el("span", "rail-name", wheel.name));

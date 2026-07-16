@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.10] - 2026-07-16
+
+### Changed
+- The wheel glyph is now a bespoke icon of the BILRESA itself -- the upright
+  rounded body, the scroll wheel and the three channel dots -- drawn from the
+  device's real shape, instead of a generic dial. Gesture icons unchanged.
+
 ## [0.5.9-rc.9] - 2026-07-16
 
 ### Changed
