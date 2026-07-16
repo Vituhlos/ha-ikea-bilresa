@@ -133,11 +133,16 @@ def test_panel_asset_has_an_accessible_mobile_exit() -> None:
 
     assert 'el("header")' in asset
     assert 'menu.type = "button"' in asset
-    assert 'aria-label", "Open Home Assistant sidebar"' in asset
+    # the label itself lives in panel_strings.py; assert it is wired, not spelled
+    assert 'menu.setAttribute("aria-label", this._t("menu"))' in asset
     assert (
         'new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })'
         in asset
     )
+    # HA's own ha-menu-button hides itself when the sidebar is already on screen;
+    # rendering a second hamburger next to HA's own is what rc.9 did.
+    assert "_showMenuButton()" in asset
+    assert 'dockedSidebar === "always_hidden"' in asset
     # a 48px target, and a focus ring so it is reachable without a touchscreen
     assert "inline-size: 48px" in asset
     assert "block-size: 48px" in asset

@@ -74,9 +74,14 @@ def _entry(wheels, subentries=()) -> SimpleNamespace:
     )
 
 
-def _hass(states=None) -> SimpleNamespace:
+def _hass(states=None, language="en") -> SimpleNamespace:
     store = states or {}
-    return SimpleNamespace(states=SimpleNamespace(get=lambda eid: store.get(eid)))
+    return SimpleNamespace(
+        states=SimpleNamespace(get=lambda eid: store.get(eid)),
+        # Real hass always has this. The fixture did not, and the production code
+        # reading hass.config.language blew up on every test at once.
+        config=SimpleNamespace(language=language),
+    )
 
 
 def _state(value, friendly_name=None) -> SimpleNamespace:
@@ -446,3 +451,37 @@ def test_a_nonsense_channel_is_skipped_not_crashed(monkeypatch) -> None:
     channels = async_overview_snapshot(_hass(), entry)["wheels"][0]["channels"]
 
     assert all(c["profile"] is None for c in channels)
+
+
+def test_behaviour_labels_follow_the_instance_language(monkeypatch) -> None:
+    """The grid shipped English to a Czech owner; this is the regression.
+
+    The language comes from hass.config.language, which is the instance's and not
+    each user's — Home Assistant offers a WebSocket handler no per-user locale.
+    """
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [_subentry(NODE_A, 1, **{CONF_MODE: MODE_BRIGHTNESS, CONF_TARGET: "light.a"})],
+    )
+    states = {"light.a": _state("on", "Lampa")}
+
+    czech = async_overview_snapshot(_hass(states, language="cs"), entry)
+    english = async_overview_snapshot(_hass(states, language="en"), entry)
+
+    assert czech["wheels"][0]["channels"][0]["behaviour"] == "Plynulé stmívání"
+    assert english["wheels"][0]["channels"][0]["behaviour"] == "Smooth dimming"
+    # the entity's own name is the user's and is never translated
+    assert czech["wheels"][0]["channels"][0]["target_label"] == "Lampa"
+
+
+def test_an_unknown_instance_language_falls_back_to_english(monkeypatch) -> None:
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [_subentry(NODE_A, 1, **{CONF_MODE: MODE_BRIGHTNESS, CONF_TARGET: "light.a"})],
+    )
+
+    snapshot = async_overview_snapshot(_hass(language="de"), entry)
+
+    assert snapshot["wheels"][0]["channels"][0]["behaviour"] == "Smooth dimming"
