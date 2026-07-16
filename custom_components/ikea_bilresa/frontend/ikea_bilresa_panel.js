@@ -407,6 +407,26 @@ class IkeaBilresaPanel extends HTMLElement {
     this._panel = panel;
   }
 
+  /**
+   * Strings come from the panel's config, localized by Python from
+   * panel_strings.py. They are NOT duplicated here: the roadmap requires English
+   * and Czech to stay aligned, and a second copy in JavaScript is how they drift.
+   *
+   * The key itself is the fallback. If a label is somehow missing, an English
+   * word is better than a blank, and a raw key is at least searchable.
+   */
+  _t(key, placeholders) {
+    const labels = this._panel?.config?.labels || {};
+    let value = labels[key];
+    if (value === undefined) return key;
+    if (placeholders) {
+      for (const [name, replacement] of Object.entries(placeholders)) {
+        value = value.replace(`{${name}}`, String(replacement));
+      }
+    }
+    return value;
+  }
+
   async _connect() {
     this._error = null;
     try {
@@ -491,7 +511,7 @@ class IkeaBilresaPanel extends HTMLElement {
     if (this._showMenuButton()) {
       const menu = el("button", "icon-button");
       menu.type = "button";
-      menu.setAttribute("aria-label", "Open Home Assistant sidebar");
+      menu.setAttribute("aria-label", this._t("menu"));
       menu.appendChild(svg(ICON.menu));
       menu.addEventListener("click", () =>
         this.dispatchEvent(
@@ -512,19 +532,23 @@ class IkeaBilresaPanel extends HTMLElement {
     ).length;
     const unknown = s.wheels.filter((w) => w.availability === "unknown").length;
 
-    wrap.appendChild(el("span", null, `${connected} connected`));
+    wrap.appendChild(el("span", null, this._t("summary_connected", { count: connected })));
     const away = s.wheels.length - connected - unknown;
     if (away > 0) {
       wrap.appendChild(el("span", "sep", "·"));
-      wrap.appendChild(el("span", null, `${away} unavailable`));
+      wrap.appendChild(el("span", null, this._t("summary_unavailable", { count: away })));
     }
     if (unknown > 0) {
       wrap.appendChild(el("span", "sep", "·"));
-      wrap.appendChild(el("span", null, `${unknown} not reporting`));
+      wrap.appendChild(el("span", null, this._t("summary_unknown", { count: unknown })));
     }
     wrap.appendChild(el("span", "sep", "·"));
     wrap.appendChild(
-      el("span", null, s.matter_connected ? "Matter connected" : "Matter offline"),
+      el(
+        "span",
+        null,
+        this._t(s.matter_connected ? "matter_connected" : "matter_offline"),
+      ),
     );
     return wrap;
   }
@@ -546,7 +570,7 @@ class IkeaBilresaPanel extends HTMLElement {
     const behaviour = el(
       "div",
       "channel-behaviour",
-      channel.behaviour || (configured ? channel.profile : "Not configured"),
+      channel.behaviour || (configured ? channel.profile : this._t("not_configured")),
     );
     text.appendChild(behaviour);
     text.appendChild(
@@ -554,8 +578,8 @@ class IkeaBilresaPanel extends HTMLElement {
         "div",
         "channel-target",
         channel.target_missing
-          ? `${channel.target_label || "Target"} — unavailable`
-          : channel.target_label || "Add a control binding",
+          ? this._t("target_unavailable", { target: channel.target_label || "" })
+          : channel.target_label || this._t("add_binding"),
       ),
     );
     row.appendChild(text);
@@ -587,17 +611,7 @@ class IkeaBilresaPanel extends HTMLElement {
     const dot = el("span", "dot");
     dot.dataset.state = wheel.availability;
     status.appendChild(dot);
-    status.appendChild(
-      el(
-        "span",
-        null,
-        {
-          connected: "Connected",
-          unavailable: "Unavailable",
-          unknown: "Not reporting",
-        }[wheel.availability] || "Unknown",
-      ),
-    );
+    status.appendChild(el("span", null, this._t(wheel.availability)));
     head.appendChild(status);
     card.appendChild(head);
 
@@ -613,7 +627,7 @@ class IkeaBilresaPanel extends HTMLElement {
    * yet" and must never read as a fault.
    */
   _activityLabel(wheel) {
-    if (!wheel.last_activity) return "No activity yet";
+    if (!wheel.last_activity) return this._t("no_activity");
     const when = new Date(wheel.last_activity);
     if (Number.isNaN(when.getTime())) return null;
     const label = this._hass?.localize
@@ -621,7 +635,7 @@ class IkeaBilresaPanel extends HTMLElement {
       : when.toLocaleString(this._hass?.language || undefined);
     const suffix =
       wheel.last_active_channel !== null && wheel.last_active_channel !== undefined
-        ? ` · last on channel ${wheel.last_active_channel}`
+        ? ` · ${this._t("last_on_channel", { channel: wheel.last_active_channel })}`
         : "";
     return `${label || when.toLocaleString()}${suffix}`;
   }
@@ -634,7 +648,7 @@ class IkeaBilresaPanel extends HTMLElement {
       const button = el("button", null);
       button.type = "button";
       button.appendChild(svg(ICON.refresh));
-      button.appendChild(el("span", null, "Try again"));
+      button.appendChild(el("span", null, this._t("retry")));
       button.addEventListener("click", () => this._retry());
       wrap.appendChild(button);
     }
@@ -643,11 +657,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _body() {
     if (this._error && !this._snapshot) {
-      return this._placeholder(
-        "Cannot reach the integration",
-        this._error,
-        true,
-      );
+      return this._placeholder(this._t("error_title"), this._error, true);
     }
     if (!this._snapshot) {
       const grid = el("div", "grid");
@@ -662,16 +672,14 @@ class IkeaBilresaPanel extends HTMLElement {
       const wrap = el("div");
       const back = el("button", null);
       back.type = "button";
-      back.textContent = "← Back to all wheels";
+      back.textContent = `← ${this._t("back")}`;
       back.addEventListener("click", () => {
         this._open = null;
         this._render();
       });
       wrap.appendChild(
         this._placeholder(
-          wheel ? wheel.name : "Wheel",
-          "Channels, live test and diagnostics arrive in the next package.",
-          false,
+          wheel ? wheel.name : "", this._t("detail_soon"), false,
         ),
       );
       const row = el("div", "placeholder");
@@ -681,25 +689,19 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     if (!this._snapshot.wheels.length) {
       return this._placeholder(
-        "No BILRESA wheels found",
-        this._snapshot.matter_connected
-          ? "The integration is connected but has not discovered a wheel yet."
-          : "Home Assistant is not connected to Matter, so no wheel can be seen.",
+        this._t("empty_title"),
+        this._t(
+          this._snapshot.matter_connected ? "empty_connected" : "empty_offline",
+        ),
         true,
       );
     }
 
     const wrap = el("div");
     if (!this._snapshot.matter_connected) {
-      wrap.appendChild(
-        this._banner(
-          "Matter is disconnected. The wheels below show their last known state.",
-        ),
-      );
+      wrap.appendChild(this._banner(this._t("banner_matter_offline")));
     } else if (this._error) {
-      wrap.appendChild(
-        this._banner("Live updates stopped. The view may be out of date."),
-      );
+      wrap.appendChild(this._banner(this._t("banner_updates_stopped")));
     }
     const missing = this._snapshot.wheels.filter((w) =>
       w.channels.some((c) => c.target_missing),
@@ -707,7 +709,7 @@ class IkeaBilresaPanel extends HTMLElement {
     if (missing.length) {
       wrap.appendChild(
         this._banner(
-          `A control binding points at something Home Assistant can no longer find (${missing.length} ${missing.length === 1 ? "wheel" : "wheels"}).`,
+          this._t("banner_target_missing", { count: missing.length }),
         ),
       );
     }

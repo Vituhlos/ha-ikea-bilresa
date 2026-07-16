@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.11] - 2026-07-16
+
+### Added
+- **The panel speaks Czech.** It follows the language configured in Home
+  Assistant's own settings.
+
+### Fixed
+- The panel no longer draws a second menu button beside Home Assistant's sidebar
+  control on desktop. This shipped in rc.10 but could not take effect until a
+  browser loaded the new panel module — the rc.10 fix that *was* visible
+  (channels showing what they control) is served by Home Assistant, not the
+  browser.
+
+### Notes
+- The panel's language is the instance's, from Settings → System → General, not
+  each user's own. Home Assistant does not offer a custom panel a per-user
+  language.
+- No Matter event decoding, gesture timing, binding behaviour or stored
+  configuration changed.
+
 ## [0.5.7-rc.10] - 2026-07-16
 
 ### Fixed

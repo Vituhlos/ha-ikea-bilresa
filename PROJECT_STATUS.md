@@ -252,6 +252,38 @@ technical spike below changes frontend delivery and a read-only WebSocket API,
 but does not implement the designed panel or change Matter, binding storage or
 hardware behavior. The physical `v0.5.7` checklist remains open.
 
+### Panel localization (Claude Code, 2026-07-16)
+
+The panel shipped English-only to a Czech owner. It was recorded as an "open
+Phase 0 decision", which described the gap without closing it.
+
+New `panel_strings.py` holds every user-facing string in both languages **on
+adjacent lines in one file**. Not `strings.json`: Home Assistant's translation
+categories are fixed (`config`, `selector`, `system_health`, `issues`,
+`device_automation`) and none describes a custom panel — HA has no category for
+one, inventing a category risks hassfest, and the frontend would not fetch it.
+
+Two JSON files in two directories is how English and Czech drift, which the
+roadmap forbids. One file makes alignment structural, and
+`tests/test_panel_strings.py` fails the build when a key, a placeholder or a
+translation is missing on either side. 34 keys, all aligned.
+
+Where each string is resolved:
+
+- **behaviour labels** (`Plynulé stmívání`) are localized in `panel_models` and
+  travel in the snapshot — they belong with the mode mapping;
+- **UI chrome** travels in the panel's `config`, resolved once at registration.
+  A language change therefore needs a reload; acceptable, since HA reloads the
+  integration on a core config change.
+
+**Known limitation, not hidden:** the language is `hass.config.language`, the
+instance's, not the individual user's. Home Assistant exposes no per-user locale
+to a WebSocket handler or to panel registration. A household reading two
+languages gets one of them. Revisit if HA ever exposes a per-connection locale.
+
+`test_the_frontend_does_not_hard_code_user_facing_english` keeps the second copy
+from creeping back into JavaScript.
+
 ### Panel grid: two defects found on first sight (Claude Code, 2026-07-16)
 
 `rc.9` deployed and the grid rendered — with **every channel of every wheel

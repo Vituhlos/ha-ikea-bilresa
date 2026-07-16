@@ -32,6 +32,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
+from .panel_strings import panel_strings, resolve_language
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
             hass.data[_STATIC_REGISTERED] = True
 
         integration = await async_get_integration(hass, DOMAIN)
+        language = resolve_language(getattr(hass.config, "language", None))
         # Cache-busting. Without this an upgrade leaves browsers on the old
         # bundle until a hard refresh, which looks exactly like a broken panel.
         module_url = f"{STATIC_URL_PATH}/{PANEL_FILENAME}?v={integration.version}"
@@ -101,7 +103,18 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
             # filtering cannot be done safely in the first package, restrict to
             # administrators and record the decision rather than over-serving.
             require_admin=True,
-            config={"spike": True, "version": str(integration.version)},
+            # The panel's own vocabulary travels in its config: Home Assistant has
+            # no translation category a custom panel could use, and the frontend
+            # would not fetch one. See panel_strings for why both languages live
+            # in a single Python file rather than two JSON files.
+            #
+            # Resolved once at registration, so a language change needs a reload.
+            # Acceptable: HA reloads the integration on a core config change.
+            config={
+                "version": str(integration.version),
+                "language": language,
+                "labels": panel_strings(language),
+            },
         )
     except Exception:  # noqa: BLE001 - a panel must never break setup
         _LOGGER.exception("Failed to register the BILRESA panel; continuing without it")

@@ -50,6 +50,7 @@ from .const import (
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
 from .model import BilresaWheel
+from .panel_strings import localize
 
 CONTRACT_VERSION = 1
 
@@ -178,49 +179,50 @@ def _binding_by_channel(entry: Any, node_id: int) -> dict[int, dict[str, Any]]:
     return bindings
 
 
-# What a rotation does, keyed by the binding's stored scroll mode.
+# The `panel_strings` key for each stored scroll mode.
 #
 # NOT keyed by CONF_BINDING_PROFILE: that is a config-flow-only field used to
 # pick sensible defaults, and it is **never written to the subentry**. Reading it
 # back returns None for every binding, which is how the first version of this
 # grid reported four configured channels as "not configured".
-_MODE_LABELS = {
-    MODE_BRIGHTNESS: "Smooth dimming",
-    MODE_COLOR_TEMP: "Colour temperature",
-    MODE_COLOR: "Colour",
-    MODE_VOLUME: "Volume",
-    MODE_COVER: "Cover position",
-    MODE_TEMPERATURE: "Temperature",
-    MODE_FAN: "Fan speed",
-    MODE_NUMBER: "Value",
+_MODE_KEYS = {
+    MODE_BRIGHTNESS: "mode_brightness",
+    MODE_COLOR_TEMP: "mode_color_temp",
+    MODE_COLOR: "mode_color",
+    MODE_VOLUME: "mode_volume",
+    MODE_COVER: "mode_cover_position",
+    MODE_TEMPERATURE: "mode_temperature",
+    MODE_FAN: "mode_fan_speed",
+    MODE_NUMBER: "mode_number",
 }
 
 
-def _behaviour_label(data: dict[str, Any]) -> str | None:
-    """A short, human phrase for what this binding does.
+def _behaviour_label(data: dict[str, Any], language: str | None) -> str | None:
+    """A short, human phrase for what this binding does, in the user's language.
 
     Scenes take precedence because scene cycling overrides the normal
     single-press action, which is what a user would notice first.
 
-    Intentionally not localized here: these are placeholders until the
-    localization decision in `PANEL_ROADMAP.md`'s open list is made. Whatever it
-    is, it belongs on the Python side — the roadmap requires English and Czech to
-    stay aligned, and two copies of these phrases in the frontend is how they
-    drift.
+    Localized here rather than in the frontend: the roadmap requires English and
+    Czech to stay aligned, and a second copy of these phrases in JavaScript is
+    how they drift.
     """
     if scenes := data.get(CONF_SCENES):
-        return f"Scenes ({len(scenes)})"
+        return localize(language, "mode_scenes", count=len(scenes))
     mode = data.get(CONF_MODE)
-    if mode in _MODE_LABELS:
-        return _MODE_LABELS[mode]
+    if mode in _MODE_KEYS:
+        return localize(language, _MODE_KEYS[mode])
     # A binding exists but its mode is unrecognised — say so rather than let it
     # read as unconfigured, which is a different and wrong thing.
-    return str(mode) if mode else "Configured"
+    return str(mode) if mode else localize(language, "configured")
 
 
 @callback
 def _channel_summaries(
-    hass: HomeAssistant, wheel: BilresaWheel, bindings: dict[int, dict[str, Any]]
+    hass: HomeAssistant,
+    wheel: BilresaWheel,
+    bindings: dict[int, dict[str, Any]],
+    language: str | None,
 ) -> list[ChannelSummary]:
     """One summary per channel the device itself reports.
 
@@ -246,7 +248,7 @@ def _channel_summaries(
                 channel=channel,
                 # The stored scroll mode. CONF_BINDING_PROFILE is not persisted.
                 profile=data.get(CONF_MODE),
-                behaviour=_behaviour_label(data),
+                behaviour=_behaviour_label(data, language),
                 target_label=_entity_label(hass, target),
                 target_missing=(
                     _target_missing(hass, target) or _target_missing(hass, click_target)
@@ -319,6 +321,9 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
     channel the device reports. Nothing here grows with uptime or event volume.
     """
     coordinator = entry.runtime_data
+    # The instance language, not the individual user's: Home Assistant exposes no
+    # per-connection locale here. See panel_strings.
+    language = getattr(hass.config, "language", None)
     wheels: list[WheelOverview] = []
 
     for node_id, wheel in sorted(coordinator.wheels.items()):
@@ -342,7 +347,7 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
                 last_activity=last_activity,
                 last_active_channel=last_channel,
                 channels=_channel_summaries(
-                    hass, wheel, _binding_by_channel(entry, node_id)
+                    hass, wheel, _binding_by_channel(entry, node_id), language
                 ),
             )
         )
