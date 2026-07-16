@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-15 by Claude Code and Codex**
+Last updated: **2026-07-16 by Claude Code**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -33,8 +33,10 @@ earlier device-reference observations.
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
 - Latest stable release remains `v0.5.0`. Prerelease `v0.5.7-rc.8` was published
-  from CI-verified commit `b50e17c`; it contains the Phase 0 technical spike,
-  the mobile-safe panel header and an idempotent browser custom-element guard.
+  from CI-verified commit `b50e17c`; it contains the Phase 0 technical spike, a
+  panel header and an idempotent browser custom-element guard. That header was
+  recorded here as "mobile-safe"; it is not. On a notched iPhone its menu button
+  sits under the notch. Fixed in the working tree, unreleased.
   Draft PR #1 remains open and `main` has not been merged.
 - The `0.5.1`–`0.5.7` numbers are ordered work packages, not existing releases.
   Candidate naming is `v0.5.N-rc.K`; the third component advances gradually.
@@ -348,16 +350,40 @@ git diff --check                                    passed (CRLF warnings only)
 
 This establishes Implemented + Static + Unit + CI + Released and a successful
 non-hardware HA deployment smoke test for the mobile header and registration
-guard. The header itself is **not Hardware/real-phone verified** until the owner
-opens RC.8 in the companion app and uses its menu button.
+guard.
+
+**The RC.8 header is NOT mobile-safe, despite the wording above and in the RC.8
+release notes.** The owner opened RC.8 on an iPhone: the menu button sits under
+the notch. The header was written with a plain `height: 56px` and no safe-area
+insets, and the companion app's WebView runs under the status bar (Home
+Assistant's frontend sets `viewport-fit=cover`), so the notch overlaps the
+one control that lets a user leave the panel. This is the same class of defect as
+the missing header itself: real on a phone, invisible everywhere it was tested.
+
+Fixed in the working tree (Claude Code, 2026-07-16), Implemented + Static only:
+the header now takes `env(safe-area-inset-top)` as `padding-block` with
+`box-sizing: content-box`, so the inset is added to the 56px bar rather than
+eaten out of it, plus `max(4px, env(safe-area-inset-left/right))` for landscape
+where the notch takes a side. `env()` resolves to 0px without insets, so nothing
+changes on a desktop. `tests/test_panel.py::test_panel_header_clears_the_notch`
+locks the CSS in.
+
+**A narrow desktop window cannot catch this** — it reports no insets. Neither
+can any test in this repository: the assertions only prove the CSS is present,
+not that it clears a real notch. Only a physical notched phone can.
 
 Still owed before Phase 0 can be called closed:
 
-- re-verify the companion app **on a real phone** with the header fix;
+- re-verify the companion app **on a real iPhone** with the safe-area fix, once
+  it is released; RC.8 is known bad there;
 - the degradation test: delete
   `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`, reload, and
   confirm setup still succeeds with a warning and no panel. Currently evidenced
   only by a mocked unit test, which says nothing about reality.
+
+For the real panel, not just this spike: every layer must respect the safe-area
+insets, not only the header. `PANEL_DESIGN.md` records the header requirement;
+the insets belong with it.
 
 The owner authorized starting the panel program with the `v0.5.7` hardware gate
 still open. The spike is deliberately additive: no event decoding, gesture

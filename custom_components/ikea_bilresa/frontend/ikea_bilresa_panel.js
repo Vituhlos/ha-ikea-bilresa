@@ -138,12 +138,25 @@ class IkeaBilresaPanel extends HTMLElement {
     const page = el("div", undefined, "font-family:Roboto,sans-serif");
     const style = document.createElement("style");
     style.textContent = `
+      /* The companion app's WebView extends under the status bar, so on a
+         notched iPhone a header with a plain 56px height puts its menu button
+         behind the notch or Dynamic Island -- reachable in theory, unusable in
+         practice. The safe-area insets are the fix, and they must be added to
+         the height rather than eating into it, or the bar just gets shorter.
+         The left/right insets matter in landscape, where the notch takes a
+         side. env() resolves to 0px everywhere else, so this costs nothing on
+         a desktop. Verify on real hardware: a narrow desktop window has no
+         insets and will look fine either way. */
       ikea-bilresa-panel .bilresa-panel-header {
         display: flex;
         align-items: center;
         gap: 8px;
+        box-sizing: content-box;
         height: 56px;
-        padding: 0 4px;
+        padding-block: env(safe-area-inset-top, 0px) 0;
+        padding-inline:
+          max(4px, env(safe-area-inset-left, 0px))
+          max(4px, env(safe-area-inset-right, 0px));
         border-bottom: 1px solid var(--divider-color);
         background: var(--app-header-background-color, var(--primary-color));
         color: var(--app-header-text-color, var(--text-primary-color));

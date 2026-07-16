@@ -134,6 +134,28 @@ def test_panel_asset_has_an_accessible_mobile_exit() -> None:
     assert ".bilresa-panel-menu:focus-visible" in asset
 
 
+def test_panel_header_clears_the_notch() -> None:
+    """A 48px target under a Dynamic Island is not a target.
+
+    The companion app's WebView runs under the status bar, so the header must
+    add the safe-area inset to its height rather than let the notch overlap it.
+    A narrow desktop window reports no insets and will not catch a regression.
+    """
+    asset = (
+        Path(__file__).parents[1]
+        / "custom_components"
+        / "ikea_bilresa"
+        / "frontend"
+        / "ikea_bilresa_panel.js"
+    ).read_text(encoding="utf-8")
+
+    assert "padding-block: env(safe-area-inset-top, 0px) 0;" in asset
+    assert "env(safe-area-inset-left, 0px)" in asset
+    assert "env(safe-area-inset-right, 0px)" in asset
+    # content-box keeps the inset additive; border-box would eat the 56px bar
+    assert "box-sizing: content-box;" in asset
+
+
 def test_panel_asset_registration_is_browser_idempotent() -> None:
     """A cache-busted upgrade must not redefine an element in an open tab."""
     asset = (
