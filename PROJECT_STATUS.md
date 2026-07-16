@@ -252,6 +252,55 @@ technical spike below changes frontend delivery and a read-only WebSocket API,
 but does not implement the designed panel or change Matter, binding storage or
 hardware behavior. The physical `v0.5.7` checklist remains open.
 
+### Panel `0.5.8` Phase 1 backend read model (Claude Code, 2026-07-16)
+
+Status: **Implemented + Static. Unit not run locally. CI has not run. Not
+deployed and not called by anything yet.** Phase 1's exit gate wants
+deterministic, bounded, privacy-reviewed serializers with no Matter or binding
+behaviour change; that is what this is, but only CI has ever executed the tests.
+
+New `panel_models.py` builds the overview snapshot the grid renders, plus
+`tests/test_panel_models.py` (16 tests: normal, empty, degraded, malformed,
+determinism, privacy). Pure functions over the coordinator, subentries and the
+device/entity/area registries. No I/O, no subscriptions, no mutation, no Matter.
+
+Decisions a later agent cannot infer from the code:
+
+- **`wheel_key` is `sha256("ikea_bilresa:<node_id>")[:12]`.** The roadmap forbids
+  the node ID on the wire, but the key must survive reloads or the panel loses
+  its selection on every reconnect; a hash is both. It is **not** a security
+  boundary — node IDs are small and brute-forceable. It exists so the node ID
+  cannot leak into screenshots, exports and bug reports, which this project has
+  already done once.
+- **Last activity comes from this integration's own `event` entity states**, not
+  the coordinator. `_recent_events` carries no node ID and endpoints are numbered
+  per node, so two wheels both have an endpoint 1 — attribution is impossible
+  there. Entity states are ISO-8601 UTC, so lexical max is chronological max.
+- **`EventEntity` does not restore state**, so `last_activity` and
+  `last_active_channel` are `None` after every restart until a wheel is touched.
+  Tested. The UI must render that as "no activity yet", never as a fault.
+- **Channels come from the device's own descriptors**, never a hard-coded three.
+- **Behaviour labels are English placeholders on the Python side.** Localization
+  is still an open Phase 0 decision, but it belongs here: the roadmap requires
+  English and Czech to stay aligned, and two copies in the frontend is how they
+  drift.
+- **`target_missing` is detection only.** The binding's fail-closed behaviour is
+  untouched; this must never decide whether a command is sent.
+
+Not done, and deliberately: nothing calls `async_overview_snapshot` yet. Phase 2
+(the authenticated API) is what gives it a caller. It is dead code until then —
+unlike GAP-1, there was no honest existing consumer to wire it into, and
+inventing one would have been worse.
+
+```text
+python -m compileall -q custom_components tests     passed
+ruff format --check / ruff check                    passed
+mypy custom_components/ikea_bilresa                 passed (18 source files)
+git diff --check                                    passed
+python -m pytest -q                                 Unit not run
+  ModuleNotFoundError: No module named 'homeassistant' (Windows/3.13)
+```
+
 ### Panel `0.5.8` Phase 0 technical spike (Claude Code, 2026-07-15)
 
 Status: **Implemented + Static + Unit + CI + Released + deployed and observed in
