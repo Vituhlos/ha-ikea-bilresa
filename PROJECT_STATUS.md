@@ -552,10 +552,14 @@ Still owed before Phase 0 can be called closed:
 
 - re-verify the companion app **on a real iPhone** with the safe-area fix, once
   it is released; RC.8 is known bad there;
-- the degradation test: delete
-  `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`, reload, and
-  confirm setup still succeeds with a warning and no panel. Currently evidenced
-  only by a mocked unit test, which says nothing about reality.
+- ~~the degradation test~~ — **run and passed on 2026-07-16.** The owner renamed
+  `frontend/ikea_bilresa_panel.js` away and the config entry was reloaded against
+  the deployed `rc.8`. The entry stayed `loaded` with two wheels, four bindings,
+  `core_matter_client` and no fallback; the log carried exactly the intended
+  `WARNING ... panel asset is missing at /config/... continuing without a panel`;
+  no `ikea_bilresa` error appeared. This is the only real evidence that
+  `async_setup_panel`'s `try/except` holds — the unit test for it invents the
+  missing file and says nothing about a running Home Assistant.
 
 For the real panel, not just this spike: every layer must respect the safe-area
 insets, not only the header. `PANEL_DESIGN.md` records the header requirement;
@@ -619,20 +623,24 @@ python -m pytest -q                                 Unit not run
   ModuleNotFoundError: No module named 'homeassistant' (Windows/3.13)
 ```
 
-**The spike's exit gate is a deployment, and it is open.** After a HACS install,
-verify in this order:
+**The spike's exit gate was a deployment. Five of six steps have passed on real
+Home Assistant; only the companion app is still owed.**
 
-1. an "IKEA BILRESA" entry appears in the sidebar and opens;
-2. every row of the stub's table is populated, including `wheels discovered`;
-3. reload the config entry — the panel returns, is not duplicated, and no
-   duplicate-route error appears in the log;
-4. restart Home Assistant — same;
-5. check the companion app's WebView, not only a desktop browser;
-6. **delete the `.js` and reload** — setup must still succeed, with a warning
-   and no panel. This is the only real test of the degradation path.
+1. sidebar entry appears and opens — **passed** (`rc.6`);
+2. every row of the stub's table populated, `wheels discovered: 2` — **passed**;
+3. config-entry reload: panel re-registers, static path does **not**, no
+   duplicate-route error — **passed**. This was the one behaviour inferred from
+   HA source and unverifiable locally;
+4. Home Assistant restart — **passed**;
+5. companion app — **failed on `rc.8`**: the header sat under the iPhone notch.
+   Fixed in `cf6454c`, released in `rc.9`, **not yet re-verified on a phone**;
+6. asset removed, reload — **passed** (2026-07-16, on `rc.8`): entry stayed
+   `loaded`, the intended warning appeared, no error. See the Phase 0 section.
 
-If step 3, 4 or 6 fails, the packaging approach is wrong and the roadmap says to
-revise or abandon the architecture rather than work around it.
+The roadmap said that if 3, 4 or 6 failed, the packaging approach was wrong and
+the architecture should be revised or abandoned rather than worked around. All
+three passed. **The delivery path is proven; a panel can be built because it can
+be delivered.** Step 5 is a bug in one header, not a verdict on the approach.
 
 ### Per-wheel availability, GAP-1 (Claude Code, 2026-07-15)
 

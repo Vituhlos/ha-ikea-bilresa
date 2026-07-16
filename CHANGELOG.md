@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.7-rc.9] - 2026-07-16
+
+### Added
+- The panel's **overview grid**: one card per physical wheel with its name, area,
+  status, last activity and all three channel summaries, over a new read-only
+  WebSocket API. Built from Home Assistant's own design tokens.
+- Read-only `ikea_bilresa/overview`, `.../overview/subscribe` and
+  `.../activity/subscribe` WebSocket commands. Admin-only. No write path.
+
+### Changed
+- The Phase 0 spike's diagnostic table and its `.../spike/*` commands are gone.
+  **An already-open panel tab from rc.8 will not work against this release**;
+  reload the page. Those commands were never a contract.
+
+### Fixed
+- The panel header no longer sits under an iPhone's notch. Home Assistant's
+  frontend runs the companion app's WebView under the status bar, and the header
+  did not take the safe-area inset, so the menu button — the only way out of the
+  panel — was covered.
+
+### Notes
+- The panel still cannot affect wheels, bindings or events, and this was now
+  verified on a running Home Assistant rather than only asserted: with the panel
+  asset removed, the integration sets up normally with a warning and no sidebar
+  entry.
+- No Matter event decoding, gesture timing, binding behaviour or stored
+  configuration changed.
+
 ## [0.5.7-rc.8] - 2026-07-15
 
 ### Fixed
