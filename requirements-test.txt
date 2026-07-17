@@ -1,3 +1,5 @@
-homeassistant
+homeassistant==2026.7.2
 pytest
 pytest-asyncio
+pytest-cov==7.1.0
+pytest-homeassistant-custom-component==0.13.346

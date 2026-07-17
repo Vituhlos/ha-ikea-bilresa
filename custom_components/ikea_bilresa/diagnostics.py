@@ -8,9 +8,30 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from . import BilresaConfigEntry
-from .const import CONF_URL
+from .const import (
+    CONF_CLICK_TARGET,
+    CONF_DOUBLE_TARGET,
+    CONF_HOLD_TARGET,
+    CONF_NODE_ID,
+    CONF_TARGET,
+    CONF_TRIPLE_TARGET,
+    CONF_URL,
+)
+from .device_link import resolve_matter_device, wheel_availability
 
-TO_REDACT = {"serial", "compressed_fabric_id"}
+TO_REDACT = {
+    CONF_CLICK_TARGET,
+    CONF_DOUBLE_TARGET,
+    CONF_HOLD_TARGET,
+    CONF_NODE_ID,
+    CONF_TARGET,
+    CONF_TRIPLE_TARGET,
+    CONF_URL,
+    "compressed_fabric_id",
+    "name",
+    "serial",
+    "title",
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -19,17 +40,32 @@ async def async_get_config_entry_diagnostics(
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data
 
-    wheels = {
-        node_id: {
-            "name": wheel.name,
-            "serial": wheel.serial,
-            "endpoints": {
-                ep: {"channel": e.channel, "role": e.role}
-                for ep, e in wheel.endpoints.items()
-            },
-        }
-        for node_id, wheel in coordinator.wheels.items()
-    }
+    wheels = []
+    for node_id, wheel in coordinator.wheels.items():
+        # `matter_event_source` and `telemetry` below describe the server
+        # connection and say nothing about one wheel. Resolving the linked core
+        # Matter device is the only read-only way to tell a flat battery apart
+        # from a dead server. `linked_to_matter` is included because it is the
+        # reason availability can be "unknown".
+        link = resolve_matter_device(
+            hass,
+            matter_url=coordinator.url,
+            server_info=coordinator.matter_server_info,
+            wheel=wheel,
+        )
+        wheels.append(
+            {
+                "node_id": node_id,
+                "name": wheel.name,
+                "serial": wheel.serial,
+                "linked_to_matter": link.device is not None,
+                "availability": wheel_availability(hass, link.device),
+                "endpoints": {
+                    ep: {"channel": e.channel, "role": e.role}
+                    for ep, e in wheel.endpoints.items()
+                },
+            }
+        )
 
     bindings = [
         {"title": subentry.title, **dict(subentry.data)}
@@ -40,9 +76,11 @@ async def async_get_config_entry_diagnostics(
         {
             "url": entry.data.get(CONF_URL),
             "matter_server_info": coordinator.matter_server_info,
+            "matter_event_source": coordinator.event_source,
             "wheel_count": len(wheels),
             "wheels": wheels,
             "bindings": bindings,
+            "telemetry": coordinator.telemetry,
         },
         TO_REDACT,
     )

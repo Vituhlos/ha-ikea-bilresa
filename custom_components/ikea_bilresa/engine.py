@@ -13,8 +13,9 @@ channels are handled independently.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
+from uuid import uuid4
 
 from .const import (
     ACTION_HOLD,
@@ -54,6 +55,8 @@ class WheelAction:
     direction: str | None = None  # DIRECTION_UP / DIRECTION_DOWN for rotate
     notches: int = 0  # rotate delta (this event only)
     presses: int = 0  # 1 / 2 / 3 for press
+    action_id: str = field(default_factory=lambda: uuid4().hex)
+    source: str = "matter"
 
 
 class GestureEngine:

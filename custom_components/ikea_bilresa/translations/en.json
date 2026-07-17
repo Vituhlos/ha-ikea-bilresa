@@ -2,8 +2,15 @@
   "config": {
     "step": {
       "user": {
-        "title": "IKEA BILRESA (smooth scroll)",
+        "title": "IKEA BILRESA",
         "description": "Connect to the Matter Server that already controls your BILRESA wheels. The URL is pre-filled from your Matter integration — leave it as is unless you run the Matter Server elsewhere.",
+        "data": {
+          "url": "Matter Server WebSocket URL"
+        }
+      },
+      "reconfigure": {
+        "title": "Change Matter Server connection",
+        "description": "Update the Matter Server WebSocket URL. The new address is tested before the integration reconnects.",
         "data": {
           "url": "Matter Server WebSocket URL"
         }
@@ -18,17 +25,19 @@
   },
   "config_subentries": {
     "binding": {
-      "title": "Light binding",
+      "title": "Control binding",
       "initiate_flow": {
-        "user": "Add light binding",
-        "reconfigure": "Reconfigure light binding"
+        "user": "Add control binding",
+        "reconfigure": "Reconfigure control binding"
       },
-      "entry_type": "light binding",
+      "entry_type": "control binding",
       "step": {
         "user": {
-          "title": "Bind a wheel channel to a light",
-          "description": "Scrolling this wheel channel will dim the chosen light in real time; a single button press runs the selected action.",
+          "title": "Bind a wheel channel to a target",
+          "description": "Choose a profile or copy an existing binding, then configure scroll and button actions.",
           "data": {
+            "binding_profile": "Starting profile",
+            "copy_from": "Copy settings from an existing binding (optional)",
             "node_id": "Wheel",
             "channel": "Channel",
             "target": "Target (light, media player, cover, climate, fan, number)",
@@ -39,15 +48,21 @@
             "max_brightness": "Maximum brightness (%)",
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
+            "button_response": "Button response",
             "click_target": "Single-press target (optional, defaults to the light)",
             "double_press_target": "Double-press: toggle entity (optional)",
             "triple_press_target": "Triple-press: toggle entity (optional)",
-            "hold_target": "Hold: toggle entity (optional)"
+            "hold_target": "Hold target (optional, used by Toggle entity)",
+            "hold_action": "Button hold action",
+            "scenes": "Scenes cycled by single press (optional, overrides its action)"
+          },
+          "data_description": {
+            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition if this binding uses double- or triple-press actions. Public BILRESA events remain fully classified in either mode."
           }
         },
         "reconfigure": {
-          "title": "Reconfigure light binding",
-          "description": "Adjust how this wheel channel controls its light.",
+          "title": "Reconfigure control binding",
+          "description": "Adjust how this wheel channel controls its target.",
           "data": {
             "node_id": "Wheel",
             "channel": "Channel",
@@ -59,12 +74,22 @@
             "max_brightness": "Maximum brightness (%)",
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
+            "button_response": "Button response",
             "click_target": "Single-press target (optional, defaults to the light)",
             "double_press_target": "Double-press: toggle entity (optional)",
             "triple_press_target": "Triple-press: toggle entity (optional)",
-            "hold_target": "Hold: toggle entity (optional)"
+            "hold_target": "Hold target (optional, used by Toggle entity)",
+            "hold_action": "Button hold action",
+            "scenes": "Scenes cycled by single press (optional, overrides its action)"
+          },
+          "data_description": {
+            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition if this binding uses double- or triple-press actions. Public BILRESA events remain fully classified in either mode."
           }
         }
+      },
+      "error": {
+        "fast_response_conflicts_with_multi_press": "Fast response cannot be combined with a double- or triple-press target. Remove those targets or choose multi-press recognition.",
+        "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls."
       },
       "abort": {
         "no_wheels": "No BILRESA wheels have been discovered yet. Make sure the wheel works in the Matter integration, then try again."
@@ -91,13 +116,42 @@
         "fan_speed": "Fan speed",
         "number": "Number value"
       }
+    },
+    "hold_action": {
+      "options": {
+        "toggle": "Toggle entity",
+        "ramp": "Ramp target while held",
+        "none": "Do nothing"
+      }
+    },
+    "binding_profile": {
+      "options": {
+        "custom": "Custom",
+        "light": "Light dimmer",
+        "media": "Media volume",
+        "cover": "Cover position",
+        "climate": "Climate temperature",
+        "scenes": "Scene selector"
+      }
+    },
+    "button_response": {
+      "options": {
+        "fast": "Fast single press",
+        "multi_press": "Recognize single, double or triple press"
+      }
     }
   },
-  "entity": {
-    "binary_sensor": {
-      "matter_server": {
-        "name": "Matter Server connection"
-      }
+  "system_health": {
+    "info": {
+      "configured": "Configured",
+      "config_entry_state": "Config entry state",
+      "matter_server_connected": "Matter Server connected",
+      "matter_server_version": "Matter Server SDK version",
+      "matter_event_source": "Matter event source",
+      "last_matter_event": "Last Matter event",
+      "fallback_reason": "Event-source fallback reason",
+      "discovered_wheels": "Discovered BILRESA wheels",
+      "configured_bindings": "Configured bindings"
     }
   },
   "issues": {
