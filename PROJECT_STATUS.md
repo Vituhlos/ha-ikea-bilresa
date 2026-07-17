@@ -209,17 +209,63 @@ Files: `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
   https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.5.9-rc.12;
 - the tag resolves to `161b2bf` and is marked prerelease.
 
-This establishes **Implemented + Static + Unit + CI + Released**. It does **not**
-establish a Home Assistant deployment or Hardware: nothing has been installed
-through HACS yet, and the panel has never rendered in a real Home Assistant
-page. Deploy `v0.5.9-rc.12`, then open it in a **completely fresh** browser tab
-(an existing tab keeps the old custom element and the web platform forbids
-redefining it).
+### Deployment smoke (2026-07-17)
 
-Owed before this can be called done: a HACS install of `v0.5.9-rc.12` and a
-real Home Assistant page opened in a fresh tab — plus the standing debts this
-work does not discharge (a non-default theme, a screen-reader pass, and a
-physical notched phone).
+Owner-authorized HACS deployment of `v0.5.9-rc.12` completed:
+
+- pre-restart config check `valid`;
+- HACS installed exactly `v0.5.9-rc.12` into
+  `/config/custom_components/ikea_bilresa` (verified on disk before restart);
+- Home Assistant (Core 2026.7.2, HA OS 18.1, Python 3.14.6) restarted and the
+  `ikea_bilresa` config entry returned to `loaded`;
+- System Health reported Matter connected via `core_matter_client`, no fallback,
+  three discovered wheels and **four configured bindings preserved**;
+- exact-domain system-log search returned zero entries; the raw error log showed
+  only Home Assistant's standard "custom integration not tested" loader warning,
+  no `custom_components.ikea_bilresa` error lines.
+
+This establishes **Implemented + Static + Unit + CI + Released + non-hardware HA
+deployment smoke**. It does **not** establish visual/HA UI review or Hardware:
+the deployment confirms the backend loads and bindings survive, but the panel
+has not been rendered in a real Home Assistant page from this session — the
+callable browser surface here is the local harness, not the authenticated HA
+frontend.
+
+Owed before this can be called done: open the deployed panel in a **completely
+fresh** browser tab (an existing tab keeps the old custom element and the web
+platform forbids redefining it) and confirm the spine, the corrected rail, the
+lighter unconfigured channels, the result-led Live test and the non-scrolling
+tab strip — plus the standing debts this work does not discharge (a non-default
+theme, a screen-reader pass, and a physical notched phone).
+
+## BILRESA dual button (E2489) planning docs (Claude Code, 2026-07-17)
+
+Status: **Documentation only. No code, no Static/Unit/CI/Hardware claim.**
+
+The owner added a physical **BILRESA dual button** (E2489, "Tlačítko Obývák",
+Matter node observed via read-only MCP) and asked for a support plan. Recorded,
+not implemented:
+
+- new `docs/ROADMAP_BUTTON.md` — a `0.6.x` minor train (B0 variant-discovery fix
+  → B1 button event entities + device triggers → B2 button binding profile → B3
+  panel → B4 hardware + `DEVICE_REFERENCE_BUTTON.md`). Kept separate from the
+  wheel roadmap at the owner's request; pointer added to `docs/ROADMAP.md`;
+- key finding it documents: `model.parse_node` matches on the product substring
+  `"bilresa"`, so the dual button is **already half-discovered** — both endpoints
+  decode as `role=button, channel=None`, it enters `coordinator.wheels` and gets
+  `ikea_bilresa` device identifiers, but `event.py` makes no entities (channel is
+  None), so it is mis-presented as a wheel with zero channels. B0 fixes that
+  before any feature;
+- firmware quirk to design around (from core PR #159045 / issue #159452):
+  pressing past `MultiPressMax` (=2) makes the firmware stop emitting events, so
+  the button decode needs a timeout-terminal, not an indefinite wait;
+- `docs/HARDWARE_TEST.md` gained a **raw SWITCH_EVENT capture** procedure (the
+  StephanMeijer gist's matter-server instrumentation, as an independent oracle
+  with explicit privacy/temporary-patch caveats) and a **Section F** dual-button
+  checklist. No hardware run recorded.
+
+Read-only MCP was used only to read the device; no Home Assistant state changed.
+Dual-button facts marked *(confirm)* in the roadmap still need a raw capture.
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
@@ -1844,14 +1890,13 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Deploy `v0.5.9-rc.12` through HACS (CI-verified, published from `161b2bf`),
-restart Home Assistant, and open the panel in a **completely fresh** browser tab
-— an existing tab keeps the old custom element and the web platform does not
-allow redefining it. Then visually check the channel spine, the corrected rail
-(accent icon + weight on the open wheel, no stray tick row), the lighter
-unconfigured channels, the result-led Live test with its detent strip, and the
-tab strip with no scrollbar. Capture screenshots against a non-default theme,
-which the harness could not exercise.
+`v0.5.9-rc.12` is deployed and loaded (deployment smoke clean). Open the panel
+in a **completely fresh** browser tab — an existing tab keeps the old custom
+element and the web platform does not allow redefining it. Then visually check
+the channel spine, the corrected rail (accent icon + weight on the open wheel,
+no stray tick row), the lighter unconfigured channels, the result-led Live test
+with its detent strip, and the tab strip with no scrollbar. Capture screenshots
+against a non-default theme, which the harness could not exercise.
 
 ## Next-agent handoff
 
