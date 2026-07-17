@@ -173,7 +173,11 @@
     "trigger_subtype": {
       "channel_1": "Kanál 1",
       "channel_2": "Kanál 2",
-      "channel_3": "Kanál 3"
+      "channel_3": "Kanál 3",
+      "button_1": "Tlačítko 1",
+      "button_2": "Tlačítko 2",
+      "button_3": "Tlačítko 3",
+      "button_4": "Tlačítko 4"
     }
   }
 }

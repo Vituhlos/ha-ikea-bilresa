@@ -21,6 +21,43 @@ Record before testing:
 Enable debug logging for `custom_components.ikea_bilresa` and retain relevant,
 redacted logs for failures.
 
+## Raw event capture (independent oracle)
+
+For any item below that asserts what the device *actually sent* — notch counts,
+press classification, timing, or the dual button's past-max behaviour — capture
+the raw Switch-cluster stream at the Matter Server, one layer below Home
+Assistant's filtering. This is the layer the integration itself consumes, so it
+is a ground-truth oracle: it proves whether a decode mismatch is ours or the
+device's, and it removes the recurring "the device's physical count was not
+independently instrumented" limitation from earlier runs.
+
+Method (adapted from StephanMeijer's public gist,
+`https://gist.github.com/StephanMeijer/75a26615f9b692cf7ce7cf8d6716ade4`):
+
+- Inside the **Matter Server add-on** container, patch
+  `matter_server/server/device_controller.py` to log each Switch (cluster 59)
+  node event as it arrives — `received_at` (ms), `endpoint_id`, `event_id`,
+  `event_number`, device timestamp and raw `data`.
+- Read it live with the add-on logs, filtered to the marker, e.g.
+  `grep SWITCH_EVENT`.
+- Cross-check the captured `event_id`/`data` sequence against the integration's
+  decoded `ikea_bilresa_event`, event entity and (where applicable) device
+  trigger for the same physical gesture.
+
+Constraints — this is instrumentation, not a test, and does **not** replace the
+checklists:
+
+- It is a manual, host-side edit performed by the owner; it is **not** something
+  the assistant can do remotely.
+- The patch lives in the add-on's `site-packages` and is **wiped on any add-on
+  update**. Treat it as temporary and remove it after the run; never rely on it
+  as a permanent fixture.
+- Raw lines contain node IDs and other household identifiers. **Redact** before
+  pasting into this file, `PROJECT_STATUS.md`, issues or chat, per the repo's
+  privacy rules.
+- It captures what the device emits only. Binding outcomes, entity/trigger/event
+  agreement, lifecycle, fallback and soak still require the checklist items.
+
 ## A. Discovery and lifecycle
 
 - [ ] Integration connects to the configured Matter Server.
@@ -114,9 +151,62 @@ Repeat on all three channels:
 - [ ] Two wheels used concurrently do not leak actions across Matter nodes.
 - [ ] Logs contain no recurring exceptions, task warnings, or reconnect spam.
 
+## F. BILRESA dual button (E2489)
+
+Separate device class from the scroll wheel: two buttons, no rotary channels.
+See `docs/ROADMAP_BUTTON.md`. Sections A–E above are wheel-shaped; use this
+section for the dual button and capture the raw stream (above) for every
+"device actually sent" claim.
+
+Record before testing: dual button firmware version (owner's unit was `1.8.5`),
+hardware version, and the endpoint `MultiPressMax` read from diagnostics.
+
+### F1. Discovery and presentation
+
+- [ ] The dual button is discovered from its node shape (two button endpoints,
+      no channel label), not from the product string.
+- [ ] It is presented as a **buttons** device, not as a wheel with zero channels,
+      and is excluded from any "wheel" count in System Health.
+- [ ] Each of the two buttons appears once as its own event entity.
+- [ ] Restarting Home Assistant restores the device and any button bindings.
+- [ ] Diagnostics redact node IDs, serials, names and target entity IDs.
+
+### F2. Raw button gestures (capture the raw stream)
+
+- [ ] Single press on button 1 and button 2 each classify as one press.
+- [ ] Double press on each button classifies as a double press.
+- [ ] Long press emits `hold`; release emits `release` exactly once, per button.
+- [ ] Advertised event types match the endpoint's `MultiPressMax`: **no triple
+      press** is offered for a `MultiPressMax = 2` device.
+- [ ] Pressing **more than max** (≥3 fast presses): confirm from the raw capture
+      that the firmware stops emitting (no `MultiPressComplete`), and that the
+      integration terminates the gesture via timeout instead of getting stuck.
+- [ ] Event entity, device trigger and `ikea_bilresa_event` agree for each
+      gesture on each button.
+
+### F3. Button binding behaviour
+
+- [ ] Single/double/hold targets affect only their configured entities.
+- [ ] Hold action `toggle`/`none` behave as configured; a missing `release` is
+      stopped by the watchdog.
+- [ ] Paired hold-to-ramp (button 1 up / button 2 down on a shared target), if
+      configured, begins on `hold` and stops on `release`.
+- [ ] Unavailable/unknown targets cause no errors or runaway commands.
+
+### F4. Reliability and no-leak
+
+- [ ] After ~15 min idle (matterjs-server #526), the next press is still
+      delivered; note whether queued presses burst on resubscribe.
+- [ ] The two buttons do not leak actions into each other.
+- [ ] A dual button and a scroll wheel used concurrently do not leak actions
+      across Matter nodes.
+- [ ] Logs contain no recurring exceptions, task warnings, or reconnect spam.
+
 ## Recorded runs
 
 No complete hardware run has been recorded yet.
+
+No BILRESA dual button (E2489) hardware run has been recorded yet.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

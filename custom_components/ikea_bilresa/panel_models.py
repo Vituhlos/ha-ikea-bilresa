@@ -491,6 +491,10 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
     wheels: list[WheelOverview] = []
 
     for node_id, wheel in sorted(coordinator.wheels.items()):
+        # The dual button (E2489) is not a wheel and must not render as a card
+        # with zero channels. It gets its own panel view in a later package.
+        if wheel.is_dual_button:
+            continue
         link = resolve_matter_device(
             hass,
             matter_url=coordinator.url,

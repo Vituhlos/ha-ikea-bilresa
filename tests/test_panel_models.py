@@ -50,6 +50,20 @@ def _wheel(node_id: int, channels: tuple[int, ...] = (1, 2, 3)) -> BilresaWheel:
     )
 
 
+def _dual_button(node_id: int) -> BilresaWheel:
+    """The E2489: two button endpoints, no rotary channels."""
+    return BilresaWheel(
+        node_id=node_id,
+        name="BILRESA dual button",
+        product_name="BILRESA dual button",
+        serial=SERIAL,
+        endpoints={
+            1: SwitchEndpoint(endpoint_id=1, channel=None, role="button"),
+            2: SwitchEndpoint(endpoint_id=2, channel=None, role="button"),
+        },
+    )
+
+
 def _subentry(node_id: int, channel: int, **data) -> SimpleNamespace:
     """A subentry shaped like the ones Home Assistant actually stores.
 
@@ -157,6 +171,18 @@ def test_snapshot_uses_the_user_name_not_the_product_name(monkeypatch) -> None:
 
     assert result["wheels"][0]["name"] == "Kolecko obyvak"
     assert result["wheels"][0]["area"] == "Living room"
+
+
+def test_snapshot_excludes_the_dual_button(monkeypatch) -> None:
+    """A dual button is not a wheel and must not render as a zero-channel card."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+
+    result = async_overview_snapshot(
+        _hass(), _entry([_wheel(NODE_A), _dual_button(15)])
+    )
+
+    assert len(result["wheels"]) == 1
+    assert result["wheels"][0]["key"] == wheel_key(NODE_A)
 
 
 def test_snapshot_leaks_no_identifiers(monkeypatch) -> None:

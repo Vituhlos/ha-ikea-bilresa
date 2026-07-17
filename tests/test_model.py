@@ -6,6 +6,8 @@ from custom_components.ikea_bilresa.const import (
     ROLE_BUTTON,
     ROLE_SCROLL_DOWN,
     ROLE_SCROLL_UP,
+    VARIANT_DUAL_BUTTON,
+    VARIANT_WHEEL,
 )
 from custom_components.ikea_bilresa.model import (
     BilresaWheel,
@@ -20,6 +22,28 @@ from custom_components.ikea_bilresa.model import (
 UP_TAGS = [{"1": 8, "2": 6, "3": "1"}, {"1": 67, "2": 3}]
 DOWN_TAGS = [{"1": 8, "2": 6, "3": "1"}, {"1": 67, "2": 4}]
 BUTTON_TAGS = [{"1": 8, "2": 6, "3": "1"}, {"1": 67, "2": 8, "3": "button"}]
+
+# The dual button (E2489) exposes two button endpoints with no numeric channel
+# label and no up/down switch tags. This shape is what distinguishes it from a
+# wheel; the fixture matches a real node observed via Home Assistant, not the
+# code's assumptions. MultiPressMax is 2 (single/double only) on this device.
+DUAL_BUTTON_TAGS = [{"1": 67, "2": 8}]
+
+
+def _dual_button_node() -> dict:
+    return {
+        "node_id": 15,
+        "attributes": {
+            "0/40/3": "BILRESA dual button",
+            "0/29/3": [1, 2],
+            "1/59/65532": 30,
+            "1/59/2": 2,  # Switch.MultiPressMax
+            "1/29/4": DUAL_BUTTON_TAGS,
+            "2/59/65532": 30,
+            "2/59/2": 2,
+            "2/29/4": DUAL_BUTTON_TAGS,
+        },
+    }
 
 
 def _node() -> dict:
@@ -60,6 +84,57 @@ def test_parse_node_rejects_non_bilresa() -> None:
     node = _node()
     node["attributes"]["0/40/3"] = "Some Other Remote"
     assert parse_node(node) is None
+
+
+def test_wheel_variant_is_wheel_when_rotary_endpoints_present() -> None:
+    wheel = parse_node(_node())
+    assert wheel is not None
+    assert wheel.variant == VARIANT_WHEEL
+    assert wheel.is_dual_button is False
+
+
+def test_parse_node_discovers_dual_button() -> None:
+    device = parse_node(_dual_button_node())
+    assert device is not None
+    assert device.node_id == 15
+    # Both endpoints are buttons; neither carries a channel label.
+    assert device.endpoints[1].role == ROLE_BUTTON
+    assert device.endpoints[2].role == ROLE_BUTTON
+    assert {e.channel for e in device.endpoints.values()} == {None}
+
+
+def test_dual_button_variant_from_endpoint_shape() -> None:
+    device = parse_node(_dual_button_node())
+    assert device is not None
+    assert device.variant == VARIANT_DUAL_BUTTON
+    assert device.is_dual_button is True
+
+
+def test_parse_node_reads_multi_press_max() -> None:
+    device = parse_node(_dual_button_node())
+    assert device is not None
+    assert device.endpoints[1].multi_press_max == 2
+    assert device.endpoints[2].multi_press_max == 2
+    # A wheel that does not report the attribute yields None, not a guess.
+    wheel = parse_node(_node())
+    assert wheel is not None
+    assert wheel.endpoints[3].multi_press_max is None
+
+
+def test_variant_never_disagrees_with_endpoints() -> None:
+    # variant is derived, not stored, so a hand-built button-only device is a
+    # dual button even though the class name is historical.
+    device = BilresaWheel(
+        node_id=15,
+        name="Buttons",
+        product_name="BILRESA dual button",
+        serial=None,
+        endpoints={
+            1: SwitchEndpoint(1, None, ROLE_BUTTON),
+            2: SwitchEndpoint(2, None, ROLE_BUTTON),
+        },
+    )
+    assert device.is_dual_button is True
 
 
 def test_decode_event_maps_ongoing_count() -> None:

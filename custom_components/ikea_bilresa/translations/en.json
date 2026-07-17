@@ -173,7 +173,11 @@
     "trigger_subtype": {
       "channel_1": "Channel 1",
       "channel_2": "Channel 2",
-      "channel_3": "Channel 3"
+      "channel_3": "Channel 3",
+      "button_1": "Button 1",
+      "button_2": "Button 2",
+      "button_3": "Button 3",
+      "button_4": "Button 4"
     }
   }
 }

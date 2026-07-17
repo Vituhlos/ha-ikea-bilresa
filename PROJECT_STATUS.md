@@ -267,6 +267,148 @@ not implemented:
 Read-only MCP was used only to read the device; no Home Assistant state changed.
 Dual-button facts marked *(confirm)* in the roadmap still need a raw capture.
 
+### B0 — device-variant discovery (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit. mypy not run locally (not
+installed). CI has not run. Not deployed, no Hardware.**
+
+The first `ROADMAP_BUTTON.md` package: stop mis-presenting the dual button as a
+wheel with zero channels, before adding any feature. No entities, triggers or
+bindings for the dual button yet — that is B1.
+
+- `model.py`: `BilresaWheel` gains derived `variant` / `is_dual_button`
+  **properties** (not stored fields), computed from endpoint shape — a device
+  with rotary (up/down) endpoints is `wheel`, one with only button endpoints is
+  `dual_button` (`VARIANT_*` in `const.py`). Derived, so it can never disagree
+  with the endpoints, and no constructor/fixture anywhere needed changing.
+  Discovery still matches on the `"bilresa"` product substring; the variant is
+  the shape distinction, not a new product-code match.
+- `system_health.py`: `discovered_wheels` now counts wheel-variant devices only,
+  and a new `discovered_buttons` counts dual buttons — so the button no longer
+  inflates the wheel count.
+- `event.py`: `_sync` skips dual buttons, so no channelless wheel device is
+  reconciled/built for them (they already produced zero entities; this also stops
+  asserting a wheel link).
+- `panel_models.py`: `async_overview_snapshot` skips dual buttons, so the grid
+  no longer renders a zero-channel wheel card.
+- `coordinator.py`: the discovery log says the variant instead of always "wheel".
+- Tests: `test_model.py` (dual-button node fixture with the real shape — two
+  button endpoints, no channel label — variant assertions), `test_system_health.py`
+  (separate wheel/button counts) and `test_panel_models.py` (overview excludes the
+  dual button).
+
+Not done on purpose (deferred): a pre-existing merged `ikea_bilresa` identifier
+on an already-discovered dual button is not un-merged here; registry migration
+belongs with B1 when the device gets its real entities.
+
+Local validation on Windows / Python 3.14:
+
+```text
+python -m compileall (changed files)                 passed
+ruff format --check custom_components tests           passed (38 files)
+ruff check custom_components tests                    passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -p pytest_asyncio.plugin                            216 passed
+mypy                                                  not run (not installed locally)
+```
+
+Files: `custom_components/ikea_bilresa/const.py`, `model.py`, `system_health.py`,
+`event.py`, `panel_models.py`, `coordinator.py`, `tests/test_model.py`,
+`tests/test_system_health.py`, `tests/test_panel_models.py`, and this handoff.
+Owed before B0 closes: exact-revision CI (mypy/hassfest/HACS) and a deployed check
+that the dual button no longer shows as a wheel in System Health or the panel.
+
+### B1 (event entities) — dual button gestures in HA (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit (222 pytest pass on py3.14, ruff
+clean). mypy not run locally. CI has not run. Not deployed, no Hardware.**
+
+This is the event-surface slice of B1: the dual button now produces real Home
+Assistant event entities. Device triggers and button bindings are **not** in this
+slice (see "deferred" below).
+
+- `event.py`: `_sync` handles both variants — it reconciles the device for both,
+  then builds channel entities for a wheel and **button** entities for a dual
+  button. New `BilresaButtonEvent`: one entity per physical button, `unique_id`
+  `{node}_ep{endpoint}`, name `Button N` (1-based in endpoint order), device
+  model `BILRESA dual button` when unlinked.
+- **Addressing:** both button endpoints report `channel = None`, so they share the
+  one `signal_channel(node, None)` dispatcher signal. Each entity filters
+  `action.endpoint_id` to keep only its own button's gestures — no coordinator
+  hot-path change was needed (the actions were already being decoded and
+  dispatched; only the entity to receive them was missing).
+- **Advertised event types are capped by MultiPressMax:** `const.button_event_types`
+  returns `press`, `double_press`, `hold`, `release` for the dual button (max 2)
+  and adds `triple_press` only at max ≥ 3. No rotation. `model.py` now parses
+  `Switch.MultiPressMax` (attribute `ep/59/2`) into `SwitchEndpoint.multi_press_max`.
+  `_handle_action` also drops any press count not in the advertised list rather
+  than raising.
+- **The "past-max goes silent" quirk needs no new timeout here:** the engine's
+  button path is stateless (it acts only on `MultiPressComplete`/`LongPress`/
+  `LongRelease`, never accumulates), so an unclassified >max press simply produces
+  no event — correct, and it cannot get stuck. The timeout concern remains
+  relevant only to hold bindings (B2), which already have the ramp watchdog.
+- Tests: `test_model.py` (MultiPressMax parsing), `test_event.py`
+  (`button_event_types` cap, entity identity/types, endpoint filtering, dropped
+  over-max press, hold/release mapping).
+
+Local validation (Windows / Python 3.14): `compileall` passed, `ruff format
+--check` passed (38 files), `ruff check` passed, full `pytest` **222 passed**.
+mypy not run locally (not installed); CI is authoritative.
+
+Deferred to later B1/B2 slices, on purpose:
+- **Device triggers** for the buttons (the automation-UI dropdown). The event
+  entities are usable in automations now; the device-trigger sugar is next.
+- **Button binding profile** (click/double/hold targets, paired hold-to-ramp) —
+  that is B2.
+- **Un-merging the pre-existing `ikea_bilresa` identifier** off an already-linked
+  dual button: reconcile is now called for it and is idempotent, so no migration
+  is forced, but a dedicated registry migration for legacy state is still owed if
+  one is found in the field.
+
+Owed before this closes: exact-revision CI, and a deployed check that pressing the
+physical dual button drives its new `Button 1/2` event entities (single/double/
+hold/release), with no triple-press trigger advertised.
+
+### B1b — device triggers for the dual button (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit (226 pytest pass on py3.14, ruff
+clean, JSON valid). mypy not run locally. CI has not run. Not deployed, no
+Hardware.**
+
+Device-page automation triggers now match the device variant.
+
+- `device_trigger.py` is variant-aware. `async_get_triggers` looks up the
+  discovered device from the loaded coordinator (duck-typed, no import cycle):
+  a **dual button** offers `button_N` subtypes (one per physical button) with
+  only the gestures `button_event_types(MultiPressMax)` allows — press,
+  double_press, hold, release; **no rotation, no triple** at max 2. A wheel (or an
+  unknown device) keeps the existing `channel_1..3` triggers unchanged.
+- `async_attach_trigger` filters a button trigger on `endpoint_id` (buttons carry
+  `channel = None` and are told apart by endpoint), and keeps the channel filter
+  for wheels. `EVENT_BILRESA` already carries `endpoint_id`, so no coordinator
+  change was needed.
+- Strings: `button_1..4` subtypes added to `strings.json`, `translations/en.json`
+  and `translations/cs.json` (Tlačítko N); the existing `{subtype} pressed` /
+  `double-pressed` / `held` / `released` trigger-type strings already read
+  correctly for buttons.
+- **New `tests/test_device_trigger.py`** (there was none): dual button offers
+  button subtypes without rotate/triple, wheel still offers channels, the
+  `button_N → endpoint` mapping, and attach filters by endpoint not channel.
+
+Local validation (Windows / Python 3.14): `compileall` passed, JSON parse of the
+three string files passed, `ruff format --check` passed (39 files), `ruff check`
+passed, full `pytest` **226 passed**. mypy/hassfest not run locally; CI is
+authoritative (hassfest validates strings.json ↔ en.json alignment).
+
+Still deferred to B2: the button binding profile (click/double/hold targets,
+paired hold-to-ramp). The legacy-identifier registry migration is still owed if
+found in the field.
+
+Owed before B1b closes: exact-revision CI, and a deployed check that the dual
+button's device page lists Button 1/Button 2 triggers (press/double/hold/release,
+no triple, no rotation) and that one fires a test automation.
+
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
 The owner selected the optical V2 product glyph and Material Symbols Rounded

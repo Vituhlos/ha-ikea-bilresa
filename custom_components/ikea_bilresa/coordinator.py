@@ -310,7 +310,8 @@ class BilresaCoordinator:
             _LOGGER.info("Updated BILRESA wheel metadata for node %s", wheel.node_id)
             return True
         _LOGGER.info(
-            "Discovered BILRESA wheel: node %s '%s' -> %s",
+            "Discovered BILRESA %s: node %s '%s' -> %s",
+            wheel.variant,
             wheel.node_id,
             wheel.name,
             {ep: (e.channel, e.role) for ep, e in wheel.endpoints.items()},

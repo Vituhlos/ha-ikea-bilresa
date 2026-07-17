@@ -56,3 +56,71 @@ Home Assistant history records target-state updates, not the first visible
 photon change. A future comparison may test a 0.3-0.5 second transition for a
 more immediate feel, but the global default must not change from this recording
 alone; visual smoothness and onset latency still need owner observation.
+
+## Next step: measured transition tuning (raw SWITCH_EVENT capture)
+
+This is the concrete procedure for the "future comparison" noted above, and the
+way to satisfy the revisit criteria with real numbers instead of guessing. It
+reuses the raw-capture instrumentation already documented in
+`HARDWARE_TEST.md` ("Raw event capture (independent oracle)") — the StephanMeijer
+gist's matter-server `SWITCH_EVENT` logging. That log is a per-event timestamp
+recorder: one line per notch, with the exact time the device emitted it.
+
+The point is **not** to make scrolling smoother than the firmware allows. IKEA's
+firmware does not do rotary encoding; it emits discrete notches batched at a
+~500 ms MultiPress window (StephanMeijer's independent measurement, consistent
+with `DEVICE_REFERENCE.md`'s 0.5-1 s). Transport is ~30-150 ms. So there is a
+hard firmware ceiling; this procedure only tunes how reliably we hit it and how
+the visible brightness change is smoothed between batches.
+
+### The loop: measure → find the gap → change one knob → measure again
+
+1. **Baseline.** Enable the raw `SWITCH_EVENT` capture and
+   `custom_components.ikea_bilresa` debug logging, then do one deliberate slow
+   and one faster rotation. Line up three timelines for the same gesture:
+   - device emit time (raw capture),
+   - our dispatch time (integration debug log),
+   - target-state acknowledgement (HA history / light state).
+
+   Example shape (illustrative, not recorded):
+
+   ```text
+   T+0 ms     device: MultiPressOngoing count=6
+   T+40 ms    integration: set brightness -> 55%
+   T+150 ms   light: acknowledged 55%
+   ```
+
+2. **Locate the gap.** The three timelines show where latency lives: in the
+   device (the ~500 ms batch — not ours to fix), in our dispatch (fixable), or in
+   the light's transition (a binding setting).
+
+3. **Change exactly one knob** on the binding, nothing else. The leading
+   candidate is `transition`: the default is `DEFAULT_TRANSITION = 1.0 s`, but the
+   device batches at ~500 ms, so a 1.0 s transition can still be easing the
+   previous batch when the next arrives — a "rubber-band" feel. Test ~0.3 s (what
+   IKEA's own KAJPLATS reportedly uses). `acceleration` and the trailing-scroll
+   suppression window are secondary candidates, each measured the same way.
+
+4. **Re-measure identically and compare.** Either the change is clearly snappier
+   and we adopt it, or nothing improves and the current default is now defended
+   with numbers rather than assumed.
+
+### Roles and constraints
+
+- The owner runs the capture and turns the wheel — the physical-hardware step
+  that cannot be done remotely. The assistant reads the **redacted** log,
+  identifies the gap and proposes the single change; then repeat.
+- The gist's numbers come from its author's unit/firmware; ours is mixed
+  `1.8.7`/`1.9.15`. Use its **method** to measure our own hardware, do not
+  hardcode its constants.
+- Redact node IDs, entity IDs, serials and URLs from every captured line before
+  it enters a report, per the repo's privacy rules. Remove the add-on patch after
+  the run; it is wiped on any add-on update anyway.
+
+### Outcome
+
+A measurement-backed entry appended here: either "change the default transition
+to X, with the before/after numbers", or "keep 1.0 s because the remaining lag is
+in firmware and no binding knob moves it". Nothing changes in runtime code until
+that entry exists. This does not touch the dual-button work in
+`ROADMAP_BUTTON.md`; it is a wheel-behaviour item.
