@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.5.9-rc.12] - 2026-07-17
+
+### Changed
+- The panel's wheel detail now navigates by the wheel's three physical selector
+  positions: a spine of three channels, one open at a time, with the open
+  channel's gestures shown as a hairline-separated ledger. Comparing every
+  channel of every wheel stays the job of the overview grid, which is why the
+  grid is the landing layer.
+- The switcher rail was misaligned and grew a stray second row: it declared
+  three grid columns but rendered four children, so wheel names were pushed to
+  the right edge and the open wheel's tick wrapped onto its own line. The tick
+  is removed; the open wheel is now marked the way Home Assistant's own sidebar
+  marks its active entry -- an accent icon and heavier text alongside the tint,
+  because the tint alone measures only 1.22:1 against the rail.
+- Unconfigured channels are compact invitations naming what they wait for,
+  instead of blank boxes stretched to a configured channel's height.
+- The wheel detail is capped at the overview's width so a wide window no longer
+  drags a label and its value to opposite ends of the screen.
+- Diagnostics fact groups are sections with hairline rows rather than nested
+  bordered cards, and the tab already naming a view no longer repeats itself as
+  an inner heading.
+- Live test leads with the calculated result at hero scale and shows a detent
+  strip scaled to the highest rotary count the hardware has been observed to
+  emit.
+- Times that are read at a glance (last activity) are now relative -- "2 hours
+  ago" -- with the exact timestamp kept on hover. Diagnostics keeps the absolute
+  stamp.
+- Buttons acknowledge a press, hover states are gated to real pointers so touch
+  users do not get stuck states, and an unavailable-target banner now names the
+  affected wheel and channel instead of reporting a count.
+
+### Fixed
+- The view tab strip no longer shows a scrollbar or clips its own focus ring:
+  `overflow-x: auto` silently makes the other axis scroll too, and an underline
+  and a focus ring that overhung the strip were caught by it.
+
+### Notes
+- This is a visual and interaction rework only. Matter event decoding, binding
+  storage, the WebSocket API and gesture processing are unchanged.
+
 ## [0.5.9-rc.11] - 2026-07-16
 
 ### Changed

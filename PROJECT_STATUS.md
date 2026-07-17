@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-16 by Codex**
+Last updated: **2026-07-17 by Claude Code**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -49,6 +49,159 @@ installation-specific identifiers. The working-tree version is now sanitized
 while retaining protocol facts. The sensitive version remains in commit
 history; do not publish another release until the owner decides whether and how
 to clean history. Never paste those identifiers into issues, logs or chat.
+
+## Panel visual rework after the RC.11 screenshots (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + Python Unit + frontend Unit + harness-measured,
+committed and published as `v0.5.9-rc.12`. Not yet deployed to Home Assistant,
+not hardware-verified.** The manifest is `0.5.9-rc.12` so the panel module URL
+cache-busts. Exact-revision CI/publication/deployment results are recorded at
+the end of this section once each gate reports.
+
+The owner opened the deployed `v0.5.9-rc.11` panel and reported it "still
+doesn't sit right", naming one concrete defect: a tick appearing on the open
+wheel in the rail and pushing a second row. That tick was the visible end of a
+structural bug, and the audit it triggered found four more.
+
+**The rail bug, because it explains two complaints at once.** `.rail-wheel`
+declared `grid-template-columns: auto minmax(0, 1fr) auto` — three tracks — and
+`_rail()` appended **four** children: glyph, status dot, copy, tick. So the dot
+took the `1fr` track, every wheel name was pushed flush right with a gap beside
+it, and the tick wrapped onto an implicit second row. The name misalignment was
+the "something's off" the owner could feel but not name.
+`test_rail_wheel_declares_a_column_for_every_child_it_renders` now parses the
+declared tracks and counts the appended children, so the two cannot silently
+disagree again.
+
+The tick is deleted rather than given a fourth column: the tinted row already
+said "open". But **measurement then showed the tint alone is not enough** — the
+selected background is only **1.22:1** against the rail in both default themes,
+since both come from `--secondary-background-color`. The rail now marks the open
+wheel the way HA's own sidebar does: tint + accent glyph + medium weight. An
+icon may take the accent where a word may not.
+
+Also fixed, all from the same screenshots:
+
+- **Empty channels carried a full channel's weight.** `repeat(3, 1fr)` plus
+  `min-block-size: 100%` stretched every unconfigured channel to the tallest
+  sibling — two blank rectangles beside one real card. This violated
+  `PANEL_DESIGN.md`'s own "an unconfigured channel stays compact" rule.
+- **The detail had no width ceiling** while the overview had one, so on the
+  owner's ~1650 px window a fact's label and its value sat ~600 px apart. The
+  detail is now capped at 1100 px; the 700 px collapse remains a *container*
+  query on the pane, never a window query.
+- **Card-in-card everywhere.** Diagnostics fact groups were bordered boxes with
+  boxed headings inside a bordered page; they are now sections with hairline
+  rows. Fewer boxes is what made the panel stop reading as a wireframe.
+- **Duplicate heading storey.** Tab `Kanály` → heading `Chování kanálů`; tab
+  `Diagnostika` → heading `Diagnostika`. The tab *is* the heading; the inner one
+  is gone and only the explanatory line survives.
+- **Italic as a state.** `Nenastaveno` was italic. HA never italicises state and
+  it is a reliable generated-UI tell; it is dimmed instead. Note the dim must be
+  `--secondary-text-color` (4.81:1), **not** `--disabled-text-color` (2.8:1,
+  fails the AA gate this program measured).
+- Robotic copy: the banner said *"Počet koleček s nedostupným cílem propojení:
+  1"* — a log line. The backend knows which wheel and channel, so it now says
+  so, and only counts when more than one wheel is affected. `Upravit cíl ·
+  Světýlka` (an infinitive that reads as a button) became `Jas · Světýlka`.
+  Absolute stamps became `Intl.RelativeTimeFormat`, with the exact time kept in
+  `title`. Diagnostics deliberately keeps the absolute stamp: it is a surface
+  for reading facts, not for glancing.
+- `:active` on every button, hover moved inside `@media (hover: hover)` so touch
+  users do not get stuck states, and the wheel card's hover stopped swinging its
+  hairline to full ink.
+
+**A scrollbar on the tab strip, found by the owner in this same session.** The
+tab row grew a vertical scrollbar beside three short tabs. Root cause worth
+recording, because it is a trap and not a typo: `.tabs` carries
+`overflow-x: auto` as a real safety net (a long translation must not push the
+page sideways), but per CSS Overflow, **when one axis is not `visible` the
+other's `visible` computes to `auto`** — so the strip scrolls in *both* axes
+whether or not that was asked for. The port then took the prototype's underline
+at `inset-block-end: -1px` (harmless there: its tab strip had no `overflow-x`),
+and that 1px overhang became 1px of scrollable height. Measured: `overflow-y`
+computed to `auto` though it was never declared; `scrollHeight` 49 in a 48px box.
+
+The same trap was clipping the tabs' focus ring: a tab fills the strip's height
+exactly, so a ring at `outline-offset: 2px` is cut off top and bottom by that
+container. Both are fixed together — the divider is painted inside as
+`box-shadow: inset`, the underline sits at 0, and `.tab:focus-visible` is inset
+at `-2px`. Verified with a real Tab keypress: `:focus-visible` matched, ring 2px
+at `-2px`, and both axes measure 0 overflow.
+
+Recorded because the deployed `border-block-end` + `overflow-x: auto` pair looks
+completely innocent and will be re-introduced by anyone who does not know the
+computed-value rule. `test_the_tab_strip_does_not_scroll_itself` holds it.
+
+### Two ideas taken from Codex's Hallmark demo
+
+The owner had Codex build a standalone Hallmark prototype at
+`bilresa-panel-hallmark-demo/` (outside the integration; not a build dependency).
+It independently reached most of the above. Two of its ideas were **not** in this
+audit and are adopted:
+
+1. **The channel spine.** Three detents, one channel open at a time, mirroring
+   the wheel's three physical selector positions. The owner selected it on
+   2026-07-17. It supersedes `PANEL_DESIGN.md`'s "separate card for each of the
+   three channels"; that document is updated rather than quietly bypassed. It
+   does not weaken the panel's first product question, because comparing every
+   channel of every wheel is the **overview's** job — which is why the grid is
+   the landing layer.
+2. **The detent strip.** Eighteen marks under the live result, active ones
+   showing the last batch. Eighteen because that is the highest rotary count
+   `DEVICE_REFERENCE.md` has ever observed — a scale grounded in this hardware,
+   not a round number that looked good. `test_the_detent_strip_is_scaled_to_
+   observed_hardware` locks the count to that provenance.
+
+The demo's own regressions were **not** carried over: `--disabled-text-color`
+for "empty" (2.8:1), font weights 600/750 (HA's scale is 400/500), a hard-coded
+white app header, and `aria-pressed` on what is really a view switcher (the
+spine here is a `tablist` with arrow-key support, like the view tabs).
+
+### Validation
+
+```text
+ruff format --check custom_components tests          passed (38 files)
+ruff check custom_components tests                   passed
+python -m compileall -q custom_components tests      passed
+node --check ikea_bilresa_panel.js                   passed
+node --test tests/panel_frontend.test.mjs            6 passed
+pytest on Windows Python 3.14                        207 passed
+git diff --check                                     passed (CRLF warnings only)
+EN/CS panel string alignment                         196 keys each
+```
+
+`mypy` did **not** run: the local Python 3.14 has no mypy installed. CI remains
+the authoritative mypy/hassfest/HACS gate and has not run for this tree.
+
+**Browser evidence is from a local harness, not Home Assistant.** The real
+`ikea_bilresa_panel.js` was rendered against a snapshot shaped like the owner's
+deployment (two wheels, four bindings, one dead target) with the real Czech
+strings exported from `panel_strings.py`. Measured at 1440 px, dark and light,
+and at 320 px: rail exactly 256 px; rail button 3 children, 56 px, one row, no
+tick; detail inner 1100 px; spine `tablist` with roving focus; gesture ledger
+reading `Jas · Světýlka Světýlka` and one merged `Podržení → uvolnění` row;
+live result 56 px with 18 detents and 6 active; `před 2 hodinami` with the exact
+stamp in `title`; at 320 px no horizontal scroll and zero elements escaping the
+frame. Console clean throughout.
+
+This is **not** HA UI evidence: the harness supplies its own theme tokens and
+its own `hass` stub, and it cannot prove what Home Assistant serves, how a real
+user theme moves these tokens, or how the companion app renders any of it. A
+screenshot of the harness is also not a screenshot of the panel. One honest
+correction worth recording: an apparent dark-theme bug (the selected rail row
+painting its light value) turned out to be a stale-paint artifact of toggling
+the theme attribute in a live page; a clean load in dark mode was correct. It
+was **not** "fixed" — nothing was wrong.
+
+Files: `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
+`custom_components/ikea_bilresa/panel_strings.py`, `tests/test_panel.py`,
+`docs/PANEL_DESIGN.md`, and this handoff.
+
+Owed before this can be called done: exact-revision CI, an RC, and a real
+Home Assistant page opened in a **fresh tab** — plus the standing debts this
+work does not discharge (a non-default theme, a screen-reader pass, and a
+physical notched phone).
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
@@ -1673,10 +1826,11 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Open the deployed `v0.5.9-rc.11` panel in a completely fresh browser tab (or
-fully close/reopen the companion app), then visually check the sidebar V2 icon,
-overview card, rotation pair, distinct double/triple press and the
-hold/release sequence. Existing tabs can retain the old custom element.
+Review the 2026-07-17 panel rework in the working tree (see the section at the
+top of this file). It is harness-measured but has never run in Home Assistant.
+If the owner approves it, publish an RC from an exact CI-verified commit and
+open it in a **completely fresh** browser tab — an existing tab keeps the old
+custom element and the web platform does not allow redefining it.
 
 ## Next-agent handoff
 

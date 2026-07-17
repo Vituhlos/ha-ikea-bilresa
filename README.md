@@ -11,10 +11,12 @@ the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
 **real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
 integration currently drops.
 
-> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.11 adds the
-> approved BILRESA V2 icon to the Home Assistant sidebar and panel, plus distinct
-> Material Rounded gestures for rotation, single/double/triple press and the
-> hold/release sequence.
+> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.12 reworks the
+> panel's visual hierarchy -- a channel spine mirroring the wheel's three
+> physical positions, a result-led live test, lighter unconfigured channels and
+> a corrected switcher rail -- on top of the approved BILRESA V2 icon and
+> Material Rounded gestures. Visual only; Matter, bindings and gestures are
+> unchanged.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared

@@ -158,10 +158,17 @@ const STYLES = `
     --_space-5: var(--ha-space-5, 20px);
     --_space-6: var(--ha-space-6, 24px);
     --_space-8: var(--ha-space-8, 32px);
+    --_space-10: var(--ha-space-10, 40px);
     --_font: var(--ha-font-family-body, Roboto, Noto, sans-serif);
     --_fast: var(--ha-animation-duration-fast, 120ms);
+    --_ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --_rail-width: 256px;
     --_overview-max: 1120px;
+    /* The detail needs the same ceiling as the overview. Without it a 1650px
+       window drags a fact's label and value ~600px apart. */
+    --_detail-max: 1100px;
+    /* The icon colour clears the 3:1 non-text bar where a word would not. */
+    --_accent: var(--state-icon-color, #44739e);
 
     min-block-size: 100vh;
     min-block-size: 100dvh;
@@ -231,30 +238,44 @@ const STYLES = `
   .icon-button svg { inline-size: 24px; block-size: 24px; fill: currentColor; }
 
   main {
-    padding-block: var(--_space-4) max(var(--_space-4), env(safe-area-inset-bottom, 0px));
+    padding-block: var(--_space-6) max(var(--_space-6), env(safe-area-inset-bottom, 0px));
     padding-inline:
-      max(var(--_space-4), env(safe-area-inset-left, 0px))
-      max(var(--_space-4), env(safe-area-inset-right, 0px));
+      max(var(--_space-6), env(safe-area-inset-left, 0px))
+      max(var(--_space-6), env(safe-area-inset-right, 0px));
   }
+  /* The detail's rail is a wall flush with the viewport edge, so the page frame
+     moves inside it, onto .detail-pane. */
+  main[data-view="detail"] { padding: 0; }
   @media (max-width: 600px) {
     main {
       padding-inline:
-        max(var(--_space-2), env(safe-area-inset-left, 0px))
-        max(var(--_space-2), env(safe-area-inset-right, 0px));
+        max(var(--_space-4), env(safe-area-inset-left, 0px))
+        max(var(--_space-4), env(safe-area-inset-right, 0px));
     }
   }
 
+  .overview-head { margin-block-end: var(--_space-6); }
+  .overview-head h1 {
+    margin: 0;
+    font-size: var(--ha-font-size-3xl, 30px);
+    font-weight: var(--ha-font-weight-normal, 400);
+    line-height: var(--ha-line-height-condensed, 1.2);
+  }
   .summary {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--_space-2);
-    margin-block-end: var(--_space-4);
-    padding-inline: var(--_space-1);
-    color: var(--_ink-dim);
+    gap: var(--_space-3) var(--_space-5);
+    margin-block-start: var(--_space-4);
     font-size: var(--ha-font-size-m, 14px);
   }
-  .summary .sep { opacity: 0.4; }
+  .summary-item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--_space-2);
+    color: var(--_ink);
+    white-space: nowrap;
+  }
 
   .overview {
     max-inline-size: var(--_overview-max);
@@ -302,13 +323,12 @@ const STYLES = `
     font: inherit;
     text-align: start;
     cursor: pointer;
-    transition:
-      border-color var(--_fast) ease-in-out,
-      background-color var(--_fast) ease-in-out;
+    transition: border-color var(--_fast) var(--_ease-out);
   }
-  .wheel:hover {
-    border-color: var(--_ink);
-    background: var(--_surface-subtle);
+  /* One signal per element. The old rule swung the hairline to full ink and
+     shifted the surface at the same time, which reads as a flash. */
+  @media (hover: hover) {
+    .wheel:hover { border-color: var(--_accent); }
   }
 
   .wheel-head {
@@ -327,16 +347,23 @@ const STYLES = `
     flex: 0 0 auto;
     inline-size: 32px;
     block-size: 32px;
-    color: var(--state-icon-color, #44739e);
+    color: var(--_accent);
     fill: currentColor;
   }
+  /* Home Assistant's own sidebar marks its active entry with an accent icon and
+     heavier text, not with a tint alone: the selected tint measures only
+     1.22:1 against the rail in both default themes, so on its own it is a
+     colour-only signal too faint to carry the state. The glyph may take the
+     accent where a word may not — it is non-text, and clears the 3:1 bar. */
   .rail-glyph {
     flex: 0 0 auto;
-    inline-size: 22px;
-    block-size: 22px;
-    color: var(--state-icon-color, #44739e);
+    inline-size: 26px;
+    block-size: 26px;
+    color: var(--_ink-dim);
     fill: currentColor;
+    transition: color var(--_fast) var(--_ease-out);
   }
+  .rail-wheel[aria-current="page"] .rail-glyph { color: var(--_accent); }
   .device-glyph .secondary-path,
   .rail-glyph .secondary-path { opacity: 0.32; }
   .wheel-name {
@@ -421,10 +448,10 @@ const STYLES = `
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
   }
-  .channel[data-state="empty"] .channel-behaviour {
-    color: var(--_ink-dim);
-    font-style: italic;
-  }
+  /* Dimmed, not italic: HA never italicises a state, and an italic label is a
+     reliable generated-UI tell. --_ink-dim clears AA; --disabled-text-color
+     does not (2.8:1) and must not be used to say "empty". */
+  .channel[data-state="empty"] .channel-behaviour { color: var(--_ink-dim); }
   .channel-warn,
   .wheel-open {
     flex: 0 0 auto;
@@ -436,27 +463,29 @@ const STYLES = `
   .detail-shell {
     display: grid;
     grid-template-columns: var(--_rail-width) minmax(0, 1fr);
-    gap: var(--_space-4);
     align-items: start;
   }
+  /* The rail is a wall of the page, not a card floating on it: one hairline
+     against the content, no radius, flush with the header. */
   .rail {
     position: sticky;
-    inset-block-start: calc(56px + env(safe-area-inset-top, 0px) + var(--_space-4));
-    max-block-size: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - var(--_space-8));
+    inset-block-start: calc(56px + env(safe-area-inset-top, 0px));
+    block-size: calc(100dvh - 56px - env(safe-area-inset-top, 0px));
     overflow: auto;
-    border: var(--ha-card-border-width, 1px) solid var(--_border);
-    border-radius: var(--_radius);
+    padding: var(--_space-4) var(--_space-3)
+      max(var(--_space-4), env(safe-area-inset-bottom, 0px));
+    border-inline-end: 1px solid var(--_divider);
     background: var(--_card);
   }
   .rail-back {
-    inline-size: 100%;
-    min-block-size: 52px;
-    display: flex;
+    inline-size: fit-content;
+    min-block-size: 44px;
+    display: inline-flex;
     align-items: center;
     gap: var(--_space-2);
-    padding-inline: var(--_space-4);
+    padding-inline: var(--_space-2);
     border: 0;
-    border-block-end: 1px solid var(--_divider);
+    border-radius: var(--ha-border-radius-md, 8px);
     background: transparent;
     color: var(--_ink);
     text-align: start;
@@ -464,27 +493,27 @@ const STYLES = `
     font-weight: var(--ha-font-weight-medium, 500);
     cursor: pointer;
   }
-  .rail-back:hover { background: var(--_surface-subtle); }
   .rail-back svg {
     inline-size: 20px;
     block-size: 20px;
     fill: currentColor;
   }
-  .rail-title {
-    padding: var(--_space-4) var(--_space-4) var(--_space-2);
-    border-block-end: 1px solid var(--_divider);
-    font-size: var(--ha-font-size-m, 14px);
-    font-weight: var(--ha-font-weight-medium, 500);
+  .rail ul {
+    margin: var(--_space-6) 0 0;
+    padding: 0;
+    list-style: none;
   }
-  .rail ul { margin: 0; padding: var(--_space-2); list-style: none; }
   .rail li + li { margin-block-start: var(--_space-1); }
+  /* Exactly three columns for exactly three children. The old rule declared
+     three and rendered four, so the dot took the 1fr track, the name was pushed
+     flush right, and the tick wrapped onto a second row. */
   .rail-wheel {
     inline-size: 100%;
-    min-block-size: 48px;
+    min-block-size: 56px;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 26px minmax(0, 1fr) 8px;
     align-items: center;
-    gap: var(--_space-2);
+    gap: var(--_space-3);
     padding: var(--_space-2) var(--_space-3);
     border: 0;
     border-radius: var(--ha-border-radius-md, 8px);
@@ -492,11 +521,10 @@ const STYLES = `
     color: var(--_ink);
     text-align: start;
     cursor: pointer;
+    transition: background-color var(--_fast) var(--_ease-out);
   }
-  .rail-wheel:hover { background: color-mix(in srgb, var(--_ink) 6%, transparent); }
   .rail-wheel[aria-current="page"] {
     background: var(--_selected);
-    font-weight: var(--ha-font-weight-medium, 500);
   }
   .rail-copy { min-inline-size: 0; }
   .rail-name,
@@ -506,21 +534,32 @@ const STYLES = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .rail-name { font-size: var(--ha-font-size-m, 14px); }
+  .rail-name {
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-normal, 400);
+  }
+  .rail-wheel[aria-current="page"] .rail-name {
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
   .rail-area {
+    margin-block-start: 1px;
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-s, 12px);
     font-weight: var(--ha-font-weight-normal, 400);
   }
   .rail-wheel[aria-current="page"] .rail-area { color: var(--_ink); }
-  .rail-check { inline-size: 18px; block-size: 18px; fill: var(--_ink); }
 
-  .detail-pane { min-inline-size: 0; container-type: inline-size; }
+  .detail-pane {
+    min-inline-size: 0;
+    container-type: inline-size;
+    padding: var(--_space-6) var(--_space-8)
+      max(var(--_space-10), env(safe-area-inset-bottom, 0px)) var(--_space-6);
+  }
+  .detail-inner { inline-size: min(100%, var(--_detail-max)); }
   .detail-top {
     display: flex;
     align-items: flex-start;
-    gap: var(--_space-3);
-    min-block-size: 72px;
+    gap: var(--_space-4);
     margin-block-end: var(--_space-2);
   }
   .back-button {
@@ -538,7 +577,14 @@ const STYLES = `
   }
   .back-button:hover { background: color-mix(in srgb, var(--_ink) 6%, transparent); }
   .back-button svg { inline-size: 20px; block-size: 20px; fill: currentColor; }
-  .detail-heading { min-inline-size: 0; padding-block-start: var(--_space-2); }
+  .detail-glyph {
+    flex: 0 0 auto;
+    inline-size: 48px;
+    block-size: 48px;
+    color: var(--_accent);
+    fill: currentColor;
+  }
+  .detail-heading { min-inline-size: 0; flex: 1; }
   .detail-heading h2 {
     margin: 0;
     overflow-wrap: anywhere;
@@ -551,47 +597,56 @@ const STYLES = `
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
   }
+  .detail-top .status { align-self: center; }
 
+  /* overflow-x: auto keeps a long translation from pushing the page sideways,
+     but it costs more than it looks: the moment one axis is not visible, the
+     other's visible computes to auto too, so this box scrolls in BOTH axes
+     whether or not we asked for it. Anything that overhangs it vertically then
+     becomes a scrollbar or gets clipped. Hence the rule below is painted inside
+     as a shadow rather than hung off the border edge, the underline sits at 0
+     rather than -1px, and the tabs' focus ring is inset. */
   .tabs {
     display: flex;
-    gap: var(--_space-1);
+    gap: var(--_space-6);
     overflow-x: auto;
-    margin-block-end: var(--_space-4);
-    border-block-end: 1px solid var(--_divider);
+    margin-block: var(--_space-5) var(--_space-6);
+    box-shadow: inset 0 -1px 0 var(--_divider);
   }
   .tab {
     position: relative;
-    min-block-size: 44px;
+    min-block-size: 48px;
     flex: 0 0 auto;
-    padding-inline: var(--_space-4);
+    padding: 0;
     border: 0;
     background: transparent;
-    color: var(--_ink);
+    color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    white-space: nowrap;
     cursor: pointer;
+    transition: color var(--_fast) var(--_ease-out);
   }
-  .tab:hover { background: color-mix(in srgb, var(--_ink) 6%, transparent); }
-  .tab[aria-selected="true"] { font-weight: var(--ha-font-weight-medium, 500); }
+  /* A tab fills the scroll container's height exactly, so an outset ring would
+     be clipped top and bottom. Inset, it is whole. */
+  .tab:focus-visible { outline-offset: -2px; }
+  .tab[aria-selected="true"] { color: var(--_ink); }
   .tab[aria-selected="true"]::after {
     content: "";
     position: absolute;
-    inset-inline: var(--_space-3);
+    inset-inline: 0;
     inset-block-end: 0;
     block-size: 3px;
-    background: var(--primary-color, #03a9f4);
+    background: var(--_accent);
   }
   .tab-panel { min-inline-size: 0; }
 
-  .section-head { margin-block-end: var(--_space-4); }
-  .section-head h3 {
-    margin: 0;
-    font-size: var(--ha-font-size-xl, 20px);
-    font-weight: var(--ha-font-weight-medium, 500);
-    line-height: var(--ha-line-height-condensed, 1.2);
-  }
+  /* The tab IS the heading. A second heading repeating it is a wasted storey,
+     so only the explanatory line survives here. */
+  .section-head { margin-block-end: var(--_space-5); }
   .section-head p {
-    max-inline-size: 70ch;
-    margin: var(--_space-1) 0 0;
+    max-inline-size: 56ch;
+    margin: 0;
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-normal, 1.6);
@@ -603,46 +658,85 @@ const STYLES = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--_space-4);
   }
-  .channel-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--_space-4);
-  }
-  .channel-detail {
-    display: flex;
-    flex-direction: column;
+  /* The wheel has three physical selector positions, so the panel navigates by
+     them: a spine of three detents, one open at a time. The overview is where
+     every channel of every wheel is compared; the detail is a workbench for one.
+     PANEL_DESIGN.md's "separate card for each channel" is superseded by this. */
+  .channel-workbench {
     min-inline-size: 0;
-    min-block-size: 100%;
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr);
     overflow: hidden;
     border: var(--ha-card-border-width, 1px) solid var(--_border);
     border-radius: var(--_radius);
     background: var(--_card);
     box-shadow: var(--ha-card-box-shadow, none);
   }
-  .channel-detail-head {
+  .channel-spine {
+    position: relative;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--_space-3);
-    padding: var(--_space-4);
+    align-content: start;
+    gap: var(--_space-8);
+    padding: var(--_space-8) var(--_space-3);
+    border-inline-end: 1px solid var(--_divider);
+    background: var(--_surface-subtle);
   }
-  .channel-detail-number {
-    inline-size: 32px;
-    block-size: 32px;
+  .channel-spine::before {
+    content: "";
+    position: absolute;
+    inset-block: 58px;
+    inset-inline-start: 50%;
+    inline-size: 1px;
+    background: var(--_divider);
+    transform: translateX(-50%);
+  }
+  .channel-position {
+    position: relative;
+    z-index: 1;
+    inline-size: 54px;
+    block-size: 54px;
     display: grid;
     place-items: center;
+    justify-self: center;
+    border: 1px solid var(--_border);
     border-radius: 50%;
-    background: var(--_selected);
-    font-size: var(--ha-font-size-m, 14px);
+    background: var(--_card);
+    color: var(--_ink-dim);
+    font: inherit;
+    font-size: var(--ha-font-size-l, 16px);
     font-weight: var(--ha-font-weight-medium, 500);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+      background-color var(--_fast) var(--_ease-out),
+      border-color var(--_fast) var(--_ease-out),
+      color var(--_fast) var(--_ease-out);
+  }
+  .channel-position[aria-selected="true"] {
+    border-color: var(--_accent);
+    background: var(--_accent);
+    color: var(--text-primary-color, #fff);
+  }
+  .channel-position:active { transform: translateY(1px); }
+  .channel-surface {
+    min-inline-size: 0;
+    padding: var(--_space-8);
+  }
+  .channel-detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--_space-6);
+    margin-block-end: var(--_space-6);
   }
   .channel-detail-copy { min-inline-size: 0; }
   .channel-detail-title {
-    font-size: var(--ha-font-size-l, 16px);
+    font-size: var(--ha-font-size-xl, 20px);
     font-weight: var(--ha-font-weight-medium, 500);
+    line-height: var(--ha-line-height-condensed, 1.2);
   }
   .channel-detail-summary {
-    margin-block-start: var(--_space-1);
+    margin-block-start: var(--_space-2);
     overflow-wrap: anywhere;
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
@@ -651,9 +745,26 @@ const STYLES = `
     color: var(--_ink);
     font-weight: var(--ha-font-weight-medium, 500);
   }
-  .channel-action-list {
+  .channel-empty {
+    min-block-size: 300px;
     display: grid;
-    gap: 0;
+    align-content: center;
+    justify-items: start;
+    gap: var(--_space-3);
+  }
+  .channel-empty-title {
+    font-size: var(--ha-font-size-xl, 20px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .channel-empty-body {
+    max-inline-size: 50ch;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
+  }
+  .channel-empty .action-button { margin-block-start: var(--_space-3); }
+  /* A ledger, not a stack of cards: hairlines carry the rhythm. */
+  .channel-action-list {
     margin: 0;
     padding: 0;
     border-block-start: 1px solid var(--_divider);
@@ -661,89 +772,70 @@ const STYLES = `
   }
   .channel-action {
     display: grid;
-    grid-template-columns: minmax(9ch, 0.9fr) minmax(0, 1.5fr);
-    gap: var(--_space-3);
-    align-items: start;
+    grid-template-columns: minmax(180px, 0.65fr) minmax(0, 1.35fr);
+    gap: var(--_space-6);
+    align-items: center;
     min-inline-size: 0;
-    padding: var(--_space-3) var(--_space-4);
-    background: var(--_card);
+    padding-block: var(--_space-4);
+    border-block-end: 1px solid var(--_divider);
   }
-  .channel-action + .channel-action { border-block-start: 1px solid var(--_divider); }
   .channel-action-label {
+    min-inline-size: 0;
     display: flex;
     align-items: center;
-    gap: var(--_space-2);
+    gap: var(--_space-3);
     color: var(--_ink-dim);
-    font-size: var(--ha-font-size-s, 12px);
+    font-size: var(--ha-font-size-m, 14px);
     line-height: var(--ha-line-height-normal, 1.4);
   }
   .gesture-glyph {
     flex: 0 0 auto;
-    inline-size: 18px;
-    block-size: 18px;
-    fill: var(--state-icon-color, #44739e);
+    inline-size: 24px;
+    block-size: 24px;
+    color: var(--_accent);
+    fill: currentColor;
   }
   .gesture-glyph-pair {
     display: inline-flex;
     flex: 0 0 auto;
+    align-items: center;
     gap: var(--_space-1);
   }
-  .gesture-sequence {
-    grid-template-columns: 24px minmax(0, 1fr);
-  }
+  /* Hold and release are one gesture with a beginning and an end, so they read
+     as one horizontal sequence rather than two unrelated rows. */
   .gesture-sequence-rail {
-    position: relative;
-    display: grid;
-    grid-template-rows: repeat(2, minmax(28px, 1fr));
-    place-items: center;
-    align-self: stretch;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
   }
-  .gesture-sequence-rail::before {
-    position: absolute;
-    inset-block: 18px;
-    inline-size: 2px;
-    background: var(--_divider);
-    content: "";
-  }
-  .gesture-sequence-rail .gesture-glyph {
-    z-index: 1;
-    background: var(--_card);
+  .gesture-sequence-line {
+    inline-size: 16px;
+    block-size: 1px;
+    background: var(--_accent);
   }
   .gesture-sequence-end {
-    z-index: 1;
-    inline-size: 10px;
-    block-size: 10px;
-    border: 2px solid var(--state-icon-color, #44739e);
+    flex: 0 0 auto;
+    inline-size: 8px;
+    block-size: 8px;
+    border: 2px solid var(--_accent);
     border-radius: 50%;
     background: var(--_card);
   }
-  .gesture-sequence-copy {
-    display: grid;
-    gap: var(--_space-3);
-  }
-  .gesture-sequence-line {
-    display: grid;
-    grid-template-columns: minmax(9ch, 0.9fr) minmax(0, 1.5fr);
-    gap: var(--_space-3);
-    align-items: start;
-    min-inline-size: 0;
-  }
   .channel-action-value {
+    min-inline-size: 0;
     overflow-wrap: anywhere;
     font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
     line-height: var(--ha-line-height-normal, 1.45);
   }
-  .channel-action[data-state="warning"] .channel-action-value {
-    font-weight: var(--ha-font-weight-medium, 500);
+  .channel-action[data-state="empty"] .channel-action-value {
+    color: var(--_ink-dim);
+    font-weight: var(--ha-font-weight-normal, 400);
   }
-  .channel-detail-footer {
-    margin-block-start: auto;
-    padding: var(--_space-3) var(--_space-4);
-    border-block-start: 1px solid var(--_divider);
-  }
-  .channel-detail-footer .action-button { inline-size: 100%; justify-content: center; }
   .channel-detail .binding-form {
-    border-block-start: 1px solid var(--_divider);
+    margin-block-start: var(--_space-8);
+    padding: var(--_space-6) 0 0;
+    border-block-start: 1px solid var(--_ink);
   }
   .detail-card {
     min-inline-size: 0;
@@ -759,21 +851,39 @@ const STYLES = `
     font-size: var(--ha-font-size-l, 16px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
-  .facts { margin: 0; padding: var(--_space-2) var(--_space-4); }
+  /* A group of facts is a section, not a card: heading on the page, hairlines
+     between rows. The bordered-box-per-group was the card-in-card tell. */
+  .diagnostic-section {
+    min-inline-size: 0;
+    margin-block-start: var(--_space-6);
+  }
+  .diagnostic-section h4 {
+    margin: 0 0 var(--_space-2);
+    font-size: var(--ha-font-size-l, 16px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .facts {
+    margin: 0;
+    padding: 0;
+    border-block-start: 1px solid var(--_divider);
+  }
   .fact {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    gap: var(--_space-3);
-    padding-block: var(--_space-2);
+    grid-template-columns: minmax(180px, 0.6fr) minmax(0, 1.4fr);
+    gap: var(--_space-6);
+    padding-block: var(--_space-3);
+    border-block-end: 1px solid var(--_divider);
   }
-  .fact + .fact { border-block-start: 1px solid var(--_divider); }
-  .fact dt { color: var(--_ink-dim); font-size: var(--ha-font-size-s, 12px); }
+  .fact dt { color: var(--_ink-dim); font-size: var(--ha-font-size-m, 14px); }
   .fact dd {
     min-inline-size: 0;
     margin: 0;
+    justify-self: end;
     overflow-wrap: anywhere;
     text-align: end;
     font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    font-variant-numeric: tabular-nums;
   }
   .fact dd[data-state="warning"] { font-weight: var(--ha-font-weight-medium, 500); }
 
@@ -790,6 +900,10 @@ const STYLES = `
   }
   .action-button {
     min-block-size: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--_space-2);
     padding-inline: var(--_space-4);
     border: 1px solid var(--_border);
     border-radius: var(--ha-border-radius-md, 8px);
@@ -797,19 +911,30 @@ const STYLES = `
     color: var(--_ink);
     font-size: var(--ha-font-size-m, 14px);
     font-weight: var(--ha-font-weight-medium, 500);
+    white-space: nowrap;
     cursor: pointer;
+    transition:
+      background-color var(--_fast) var(--_ease-out),
+      border-color var(--_fast) var(--_ease-out);
   }
-  .action-button:hover { background: var(--_selected); }
+  @media (hover: hover) {
+    .action-button:hover { border-color: var(--_ink-dim); background: var(--_selected); }
+  }
+  /* The press is the one animation the panel owes a user: without it a click
+     has no acknowledgement until the network answers. */
+  .action-button:active { transform: translateY(1px); }
+  .action-button svg { inline-size: 18px; block-size: 18px; fill: currentColor; }
   .action-button[data-primary="true"] {
-    border-color: var(--primary-color, var(--_ink));
-    background: var(--primary-color, var(--_ink));
-    color: var(--text-primary-color, var(--_card));
+    border-color: var(--_accent);
+    background: var(--_accent);
+    color: var(--text-primary-color, #fff);
   }
   .action-button[data-danger="true"] {
     border-color: var(--error-color, var(--_ink));
     color: var(--error-color, var(--_ink));
   }
   .action-button:disabled { cursor: wait; opacity: 0.65; }
+  .action-button:disabled:active { transform: none; }
 
   .binding-form {
     display: grid;
@@ -904,29 +1029,38 @@ const STYLES = `
   }
 
   .live-layout {
-    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: var(--_space-8);
     align-items: start;
   }
   .live-output {
-    min-block-size: 360px;
+    min-block-size: 420px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     padding: var(--_space-8);
   }
   .live-status {
     display: inline-flex;
     align-items: center;
     gap: var(--_space-2);
-    margin-block-end: var(--_space-6);
     color: var(--_ink);
     font-size: var(--ha-font-size-s, 12px);
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
+  .live-body { margin-block: auto; padding-block: var(--_space-8); }
+  .live-result-label {
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 12px);
+    font-weight: var(--ha-font-weight-medium, 500);
   }
   .live-result {
+    margin-block-start: var(--_space-3);
     overflow-wrap: anywhere;
-    font-size: var(--ha-font-size-4xl, 36px);
+    font-size: clamp(32px, 5cqi, 56px);
     font-weight: var(--ha-font-weight-medium, 500);
-    line-height: var(--ha-line-height-condensed, 1.2);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
   }
   .live-explanation {
     max-inline-size: 62ch;
@@ -938,14 +1072,44 @@ const STYLES = `
   .dispatch {
     display: flex;
     align-items: center;
-    gap: var(--_space-2);
+    gap: var(--_space-3);
     margin-block-start: var(--_space-5);
     font-size: var(--ha-font-size-l, 16px);
   }
   .gesture-caption {
-    margin-block-start: var(--_space-4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--_space-2);
+    margin-block-start: var(--_space-5);
+    padding-block-start: var(--_space-5);
+    border-block-start: 1px solid var(--_divider);
     color: var(--_ink-dim);
-    font-size: var(--ha-font-size-s, 12px);
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .gesture-caption + .gesture-caption {
+    margin-block-start: var(--_space-2);
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+  /* Eighteen detents because eighteen is the highest rotary count
+     DEVICE_REFERENCE.md has ever observed. The strip is a measured scale, not
+     decoration; do not change the count without a new observation. */
+  .detent-strip {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--_space-2);
+    block-size: 32px;
+    margin-block-start: var(--_space-5);
+  }
+  .detent {
+    inline-size: 2px;
+    block-size: 14px;
+    background: var(--_divider);
+  }
+  .detent[data-active="true"] {
+    block-size: 28px;
+    background: var(--_accent);
   }
   .waiting-title {
     font-size: var(--ha-font-size-2xl, 24px);
@@ -1076,35 +1240,62 @@ const STYLES = `
     opacity: 0.5;
   }
 
+  /* These measure the detail pane, not the window: with the rail present the
+     pane is ~256px narrower, and a window-width breakpoint keeps two columns in
+     a pane far too narrow for them. */
   @container (max-width: 700px) {
     .diagnostic-grid,
     .live-layout,
     .form-grid { grid-template-columns: minmax(0, 1fr); }
-    .channel-grid { grid-template-columns: minmax(0, 1fr); }
     .field[data-wide="true"] { grid-column: auto; }
+    .channel-workbench { grid-template-columns: minmax(0, 1fr); }
+    .channel-spine {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      gap: var(--_space-3);
+      padding: var(--_space-4);
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--_divider);
+    }
+    .channel-spine::before {
+      inset-block: auto;
+      inset-block-start: 50%;
+      inset-inline: 44px;
+      inline-size: auto;
+      block-size: 1px;
+      transform: translateY(-50%);
+    }
+    .channel-surface { padding: var(--_space-6) var(--_space-4); }
+    .channel-detail-head { display: grid; }
+    .channel-action {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--_space-2);
+    }
+    .channel-action-value { padding-inline-start: 37px; }
+    .fact {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--_space-1);
+    }
+    .fact dd { justify-self: start; text-align: start; }
   }
 
   @media (max-width: 619px) {
     .detail-shell { grid-template-columns: minmax(0, 1fr); }
     .rail { display: none; }
-    .detail-top { display: block; }
-    .back-button { display: inline-flex; }
-    .detail-heading { padding: var(--_space-2) var(--_space-3) 0; }
-    .detail-heading h2 { font-size: var(--ha-font-size-xl, 20px); }
+    .detail-pane {
+      padding: var(--_space-5) var(--_space-4)
+        max(var(--_space-8), env(safe-area-inset-bottom, 0px));
+    }
+    .back-button { display: inline-flex; margin-block-end: var(--_space-4); }
+    .detail-top { gap: var(--_space-3); }
+    .detail-glyph { inline-size: 40px; block-size: 40px; }
+    .detail-heading h2 { font-size: var(--ha-font-size-2xl, 24px); }
     .wheel-head { padding-inline: var(--_space-4); }
     .channel { padding-inline: var(--_space-4); }
-    .channel-detail-head {
-      grid-template-columns: auto minmax(0, 1fr);
-      padding-inline: var(--_space-4);
-    }
-    .channel-action { grid-template-columns: minmax(0, 1fr); }
-    .gesture-sequence { grid-template-columns: 24px minmax(0, 1fr); }
-    .gesture-sequence-line { grid-template-columns: minmax(0, 1fr); }
     .live-output {
-      min-block-size: 280px;
+      min-block-size: 340px;
       padding: var(--_space-6) var(--_space-4);
     }
-    .live-result { font-size: var(--ha-font-size-3xl, 30px); }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1184,6 +1375,7 @@ class IkeaBilresaPanel extends HTMLElement {
     this._unsub = null;
     this._started = false;
     this._open = null;
+    this._openChannel = 1;
     this._view = "channels";
     this._activities = [];
     this._activityUnsub = null;
@@ -1386,16 +1578,28 @@ class IkeaBilresaPanel extends HTMLElement {
   _openWheel(key) {
     if (key !== this._open) {
       this._activities = [];
+      this._openChannel = 1;
       this._closeEditor();
     }
     this._open = key;
     this._render();
   }
 
+  _openChannelAt(channel) {
+    if (channel === this._openChannel) return;
+    this._openChannel = channel;
+    this._closeEditor();
+    this._render();
+    this.shadowRoot
+      ?.getElementById(`spine-${this._open}-${channel}`)
+      ?.focus({ preventScroll: true });
+  }
+
   _backToOverview() {
     this._stopActivity();
     this._view = "channels";
     this._open = null;
+    this._openChannel = 1;
     this._activities = [];
     this._closeEditor();
     this._render();
@@ -1423,8 +1627,18 @@ class IkeaBilresaPanel extends HTMLElement {
     return bar;
   }
 
-  _summary() {
+  _summaryItem(text, state) {
+    const item = el("span", "summary-item");
+    item.appendChild(this._statusDot(state));
+    item.appendChild(el("span", null, text));
+    return item;
+  }
+
+  _overviewHead() {
     const s = this._snapshot;
+    const head = el("div", "overview-head");
+    head.appendChild(el("h1", null, this._t("overview_title")));
+
     const wrap = el("div", "summary");
     const connected = s.wheels.filter(
       (wheel) => wheel.availability === "connected",
@@ -1435,33 +1649,35 @@ class IkeaBilresaPanel extends HTMLElement {
     const unavailable = s.wheels.length - connected - unknown;
 
     wrap.appendChild(
-      el("span", null, this._t("summary_connected", { count: connected })),
+      this._summaryItem(
+        this._t("summary_connected", { count: connected }),
+        "connected",
+      ),
     );
     if (unavailable > 0) {
-      wrap.appendChild(el("span", "sep", "·"));
       wrap.appendChild(
-        el(
-          "span",
-          null,
+        this._summaryItem(
           this._t("summary_unavailable", { count: unavailable }),
+          "unavailable",
         ),
       );
     }
     if (unknown > 0) {
-      wrap.appendChild(el("span", "sep", "·"));
       wrap.appendChild(
-        el("span", null, this._t("summary_unknown", { count: unknown })),
+        this._summaryItem(
+          this._t("summary_unknown", { count: unknown }),
+          "unknown",
+        ),
       );
     }
-    wrap.appendChild(el("span", "sep", "·"));
     wrap.appendChild(
-      el(
-        "span",
-        null,
+      this._summaryItem(
         this._t(s.matter_connected ? "matter_connected" : "matter_offline"),
+        s.matter_connected ? "connected" : "unavailable",
       ),
     );
-    return wrap;
+    head.appendChild(wrap);
+    return head;
   }
 
   _banner(text) {
@@ -1526,7 +1742,10 @@ class IkeaBilresaPanel extends HTMLElement {
     const names = el("span", "wheel-names");
     names.appendChild(el("span", "wheel-name", wheel.name));
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
-    names.appendChild(el("span", "wheel-sub", meta.join(" · ")));
+    const sub = el("span", "wheel-sub", meta.join(" · "));
+    // The relative time is for reading; the exact stamp stays one hover away.
+    if (wheel.last_activity) sub.title = this._formatDate(wheel.last_activity);
+    names.appendChild(sub);
     head.appendChild(names);
     head.appendChild(this._status(wheel.availability));
     head.appendChild(svg(ICON.chevron, "wheel-open"));
@@ -1551,7 +1770,7 @@ class IkeaBilresaPanel extends HTMLElement {
             channel: wheel.last_active_channel,
           })}`
         : "";
-    return `${this._formatDate(when)}${suffix}`;
+    return `${this._formatRelative(when)}${suffix}`;
   }
 
   _formatDate(value) {
@@ -1561,6 +1780,31 @@ class IkeaBilresaPanel extends HTMLElement {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(date);
+  }
+
+  // "2 hours ago" is read at a glance; "16. 7. 2026 9:54" has to be subtracted
+  // from now. Home Assistant tells time this way everywhere, and the exact
+  // stamp stays one hover away in the title.
+  _formatRelative(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const seconds = (date.getTime() - Date.now()) / 1000;
+    const units = [
+      ["year", 31536000],
+      ["month", 2592000],
+      ["day", 86400],
+      ["hour", 3600],
+      ["minute", 60],
+    ];
+    const format = new Intl.RelativeTimeFormat(this._hass?.language || undefined, {
+      numeric: "auto",
+    });
+    for (const [unit, size] of units) {
+      if (Math.abs(seconds) >= size) {
+        return format.format(Math.round(seconds / size), unit);
+      }
+    }
+    return format.format(Math.round(seconds), "second");
   }
 
   _formatTime(value) {
@@ -1583,7 +1827,6 @@ class IkeaBilresaPanel extends HTMLElement {
     back.appendChild(el("span", null, this._t("back")));
     back.addEventListener("click", () => this._backToOverview());
     nav.appendChild(back);
-    nav.appendChild(el("div", "rail-title", this._t("wheel_switcher")));
     const list = el("ul");
     for (const wheel of this._snapshot.wheels) {
       const item = el("li");
@@ -1598,22 +1841,17 @@ class IkeaBilresaPanel extends HTMLElement {
           this._t(wheel.availability),
         ].join(", "),
       );
+      // Exactly three children for the rail's three columns. The tick that used
+      // to trail the open wheel was a fourth, so it wrapped to its own row — and
+      // it was redundant anyway: the tinted surface already says "open".
       button.appendChild(bilresaIcon("rail-glyph"));
-      button.appendChild(this._statusDot(wheel.availability));
       const copy = el("span", "rail-copy");
       copy.appendChild(el("span", "rail-name", wheel.name));
       copy.appendChild(
-        el(
-          "span",
-          "rail-area",
-          [
-            wheel.area || this._t("detail_area_none"),
-            this._t(wheel.availability),
-          ].join(" · "),
-        ),
+        el("span", "rail-area", wheel.area || this._t("detail_area_none")),
       );
       button.appendChild(copy);
-      if (wheel.key === this._open) button.appendChild(svg(ICON.check, "rail-check"));
+      button.appendChild(this._statusDot(wheel.availability));
       button.addEventListener("click", () => this._openWheel(wheel.key));
       item.appendChild(button);
       list.appendChild(item);
@@ -1632,13 +1870,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _detailTop(wheel) {
     const top = el("div", "detail-top");
-    const back = el("button", "back-button");
-    back.id = "back-to-overview";
-    back.type = "button";
-    back.appendChild(svg(ICON.back));
-    back.appendChild(el("span", null, this._t("back")));
-    back.addEventListener("click", () => this._backToOverview());
-    top.appendChild(back);
+    top.appendChild(bilresaIcon("detail-glyph"));
 
     const heading = el("div", "detail-heading");
     heading.appendChild(el("h2", null, wheel.name));
@@ -1646,9 +1878,22 @@ class IkeaBilresaPanel extends HTMLElement {
       wheel.area || this._t("detail_area_none"),
       this._activityLabel(wheel),
     ].filter(Boolean);
-    heading.appendChild(el("div", "detail-meta", meta.join(" · ")));
+    const metaNode = el("div", "detail-meta", meta.join(" · "));
+    if (wheel.last_activity) metaNode.title = this._formatDate(wheel.last_activity);
+    heading.appendChild(metaNode);
     top.appendChild(heading);
+    top.appendChild(this._status(wheel.availability));
     return top;
+  }
+
+  _mobileBack() {
+    const back = el("button", "back-button");
+    back.id = "back-to-overview";
+    back.type = "button";
+    back.appendChild(svg(ICON.back));
+    back.appendChild(el("span", null, this._t("back")));
+    back.addEventListener("click", () => this._backToOverview());
+    return back;
   }
 
   _tabs(wheel) {
@@ -1683,10 +1928,11 @@ class IkeaBilresaPanel extends HTMLElement {
     return tabs;
   }
 
-  _sectionHead(title, body) {
+  // The selected tab already names the view; a heading repeating it is a second
+  // storey of hierarchy carrying no information. Only the explanation remains.
+  _sectionHead(body) {
     const head = el("div", "section-head");
-    head.appendChild(el("h3", null, title));
-    if (body) head.appendChild(el("p", null, body));
+    head.appendChild(el("p", null, body));
     return head;
   }
 
@@ -2159,13 +2405,31 @@ class IkeaBilresaPanel extends HTMLElement {
     const missingTarget =
       channel.target_missing ||
       (channel.actions || []).some((action) => action.target_missing);
-    const card = el("article", "channel-detail");
+    const card = el("div", "channel-detail");
     card.dataset.state = missingTarget ? "warning" : configured ? "ready" : "empty";
 
+    if (!configured && this._editingChannel !== channel.channel) {
+      const empty = el("div", "channel-empty");
+      empty.appendChild(
+        el(
+          "div",
+          "channel-empty-title",
+          this._t("channel_empty_title", { channel: channel.channel }),
+        ),
+      );
+      empty.appendChild(
+        el("div", "channel-empty-body", this._t("channel_empty_body")),
+      );
+      const add = el("button", "action-button", this._t("add_binding"));
+      add.type = "button";
+      add.dataset.primary = "true";
+      add.addEventListener("click", () => this._startEditor(channel));
+      empty.appendChild(add);
+      card.appendChild(empty);
+      return card;
+    }
+
     const head = el("div", "channel-detail-head");
-    head.appendChild(
-      el("span", "channel-detail-number", String(channel.channel)),
-    );
     const copy = el("div", "channel-detail-copy");
     copy.appendChild(
       el(
@@ -2188,7 +2452,16 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     copy.appendChild(el("div", "channel-detail-summary", summary));
     head.appendChild(copy);
-
+    if (this._editingChannel !== channel.channel) {
+      const edit = el(
+        "button",
+        "action-button",
+        this._t(configured ? "edit_binding" : "add_binding"),
+      );
+      edit.type = "button";
+      edit.addEventListener("click", () => this._startEditor(channel));
+      head.appendChild(edit);
+    }
     card.appendChild(head);
 
     if (configured && (channel.actions || []).length) {
@@ -2208,30 +2481,43 @@ class IkeaBilresaPanel extends HTMLElement {
         const action = summaries[index];
         const release = summaries[index + 1];
 
+        // Hold and release are one gesture with a start and an end, so they
+        // share one row and one glyph sequence rather than reading as two
+        // unrelated actions.
         if (action.gesture === "hold" && release?.gesture === "release") {
-          const item = el("li", "channel-action gesture-sequence");
+          const item = el("li", "channel-action");
           if (action.target_missing || release.target_missing) {
             item.dataset.state = "warning";
+          } else if (this._isNoAction(action) && this._isNoAction(release)) {
+            item.dataset.state = "empty";
           }
 
+          const label = el("span", "channel-action-label");
           const rail = el("span", "gesture-sequence-rail");
           rail.setAttribute("aria-hidden", "true");
           rail.appendChild(svg(GESTURE_ICON.hold, "gesture-glyph"));
+          rail.appendChild(el("span", "gesture-sequence-line"));
           rail.appendChild(el("span", "gesture-sequence-end"));
-          item.appendChild(rail);
-
-          const copy = el("span", "gesture-sequence-copy");
-          for (const step of [action, release]) {
-            const line = el("span", "gesture-sequence-line");
-            line.appendChild(
-              el("span", "channel-action-label", step.gesture_label),
-            );
-            line.appendChild(
-              el("span", "channel-action-value", actionValue(step)),
-            );
-            copy.appendChild(line);
-          }
-          item.appendChild(copy);
+          label.appendChild(rail);
+          label.appendChild(
+            el(
+              "span",
+              null,
+              `${action.gesture_label} → ${release.gesture_label.toLocaleLowerCase(
+                this._hass?.language || undefined,
+              )}`,
+            ),
+          );
+          item.appendChild(label);
+          item.appendChild(
+            el(
+              "span",
+              "channel-action-value",
+              this._isNoAction(action) && this._isNoAction(release)
+                ? actionValue(action)
+                : [action, release].map(actionValue).join(" → "),
+            ),
+          );
           actions.appendChild(item);
           index += 1;
           continue;
@@ -2239,6 +2525,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
         const item = el("li", "channel-action");
         if (action.target_missing) item.dataset.state = "warning";
+        else if (this._isNoAction(action)) item.dataset.state = "empty";
         const label = el("span", "channel-action-label");
         label.appendChild(gestureGlyph(action.gesture));
         label.appendChild(el("span", null, action.gesture_label));
@@ -2253,34 +2540,81 @@ class IkeaBilresaPanel extends HTMLElement {
 
     if (this._editingChannel === channel.channel) {
       card.appendChild(this._bindingForm(wheel, channel));
-    } else {
-      const footer = el("div", "channel-detail-footer");
-      const edit = el(
-        "button",
-        "action-button",
-        this._t(configured ? "edit_binding" : "add_binding"),
-      );
-      edit.type = "button";
-      edit.addEventListener("click", () => this._startEditor(channel));
-      footer.appendChild(edit);
-      card.appendChild(footer);
     }
     return card;
   }
 
+  _isNoAction(action) {
+    return !action.target_label && action.action_label === this._t("action_none");
+  }
+
   _channelsView(wheel) {
     const wrap = el("div");
-    wrap.appendChild(
-      this._sectionHead(
-        this._t("detail_channels_heading"),
-        this._t("detail_channels_intro"),
-      ),
-    );
-    const grid = el("div", "channel-grid");
-    for (const channel of wheel.channels) {
-      grid.appendChild(this._channelDetail(wheel, channel));
-    }
-    wrap.appendChild(grid);
+    wrap.appendChild(this._sectionHead(this._t("detail_channels_intro")));
+
+    const open =
+      wheel.channels.find((item) => item.channel === this._openChannel) ||
+      wheel.channels[0];
+    if (!open) return wrap;
+
+    const workbench = el("div", "channel-workbench");
+    // The wheel's three selector positions ARE the navigation: the spine mirrors
+    // the hardware, so picking a position on screen is the same act as clicking
+    // one in the hand. Every channel of every wheel is compared on the overview;
+    // the detail is a workbench for one.
+    const spine = el("div", "channel-spine");
+    spine.setAttribute("role", "tablist");
+    spine.setAttribute("aria-orientation", "vertical");
+    spine.setAttribute("aria-label", this._t("channel_spine"));
+    wheel.channels.forEach((channel, index) => {
+      const dot = el(
+        "button",
+        "channel-position",
+        String(channel.channel),
+      );
+      dot.type = "button";
+      dot.id = `spine-${wheel.key}-${channel.channel}`;
+      dot.setAttribute("role", "tab");
+      dot.setAttribute("aria-selected", String(channel.channel === open.channel));
+      dot.setAttribute("aria-controls", `channel-${wheel.key}-${channel.channel}`);
+      dot.tabIndex = channel.channel === open.channel ? 0 : -1;
+      const configured =
+        channel.profile !== null && channel.profile !== undefined;
+      dot.setAttribute(
+        "aria-label",
+        `${this._t("channel_title", { channel: channel.channel })}: ${
+          configured
+            ? channel.behaviour || channel.profile
+            : this._t("not_configured")
+        }`,
+      );
+      dot.addEventListener("click", () => this._openChannelAt(channel.channel));
+      dot.addEventListener("keydown", (event) => {
+        const keys = {
+          ArrowDown: (index + 1) % wheel.channels.length,
+          ArrowRight: (index + 1) % wheel.channels.length,
+          ArrowUp: (index - 1 + wheel.channels.length) % wheel.channels.length,
+          ArrowLeft: (index - 1 + wheel.channels.length) % wheel.channels.length,
+          Home: 0,
+          End: wheel.channels.length - 1,
+        };
+        const next = keys[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        spine.querySelectorAll('[role="tab"]')[next]?.focus();
+      });
+      spine.appendChild(dot);
+    });
+    workbench.appendChild(spine);
+
+    const surface = el("div", "channel-surface");
+    surface.id = `channel-${wheel.key}-${open.channel}`;
+    surface.setAttribute("role", "tabpanel");
+    surface.setAttribute("aria-labelledby", `spine-${wheel.key}-${open.channel}`);
+    surface.appendChild(this._channelDetail(wheel, open));
+    workbench.appendChild(surface);
+
+    wrap.appendChild(workbench);
     return wrap;
   }
 
@@ -2449,7 +2783,7 @@ class IkeaBilresaPanel extends HTMLElement {
     for (const channel of wheel.channels) {
       const row = el("div", "live-channel");
       row.appendChild(
-        el("span", "channel-detail-number", String(channel.channel)),
+        el("span", "channel-n", String(channel.channel)),
       );
       const copy = el("div", "live-channel-copy");
       copy.appendChild(
@@ -2483,9 +2817,33 @@ class IkeaBilresaPanel extends HTMLElement {
     return card;
   }
 
+  // Eighteen is the highest rotary count DEVICE_REFERENCE.md has ever observed,
+  // so the strip is a measured scale of what this hardware can emit in one
+  // batch, not a decorative bar. Do not change the count without a new
+  // observation to justify it.
+  _detentStrip(notches) {
+    const total = 18;
+    const active = Math.min(Math.abs(Number(notches) || 0), total);
+    const strip = el("div", "detent-strip");
+    strip.setAttribute(
+      "aria-label",
+      this._t("gesture_rotate", {
+        channel: "",
+        direction: "",
+        delta: active,
+      }).trim(),
+    );
+    for (let index = 0; index < total; index += 1) {
+      const detent = el("span", "detent");
+      if (index >= total - active) detent.dataset.active = "true";
+      strip.appendChild(detent);
+    }
+    return strip;
+  }
+
   _liveView(wheel) {
     const wrap = el("div");
-    wrap.appendChild(this._sectionHead(this._t("tab_live")));
+    wrap.appendChild(this._sectionHead(this._t("live_intro")));
     if (this._activityError) wrap.appendChild(this._banner(this._t("live_error")));
 
     const layout = el("div", "live-layout");
@@ -2504,16 +2862,20 @@ class IkeaBilresaPanel extends HTMLElement {
     output.appendChild(listening);
 
     const latest = this._activities[0];
+    const body = el("div", "live-body");
     if (!latest) {
-      output.appendChild(el("div", "waiting-title", this._t("live_waiting_title")));
-      output.appendChild(
+      body.appendChild(el("div", "waiting-title", this._t("live_waiting_title")));
+      body.appendChild(
         el("div", "live-explanation", this._t("live_waiting_body")),
       );
+      output.appendChild(body);
     } else {
-      const result = this._formatResult(latest.result);
-      output.appendChild(el("div", "live-result", result));
+      body.appendChild(
+        el("div", "live-result-label", this._t("live_result_label")),
+      );
+      body.appendChild(el("div", "live-result", this._formatResult(latest.result)));
       if (latest.result === null || latest.result === undefined) {
-        output.appendChild(
+        body.appendChild(
           el(
             "div",
             "live-explanation",
@@ -2525,12 +2887,17 @@ class IkeaBilresaPanel extends HTMLElement {
       const dispatch = el("div", "dispatch");
       dispatch.appendChild(this._statusDot(dispatchState));
       dispatch.appendChild(el("span", null, this._t(dispatchKey)));
-      output.appendChild(dispatch);
+      body.appendChild(dispatch);
+      output.appendChild(body);
+
       output.appendChild(el("div", "gesture-caption", this._gestureLabel(latest)));
       if (latest.source === "panel_test") {
         output.appendChild(
           el("div", "gesture-caption", this._t("source_panel_test")),
         );
+      }
+      if (latest.gesture === "rotate") {
+        output.appendChild(this._detentStrip(latest.notches));
       }
     }
     layout.appendChild(output);
@@ -2576,12 +2943,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _diagnosticsView(wheel) {
     const wrap = el("div");
-    wrap.appendChild(
-      this._sectionHead(
-        this._t("tab_diagnostics"),
-        this._t("diagnostics_intro"),
-      ),
-    );
+    wrap.appendChild(this._sectionHead(this._t("diagnostics_intro")));
     const grid = el("div", "diagnostic-grid");
     const recoveryKey = this._recoveryKey(wheel);
     const healthy = recoveryKey === "recovery_ok";
@@ -2608,7 +2970,7 @@ class IkeaBilresaPanel extends HTMLElement {
     health.appendChild(healthCopy);
     grid.appendChild(health);
 
-    const status = el("section", "detail-card");
+    const status = el("section", "diagnostic-section");
     status.appendChild(
       el("h4", null, this._t("diagnostic_connection_heading")),
     );
@@ -2644,7 +3006,7 @@ class IkeaBilresaPanel extends HTMLElement {
     status.appendChild(facts);
     grid.appendChild(status);
 
-    const activity = el("section", "detail-card");
+    const activity = el("section", "diagnostic-section");
     activity.appendChild(
       el("h4", null, this._t("diagnostic_activity_heading")),
     );
@@ -2704,22 +3066,23 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _detail(wheel) {
-    const outer = el("div");
-    if (!this._snapshot.matter_connected) {
-      outer.appendChild(this._banner(this._t("banner_matter_offline")));
-    } else if (this._error) {
-      outer.appendChild(this._banner(this._t("banner_updates_stopped")));
-    }
-
     const shell = el("div", "detail-shell");
     shell.appendChild(this._rail());
+
     const pane = el("div", "detail-pane");
-    pane.appendChild(this._detailTop(wheel));
-    pane.appendChild(this._tabs(wheel));
-    pane.appendChild(this._detailPanel(wheel));
+    const inner = el("div", "detail-inner");
+    if (!this._snapshot.matter_connected) {
+      inner.appendChild(this._banner(this._t("banner_matter_offline")));
+    } else if (this._error) {
+      inner.appendChild(this._banner(this._t("banner_updates_stopped")));
+    }
+    inner.appendChild(this._mobileBack());
+    inner.appendChild(this._detailTop(wheel));
+    inner.appendChild(this._tabs(wheel));
+    inner.appendChild(this._detailPanel(wheel));
+    pane.appendChild(inner);
     shell.appendChild(pane);
-    outer.appendChild(shell);
-    return outer;
+    return shell;
   }
 
   _missingWheel() {
@@ -2790,14 +3153,27 @@ class IkeaBilresaPanel extends HTMLElement {
     const missing = this._snapshot.wheels.filter((wheel) =>
       wheel.channels.some((channel) => channel.target_missing),
     );
-    if (missing.length) {
+    if (missing.length === 1) {
+      // The backend knows which wheel and which channel, so the banner says so.
+      // "Wheels with an unavailable target: 1" is a log line, not a sentence.
+      const wheel = missing[0];
+      const channel = wheel.channels.find((item) => item.target_missing);
+      wrap.appendChild(
+        this._banner(
+          this._t("banner_target_missing_named", {
+            wheel: wheel.name,
+            channel: channel.channel,
+          }),
+        ),
+      );
+    } else if (missing.length > 1) {
       wrap.appendChild(
         this._banner(
           this._t("banner_target_missing", { count: missing.length }),
         ),
       );
     }
-    wrap.appendChild(this._summary());
+    wrap.appendChild(this._overviewHead());
     const grid = el("div", "grid");
     for (const wheel of this._snapshot.wheels) grid.appendChild(this._wheel(wheel));
     wrap.appendChild(grid);
@@ -2809,6 +3185,9 @@ class IkeaBilresaPanel extends HTMLElement {
     const style = document.createElement("style");
     style.textContent = STYLES;
     const main = el("main");
+    // The detail's rail runs to the viewport edge, so the page frame lives on
+    // .detail-pane instead of here.
+    if (this._open && this._snapshot) main.dataset.view = "detail";
     main.appendChild(this._body());
     this.shadowRoot.replaceChildren(style, this._header(), main);
     if (focused) this.shadowRoot.getElementById(focused)?.focus({ preventScroll: true });

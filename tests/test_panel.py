@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -234,7 +235,7 @@ def test_panel_uses_distinct_material_rounded_gestures() -> None:
         "hold",
     ):
         assert f"{gesture}: {{" in asset
-    assert 'el("li", "channel-action gesture-sequence")' in asset
+    assert 'el("span", "gesture-sequence-rail")' in asset
     assert 'el("span", "gesture-sequence-end")' in asset
     assert "gestureGlyph(action.gesture)" in asset
 
@@ -355,9 +356,13 @@ def test_panel_detail_keeps_the_measured_rail_and_pane_breakpoints() -> None:
     assert "@media (max-width: 619px)" in asset
     assert ".rail { display: none; }" in asset
     # This must be a container query on the detail pane, never a window query.
-    assert ".detail-pane { min-inline-size: 0; container-type: inline-size; }" in asset
+    assert "container-type: inline-size;" in asset
     assert "@container (max-width: 700px)" in asset
     assert "@media (max-width: 700px)" not in asset
+    # The detail needs the overview's ceiling too: without it a wide window
+    # drags a fact's label and its value to opposite ends of the screen.
+    assert "--_detail-max: 1100px;" in asset
+    assert ".detail-inner { inline-size: min(100%, var(--_detail-max)); }" in asset
 
 
 def test_panel_detail_puts_desktop_back_navigation_inside_the_rail() -> None:
@@ -373,21 +378,182 @@ def test_panel_detail_puts_desktop_back_navigation_inside_the_rail() -> None:
     assert ".back-button {\n    display: none;" in asset
     assert "display: inline-flex;" not in back_rule
     assert "@media (max-width: 619px)" in asset
-    assert ".back-button { display: inline-flex; }" in asset
+    assert (
+        ".back-button { display: inline-flex; margin-block-end: var(--_space-4); }"
+        in asset
+    )
 
 
-def test_panel_channel_detail_is_card_list_not_a_table_grid() -> None:
-    """The detail needs to scan as channel cards, not as a spreadsheet."""
+def test_rail_wheel_declares_a_column_for_every_child_it_renders() -> None:
+    """A four-child button in a three-column grid wraps and misaligns.
+
+    The shipped rail declared `auto minmax(0, 1fr) auto` and then appended four
+    children: glyph, status dot, copy, tick. The dot took the 1fr track, so every
+    wheel name was pushed flush right with a gap beside it, and the tick wrapped
+    onto a second row inside the open wheel's button. Both defects were visible
+    in the owner's screenshots and neither was caught by a test, because nothing
+    asserted the grid and the children agree.
+    """
     asset = _asset()
-    channel = asset.split("  _channelDetail(wheel, channel) {", 1)[1].split(
-        "  _channelsView(wheel) {", 1
+    rail = asset.split("  _rail() {", 1)[1].split("  _statusDot(", 1)[0]
+    rule = asset.split("  .rail-wheel {", 1)[1].split("  }", 1)[0]
+
+    columns = re.search(r"grid-template-columns:\s*([^;]+);", rule)
+    assert columns is not None
+    # count top-level tracks: minmax(0, 1fr) is one track, not two
+    tracks = re.sub(r"\([^)]*\)", "", columns.group(1)).split()
+    assert len(tracks) == 3
+
+    appends = re.findall(r"button\.appendChild\(", rail)
+    assert len(appends) == 3, "the rail button must render one child per column"
+
+    # The tick is gone; the state is carried by the three signals below instead.
+    assert "rail-check" not in asset
+    assert 'svg(ICON.check, "rail-check")' not in rail
+
+
+def test_the_open_wheel_is_not_marked_by_a_tint_alone() -> None:
+    """Measured in both default themes: the selected tint is only 1.22:1.
+
+    A selected background that faint is a colour-only signal, and it is the sole
+    remaining marker once the (broken, redundant) tick is removed. Home
+    Assistant's own sidebar answers this with an accent icon and heavier text,
+    so the rail does the same: the glyph may take the accent where a word may
+    not, because an icon clears the 3:1 non-text bar.
+    """
+    asset = _asset()
+
+    assert (
+        '.rail-wheel[aria-current="page"] .rail-glyph { color: var(--_accent); }'
+        in asset
+    )
+    assert ".rail-glyph {\n    flex: 0 0 auto;\n    inline-size: 26px;" in asset
+    assert "color: var(--_ink-dim);\n    fill: currentColor;" in asset
+    assert '.rail-wheel[aria-current="page"] .rail-name {' in asset
+    assert (
+        '.rail-wheel[aria-current="page"] {\n    background: var(--_selected);\n  }'
+        in asset
+    )
+
+
+def test_the_tab_strip_does_not_scroll_itself() -> None:
+    """The owner found a scrollbar on a row of three short tabs.
+
+    `overflow-x: auto` is a real safety net — a long translation must not push
+    the page sideways — but it costs more than it looks. Per CSS Overflow, when
+    one axis is not `visible` the other's `visible` computes to `auto`, so the
+    tab strip scrolls in BOTH axes whether or not we asked. Anything overhanging
+    it vertically then becomes a scrollbar or gets clipped:
+
+    * an underline at `inset-block-end: -1px` (ported from a prototype whose tab
+      strip had no `overflow-x`) made 1px of scrollable height, so a vertical
+      scrollbar appeared beside three short tabs;
+    * a tab fills the strip's height exactly, so an outset focus ring is clipped
+      top and bottom.
+
+    Hence: the rule is painted inside as a shadow, the underline sits at 0, and
+    the tabs' ring is inset. Measured after the fix: 0px overflow on both axes.
+    """
+    asset = _asset()
+    styles = asset.split("const STYLES = `", 1)[1].split("`;", 1)[0]
+    tabs_rule = styles.split("  .tabs {", 1)[1].split("  }", 1)[0]
+
+    # the divider is painted inside, never hung off the border edge
+    assert "box-shadow: inset 0 -1px 0 var(--_divider);" in tabs_rule
+    assert "border-block-end" not in tabs_rule
+    # nothing may overhang the scroll container
+    assert "inset-block-end: -1px;" not in styles
+    assert (
+        '.tab[aria-selected="true"]::after {\n'
+        '    content: "";\n'
+        "    position: absolute;\n"
+        "    inset-inline: 0;\n"
+        "    inset-block-end: 0;" in styles
+    )
+    # a ring on a full-height tab must be inset or the container clips it
+    assert ".tab:focus-visible { outline-offset: -2px; }" in styles
+
+
+def test_glanceable_times_are_relative_and_keep_the_exact_stamp() -> None:
+    """ "2 hours ago" is read; "16. 7. 2026 9:54" has to be subtracted from now.
+
+    Diagnostics is the exception and keeps the absolute stamp: it is a surface
+    for reading facts, not for glancing.
+    """
+    asset = _asset()
+    activity = asset.split("  _activityLabel(wheel) {", 1)[1].split(
+        "  _formatDate(value) {", 1
+    )[0]
+    diagnostics = asset.split("  _diagnosticsView(wheel) {", 1)[1].split(
+        "  _detailPanel(wheel) {", 1
     )[0]
 
-    assert 'el("div", "channel-grid")' in asset
+    assert "Intl.RelativeTimeFormat" in asset
+    assert "this._formatRelative(when)" in activity
+    assert "this._formatDate(" not in activity
+    # the precise time stays one hover away rather than being thrown away
+    assert "sub.title = this._formatDate(wheel.last_activity)" in asset
+    assert "metaNode.title = this._formatDate(wheel.last_activity)" in asset
+    assert "this._formatDate(wheel.last_activity)" in diagnostics
+
+
+def test_channel_detail_navigates_by_the_wheels_three_physical_positions() -> None:
+    """The spine mirrors the hardware the user is holding.
+
+    The wheel has three physical selector positions, so the detail navigates by
+    them and opens one at a time. Comparing every channel of every wheel is the
+    overview's job — that is why the grid is the landing layer.
+    """
+    asset = _asset()
+    view = asset.split("  _channelsView(wheel) {", 1)[1].split(
+        "  _gestureLabel(activity) {", 1
+    )[0]
+    channel = asset.split("  _channelDetail(wheel, channel) {", 1)[1].split(
+        "  _isNoAction(action) {", 1
+    )[0]
+
+    assert 'el("div", "channel-workbench")' in view
+    assert 'el("div", "channel-spine")' in view
     assert 'el("ul", "channel-action-list")' in channel
     assert 'el("li", "channel-action")' in channel
-    assert 'el("div", "gesture-grid")' not in channel
-    assert 'el("div", "channel-detail-footer")' in channel
+    # the old equal-weight three-column grid is gone
+    assert 'el("div", "channel-grid")' not in asset
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" not in asset
+
+    # The spine is a switcher, so it owes the same keyboard contract as the tabs.
+    assert 'spine.setAttribute("role", "tablist")' in view
+    assert 'spine.setAttribute("aria-orientation", "vertical")' in view
+    assert 'dot.setAttribute("role", "tab")' in view
+    for key in ("ArrowDown", "ArrowUp", "Home", "End"):
+        assert f"{key}:" in view
+
+
+def test_an_unconfigured_channel_stays_lighter_than_a_configured_one() -> None:
+    """PANEL_DESIGN.md: an empty channel must not carry a full channel's weight.
+
+    The shipped grid stretched every channel to the tallest sibling, so two
+    empty channels rendered as two large blank rectangles beside one real one.
+    """
+    asset = _asset()
+    channel = asset.split("  _channelDetail(wheel, channel) {", 1)[1].split(
+        "  _isNoAction(action) {", 1
+    )[0]
+
+    assert 'el("div", "channel-empty")' in channel
+    assert 'this._t("channel_empty_title"' in channel
+    assert "min-block-size: 100%;" not in asset
+
+    # Dimmed, never italic: HA does not italicise state, and an italic label is
+    # a reliable generated-UI tell.
+    assert "font-style: italic" not in asset
+    # --disabled-text-color is 2.8:1 on a light card and fails the AA gate this
+    # project measured. "Empty" is said with --_ink-dim (secondary text, 4.81:1).
+    styles = asset.split("const STYLES = `", 1)[1].split("`;", 1)[0]
+    assert "var(--disabled-text-color" not in styles
+    assert (
+        '.channel[data-state="empty"] .channel-behaviour { color: var(--_ink-dim); }'
+        in styles
+    )
 
 
 def test_overview_rows_do_not_promise_per_channel_navigation() -> None:
@@ -436,10 +602,29 @@ def test_live_test_leads_with_result_and_hides_synthetic_controls() -> None:
     asset = _asset()
 
     assert 'el("section", "detail-card live-output")' in asset
-    assert 'el("div", "live-result", result)' in asset
+    assert 'el("div", "live-result", this._formatResult(latest.result))' in asset
     assert 'el("section", "detail-card live-channels")' in asset
     assert 'el("details", "detail-card test-panel")' in asset
     assert 'el("summary", null, this._t("test_controls_heading"))' in asset
+
+
+def test_the_detent_strip_is_scaled_to_observed_hardware() -> None:
+    """The strip is a measured scale, not decoration.
+
+    Eighteen is the highest rotary count DEVICE_REFERENCE.md has ever recorded,
+    so the strip shows one batch against what this firmware can actually emit.
+    A round number chosen because it looked nice would be a lie about hardware.
+    """
+    asset = _asset()
+    strip = asset.split("  _detentStrip(notches) {", 1)[1].split(
+        "  _liveView(wheel) {", 1
+    )[0]
+
+    assert "const total = 18;" in strip
+    assert "Math.min(Math.abs(Number(notches) || 0), total)" in strip
+    assert 'el("span", "detent")' in strip
+    # only a rotation has notches to show
+    assert 'if (latest.gesture === "rotate") {' in asset
 
 
 def test_diagnostics_hides_internal_contract_under_technical_details() -> None:
@@ -453,6 +638,11 @@ def test_diagnostics_hides_internal_contract_under_technical_details() -> None:
     assert 'el("details", "detail-card technical-details")' in diagnostics
     assert 'this._t("diagnostic_technical_details")' in diagnostics
     assert 'this._t("diagnostic_contract")' in diagnostics
+    # Fact groups are sections on the page, not cards inside the page. A
+    # bordered box per group, each with its own boxed heading, is the
+    # card-in-card tell that made the panel read as a wireframe.
+    assert 'el("section", "diagnostic-section")' in diagnostics
+    assert diagnostics.count('el("section", "detail-card")') == 0
 
 
 def test_live_activity_renders_structured_runtime_outcomes_without_call_service() -> (

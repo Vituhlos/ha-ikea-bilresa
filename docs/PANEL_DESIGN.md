@@ -99,6 +99,17 @@ theme's colour on the tab underline, the status dot, the icon — surfaces where
 elsewhere. Put the words themselves on `--primary-text-color`. A green tick
 beside black text reads as success and passes; green text does not pass.
 
+**A selected tint is not a state signal on its own.** Measured 2026-07-17 in
+the panel's own rail: the selected row's background reaches only **1.22:1**
+against the rail in *both* default themes, because both derive from
+`--secondary-background-color`. That is a colour-only signal, and a faint one.
+Home Assistant's own sidebar never relies on it alone — it marks its active
+entry with an accent **icon** plus heavier text. The rail therefore carries
+three signals: tint, accent glyph, medium weight. The glyph may take the accent
+where a word may not; it is non-text and clears the 3:1 bar. A tick was tried
+and removed — it repeated what the tint already said, and (see
+`PROJECT_STATUS.md`) it broke the rail's grid.
+
 Two consequences that are easy to miss:
 
 - `--secondary-text-color` clears AA by **0.31** on a light card. Any tinted
@@ -295,8 +306,32 @@ narrow for them.
 
 ### Channels and behavior
 
-Show a separate card for each of the three channels. A configured card should
-summarize the behavior of:
+**Revised 2026-07-17: the detail opens one channel at a time, on a spine.**
+The earlier rule — a separate card for each of the three channels, all visible
+at once — is superseded and must not be built from.
+
+The wheel has three physical selector positions, so the detail navigates by
+them: a vertical spine of three detents on the left, the open channel's
+workbench on the right. Picking a position on screen is the same act as moving
+the selector in the hand. The spine collapses to a horizontal strip below the
+detail pane's 700 px threshold, and carries the same ARIA/keyboard contract as
+the view tabs.
+
+This does not weaken `Product intent` question 1 — *what does each wheel
+control* — because that question is the **overview's** job, and answering it is
+precisely why the grid is the landing layer: it shows every channel of every
+wheel at once. The detail is a workbench for one channel, not a second
+comparison surface.
+
+What the all-cards rule actually produced, measured on the deployed
+`v0.5.9-rc.11`: a `repeat(3, 1fr)` grid with `min-block-size: 100%` per card, so
+a wheel with one configured channel rendered one real card beside two blank
+rectangles stretched to its height — the "unconfigured channel stays compact"
+rule below, violated by the layout meant to carry it. An unconfigured channel
+now renders as a short invitation naming what it waits for, never as an empty
+box holding a full channel's floor space.
+
+A configured channel summarizes the behavior of:
 
 - rotation left;
 - rotation right;
@@ -307,13 +342,14 @@ summarize the behavior of:
 
 Technical endpoint and cluster information belongs only in expanded diagnostics.
 
-The production layout presents all three channels as compact, independently
-scannable cards. Each channel has a numbered heading, a one-line
-behavior/target summary and a short vertical gesture list. Avoid table-like
-3 x 2 gesture matrices on desktop; they make the wheel feel like an
-administration grid rather than a control surface. An unconfigured channel stays
-compact instead of occupying the same visual weight as a fully configured one.
-Editing expands inside that channel without moving the user to a separate
+The open channel has a heading, a one-line behavior/target summary and a
+vertical gesture ledger — hairline-separated rows on one surface, never a
+table-like 3 x 2 gesture matrix and never a stack of nested cards. Both make the
+wheel feel like an administration grid rather than a control surface. Hold and
+release are one row: they are one gesture with a start and an end, and splitting
+them into two rows presents a sequence as two unrelated actions.
+
+Editing expands inside the open channel without moving the user to a separate
 administration page.
 
 ### Guided binding editor

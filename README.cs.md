@@ -15,10 +15,11 @@ jaké má na originálním IKEA hubu DIRIGERA — tím, že reaguje na **`MultiP
 události v reálném čase**, které vestavěná Matter integrace v Home Assistantu
 zahazuje.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.9-rc.11 přidává
-> schválenou V2 ikonu BILRESA do sidebaru i panelu Home Assistanta a samostatná
-> Material Rounded gesta pro otáčení, jednoduchý/dvojitý/trojitý stisk a
-> sekvenci podržení/uvolnění.
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.9-rc.12
+> přepracovává vizuální hierarchii panelu -- páteř kanálů zrcadlící tři fyzické
+> polohy kolečka, živý test vedený výsledkem, lehčí nenastavené kanály a
+> opravený přepínací rail -- nad schválenou V2 ikonou BILRESA a Material Rounded
+> gesty. Jen vizuál; Matter, propojení a gesta se nemění.
 >
 > Malý patch release train `0.5.1`–`0.5.7` je v
 > [docs/ROADMAP.md](docs/ROADMAP.md).

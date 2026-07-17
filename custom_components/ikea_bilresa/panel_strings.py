@@ -52,6 +52,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "no_activity": "No activity yet",
         "last_on_channel": "last on channel {channel}",
         # summary
+        "overview_title": "Wheels",
         "summary_connected": "{count} connected",
         "summary_unavailable": "{count} unavailable",
         "summary_unknown": "{count} not reporting",
@@ -65,6 +66,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "banner_target_missing": (
             "Bindings on {count} wheels point to targets Home Assistant can no "
             "longer find. Open a marked channel to repair it."
+        ),
+        "banner_target_missing_named": (
+            "{wheel} has an unavailable binding target on channel {channel}. "
+            "Open the channel and repair the binding."
         ),
         # states
         "empty_title": "No BILRESA wheels found",
@@ -87,9 +92,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "detail_last_activity": "Last activity",
         "detail_last_channel": "Last active channel",
         "detail_no_last_channel": "No channel observed yet",
-        "detail_channels_heading": "Channel behaviour",
+        "detail_channels_heading": "Physical position behaviour",
         "detail_channels_intro": (
-            "Review and assign what rotation, presses and holds control."
+            "The three selector positions on the wheel are also the navigation. "
+            "Pick a position to review or edit its gestures in place."
+        ),
+        "channel_spine": "Wheel channels",
+        "channel_empty_title": "Channel {channel} is waiting for a binding",
+        "channel_empty_body": (
+            "Pick a behaviour and a target. The other two physical positions "
+            "stay unchanged."
         ),
         "channel_title": "Channel {channel}",
         "channel_binding": "Binding",
@@ -179,6 +191,11 @@ STRINGS: dict[str, dict[str, str]] = {
             "The wheel was removed or the integration reloaded. Return to the overview."
         ),
         # live test
+        "live_intro": (
+            "The panel only listens. The largest figure answers whether the "
+            "action actually reached its target."
+        ),
+        "live_result_label": "Last result",
         "live_listening": "Listening",
         "live_stopped": "Listening stopped",
         "live_waiting_title": "Waiting for the wheel",
@@ -241,7 +258,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_release": "Channel {channel} · release",
         "gesture_unknown": "Channel {channel} · activity received",
         "live_channels_heading": "Configured channels",
-        "live_recent": "Recent activity",
+        "live_recent": "Latest events",
         # diagnostics
         "diagnostics_heading": "Wheel status",
         "diagnostics_intro": (
@@ -299,6 +316,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "mode_scenes": "Scény ({count})",
         "no_activity": "Zatím žádná aktivita",
         "last_on_channel": "naposledy na kanálu {channel}",
+        "overview_title": "Kolečka",
         "summary_connected": "{count} připojeno",
         "summary_unavailable": "{count} nedostupné",
         "summary_unknown": "{count} se nehlásí",
@@ -313,6 +331,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "banner_target_missing": (
             "Počet koleček s nedostupným cílem propojení: {count}. Otevřete "
             "označený kanál a propojení opravte."
+        ),
+        "banner_target_missing_named": (
+            "{wheel} má na kanálu {channel} nedostupný cíl propojení. "
+            "Otevřete kanál a propojení opravte."
         ),
         "empty_title": "Nenalezeno žádné kolečko BILRESA",
         "empty_connected": "Integrace je připojená, ale zatím nenašla žádné kolečko.",
@@ -331,9 +353,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "detail_last_activity": "Poslední aktivita",
         "detail_last_channel": "Naposledy aktivní kanál",
         "detail_no_last_channel": "Zatím nebyl pozorován žádný kanál",
-        "detail_channels_heading": "Chování kanálů",
+        "detail_channels_heading": "Chování fyzických poloh",
         "detail_channels_intro": (
-            "Zkontrolujte a přiřaďte, co ovládá otáčení, stisky a podržení."
+            "Tři polohy přepínače na kolečku jsou zároveň navigací. Vyberte "
+            "polohu a upravte její gesta bez přesunu na další stránku."
+        ),
+        "channel_spine": "Kanály kolečka",
+        "channel_empty_title": "Kanál {channel} čeká na propojení",
+        "channel_empty_body": (
+            "Zvolte chování a cíl. Ostatní dvě fyzické polohy kolečka zůstanou "
+            "beze změny."
         ),
         "channel_title": "Kanál {channel}",
         "channel_binding": "Propojení",
@@ -418,6 +447,11 @@ STRINGS: dict[str, dict[str, str]] = {
             "Kolečko bylo odebráno nebo se integrace znovu načetla. Vraťte se na "
             "přehled."
         ),
+        "live_intro": (
+            "Panel pouze naslouchá. Největší údaj odpovídá na otázku, zda akce "
+            "skutečně dorazila k cíli."
+        ),
+        "live_result_label": "Poslední výsledek",
         "live_listening": "Naslouchám",
         "live_stopped": "Naslouchání zastaveno",
         "live_waiting_title": "Čekám na kolečko",
@@ -481,7 +515,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_release": "Kanál {channel} · uvolnění",
         "gesture_unknown": "Kanál {channel} · přijata aktivita",
         "live_channels_heading": "Nastavené kanály",
-        "live_recent": "Nedávná aktivita",
+        "live_recent": "Poslední události",
         "diagnostics_heading": "Stav kolečka",
         "diagnostics_intro": (
             "Stav z Home Assistantu pouze pro čtení. Soukromé identifikátory Matter "
