@@ -198,8 +198,26 @@ Files: `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
 `custom_components/ikea_bilresa/panel_strings.py`, `tests/test_panel.py`,
 `docs/PANEL_DESIGN.md`, and this handoff.
 
-Owed before this can be called done: exact-revision CI, an RC, and a real
-Home Assistant page opened in a **fresh tab** — plus the standing debts this
+### Publication (2026-07-17)
+
+- runtime commit `161b2bf` (`feat: rework panel visual hierarchy`) pushed to
+  `agent/stabilize-0.5-x`, updating draft PR #1;
+- exact-revision GitHub Actions run `29604008836` passed for `161b2bf`:
+  Frontend checks, mypy, Validate HACS, hassfest, Lint (ruff) and 210 unit
+  tests. This supplies the mypy gate the local Python 3.14 could not run;
+- prerelease `v0.5.9-rc.12` published from exact commit `161b2bf`:
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.5.9-rc.12;
+- the tag resolves to `161b2bf` and is marked prerelease.
+
+This establishes **Implemented + Static + Unit + CI + Released**. It does **not**
+establish a Home Assistant deployment or Hardware: nothing has been installed
+through HACS yet, and the panel has never rendered in a real Home Assistant
+page. Deploy `v0.5.9-rc.12`, then open it in a **completely fresh** browser tab
+(an existing tab keeps the old custom element and the web platform forbids
+redefining it).
+
+Owed before this can be called done: a HACS install of `v0.5.9-rc.12` and a
+real Home Assistant page opened in a fresh tab — plus the standing debts this
 work does not discharge (a non-default theme, a screen-reader pass, and a
 physical notched phone).
 
@@ -1826,11 +1844,14 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Review the 2026-07-17 panel rework in the working tree (see the section at the
-top of this file). It is harness-measured but has never run in Home Assistant.
-If the owner approves it, publish an RC from an exact CI-verified commit and
-open it in a **completely fresh** browser tab — an existing tab keeps the old
-custom element and the web platform does not allow redefining it.
+Deploy `v0.5.9-rc.12` through HACS (CI-verified, published from `161b2bf`),
+restart Home Assistant, and open the panel in a **completely fresh** browser tab
+— an existing tab keeps the old custom element and the web platform does not
+allow redefining it. Then visually check the channel spine, the corrected rail
+(accent icon + weight on the open wheel, no stray tick row), the lighter
+unconfigured channels, the result-led Live test with its detent strip, and the
+tab strip with no scrollbar. Capture screenshots against a non-default theme,
+which the harness could not exercise.
 
 ## Next-agent handoff
 
