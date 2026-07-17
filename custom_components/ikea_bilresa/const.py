@@ -143,6 +143,7 @@ SUBENTRY_BINDING = "binding"
 
 CONF_NODE_ID = "node_id"
 CONF_CHANNEL = "channel"
+CONF_ENDPOINT = "endpoint"
 CONF_TARGET = "target"
 CONF_MODE = "mode"
 CONF_STEP = "step"
@@ -157,6 +158,7 @@ CONF_DOUBLE_TARGET = "double_press_target"
 CONF_TRIPLE_TARGET = "triple_press_target"
 CONF_HOLD_TARGET = "hold_target"
 CONF_HOLD_ACTION = "hold_action"
+CONF_RAMP_DIRECTION = "ramp_direction"
 CONF_SCENES = "scenes"
 
 # Flow-only convenience fields used when creating a binding.
@@ -183,6 +185,18 @@ HOLD_RAMP = "ramp"  # continuously ramp the scroll target while held
 HOLD_NONE = "none"
 HOLD_ACTIONS = [HOLD_TOGGLE, HOLD_RAMP, HOLD_NONE]
 DEFAULT_HOLD_ACTION = HOLD_TOGGLE
+
+# A dual-button hold ramp may alternate like the historic wheel behavior or
+# take a fixed role so two endpoints form a software dimmer pair.
+RAMP_DIRECTION_ALTERNATE = "alternate"
+RAMP_DIRECTION_UP = "up"
+RAMP_DIRECTION_DOWN = "down"
+RAMP_DIRECTIONS = [
+    RAMP_DIRECTION_ALTERNATE,
+    RAMP_DIRECTION_UP,
+    RAMP_DIRECTION_DOWN,
+]
+DEFAULT_RAMP_DIRECTION = RAMP_DIRECTION_ALTERNATE
 
 DEFAULT_STEP = 3
 DEFAULT_ACCELERATION = 0
@@ -271,10 +285,10 @@ DISCONNECT_GRACE_SECONDS = 60
 
 
 def signal_channel(node_id: int, channel: int | None) -> str:
-    """Per wheel-channel dispatcher signal carrying decoded WheelActions."""
+    """Per-node/channel signal; button endpoints share channel=None and filter."""
     return f"{DOMAIN}_action_{node_id}_{channel}"
 
 
 def signal_raw_button(node_id: int, channel: int | None) -> str:
-    """Internal per-channel signal carrying raw button event names."""
+    """Internal per-node/channel raw signal carrying endpoint metadata."""
     return f"{DOMAIN}_raw_button_{node_id}_{channel}"

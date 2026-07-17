@@ -33,13 +33,14 @@
       "entry_type": "control binding",
       "step": {
         "user": {
-          "title": "Bind a wheel channel to a target",
-          "description": "Choose a profile or copy an existing binding, then configure scroll and button actions.",
+          "title": "Configure a BILRESA control",
+          "description": "Choose a BILRESA device or copy an existing binding. Wheel channels show rotary and button actions; dual-button endpoints show only the actions their hardware supports.",
           "data": {
             "binding_profile": "Starting profile",
             "copy_from": "Copy settings from an existing binding (optional)",
-            "node_id": "Wheel",
+            "node_id": "BILRESA device",
             "channel": "Channel",
+            "endpoint": "Button",
             "target": "Target (light, media player, cover, climate, fan, number)",
             "mode": "Scroll controls",
             "step": "Change per notch (% of range)",
@@ -49,23 +50,32 @@
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
             "button_response": "Button response",
-            "click_target": "Single-press target (optional, defaults to the light)",
+            "click_target": "Single-press target",
             "double_press_target": "Double-press: toggle entity (optional)",
             "triple_press_target": "Triple-press: toggle entity (optional)",
-            "hold_target": "Hold target (optional, used by Toggle entity)",
+            "hold_target": "Hold-action target",
             "hold_action": "Button hold action",
+            "ramp_direction": "Hold-ramp direction",
             "scenes": "Scenes cycled by single press (optional, overrides its action)"
           },
           "data_description": {
-            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition if this binding uses double- or triple-press actions. Public BILRESA events remain fully classified in either mode."
+            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition when this binding uses another press-count action. Public BILRESA events remain fully classified in either mode."
+          }
+        },
+        "profile": {
+          "title": "Choose a wheel profile",
+          "description": "Select starting defaults for this wheel channel. You can adjust every value on the next screen.",
+          "data": {
+            "binding_profile": "Starting profile"
           }
         },
         "reconfigure": {
           "title": "Reconfigure control binding",
-          "description": "Adjust how this wheel channel controls its target.",
+          "description": "Adjust this wheel channel or dual-button endpoint. Only options supported by the selected hardware are shown.",
           "data": {
-            "node_id": "Wheel",
+            "node_id": "BILRESA device",
             "channel": "Channel",
+            "endpoint": "Button",
             "target": "Target (light, media player, cover, climate, fan, number)",
             "mode": "Scroll controls",
             "step": "Change per notch (% of range)",
@@ -75,24 +85,27 @@
             "transition": "Transition (s)",
             "click_action": "Button single-press action",
             "button_response": "Button response",
-            "click_target": "Single-press target (optional, defaults to the light)",
+            "click_target": "Single-press target",
             "double_press_target": "Double-press: toggle entity (optional)",
             "triple_press_target": "Triple-press: toggle entity (optional)",
-            "hold_target": "Hold target (optional, used by Toggle entity)",
+            "hold_target": "Hold-action target",
             "hold_action": "Button hold action",
+            "ramp_direction": "Hold-ramp direction",
             "scenes": "Scenes cycled by single press (optional, overrides its action)"
           },
           "data_description": {
-            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition if this binding uses double- or triple-press actions. Public BILRESA events remain fully classified in either mode."
+            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition when this binding uses another press-count action. Public BILRESA events remain fully classified in either mode."
           }
         }
       },
       "error": {
-        "fast_response_conflicts_with_multi_press": "Fast response cannot be combined with a double- or triple-press target. Remove those targets or choose multi-press recognition.",
-        "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls."
+        "fast_response_conflicts_with_multi_press": "Fast response cannot be combined with a multi-press target. Remove that target or choose multi-press recognition.",
+        "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls.",
+        "target_required": "Choose a target for this action, or set the action to Do nothing.",
+        "ramp_requires_light": "Hold-to-ramp requires a light target."
       },
       "abort": {
-        "no_wheels": "No BILRESA wheels have been discovered yet. Make sure the wheel works in the Matter integration, then try again."
+        "no_devices": "No supported BILRESA devices have been discovered yet. Make sure the device works in the Matter integration, then try again."
       }
     }
   },
@@ -138,6 +151,19 @@
       "options": {
         "fast": "Fast single press",
         "multi_press": "Recognize single, double or triple press"
+      }
+    },
+    "dual_button_response": {
+      "options": {
+        "fast": "Fast single press",
+        "multi_press": "Recognize single or double press"
+      }
+    },
+    "ramp_direction": {
+      "options": {
+        "alternate": "Alternate after each hold",
+        "up": "Always brighten",
+        "down": "Always dim"
       }
     }
   },

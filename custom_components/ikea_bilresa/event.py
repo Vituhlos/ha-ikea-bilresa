@@ -229,7 +229,7 @@ class BilresaButtonEvent(EventEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_device_class = EventDeviceClass.BUTTON
-    _attr_icon = "mdi:gesture-tap-button"
+    _attr_icon = "bilresa:dual-button"
 
     def __init__(
         self,

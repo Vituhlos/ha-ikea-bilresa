@@ -33,13 +33,14 @@
       "entry_type": "ovládací propojení",
       "step": {
         "user": {
-          "title": "Propoj kanál kolečka s cílem",
-          "description": "Vyber profil nebo zkopíruj existující propojení a potom nastav scroll a akce tlačítka.",
+          "title": "Nastavit ovládání BILRESA",
+          "description": "Vyber zařízení BILRESA nebo zkopíruj existující propojení. U kanálu kolečka se zobrazí otáčení i akce tlačítka; u endpointu dual buttonu jen akce, které jeho hardware podporuje.",
           "data": {
             "binding_profile": "Výchozí profil",
             "copy_from": "Kopírovat nastavení z existujícího propojení (volitelné)",
-            "node_id": "Kolečko",
+            "node_id": "Zařízení BILRESA",
             "channel": "Kanál",
+            "endpoint": "Tlačítko",
             "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
             "mode": "Scroll ovládá",
             "step": "Změna na zářez (% rozsahu)",
@@ -49,23 +50,32 @@
             "transition": "Přechod (s)",
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
-            "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
+            "click_target": "Cíl jednoduchého stisku",
             "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
             "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
-            "hold_target": "Cíl podržení (volitelné, používá volba Přepnout entitu)",
+            "hold_target": "Cíl akce při podržení",
             "hold_action": "Akce při podržení tlačítka",
+            "ramp_direction": "Směr plynulé změny při podržení",
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           },
           "data_description": {
-            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá dvojstisk nebo trojstisk, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
+            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá další akci podle počtu stisků, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
+          }
+        },
+        "profile": {
+          "title": "Vyber profil kolečka",
+          "description": "Vyber výchozí hodnoty pro tento kanál kolečka. Na další obrazovce můžeš každou hodnotu upravit.",
+          "data": {
+            "binding_profile": "Výchozí profil"
           }
         },
         "reconfigure": {
           "title": "Upravit ovládací propojení",
-          "description": "Uprav, jak tento kanál kolečka ovládá svůj cíl.",
+          "description": "Uprav tento kanál kolečka nebo endpoint dual buttonu. Zobrazují se jen volby podporované vybraným hardwarem.",
           "data": {
-            "node_id": "Kolečko",
+            "node_id": "Zařízení BILRESA",
             "channel": "Kanál",
+            "endpoint": "Tlačítko",
             "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
             "mode": "Scroll ovládá",
             "step": "Změna na zářez (% rozsahu)",
@@ -75,24 +85,27 @@
             "transition": "Přechod (s)",
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
-            "click_target": "Cíl jednoduchého stisku (volitelné, jinak světlo)",
+            "click_target": "Cíl jednoduchého stisku",
             "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
             "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
-            "hold_target": "Cíl podržení (volitelné, používá volba Přepnout entitu)",
+            "hold_target": "Cíl akce při podržení",
             "hold_action": "Akce při podržení tlačítka",
+            "ramp_direction": "Směr plynulé změny při podržení",
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           },
           "data_description": {
-            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá dvojstisk nebo trojstisk, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
+            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá další akci podle počtu stisků, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
           }
         }
       },
       "error": {
-        "fast_response_conflicts_with_multi_press": "Rychlou odezvu nelze kombinovat s cílem pro dvojstisk nebo trojstisk. Tyto cíle odeber nebo zvol rozpoznání více stisků.",
-        "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním scrollu. Vyber odpovídající entitu nebo změň, co scroll ovládá."
+        "fast_response_conflicts_with_multi_press": "Rychlou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeber nebo zvol rozpoznání více stisků.",
+        "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním scrollu. Vyber odpovídající entitu nebo změň, co scroll ovládá.",
+        "target_required": "Vyber cíl této akce, nebo nastav Nedělat nic.",
+        "ramp_requires_light": "Plynulá změna při podržení vyžaduje jako cíl světlo."
       },
       "abort": {
-        "no_wheels": "Zatím se nenašla žádná kolečka BILRESA. Ověř, že kolečko funguje v Matter integraci, a zkus to znovu."
+        "no_devices": "Zatím se nenašlo žádné podporované zařízení BILRESA. Ověř, že zařízení funguje v Matter integraci, a zkus to znovu."
       }
     }
   },
@@ -138,6 +151,19 @@
       "options": {
         "fast": "Rychlý jednoduchý stisk",
         "multi_press": "Rozpoznat jeden, dva nebo tři stisky"
+      }
+    },
+    "dual_button_response": {
+      "options": {
+        "fast": "Rychlý jednoduchý stisk",
+        "multi_press": "Rozpoznat jeden nebo dva stisky"
+      }
+    },
+    "ramp_direction": {
+      "options": {
+        "alternate": "Po každém podržení směr vystřídat",
+        "up": "Vždy zesvětlovat",
+        "down": "Vždy stmívat"
       }
     }
   },

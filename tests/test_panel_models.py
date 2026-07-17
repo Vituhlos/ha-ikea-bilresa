@@ -10,9 +10,12 @@ from custom_components.ikea_bilresa.const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_ENDPOINT,
     CONF_HOLD_ACTION,
+    CONF_HOLD_TARGET,
     CONF_MODE,
     CONF_NODE_ID,
+    CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_TARGET,
     CONF_TRIPLE_TARGET,
@@ -58,8 +61,12 @@ def _dual_button(node_id: int) -> BilresaWheel:
         product_name="BILRESA dual button",
         serial=SERIAL,
         endpoints={
-            1: SwitchEndpoint(endpoint_id=1, channel=None, role="button"),
-            2: SwitchEndpoint(endpoint_id=2, channel=None, role="button"),
+            1: SwitchEndpoint(
+                endpoint_id=1, channel=None, role="button", multi_press_max=2
+            ),
+            2: SwitchEndpoint(
+                endpoint_id=2, channel=None, role="button", multi_press_max=2
+            ),
         },
     )
 
@@ -78,6 +85,16 @@ def _subentry(node_id: int, channel: int, **data) -> SimpleNamespace:
         subentry_type=SUBENTRY_BINDING,
         title=f"Wheel · Channel {channel}",
         data={CONF_NODE_ID: str(node_id), CONF_CHANNEL: str(channel), **data},
+    )
+
+
+def _button_subentry(node_id: int, endpoint: int, **data) -> SimpleNamespace:
+    """A real dual-button binding is stored by endpoint, never by channel."""
+    return SimpleNamespace(
+        subentry_id=f"button-binding-{node_id}-{endpoint}",
+        subentry_type=SUBENTRY_BINDING,
+        title=f"Button · BTN {endpoint}",
+        data={CONF_NODE_ID: str(node_id), CONF_ENDPOINT: str(endpoint), **data},
     )
 
 
@@ -173,16 +190,103 @@ def test_snapshot_uses_the_user_name_not_the_product_name(monkeypatch) -> None:
     assert result["wheels"][0]["area"] == "Living room"
 
 
-def test_snapshot_excludes_the_dual_button(monkeypatch) -> None:
-    """A dual button is not a wheel and must not render as a zero-channel card."""
+def test_snapshot_includes_dual_button_as_two_buttons(monkeypatch) -> None:
+    """B3 keeps the same overview but gives the device its real two controls."""
     _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
 
     result = async_overview_snapshot(
         _hass(), _entry([_wheel(NODE_A), _dual_button(15)])
     )
 
-    assert len(result["wheels"]) == 1
-    assert result["wheels"][0]["key"] == wheel_key(NODE_A)
+    assert len(result["wheels"]) == 2
+    button = next(item for item in result["wheels"] if item["variant"] == "dual_button")
+    assert button["key"] == wheel_key(15)
+    assert button["channels"] == []
+    assert [item["button"] for item in button["buttons"]] == [1, 2]
+    assert all(item["binding"] is None for item in button["buttons"])
+
+
+def test_dual_button_bindings_are_independent_and_hide_endpoints(monkeypatch) -> None:
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_dual_button(NODE_A)],
+        [
+            _button_subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_CLICK_ACTION: "toggle",
+                    CONF_CLICK_TARGET: "light.first",
+                    CONF_HOLD_ACTION: "none",
+                },
+            ),
+            _button_subentry(
+                NODE_A,
+                2,
+                **{
+                    CONF_CLICK_ACTION: "on",
+                    CONF_CLICK_TARGET: "light.second",
+                    CONF_HOLD_ACTION: "ramp",
+                    CONF_HOLD_TARGET: "light.second",
+                    CONF_RAMP_DIRECTION: "down",
+                },
+            ),
+        ],
+    )
+
+    buttons = async_overview_snapshot(_hass(), entry)["wheels"][0]["buttons"]
+
+    assert buttons[0]["binding"]["id"] == f"button-binding-{NODE_A}-1"
+    assert buttons[1]["binding"]["id"] == f"button-binding-{NODE_A}-2"
+    assert buttons[0]["target_label"] == "light.first"
+    assert buttons[1]["target_label"] == "light.second"
+    assert CONF_ENDPOINT not in buttons[0]["binding"]["data"]
+    assert CONF_NODE_ID not in buttons[0]["binding"]["data"]
+    assert {action["gesture"] for action in buttons[0]["actions"]} == {
+        "short_press",
+        "double_press",
+        "hold",
+        "release",
+    }
+    assert buttons[1]["actions"][2]["action_label"] == "Dim"
+
+
+def test_multiple_dual_buttons_keep_their_bindings_separate(monkeypatch) -> None:
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_dual_button(NODE_A), _dual_button(NODE_B)],
+        [
+            _button_subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_CLICK_ACTION: "toggle",
+                    CONF_CLICK_TARGET: "light.living_room",
+                    CONF_HOLD_ACTION: "none",
+                },
+            ),
+            _button_subentry(
+                NODE_B,
+                1,
+                **{
+                    CONF_CLICK_ACTION: "toggle",
+                    CONF_CLICK_TARGET: "light.bedroom",
+                    CONF_HOLD_ACTION: "none",
+                },
+            ),
+        ],
+    )
+
+    devices = {
+        device["key"]: device
+        for device in async_overview_snapshot(_hass(), entry)["wheels"]
+    }
+
+    assert len(devices) == 2
+    assert devices[wheel_key(NODE_A)]["buttons"][0]["target_label"] == (
+        "light.living_room"
+    )
+    assert devices[wheel_key(NODE_B)]["buttons"][0]["target_label"] == "light.bedroom"
 
 
 def test_snapshot_leaks_no_identifiers(monkeypatch) -> None:
@@ -439,6 +543,30 @@ def test_no_activity_after_restart_is_none_not_a_fault(monkeypatch) -> None:
     assert wheel["last_active_channel"] is None
     # and the wheel itself is still reported, not dropped
     assert wheel["availability"] == "connected"
+
+
+def test_dual_button_activity_maps_endpoint_to_safe_button_number(monkeypatch) -> None:
+    _patch(
+        monkeypatch,
+        device=SimpleNamespace(id="d", name_by_user="A", area_id=None),
+        entity_ids={
+            f"{NODE_A}_ep1": "event.a_button_1",
+            f"{NODE_A}_ep2": "event.a_button_2",
+        },
+    )
+    hass = _hass(
+        {
+            "event.a_button_1": _state("2026-07-16T10:00:00+00:00"),
+            "event.a_button_2": _state("2026-07-16T11:00:00+00:00"),
+        }
+    )
+
+    button = async_overview_snapshot(hass, _entry([_dual_button(NODE_A)]))["wheels"][0]
+
+    assert button["last_activity"] == "2026-07-16T11:00:00+00:00"
+    assert button["last_active_button"] == 2
+    assert button["last_active_channel"] is None
+    assert CONF_ENDPOINT not in str(button)
 
 
 # -- degraded and malformed ------------------------------------------------

@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-17 by Claude Code**
+Last updated: **2026-07-17 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -22,8 +22,8 @@ earlier device-reference observations.
 
 ## Repository state
 
-- Active publication branch: `agent/stabilize-0.5-x`, created from `main` at
-  `f1e7583`.
+- Active publication branch: `agent/dual-button-0.6`, branched from the
+  deployed `agent/stabilize-0.5-x` line after local B0/B1 commit `7446194`.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
@@ -34,8 +34,9 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. The latest prerelease is
-  `v0.5.9-rc.11`. Panel Phases 0-3 were published as
+- Latest stable release remains `v0.5.0`. The latest published prerelease is
+  `v0.5.9-rc.12`; `v0.6.0-rc.1` is the owner-authorized B0-B3 candidate now
+  being prepared. Panel Phases 0-3 were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
   deployed as `v0.5.9-rc.2`, the duplicate-back/channel-detail follow-up as
@@ -408,6 +409,187 @@ found in the field.
 Owed before B1b closes: exact-revision CI, and a deployed check that the dual
 button's device page lists Button 1/Button 2 triggers (press/double/hold/release,
 no triple, no rotation) and that one fires a test automation.
+
+### B2 — dual-button binding profile and config flow (Codex, 2026-07-17)
+
+Status: **Implemented + Static + local Unit. CI has not run. Not committed,
+deployed, HA-UI-verified or Hardware-verified.**
+
+B2 now treats each physical button as its own fully independent control binding,
+including when several dual buttons expose the same endpoint numbers:
+
+- **Stored/runtime address:** a wheel binding remains `node_id + channel`; a
+  dual-button binding stores `node_id + endpoint`. Runtime keys are explicitly
+  tagged `(node_id, "channel", channel)` or
+  `(node_id, "endpoint", endpoint_id)`, so the two buttons on one device cannot
+  collide and endpoint 1 on one physical dual button cannot collide with
+  endpoint 1 on another. Both button bindings still subscribe to the existing
+  shared `channel=None` action/raw signals and filter the action's `endpoint_id`
+  before running.
+- **Independent actions:** each endpoint has its own single-press action
+  (`toggle` / `on` / `off` / `none`) and target, optional double-press toggle
+  target, and hold action/target. Button 1 may therefore toggle one light while
+  button 2 toggles another; every other dual button has its own independent pair.
+- **No impossible UI:** creation selects the physical BILRESA first, then builds
+  the schema from its parsed variant. A dual button never receives mode, step,
+  acceleration, min/max brightness, transition, scene or triple-press fields.
+  Its multi-press selector says single/double only. Wheel profiles retain their
+  rotary and triple-press fields. Reconfigure may move a binding only between
+  devices of the same variant, preventing a channel-shaped entry from being
+  saved onto a button-shaped device.
+- **Copy flow:** copy-from-existing still pre-fills actions, but the selected
+  destination node is authoritative and unsupported source fields are omitted
+  before storage. Copying a wheel profile to a button cannot smuggle mode,
+  rotation, scene or triple-press fields into the button subentry.
+- **Hold-to-ramp / software DIRIGERA:** button bindings reuse the existing
+  brightness ramp, release/reconnect/new-gesture stops and 30-second watchdog.
+  A new button-only direction can be `up`, `down` or `alternate`, so two endpoint
+  bindings may share a light while button 1 always brightens and button 2 always
+  dims. The historic wheel behavior remains `alternate`.
+- **Icon:** `bilresa_icons.js` now contains the owner-supplied dual-button
+  primary and 0.32 secondary paths as the self-contained
+  `bilresa:dual-button` glyph. Both current and legacy Home Assistant icon
+  contracts resolve it, and `BilresaButtonEvent` uses it. The wheel glyph is
+  unchanged.
+- **Documentation:** the endpoint address decision and fixed-direction paired
+  ramp are recorded in `docs/ROADMAP_BUTTON.md` and
+  `docs/DEVICE_REFERENCE_BUTTON.md`; `CHANGELOG.md` records the user-visible
+  behavior.
+
+Tests use the real device shape (two `ROLE_BUTTON` endpoints, `channel=None`,
+`MultiPressMax=2`) and cover two endpoints on one device, the same endpoint ids
+on a second device, independent click targets, endpoint-filtered fast response,
+copy sanitization, hidden rotary/triple fields, wheel-schema preservation,
+fixed up/down shared-target ramps, release/watchdog safety, titles and both icon
+provider contracts.
+
+Exact local validation on Windows / Python 3.14:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+EN/CS/string recursive key alignment                 passed (163 paths each)
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel + icon provider                    passed
+node --test panel + icon frontend tests               passed (10 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                         passed (238 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Not run: hassfest, HACS validation and exact-revision GitHub CI. No Home
+Assistant config-flow screen was opened and no physical press changed a target,
+so neither HA UI nor Hardware is claimed. The existing identifier-registry
+migration was not needed and remains a separate owed item. B3 panel rendering
+was intentionally not touched by the B2 slice; its later implementation is
+recorded directly below.
+
+Known assumption: the config flow validates the selected endpoint against the
+currently discovered device, and stores the Matter endpoint rather than a
+derived button index. This is stable across multiple physical devices and does
+not assume endpoints are globally unique.
+
+Single best next action: after owner review of the combined B2+B3 tree, commit
+it and run exact-revision CI; only then deploy a candidate for the real-HA panel
+pass and execute `HARDWARE_TEST.md` F3 for independent button targets and the
+fixed up/down shared-light ramp.
+
+### B3 — existing panel adapted for the dual button (Codex, 2026-07-17)
+
+Status: **Implemented + Static + local Unit + browser-harness visual checks.
+Not committed, not run in exact-revision CI, not deployed to Home Assistant and
+not Hardware-verified.**
+
+B3 is an adaptation of the existing wheel panel, not a second panel or a new
+visual direction:
+
+- **Shared overview and rail:** every wheel and every dual-button device stays
+  in the same landing grid and the same 256 px detail switcher. Multiple
+  dual-button devices retain separate opaque device keys and each shows its own
+  button 1/2 summaries.
+- **The same workbench:** the dual-button detail literally reuses
+  `.channel-workbench`, `.channel-spine`, `.channel-position` and
+  `.channel-surface`. The wheel's vertical `1 / 2 / 3` selector becomes
+  `1 / 2`; selecting a number opens one button in the same right-hand gesture
+  ledger. An earlier two-stacked-card draft was rejected after owner review and
+  removed; no button-only card system or parallel panel remains.
+- **Independent binding editor:** button 1 and button 2 open the existing inline
+  editor with only their supported short press, double press and hold/release
+  fields. Saving sends the safe display button number; the server resolves and
+  stores the Matter endpoint. Endpoint ids never enter the frontend snapshot or
+  mutation response.
+- **Adapted Live test:** the existing `Live test` tab remains. The WebSocket
+  activity API maps a private endpoint to safe `button: 1|2` server-side, so the
+  UI reports the physical button, short/double/hold/release gesture, dispatch
+  state and structured binding result. Panel-triggered tests offer only single,
+  double, hold and release. Rotation, triple press and the detent strip remain
+  wheel-only.
+- **Variant-aware diagnostics and copy:** last activity names a button for the
+  dual device; device-level diagnostic wording no longer calls every BILRESA a
+  wheel. EN and CS panel dictionaries remain exactly aligned.
+
+The privacy/multi-device tests cover two dual-button devices with the same
+endpoint numbers, independent targets, safe endpoint-to-button activity
+mapping, binding mutations without leaked endpoint ids, and rejection of
+channel-shaped or unsupported rotary/triple requests.
+
+Browser harness checks used the production custom element and its production
+CSS, first at the owner's 1521 px reference width and then at 320 px. The
+desktop workbench matched the existing wheel composition with a vertical grey
+spine and one right-hand action surface. Light and custom dark themes had no
+document, host or main-pane horizontal overflow; both button positions were
+present; every visible control measured at least 44 px; and real Tab traversal
+showed a 2 px focus outline at every in-panel stop. The adapted Live test showed
+`Tlačítko 2 · dvojitý stisk`, its structured target result, no detent strip and
+only the four supported synthetic controls. This is harness evidence, **not** a
+real-HA visual pass.
+
+Exact local validation on Windows / Python 3.14 after B3:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+EN/CS/string recursive key alignment                 passed
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel + icon provider                    passed
+node --test panel + icon frontend tests               passed (16 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                         passed (246 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Still owed: exact-revision hassfest/HACS/Ruff/mypy/unit CI, a real Home
+Assistant light/dark/custom-theme visual and screen-reader pass, and B4 physical
+verification. No release, deployment or device control has been performed.
+
+### `v0.6.0-rc.1` publication and controlled deployment
+
+The owner explicitly authorized publication of B0-B3 as an RC and installation
+through the existing custom HACS repository on 2026-07-17, specifically to make
+the real-HA and physical checks in B4 possible.
+
+Candidate preparation:
+
+- branch: `agent/dual-button-0.6`, based on the currently deployed 0.5.x line;
+- version/tag: `0.6.0-rc.1` / `v0.6.0-rc.1`;
+- scope: B0 variant discovery, B1 event entities/device triggers, B2 independent
+  bindings/config flow, and B3 adaptation of the existing panel and Live test;
+- B4 remains open and this tag must be a **prerelease**, never stable;
+- local Static, Python Unit, frontend Unit and browser-harness results are
+  recorded in the B2/B3 sections above.
+
+The historical repository warning about installation-specific identifiers in
+an older, already-public commit remains recorded above. The owner has now
+explicitly requested another repository release from this same public history;
+the release must not copy any such identifiers into notes, logs or chat.
+
+Pending at this point: commit/push, draft PR, exact-revision CI, prerelease,
+pre-deployment HA configuration check, HACS download, restart and loaded-version
+smoke check. Record each concrete result here; authorization is not proof.
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 

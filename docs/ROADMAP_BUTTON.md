@@ -11,7 +11,8 @@ Read this together with `PROJECT_STATUS.md`, `docs/DEVICE_REFERENCE.md` and
 CI / Hardware / Released) and the rule that these states are never collapsed both
 apply here unchanged.
 
-Nothing in this document is implemented yet. It is a plan.
+This document is the implementation contract; the current phase-by-phase
+validation state is recorded in `PROJECT_STATUS.md`.
 
 ## Why this is its own version train
 
@@ -116,20 +117,41 @@ misrepresentation before any feature is added.
 
 ### B2 — Button binding profile and config flow
 
+Implementation decision (2026-07-17): wheel bindings keep their stored
+`(node_id, channel)` address. A dual-button binding instead stores
+`CONF_NODE_ID` plus `CONF_ENDPOINT` and is keyed at runtime as
+`(node_id, "endpoint", endpoint_id)`. The action and raw-button dispatcher
+signals remain shared at `signal_channel(node, None)` /
+`signal_raw_button(node, None)`, but every button binding filters the action's
+endpoint before it can run. The node component separates any number of physical
+dual buttons; the endpoint component separates the two buttons on each device.
+The channel and endpoint key spaces are explicitly tagged, so a wheel channel
+number can never alias a button endpoint number.
+
 - A button-only binding: `click_action` / `double_press_target` /
   `hold_action` / `hold_target`, **without** a scroll `mode`. Most fields already
   exist in `const.py`; the flow just omits rotary-only options for this variant.
 - Optional "software DIRIGERA" convenience: because IKEA does **not** implement
-  Matter bindings, offer a paired hold-to-ramp where button 1 ramps a shared
-  target up and button 2 ramps it down. This reuses the wheel's ramp watchdog.
+  Matter bindings, offer a hold-ramp direction of `up`, `down`, or `alternate`.
+  Two independent endpoint bindings can therefore share a light target while
+  button 1 always ramps up and button 2 always ramps down. This reuses the
+  wheel's release/reconnect/new-gesture stops and lost-release watchdog.
 - Config-flow validation and copy-from-existing, mirroring the wheel binding,
   with the incompatible rotary options hidden rather than rejected after entry.
 
 ### B3 — Panel presentation
 
 - The panel must render a `dual_button` device as **two buttons**, not three
-  channels — no rotary/live-scroll UI, no detent strip. Reuse the existing
-  detail shell; swap the channel spine for a button list.
+  channels — no rotary controls or detent strip. Keep the existing `Live test`
+  view, adapted to report button 1/2 short press, double press, hold, release
+  and the resulting binding outcome. Reuse the existing
+  detail shell **and the existing workbench composition**: the wheel's numbered
+  `1 / 2 / 3` spine becomes a numbered `1 / 2` button spine, with one selected
+  control rendered in the same right-hand action surface. Do not introduce a
+  second panel design or stack separate button cards.
+- The shared overview and detail rail list every wheel and every dual-button
+  device. Button numbers are only safe display controls; the browser never
+  receives Matter endpoint ids.
 - All existing panel gates apply: dark + one non-default theme, EN/CS expansion,
   keyboard + screen-reader pass, 320 px, contrast against real HA.
 

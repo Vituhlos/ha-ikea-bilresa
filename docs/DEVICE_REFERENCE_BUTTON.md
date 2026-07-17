@@ -68,6 +68,10 @@ Switch stream — the raw `initial_press` / `short_release` / `multi_press_ongoi
   `press`, `double_press`, `hold`, `release` — capped by MultiPressMax, so no
   `triple_press` is offered here. Both endpoints report `channel = None` and share
   one dispatcher signal; each entity filters by endpoint id.
+- Binding subentries use `node_id + endpoint` rather than the absent channel.
+  Runtime keys tag endpoint and channel addresses separately, so both buttons
+  on every physical dual button can keep independent targets even when several
+  devices expose the same endpoint numbers.
 - The gesture engine's button path is stateless (acts on
   `MultiPressComplete` / `LongPress` / `LongRelease` only), so a press beyond the
   device maximum simply yields no event and cannot get stuck.

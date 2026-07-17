@@ -10,6 +10,7 @@ import pytest
 
 from custom_components.ikea_bilresa.binding import LightBinding
 from custom_components.ikea_bilresa.const import (
+    ACTION_HOLD,
     ACTION_PRESS,
     ACTION_RELEASE,
     ACTION_ROTATE,
@@ -18,15 +19,22 @@ from custom_components.ikea_bilresa.const import (
     CONF_ACCELERATION,
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
+    CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_ENDPOINT,
     CONF_HOLD_ACTION,
+    CONF_HOLD_TARGET,
     CONF_MODE,
     CONF_NODE_ID,
+    CONF_RAMP_DIRECTION,
     CONF_TARGET,
     DIRECTION_DOWN,
     DIRECTION_UP,
+    HOLD_NONE,
     HOLD_RAMP,
     MODE_VOLUME,
+    RAMP_DIRECTION_DOWN,
+    RAMP_DIRECTION_UP,
 )
 from custom_components.ikea_bilresa.engine import WheelAction
 
@@ -88,6 +96,141 @@ def _action(action_type: str, *, presses: int = 0) -> WheelAction:
         type=action_type,
         presses=presses,
     )
+
+
+def _button_binding(
+    monkeypatch, *, node_id: int, endpoint_id: int, target: str, **overrides
+) -> tuple[LightBinding, Mock, Mock]:
+    binding, interval_unsub, watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_NODE_ID: node_id,
+            CONF_ENDPOINT: endpoint_id,
+            CONF_CHANNEL: None,
+            CONF_TARGET: None,
+            CONF_HOLD_ACTION: HOLD_NONE,
+            CONF_CLICK_TARGET: target,
+            **overrides,
+        },
+    )
+    return binding, interval_unsub, watchdog_unsub
+
+
+def _button_action(
+    node_id: int, endpoint_id: int, action_type: str, *, presses: int = 0
+) -> WheelAction:
+    return WheelAction(
+        node_id=node_id,
+        wheel_name="Test dual button",
+        channel=None,
+        endpoint_id=endpoint_id,
+        type=action_type,
+        presses=presses,
+    )
+
+
+def test_button_bindings_keep_endpoints_devices_and_targets_independent(
+    monkeypatch,
+) -> None:
+    first, _interval, _watchdog = _button_binding(
+        monkeypatch, node_id=101, endpoint_id=1, target="light.first"
+    )
+    second, _interval, _watchdog = _button_binding(
+        monkeypatch, node_id=101, endpoint_id=2, target="light.second"
+    )
+
+    first._handle_dispatched_action(_button_action(101, 2, ACTION_PRESS, presses=1))
+    first._handle_dispatched_action(_button_action(202, 1, ACTION_PRESS, presses=1))
+    first.hass.services.async_call.assert_not_called()
+
+    first._handle_dispatched_action(_button_action(101, 1, ACTION_PRESS, presses=1))
+    second._handle_dispatched_action(_button_action(101, 2, ACTION_PRESS, presses=1))
+
+    assert (
+        first.hass.services.async_call.call_args.args[2]["entity_id"] == "light.first"
+    )
+    assert (
+        second.hass.services.async_call.call_args.args[2]["entity_id"] == "light.second"
+    )
+
+
+def test_button_fast_response_filters_shared_raw_signal_by_endpoint(
+    monkeypatch,
+) -> None:
+    binding, _interval, _watchdog = _button_binding(
+        monkeypatch,
+        node_id=101,
+        endpoint_id=1,
+        target="light.first",
+        **{CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST},
+    )
+    binding._single_press = Mock()
+
+    binding._handle_raw_input("button", "short_release", 2)
+    binding._handle_raw_input("button", "short_release", 1)
+
+    binding._single_press.assert_called_once()
+
+
+def test_button_fixed_down_ramp_reuses_release_and_watchdog_safety(
+    monkeypatch,
+) -> None:
+    binding, interval_unsub, watchdog_unsub = _button_binding(
+        monkeypatch,
+        node_id=101,
+        endpoint_id=2,
+        target="light.second",
+        **{
+            CONF_HOLD_ACTION: HOLD_RAMP,
+            CONF_HOLD_TARGET: "light.second",
+            CONF_RAMP_DIRECTION: RAMP_DIRECTION_DOWN,
+        },
+    )
+
+    binding._handle_dispatched_action(_button_action(101, 2, ACTION_HOLD))
+    binding._rotate_by.assert_called_once_with(1, False)
+    binding._handle_dispatched_action(_button_action(101, 2, ACTION_RELEASE))
+    interval_unsub.assert_called_once()
+    watchdog_unsub.assert_called_once()
+    assert binding._ramp_up is False
+
+    binding._handle_dispatched_action(_button_action(101, 2, ACTION_HOLD))
+    binding._ramp_watchdog(None)
+    assert interval_unsub.call_count == 2
+    assert binding._ramp_up is False
+
+
+def test_two_button_hold_pair_ramps_shared_light_in_opposite_directions(
+    monkeypatch,
+) -> None:
+    up, _interval, _watchdog = _button_binding(
+        monkeypatch,
+        node_id=101,
+        endpoint_id=1,
+        target="light.shared",
+        **{
+            CONF_HOLD_ACTION: HOLD_RAMP,
+            CONF_HOLD_TARGET: "light.shared",
+            CONF_RAMP_DIRECTION: RAMP_DIRECTION_UP,
+        },
+    )
+    down, _interval, _watchdog = _button_binding(
+        monkeypatch,
+        node_id=101,
+        endpoint_id=2,
+        target="light.shared",
+        **{
+            CONF_HOLD_ACTION: HOLD_RAMP,
+            CONF_HOLD_TARGET: "light.shared",
+            CONF_RAMP_DIRECTION: RAMP_DIRECTION_DOWN,
+        },
+    )
+
+    up._handle_dispatched_action(_button_action(101, 1, ACTION_HOLD))
+    down._handle_dispatched_action(_button_action(101, 2, ACTION_HOLD))
+
+    up._rotate_by.assert_called_once_with(1, True)
+    down._rotate_by.assert_called_once_with(1, False)
 
 
 def test_release_stops_ramp_and_changes_next_direction(monkeypatch) -> None:

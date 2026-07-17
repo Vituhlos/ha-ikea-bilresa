@@ -21,6 +21,8 @@ from homeassistant.helpers.event import async_call_later
 from .binding import LightBinding
 from .const import (
     CLUSTER_SWITCH,
+    CONF_CHANNEL,
+    CONF_ENDPOINT,
     DISCONNECT_GRACE_SECONDS,
     DOMAIN,
     EVENT_BILRESA,
@@ -38,6 +40,15 @@ from .matter_ws import MatterWSClient
 from .model import BilresaWheel, decode_event, parse_node
 
 _LOGGER = logging.getLogger(__name__)
+
+BindingKey = tuple[int, str, int]
+
+
+def _action_binding_key(action: WheelAction) -> BindingKey:
+    """Address wheel channels and button endpoints without sharing a keyspace."""
+    if action.channel is not None:
+        return (action.node_id, CONF_CHANNEL, action.channel)
+    return (action.node_id, CONF_ENDPOINT, action.endpoint_id)
 
 
 class BilresaCoordinator:
@@ -60,8 +71,8 @@ class BilresaCoordinator:
         self._source_switch_lock = asyncio.Lock()
         self._stopping = False
         self._binding_unsubs: list[Callable[[], None]] = []
-        self._binding_keys: set[tuple[int, int]] = set()
-        self._bindings: dict[tuple[int, int], LightBinding] = {}
+        self._binding_keys: set[BindingKey] = set()
+        self._bindings: dict[BindingKey, LightBinding] = {}
         self._disconnect_timer: Callable[[], None] | None = None
         self._event_counts: Counter[str] = Counter()
         self._ignored_counts: Counter[str] = Counter()
@@ -162,11 +173,11 @@ class BilresaCoordinator:
                 continue
             binding = LightBinding(self.hass, dict(subentry.data))
             self._binding_unsubs.append(binding.async_attach())
-            key = (binding.node_id, binding.channel)
+            key = binding.binding_key
             self._binding_keys.add(key)
             self._bindings[key] = binding
         if self._binding_unsubs:
-            _LOGGER.debug("Attached %s light binding(s)", len(self._binding_unsubs))
+            _LOGGER.debug("Attached %s control binding(s)", len(self._binding_unsubs))
 
     @callback
     def _detach_bindings(self) -> None:
@@ -179,7 +190,7 @@ class BilresaCoordinator:
     @callback
     def test_binding_action(self, action: WheelAction) -> bool:
         """Execute a synthetic panel test through one configured binding."""
-        binding = self._bindings.get((action.node_id, action.channel or 0))
+        binding = self._bindings.get(_action_binding_key(action))
         if binding is None:
             return False
         binding.test_action(action)
@@ -236,6 +247,7 @@ class BilresaCoordinator:
             signal_raw_button(wheel.node_id, decoded["channel"]),
             decoded["role"],
             decoded["event_type"],
+            decoded["endpoint_id"],
         )
         action = self._engine.process(wheel, decoded)
         if action is not None:
@@ -265,7 +277,7 @@ class BilresaCoordinator:
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )
-        if (action.node_id, action.channel) not in self._binding_keys:
+        if _action_binding_key(action) not in self._binding_keys:
             async_dispatcher_send(
                 self.hass,
                 SIGNAL_BINDING_ACTIVITY,

@@ -1,11 +1,11 @@
 """Turnkey control bindings configured via config subentries.
 
-A binding subscribes to one wheel channel and drives a target entity directly.
-Depending on its *mode*, scrolling adjusts a light's brightness / colour
-temperature / colour, a media player's volume, a cover's position, a climate
-target temperature, a fan's speed, or a number's value. A single / double /
-triple press and a hold each run an optional action, which may target a
-*different* entity (e.g. dim a bulb but toggle the Shelly in the wall switch).
+A binding subscribes either to one wheel channel or to one endpoint of a dual
+button. Depending on its *mode*, wheel scrolling adjusts a light's brightness /
+colour temperature / colour, a media player's volume, a cover's position, a
+climate target temperature, a fan's speed, or a number's value. Button-only
+bindings omit all rotary configuration while retaining single / double press
+and hold actions.
 
 Values are tracked internally as an absolute target rather than issued as
 relative steps. This avoids reading a mid-transition value back from the entity
@@ -50,12 +50,14 @@ from .const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
+    CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_STEP,
     CONF_TARGET,
@@ -68,6 +70,7 @@ from .const import (
     DEFAULT_MAX_BRIGHTNESS,
     DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_MODE,
+    DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_TRANSITION,
     DIRECTION_UP,
@@ -85,6 +88,8 @@ from .const import (
     MODE_NUMBER,
     MODE_TEMPERATURE,
     MODE_VOLUME,
+    RAMP_DIRECTION_ALTERNATE,
+    RAMP_DIRECTION_DOWN,
     ROLE_BUTTON,
     ROLE_SCROLL_DOWN,
     ROLE_SCROLL_UP,
@@ -152,16 +157,36 @@ def _as_float(value: Any) -> float | None:
 
 
 class LightBinding:
-    """Runtime for one GUI-configured wheel-channel -> entity binding."""
+    """Runtime for one GUI-configured wheel channel or button endpoint."""
 
     def __init__(self, hass: HomeAssistant, data: dict[str, Any]) -> None:
         self.hass = hass
         self._node_id = int(data[CONF_NODE_ID])
-        self._channel = int(data[CONF_CHANNEL])
-        self._target = data[CONF_TARGET]
+        raw_channel = data.get(CONF_CHANNEL)
+        raw_endpoint = data.get(CONF_ENDPOINT)
+        self._channel = int(raw_channel) if raw_channel is not None else None
+        self._endpoint_id = int(raw_endpoint) if raw_endpoint is not None else None
+        if (self._channel is None) == (self._endpoint_id is None):
+            raise ValueError(
+                "A BILRESA binding must contain exactly one of channel or endpoint"
+            )
+        self._hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
+        self._hold_target = data.get(CONF_HOLD_TARGET)
+        self._target: str = data.get(CONF_TARGET) or ""
+        if self._endpoint_id is not None and self._hold_action == HOLD_RAMP:
+            # A button has no rotary target. Its hold target becomes the
+            # brightness-ramp target while the rotary-only mode remains hidden.
+            self._target = self._hold_target or ""
+        if self._channel is not None and not self._target:
+            raise ValueError("A wheel-channel binding requires a target")
         self._mode = data.get(CONF_MODE, DEFAULT_MODE)
-        self._mode_target_valid = mode_supports_target(self._mode, self._target)
-        if not self._mode_target_valid:
+        self._mode_target_valid = bool(self._target) and mode_supports_target(
+            self._mode, self._target
+        )
+        if not self._mode_target_valid and (
+            self._channel is not None
+            or (self._endpoint_id is not None and self._hold_action == HOLD_RAMP)
+        ):
             _LOGGER.error(
                 "Disabling incompatible BILRESA binding mode %s for target %s",
                 self._mode,
@@ -177,14 +202,13 @@ class LightBinding:
         )
         self._transition = float(data.get(CONF_TRANSITION, DEFAULT_TRANSITION))
         self._click = data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION)
-        self._click_target = data.get(CONF_CLICK_TARGET) or self._target
+        self._click_target: str | None = data.get(CONF_CLICK_TARGET) or self._target
         self._double_target = data.get(CONF_DOUBLE_TARGET)
         self._triple_target = data.get(CONF_TRIPLE_TARGET)
-        self._hold_target = data.get(CONF_HOLD_TARGET)
-        self._hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
         self._scenes: list[str] = list(data.get(CONF_SCENES) or [])
         self._scene_index = 0
-        self._ramp_up = True
+        self._ramp_direction = data.get(CONF_RAMP_DIRECTION, DEFAULT_RAMP_DIRECTION)
+        self._ramp_up = self._ramp_direction != RAMP_DIRECTION_DOWN
         self._ramp_unsub: Callable[[], None] | None = None
         self._ramp_watchdog_unsub: Callable[[], None] | None = None
         self._tracked: float | None = None
@@ -217,9 +241,22 @@ class LightBinding:
         return self._node_id
 
     @property
-    def channel(self) -> int:
-        """Physical channel this binding listens to."""
+    def channel(self) -> int | None:
+        """Physical wheel channel, or None for a button endpoint binding."""
         return self._channel
+
+    @property
+    def endpoint_id(self) -> int | None:
+        """Physical button endpoint, or None for a wheel-channel binding."""
+        return self._endpoint_id
+
+    @property
+    def binding_key(self) -> tuple[int, str, int]:
+        """Collision-free runtime key across wheels, buttons and devices."""
+        if self._channel is not None:
+            return (self._node_id, CONF_CHANNEL, self._channel)
+        assert self._endpoint_id is not None
+        return (self._node_id, CONF_ENDPOINT, self._endpoint_id)
 
     @callback
     def test_action(self, action: WheelAction) -> None:
@@ -232,7 +269,7 @@ class LightBinding:
         action_unsub = async_dispatcher_connect(
             self.hass,
             signal_channel(self._node_id, self._channel),
-            self._handle_action,
+            self._handle_dispatched_action,
         )
         raw_button_unsub = async_dispatcher_connect(
             self.hass,
@@ -242,8 +279,12 @@ class LightBinding:
         connection_unsub = async_dispatcher_connect(
             self.hass, SIGNAL_CONNECTION, self._handle_connection_change
         )
-        state_unsub = async_track_state_change_event(
-            self.hass, [self._target], self._handle_target_state_change
+        state_unsub = (
+            async_track_state_change_event(
+                self.hass, [self._target], self._handle_target_state_change
+            )
+            if self._target
+            else None
         )
         trace_state_unsub = (
             async_track_state_change_event(
@@ -251,7 +292,7 @@ class LightBinding:
                 [self._click_target],
                 self._handle_latency_target_state_change,
             )
-            if self._click_target != self._target
+            if self._click_target is not None and self._click_target != self._target
             else None
         )
 
@@ -262,12 +303,22 @@ class LightBinding:
             self._reset_latency_trace()
             if trace_state_unsub is not None:
                 trace_state_unsub()
-            state_unsub()
+            if state_unsub is not None:
+                state_unsub()
             connection_unsub()
             raw_button_unsub()
             action_unsub()
 
         return unsubscribe
+
+    @callback
+    def _handle_dispatched_action(self, action: WheelAction) -> None:
+        """Filter the shared channel=None signal to this physical endpoint."""
+        if action.node_id != self._node_id or (
+            self._endpoint_id is not None and action.endpoint_id != self._endpoint_id
+        ):
+            return
+        self._handle_action(action)
 
     @callback
     def _handle_action(self, action: WheelAction) -> None:
@@ -367,8 +418,12 @@ class LightBinding:
         self._log_latency_stage("target_state_change")
 
     @callback
-    def _handle_raw_input(self, role: str, event_type: str) -> None:
+    def _handle_raw_input(
+        self, role: str, event_type: str, endpoint_id: int | None = None
+    ) -> None:
         """Track private gesture boundaries and forward button hints."""
+        if self._endpoint_id is not None and endpoint_id != self._endpoint_id:
+            return
         if role in (ROLE_SCROLL_UP, ROLE_SCROLL_DOWN):
             if event_type == _INITIAL_PRESS:
                 self._scroll_gesture += 1
@@ -412,7 +467,7 @@ class LightBinding:
             node_id=self._node_id,
             wheel_name="",
             channel=self._channel,
-            endpoint_id=0,
+            endpoint_id=self._endpoint_id or 0,
             type=ACTION_PRESS,
             presses=1,
         )
@@ -496,6 +551,7 @@ class LightBinding:
                 "action_id": current.action_id,
                 "node_id": self._node_id,
                 "channel": self._channel,
+                "endpoint_id": self._endpoint_id,
                 "type": current.type,
                 "direction": current.direction,
                 "notches": current.notches,
@@ -585,6 +641,7 @@ class LightBinding:
     def _start_ramp(self) -> None:
         if (
             self._ramp_unsub is not None
+            or not self._target
             or not self._mode_target_valid
             or self._available_state(self._target) is None
         ):
@@ -626,7 +683,7 @@ class LightBinding:
         if self._ramp_watchdog_unsub is not None:
             self._ramp_watchdog_unsub()
             self._ramp_watchdog_unsub = None
-        if change_direction:
+        if change_direction and self._ramp_direction == RAMP_DIRECTION_ALTERNATE:
             self._ramp_up = not self._ramp_up
         self._ramp_action = None
 
@@ -939,6 +996,9 @@ class LightBinding:
             self._report_activity("skipped", reason="short_press_not_configured")
             return
         service = _CLICK_SERVICE.get(self._click, "toggle")
+        if self._click_target is None:
+            self._report_activity("skipped", reason="target_not_configured")
+            return
         self._call_entity(
             "homeassistant",
             service,

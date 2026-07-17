@@ -1,4 +1,4 @@
-# IKEA BILRESA (smooth scroll) for Home Assistant
+# IKEA BILRESA for Home Assistant
 
 **English** · [Čeština](README.cs.md)
 
@@ -6,22 +6,22 @@
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
 [![license](https://img.shields.io/github/license/Vituhlos/ha-ikea-bilresa)](LICENSE)
 
-Make the **IKEA BILRESA scroll wheel** (Matter over Thread) feel smooth again —
-the way it does on IKEA's own DIRIGERA hub — by reacting to the wheel's
-**real-time `MultiPressOngoing` events**, which Home Assistant's built-in Matter
-integration currently drops.
+Add first-party-style Home Assistant control for the **IKEA BILRESA scroll
+wheel and dual button** (Matter over Thread). The wheel reacts to real-time
+`MultiPressOngoing` events for DIRIGERA-like smoothness; the dual button gains
+independent events, bindings, device triggers and the same BILRESA panel.
 
-> **Status:** latest stable release v0.5.0; prerelease v0.5.9-rc.12 reworks the
-> panel's visual hierarchy -- a channel spine mirroring the wheel's three
-> physical positions, a result-led live test, lighter unconfigured channels and
-> a corrected switcher rail -- on top of the approved BILRESA V2 icon and
-> Material Rounded gestures. Visual only; Matter, bindings and gestures are
-> unchanged.
+> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.1** adds the
+> BILRESA dual button through roadmap phases B0-B3. Its two buttons have
+> independent events, triggers and bindings; the existing panel adapts its
+> `1 / 2 / 3` wheel workbench to buttons `1 / 2` and retains an adapted Live
+> test. Physical verification is deliberately left for B4.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
 > workflow is documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-> The ordered patch release train is in [docs/ROADMAP.md](docs/ROADMAP.md).
+> The wheel release train is in [docs/ROADMAP.md](docs/ROADMAP.md); the dual
+> button train is in [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ---
 
@@ -71,10 +71,14 @@ Related upstream work:
 - 🔢 **Correct notch counting** — a gesture engine converts the wheel's
   cumulative, batched counter into per-event **notch deltas** (up to 18 per
   gesture), so brightness moves by the right amount.
-- 🧭 **Automatic discovery of any number of wheels** — channels and directions
-  are read from each wheel's own Matter descriptors; nothing is hard-coded.
+- 🧭 **Automatic discovery of any number of BILRESA devices** — wheels and dual
+  buttons are distinguished from their Matter endpoint shape; nothing is
+  hard-coded to a product name or installation.
 - 🎛️ **Clean events** — `rotate_up` / `rotate_down` (with a `notches` count),
-  `press` / `double_press` / `triple_press`, `hold`, `release`.
+  `press` / `double_press` / `triple_press`, `hold`, `release` for a wheel;
+  button 1/2 expose `press`, `double_press`, `hold`, `release`.
+- 🔘 **Independent dual-button bindings** — each button can toggle a different
+  target, or a shared light can use fixed brighten/dim hold directions.
 - 🪶 **No extra dependencies** — a tiny `aiohttp` WebSocket client, nothing to
   install or break on upgrades.
 - 🛡️ **Safe & passive** — it only *listens*; it never sends commands to devices,
@@ -83,8 +87,9 @@ Related upstream work:
 ## How it works
 
 ```
-BILRESA wheel ──Matter/Thread──▶ Matter Server ──WS──▶ this integration ──▶ event entities
-                                                                          └▶ ikea_bilresa_event
+BILRESA wheel / dual button ──Matter/Thread──▶ Matter Server ──WS──▶ this integration
+                                                                    ├▶ event entities
+                                                                    └▶ ikea_bilresa_event
 ```
 
 The integration normally reuses the core Matter integration's existing
@@ -99,6 +104,10 @@ Each wheel exposes **3 channels**, each of which is 3 Matter Switch endpoints:
 |------|---------------------|
 | Scroll ↑ / ↓ (rotary) | MomentarySwitch + Release + MultiPress, `MultiPressMax = 18` |
 | Button (press) | + LongPress, `MultiPressMax = 3` |
+
+The E2489 dual button exposes two button-only endpoints with no channel labels.
+Each becomes a separate Button 1/2 event entity and supports single press,
+double press, hold and release (`MultiPressMax = 2`).
 
 ## Requirements
 
@@ -126,8 +135,9 @@ Copy `custom_components/ikea_bilresa/` into your Home Assistant
 
 **Settings → Devices & Services → Add Integration → IKEA BILRESA.**
 Confirm the pre-filled Matter Server URL (change it only if you run the Matter
-Server elsewhere). The integration discovers all BILRESA wheels automatically and
-creates one device per wheel with an event entity per channel.
+Server elsewhere). The integration discovers all supported BILRESA devices
+automatically. A wheel gets an event entity per channel; a dual button gets one
+per physical button.
 
 ### GUI control bindings (turnkey control)
 
@@ -166,6 +176,12 @@ the recovered entity's real state. Rotate-up from an off light starts at the
 configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
+
+For a dual button, the same flow first selects Button 1 or Button 2 and then
+shows only supported actions: independent single/double-press targets and
+hold/release. There are no rotary, scene or triple-press fields. A hold ramp can
+alternate direction or stay fixed to brighten/dim, so two buttons can form a
+software DIRIGERA-style pair for one light.
 
 Acceleration, when enabled, is based on decoded notches per elapsed time rather
 than the size of one Matter batch. It resets after idle, direction changes,

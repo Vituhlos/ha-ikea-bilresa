@@ -23,7 +23,17 @@ test("serves the selected two-path scroll-wheel glyph", async () => {
   assert.match(icon.secondaryPath, /M13\.05 1\.35/);
   assert.deepEqual(await window.customIcons.bilresa.getIconList(), [
     { name: "scroll-wheel" },
+    { name: "dual-button" },
   ]);
+});
+
+test("serves the dedicated two-path dual-button glyph", async () => {
+  const icon = await window.customIcons.bilresa.getIcon("dual-button");
+
+  assert.equal(icon.viewBox, "0 0 24 24");
+  assert.match(icon.path, /M11\.3 4\.35 A1\.8 1\.9/);
+  assert.match(icon.path, /M11\.3 17\.05 A1\.23 1\.37/);
+  assert.match(icon.secondaryPath, /M13\.05 1\.35/);
 });
 
 test("does not invent icons outside the bilresa namespace contract", async () => {

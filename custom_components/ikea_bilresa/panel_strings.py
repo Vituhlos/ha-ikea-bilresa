@@ -38,6 +38,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "edit_binding": "Edit binding",
         "target_unavailable": "{target} — unavailable",
         "configured": "Configured",
+        "button_actions": "Button actions",
+        "multiple_targets": "{count} targets",
         # scroll modes — what a rotation does
         "mode_brightness": "Smooth dimming",
         "mode_color_temp": "Colour temperature",
@@ -51,8 +53,9 @@ STRINGS: dict[str, dict[str, str]] = {
         # wheel card
         "no_activity": "No activity yet",
         "last_on_channel": "last on channel {channel}",
+        "last_on_button": "last on button {button}",
         # summary
-        "overview_title": "Wheels",
+        "overview_title": "BILRESA devices",
         "summary_connected": "{count} connected",
         "summary_unavailable": "{count} unavailable",
         "summary_unknown": "{count} not reporting",
@@ -60,38 +63,45 @@ STRINGS: dict[str, dict[str, str]] = {
         "matter_offline": "Matter offline",
         # banners
         "banner_matter_offline": (
-            "Matter is disconnected. The wheels below show their last known state."
+            "Matter is disconnected. The devices below show their last known state."
         ),
         "banner_updates_stopped": "Live updates stopped. This view may be out of date.",
         "banner_target_missing": (
-            "Bindings on {count} wheels point to targets Home Assistant can no "
-            "longer find. Open a marked channel to repair it."
+            "Bindings on {count} devices point to targets Home Assistant can no "
+            "longer find. Open a marked control to repair it."
         ),
         "banner_target_missing_named": (
             "{wheel} has an unavailable binding target on channel {channel}. "
             "Open the channel and repair the binding."
         ),
+        "banner_target_missing_button_named": (
+            "{wheel} has an unavailable binding target on button {button}. "
+            "Open the button and repair the binding."
+        ),
         # states
-        "empty_title": "No BILRESA wheels found",
+        "empty_title": "No BILRESA devices found",
         "empty_connected": (
-            "The integration is connected but has not discovered a wheel yet."
+            "The integration is connected but has not discovered a device yet."
         ),
         "empty_offline": (
-            "Home Assistant is not connected to Matter, so no wheel can be seen."
+            "Home Assistant is not connected to Matter, so no device can be seen."
         ),
         "error_title": "Cannot reach the integration",
         "retry": "Try again",
         # detail
-        "back": "Back to all wheels",
-        "wheel_switcher": "Wheels",
-        "detail_views": "Wheel detail views",
+        "back": "Back to all BILRESA devices",
+        "wheel_switcher": "BILRESA devices",
+        "detail_views": "Device detail views",
         "tab_channels": "Channels",
+        "tab_buttons": "Buttons",
         "tab_live": "Live test",
         "tab_diagnostics": "Diagnostics",
         "detail_area_none": "No area",
         "detail_last_activity": "Last activity",
         "detail_last_channel": "Last active channel",
         "detail_no_last_channel": "No channel observed yet",
+        "detail_last_button": "Last active button",
+        "detail_no_last_button": "No button observed yet",
         "detail_channels_heading": "Physical position behaviour",
         "detail_channels_intro": (
             "The three selector positions on the wheel are also the navigation. "
@@ -105,9 +115,20 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "channel_title": "Channel {channel}",
         "channel_binding": "Binding",
+        "detail_buttons_intro": (
+            "The two physical buttons are also the navigation. Pick a button to "
+            "review or edit its gestures in place."
+        ),
+        "button_spine": "Dual-button controls",
+        "button_empty_title": "Button {button} is waiting for a binding",
+        "button_empty_body": (
+            "Choose what a short press, double press and hold should control."
+        ),
+        "button_title": "Button {button}",
         "target_none": "No target configured",
         # binding editor
         "binding_editor_title": "Edit channel {channel} binding",
+        "binding_editor_button_title": "Edit button {button} binding",
         "field_mode": "Rotation mode",
         "field_target": "Rotation target",
         "field_step": "Step per notch",
@@ -122,6 +143,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "field_triple_target": "Triple-press target",
         "field_hold_action": "Hold",
         "field_hold_target": "Hold target",
+        "field_ramp_direction": "Hold ramp direction",
         "field_scenes": "Scenes",
         "field_scenes_help": (
             "Select multiple scenes to cycle through them on each short press."
@@ -135,14 +157,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "hold_toggle": "Toggle hold target",
         "hold_ramp": "Ramp rotation target",
         "hold_none": "No action",
+        "ramp_direction_alternate": "Alternate up and down",
+        "ramp_direction_up": "Always brighten",
+        "ramp_direction_down": "Always dim",
         "button_response_multi_press": "Wait for single/double/triple press",
         "button_response_fast": "Run single press immediately",
+        "dual_button_response_multi_press": "Wait for single or double press",
+        "dual_button_response_fast": "Run single press immediately",
         "save_binding": "Save binding",
         "cancel_edit": "Cancel editing",
         "delete_binding": "Delete binding",
         "keep_binding": "Keep binding",
         "delete_binding_confirm": (
             "Delete this channel binding? The wheel will stop controlling its targets."
+        ),
+        "delete_button_binding_confirm": (
+            "Delete this button binding? The button will stop controlling its targets."
         ),
         "binding_saved": "Binding saved and activated.",
         "binding_validation_failed": "Fix the marked fields and save again.",
@@ -159,8 +189,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_error_channel_occupied": (
             "This wheel channel already has another binding."
         ),
+        "binding_error_button_occupied": ("This button already has another binding."),
+        "binding_error_control_mismatch": (
+            "This control does not belong to the selected BILRESA device."
+        ),
+        "binding_error_control_missing": "This control is no longer available.",
+        "binding_error_binding_address_mismatch": (
+            "This binding belongs to another control. Reload the panel and try again."
+        ),
+        "binding_error_gesture_unsupported": (
+            "This BILRESA device does not support that gesture."
+        ),
         "binding_error_binding_not_configured": (
-            "Configure this channel before testing it."
+            "Configure this control before testing it."
         ),
         "validation_invalid_value": "Choose or enter a valid value.",
         "validation_mode_target_mismatch": (
@@ -185,15 +226,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_none": "No action",
         "action_cycle_scenes": "Cycle scenes",
         "action_ramp": "Ramp target",
+        "action_ramp_alternate": "Ramp up or down",
+        "action_ramp_up": "Brighten",
+        "action_ramp_down": "Dim",
         "action_stop_ramp": "Stop ramp",
-        "wheel_missing_title": "Wheel no longer available",
+        "wheel_missing_title": "BILRESA device no longer available",
         "wheel_missing_body": (
-            "The wheel was removed or the integration reloaded. Return to the overview."
+            "The device was removed or the integration reloaded. Return to the "
+            "overview."
         ),
         # live test
         "live_intro": (
             "The panel only listens. The largest figure answers whether the "
             "action actually reached its target."
+        ),
+        "live_button_intro": (
+            "The panel listens to both physical buttons. The largest figure shows "
+            "whether the pressed button actually reached its target."
         ),
         "live_result_label": "Last result",
         "live_listening": "Listening",
@@ -201,6 +250,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "live_waiting_title": "Waiting for the wheel",
         "live_waiting_body": (
             "Turn or press this wheel. Activity appears only while this view is open."
+        ),
+        "live_button_waiting_title": "Waiting for a button press",
+        "live_button_waiting_body": (
+            "Press, double-press or hold either button. Activity appears only while "
+            "this view is open."
         ),
         "live_error": (
             "Live activity stopped. Leave and reopen Live test to try again."
@@ -214,6 +268,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "dispatch_pending": "Sending action to Home Assistant",
         "dispatch_skipped": "Binding skipped the action",
         "dispatch_not_configured": "No binding is configured for this channel",
+        "dispatch_not_configured_button": ("No binding is configured for this button"),
         "dispatch_completed": "Local binding action completed",
         "dispatch_received": "Gesture received; calculating result",
         "dispatch_failed": "Action not dispatched",
@@ -239,7 +294,12 @@ STRINGS: dict[str, dict[str, str]] = {
             "These controls run the real binding without a physical wheel. They can "
             "change target entities immediately."
         ),
+        "test_controls_button_intro": (
+            "These controls run the real binding without pressing the physical "
+            "button. They can change target entities immediately."
+        ),
         "test_channel": "Test channel {channel}",
+        "test_button": "Test button {button}",
         "test_rotate_down": "Rotate down",
         "test_rotate_up": "Rotate up",
         "test_single": "Single press",
@@ -248,6 +308,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "test_hold": "Start hold",
         "test_release": "Release hold",
         "test_no_bindings": "Configure a channel to enable panel tests.",
+        "test_no_button_bindings": "Configure a button to enable panel tests.",
         "direction_up": "up",
         "direction_down": "down",
         "gesture_rotate": "Channel {channel} · rotate {direction} · {delta} steps",
@@ -258,14 +319,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_release": "Channel {channel} · release",
         "gesture_unknown": "Channel {channel} · activity received",
         "live_channels_heading": "Configured channels",
+        "gesture_button_press_single": "Button {button} · single press",
+        "gesture_button_press_double": "Button {button} · double press",
+        "gesture_button_hold": "Button {button} · hold",
+        "gesture_button_release": "Button {button} · release",
+        "gesture_button_unknown": "Button {button} · activity received",
+        "live_buttons_heading": "Configured buttons",
         "live_recent": "Latest events",
         # diagnostics
-        "diagnostics_heading": "Wheel status",
+        "diagnostics_heading": "Device status",
         "diagnostics_intro": (
             "Read-only status from Home Assistant. Private Matter identifiers are "
             "not shown."
         ),
-        "diagnostic_availability": "Wheel availability",
+        "diagnostic_availability": "Device availability",
         "diagnostic_matter": "Matter connection",
         "diagnostic_source": "Event source",
         "diagnostic_link": "Matter device link",
@@ -305,6 +372,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "edit_binding": "Upravit propojení",
         "target_unavailable": "{target} — nedostupné",
         "configured": "Nastaveno",
+        "button_actions": "Akce tlačítka",
+        "multiple_targets": "{count} cíle",
         "mode_brightness": "Plynulé stmívání",
         "mode_color_temp": "Teplota bílé",
         "mode_color": "Barva",
@@ -316,43 +385,51 @@ STRINGS: dict[str, dict[str, str]] = {
         "mode_scenes": "Scény ({count})",
         "no_activity": "Zatím žádná aktivita",
         "last_on_channel": "naposledy na kanálu {channel}",
-        "overview_title": "Kolečka",
+        "last_on_button": "naposledy na tlačítku {button}",
+        "overview_title": "Zařízení BILRESA",
         "summary_connected": "{count} připojeno",
         "summary_unavailable": "{count} nedostupné",
         "summary_unknown": "{count} se nehlásí",
         "matter_connected": "Matter připojen",
         "matter_offline": "Matter odpojen",
         "banner_matter_offline": (
-            "Matter je odpojený. Kolečka níže ukazují svůj poslední známý stav."
+            "Matter je odpojený. Zařízení níže ukazují svůj poslední známý stav."
         ),
         "banner_updates_stopped": (
             "Živé aktualizace se zastavily. Tento pohled může být zastaralý."
         ),
         "banner_target_missing": (
-            "Počet koleček s nedostupným cílem propojení: {count}. Otevřete "
-            "označený kanál a propojení opravte."
+            "{count} zařízení má nedostupný cíl propojení. Otevřete označený "
+            "ovládací prvek a propojení opravte."
         ),
         "banner_target_missing_named": (
             "{wheel} má na kanálu {channel} nedostupný cíl propojení. "
             "Otevřete kanál a propojení opravte."
         ),
-        "empty_title": "Nenalezeno žádné kolečko BILRESA",
-        "empty_connected": "Integrace je připojená, ale zatím nenašla žádné kolečko.",
+        "banner_target_missing_button_named": (
+            "{wheel} má na tlačítku {button} nedostupný cíl propojení. "
+            "Otevřete tlačítko a propojení opravte."
+        ),
+        "empty_title": "Nenalezeno žádné zařízení BILRESA",
+        "empty_connected": "Integrace je připojená, ale zatím nenašla žádné zařízení.",
         "empty_offline": (
-            "Home Assistant není připojený k Matteru, takže nevidí žádné kolečko."
+            "Home Assistant není připojený k Matteru, takže nevidí žádné zařízení."
         ),
         "error_title": "Integrace není dostupná",
         "retry": "Zkusit znovu",
-        "back": "Zpět na všechna kolečka",
-        "wheel_switcher": "Kolečka",
-        "detail_views": "Pohledy detailu kolečka",
+        "back": "Zpět na všechna zařízení BILRESA",
+        "wheel_switcher": "Zařízení BILRESA",
+        "detail_views": "Pohledy detailu zařízení",
         "tab_channels": "Kanály",
+        "tab_buttons": "Tlačítka",
         "tab_live": "Živý test",
         "tab_diagnostics": "Diagnostika",
         "detail_area_none": "Bez oblasti",
         "detail_last_activity": "Poslední aktivita",
         "detail_last_channel": "Naposledy aktivní kanál",
         "detail_no_last_channel": "Zatím nebyl pozorován žádný kanál",
+        "detail_last_button": "Naposledy aktivní tlačítko",
+        "detail_no_last_button": "Zatím nebylo pozorováno žádné tlačítko",
         "detail_channels_heading": "Chování fyzických poloh",
         "detail_channels_intro": (
             "Tři polohy přepínače na kolečku jsou zároveň navigací. Vyberte "
@@ -366,8 +443,19 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "channel_title": "Kanál {channel}",
         "channel_binding": "Propojení",
+        "detail_buttons_intro": (
+            "Dvě fyzická tlačítka jsou zároveň navigací. Vyberte tlačítko a "
+            "upravte jeho gesta bez přesunu na další stránku."
+        ),
+        "button_spine": "Tlačítka dvoutlačítka",
+        "button_empty_title": "Tlačítko {button} čeká na propojení",
+        "button_empty_body": (
+            "Zvolte, co má ovládat krátký stisk, dvojitý stisk a podržení."
+        ),
+        "button_title": "Tlačítko {button}",
         "target_none": "Není nastaven žádný cíl",
         "binding_editor_title": "Upravit propojení kanálu {channel}",
+        "binding_editor_button_title": "Upravit propojení tlačítka {button}",
         "field_mode": "Režim otáčení",
         "field_target": "Cíl otáčení",
         "field_step": "Krok na jeden zub",
@@ -382,6 +470,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "field_triple_target": "Cíl trojitého stisku",
         "field_hold_action": "Podržení",
         "field_hold_target": "Cíl podržení",
+        "field_ramp_direction": "Směr plynulé změny při podržení",
         "field_scenes": "Scény",
         "field_scenes_help": ("Vyberte více scén; každý krátký stisk přejde na další."),
         "field_unit": "Jednotka rozsahu: {unit}",
@@ -393,14 +482,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "hold_toggle": "Přepnout cíl podržení",
         "hold_ramp": "Plynule měnit cíl otáčení",
         "hold_none": "Bez akce",
+        "ramp_direction_alternate": "Střídat zesílení a zeslabení",
+        "ramp_direction_up": "Vždy zesílit",
+        "ramp_direction_down": "Vždy zeslabit",
         "button_response_multi_press": "Počkat na jednoduchý/dvojitý/trojitý stisk",
         "button_response_fast": "Spustit jednoduchý stisk okamžitě",
+        "dual_button_response_multi_press": "Počkat na jednoduchý nebo dvojitý stisk",
+        "dual_button_response_fast": "Spustit jednoduchý stisk okamžitě",
         "save_binding": "Uložit propojení",
         "cancel_edit": "Zrušit úpravy",
         "delete_binding": "Smazat propojení",
         "keep_binding": "Ponechat propojení",
         "delete_binding_confirm": (
             "Smazat propojení tohoto kanálu? Kolečko přestane ovládat jeho cíle."
+        ),
+        "delete_button_binding_confirm": (
+            "Smazat propojení tohoto tlačítka? Tlačítko přestane ovládat své cíle."
         ),
         "binding_saved": "Propojení bylo uloženo a aktivováno.",
         "binding_validation_failed": "Opravte označená pole a uložte znovu.",
@@ -415,8 +512,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_error_wheel_missing": "Kolečko už není dostupné.",
         "binding_error_binding_missing": "Propojení už neexistuje.",
         "binding_error_channel_occupied": ("Tento kanál kolečka už má jiné propojení."),
+        "binding_error_button_occupied": "Toto tlačítko už má jiné propojení.",
+        "binding_error_control_mismatch": (
+            "Tento ovládací prvek nepatří k vybranému zařízení BILRESA."
+        ),
+        "binding_error_control_missing": "Tento ovládací prvek už není dostupný.",
+        "binding_error_binding_address_mismatch": (
+            "Toto propojení patří jinému ovládacímu prvku. Obnovte panel a zkuste "
+            "to znovu."
+        ),
+        "binding_error_gesture_unsupported": (
+            "Toto zařízení BILRESA dané gesto nepodporuje."
+        ),
         "binding_error_binding_not_configured": (
-            "Před testem nejdřív nastavte tento kanál."
+            "Před testem nejdřív nastavte tento ovládací prvek."
         ),
         "validation_invalid_value": "Vyberte nebo zadejte platnou hodnotu.",
         "validation_mode_target_mismatch": (
@@ -441,15 +550,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_none": "Bez akce",
         "action_cycle_scenes": "Procházet scény",
         "action_ramp": "Plynule měnit cíl",
+        "action_ramp_alternate": "Plynule zesílit nebo zeslabit",
+        "action_ramp_up": "Zesílit",
+        "action_ramp_down": "Zeslabit",
         "action_stop_ramp": "Zastavit změnu",
-        "wheel_missing_title": "Kolečko už není dostupné",
+        "wheel_missing_title": "Zařízení BILRESA už není dostupné",
         "wheel_missing_body": (
-            "Kolečko bylo odebráno nebo se integrace znovu načetla. Vraťte se na "
+            "Zařízení bylo odebráno nebo se integrace znovu načetla. Vraťte se na "
             "přehled."
         ),
         "live_intro": (
             "Panel pouze naslouchá. Největší údaj odpovídá na otázku, zda akce "
             "skutečně dorazila k cíli."
+        ),
+        "live_button_intro": (
+            "Panel naslouchá oběma fyzickým tlačítkům. Největší údaj ukazuje, zda "
+            "stisknuté tlačítko skutečně ovládlo svůj cíl."
         ),
         "live_result_label": "Poslední výsledek",
         "live_listening": "Naslouchám",
@@ -458,6 +574,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "live_waiting_body": (
             "Otočte kolečkem nebo ho stiskněte. Aktivita se zobrazuje jen v tomto "
             "pohledu."
+        ),
+        "live_button_waiting_title": "Čekám na stisk tlačítka",
+        "live_button_waiting_body": (
+            "Stiskněte, dvakrát stiskněte nebo podržte libovolné tlačítko. Aktivita "
+            "se zobrazuje jen v tomto pohledu."
         ),
         "live_error": (
             "Živá aktivita se zastavila. Odejděte z Živého testu a znovu ho otevřete."
@@ -471,6 +592,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "dispatch_pending": "Odesílám akci do Home Assistantu",
         "dispatch_skipped": "Propojení akci přeskočilo",
         "dispatch_not_configured": "Tento kanál nemá nastavené propojení",
+        "dispatch_not_configured_button": ("Toto tlačítko nemá nastavené propojení"),
         "dispatch_completed": "Místní akce propojení byla dokončena",
         "dispatch_received": "Gesto přijato; počítám výsledek",
         "dispatch_failed": "Akce nebyla odeslána",
@@ -496,7 +618,12 @@ STRINGS: dict[str, dict[str, str]] = {
             "Tyto ovladače spustí skutečné propojení bez fyzického kolečka. "
             "Cílové entity se mohou okamžitě změnit."
         ),
+        "test_controls_button_intro": (
+            "Tyto ovladače spustí skutečné propojení bez stisku fyzického tlačítka. "
+            "Cílové entity se mohou okamžitě změnit."
+        ),
         "test_channel": "Test kanálu {channel}",
+        "test_button": "Test tlačítka {button}",
         "test_rotate_down": "Otočit dolů",
         "test_rotate_up": "Otočit nahoru",
         "test_single": "Jednoduchý stisk",
@@ -505,6 +632,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "test_hold": "Začít podržení",
         "test_release": "Uvolnit podržení",
         "test_no_bindings": "Pro testování nejdřív nastavte některý kanál.",
+        "test_no_button_bindings": ("Pro testování nejdřív nastavte některé tlačítko."),
         "direction_up": "nahoru",
         "direction_down": "dolů",
         "gesture_rotate": "Kanál {channel} · otočení {direction} · {delta} kroků",
@@ -515,13 +643,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_release": "Kanál {channel} · uvolnění",
         "gesture_unknown": "Kanál {channel} · přijata aktivita",
         "live_channels_heading": "Nastavené kanály",
+        "gesture_button_press_single": "Tlačítko {button} · jednoduchý stisk",
+        "gesture_button_press_double": "Tlačítko {button} · dvojitý stisk",
+        "gesture_button_hold": "Tlačítko {button} · podržení",
+        "gesture_button_release": "Tlačítko {button} · uvolnění",
+        "gesture_button_unknown": "Tlačítko {button} · přijata aktivita",
+        "live_buttons_heading": "Nastavená tlačítka",
         "live_recent": "Poslední události",
-        "diagnostics_heading": "Stav kolečka",
+        "diagnostics_heading": "Stav zařízení",
         "diagnostics_intro": (
             "Stav z Home Assistantu pouze pro čtení. Soukromé identifikátory Matter "
             "se nezobrazují."
         ),
-        "diagnostic_availability": "Dostupnost kolečka",
+        "diagnostic_availability": "Dostupnost zařízení",
         "diagnostic_matter": "Připojení Matter",
         "diagnostic_source": "Zdroj událostí",
         "diagnostic_link": "Propojení se zařízením Matter",

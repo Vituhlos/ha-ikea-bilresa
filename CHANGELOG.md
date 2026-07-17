@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.1] - 2026-07-17
+
+### Added
+- BILRESA devices are now classified from their Matter endpoint shape as either
+  a scroll wheel or an E2489 dual button, so a button-only device is no longer
+  presented as an empty wheel.
+- Each physical dual-button control gets its own event entity and device
+  triggers for single press, double press, hold and release. Rotation and
+  triple press are never advertised for `MultiPressMax = 2`.
+- Dual-button bindings are stored and dispatched by Matter endpoint, so both
+  buttons on each device — and any number of dual-button devices — can keep
+  independent single-press, double-press and hold targets without colliding on
+  their shared `channel = None` signal.
+- Dual-button hold-to-ramp supports fixed brighten/dim roles for a
+  two-button "software DIRIGERA" pair, or the existing alternating direction,
+  with the same release, reconnect, new-gesture and watchdog safety stops.
+- The native config flow now builds a hardware-specific form after the device
+  is selected. Dual buttons never show rotary, scene or triple-press options;
+  wheel profiles and their existing rotary options are unchanged.
+- A bundled `bilresa:dual-button` two-path glyph now identifies dual-button
+  event entities through both supported Home Assistant custom-icon contracts.
+- The existing BILRESA panel now includes every dual-button device alongside
+  the wheels. Its unchanged detail workbench adapts the numbered channel spine
+  from `1 / 2 / 3` to independently configurable buttons `1 / 2`, while
+  omitting only rotation, triple-press and detent controls the hardware does
+  not have. The existing Live test reports which button was pressed and the
+  resulting action outcome. Matter endpoint ids remain server-side.
+
 ## [0.5.9-rc.12] - 2026-07-17
 
 ### Changed
@@ -465,7 +493,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.8...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...HEAD
+[0.6.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.9-rc.12...v0.6.0-rc.1
 [0.5.7-rc.8]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.7...v0.5.7-rc.8
 [0.5.7-rc.7]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.6...v0.5.7-rc.7
 [0.5.7-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.5...v0.5.7-rc.6
