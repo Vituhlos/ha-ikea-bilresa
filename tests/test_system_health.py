@@ -67,7 +67,10 @@ async def test_system_health_reports_setup_failure_without_runtime_data() -> Non
 @pytest.mark.asyncio
 async def test_system_health_counts_wheels_and_buttons_separately() -> None:
     coordinator = SimpleNamespace(
-        matter_server_info={"sdk_version": "1.1.7"},
+        matter_server_info={
+            "sdk_version": "matter-server/1.2.6",
+            "schema_version": 12,
+        },
         telemetry={"last_event_at": None, "last_fallback_reason": None},
         connected=True,
         event_source="core_matter_client",
@@ -87,3 +90,5 @@ async def test_system_health_counts_wheels_and_buttons_separately() -> None:
     # A dual button must not inflate the wheel count.
     assert result["discovered_wheels"] == 2
     assert result["discovered_buttons"] == 1
+    assert result["matter_server_schema"] == 12
+    assert result["matter_client_compatibility_schema"] == 11

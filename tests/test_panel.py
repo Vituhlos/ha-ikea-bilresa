@@ -599,6 +599,15 @@ def test_dual_button_reuses_the_panel_shell_with_two_button_controls() -> None:
     assert '"ramp_direction"' in form
 
 
+def test_binding_editor_offers_three_truthful_response_points() -> None:
+    asset = _asset()
+    form = asset.split("  _bindingForm(wheel, control) {", 1)[1].split(
+        "  _channelDetail(wheel, channel) {", 1
+    )[0]
+
+    assert '["multi_press", "fast", "instant"]' in form
+
+
 def test_panel_detail_tabs_follow_the_aria_keyboard_contract() -> None:
     """Tabs need roles, relationships, roving focus and arrow-key navigation."""
     asset = _asset()
@@ -631,11 +640,36 @@ def test_live_test_leads_with_result_and_hides_synthetic_controls() -> None:
     asset = _asset()
 
     assert 'el("section", "detail-card live-output")' in asset
-    assert 'el("div", "live-result", this._formatResult(latest.result))' in asset
+    assert 'el("div", "live-result", this._liveResult(latest))' in asset
     assert 'el("section", "detail-card live-channels")' in asset
     assert "this._liveControls(wheel)" in asset
     assert 'el("details", "detail-card test-panel")' in asset
     assert 'el("summary", null, this._t("test_controls_heading"))' in asset
+
+
+def test_live_test_turns_an_unconfigured_gesture_into_a_useful_empty_state() -> None:
+    """Recognized hardware is success even when no target has been configured."""
+    asset = _asset()
+
+    assert '"result_gesture_press"' in asset
+    assert '"result_not_configured_button_detail"' in asset
+    assert 'this._t(isButton ? "live_setup_button" : "live_setup_channel"' in asset
+    assert "this._configureFromLive(wheel, latest)" in asset
+    assert 'not_configured: [\n        "unknown",' in asset
+
+
+def test_recent_live_events_form_a_keyboard_scroll_region() -> None:
+    """A burst stays bounded on screen and remains reachable without a pointer."""
+    asset = _asset()
+
+    assert ".recent ol {" in asset
+    assert "max-block-size: 320px;" in asset
+    assert "overflow-y: auto;" in asset
+    assert "overscroll-behavior: contain;" in asset
+    assert "scrollbar-gutter: stable;" in asset
+    assert "list.tabIndex = 0;" in asset
+    assert 'list.setAttribute("aria-labelledby", recentHeading.id);' in asset
+    assert ".recent ol:focus-visible {" in asset
 
 
 def test_the_detent_strip_is_scaled_to_observed_hardware() -> None:

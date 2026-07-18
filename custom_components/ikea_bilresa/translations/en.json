@@ -59,7 +59,7 @@
             "scenes": "Scenes cycled by single press (optional, overrides its action)"
           },
           "data_description": {
-            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition when this binding uses another press-count action. Public BILRESA events remain fully classified in either mode."
+            "button_response": "Instant runs on the initial press and requires multi-press and hold actions to be disabled. Fast release runs after the first short release. Multi-press aware waits for the completed gesture. Public BILRESA events remain fully classified in every mode."
           }
         },
         "profile": {
@@ -94,12 +94,14 @@
             "scenes": "Scenes cycled by single press (optional, overrides its action)"
           },
           "data_description": {
-            "button_response": "Fast response runs this binding's single-press action on the first release. Choose multi-press recognition when this binding uses another press-count action. Public BILRESA events remain fully classified in either mode."
+            "button_response": "Instant runs on the initial press and requires multi-press and hold actions to be disabled. Fast release runs after the first short release. Multi-press aware waits for the completed gesture. Public BILRESA events remain fully classified in every mode."
           }
         }
       },
       "error": {
         "fast_response_conflicts_with_multi_press": "Fast response cannot be combined with a multi-press target. Remove that target or choose multi-press recognition.",
+        "instant_response_conflicts_with_multi_press": "Instant response cannot be combined with a multi-press target. Remove that target or choose multi-press recognition.",
+        "instant_response_conflicts_with_hold": "Instant response cannot be combined with a separate hold action. Set hold to Do nothing or choose Fast release / Multi-press aware.",
         "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls.",
         "target_required": "Choose a target for this action, or set the action to Do nothing.",
         "ramp_requires_light": "Hold-to-ramp requires a light target."
@@ -149,13 +151,15 @@
     },
     "button_response": {
       "options": {
-        "fast": "Fast single press",
+        "instant": "Instant initial press",
+        "fast": "Fast release",
         "multi_press": "Recognize single, double or triple press"
       }
     },
     "dual_button_response": {
       "options": {
-        "fast": "Fast single press",
+        "instant": "Instant initial press",
+        "fast": "Fast release",
         "multi_press": "Recognize single or double press"
       }
     },

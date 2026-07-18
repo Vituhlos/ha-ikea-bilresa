@@ -41,6 +41,7 @@ from .const import (
     ACTION_RELEASE,
     ACTION_ROTATE,
     BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_INSTANT,
     CLICK_NONE,
     CLICK_OFF,
     CLICK_ON,
@@ -79,6 +80,7 @@ from .const import (
     EVT_SHORT_RELEASE,
     FALLBACK_MAX_KELVIN,
     FALLBACK_MIN_KELVIN,
+    HOLD_NONE,
     HOLD_RAMP,
     HOLD_TOGGLE,
     MODE_COLOR,
@@ -224,10 +226,20 @@ class LightBinding:
         self._velocity_direction: str | None = None
         self._reset_velocity_after_rotate = False
         self._unavailable_targets: set[str] = set()
-        self._fast_single = (
-            data.get(CONF_BUTTON_RESPONSE, DEFAULT_BUTTON_RESPONSE)
-            == BUTTON_RESPONSE_FAST
+        button_response = data.get(CONF_BUTTON_RESPONSE, DEFAULT_BUTTON_RESPONSE)
+        instant_requested = button_response == BUTTON_RESPONSE_INSTANT
+        self._instant_single = (
+            instant_requested
+            and self._double_target is None
+            and self._triple_target is None
+            and self._hold_action == HOLD_NONE
         )
+        if instant_requested and not self._instant_single:
+            _LOGGER.error(
+                "Disabling ambiguous BILRESA Instant response; use validation "
+                "to remove multi-press and hold actions"
+            )
+        self._fast_single = button_response == BUTTON_RESPONSE_FAST
         self._fast_press_started: float | None = None
         self._latency_trace_sequence = 0
         self._latency_trace_started_at: float | None = None
@@ -440,8 +452,8 @@ class LightBinding:
 
     @callback
     def _handle_raw_button(self, event_type: str) -> None:
-        """Run an unambiguous single-press binding on ShortRelease."""
-        if not self._fast_single:
+        """Run an unambiguous early single-press binding exactly once."""
+        if not self._fast_single and not self._instant_single:
             return
         now = time.monotonic()
         if event_type == _INITIAL_PRESS:
@@ -450,15 +462,26 @@ class LightBinding:
                 and now - self._fast_press_started > _FAST_PRESS_GESTURE_TIMEOUT
             ):
                 self._fast_press_started = None
+            if self._instant_single and self._fast_press_started is None:
+                self._run_early_single(now, _INITIAL_PRESS)
             return
-        if event_type != _SHORT_RELEASE or self._fast_press_started is not None:
+        if (
+            not self._fast_single
+            or event_type != _SHORT_RELEASE
+            or self._fast_press_started is not None
+        ):
             return
 
         # A hold ends with LongRelease, so ShortRelease is safe for the normal
         # click action. Further releases in the same multi-press gesture are
         # collapsed until its public MultiPressComplete action arrives.
+        self._run_early_single(now, _SHORT_RELEASE)
+
+    @callback
+    def _run_early_single(self, now: float, stage: str) -> None:
+        """Execute the configured single action and arm completion suppression."""
         self._fast_press_started = now
-        self._start_latency_trace(now)
+        self._start_latency_trace(now, stage)
         if self._ramp_unsub is not None:
             self._stop_ramp(change_direction=False)
         self._hold_off_rotation()
@@ -476,7 +499,7 @@ class LightBinding:
         finally:
             self._active_action = previous_action
 
-    def _start_latency_trace(self, now: float) -> None:
+    def _start_latency_trace(self, now: float, stage: str) -> None:
         """Start a privacy-safe fast-press trace only while DEBUG is enabled."""
         if not _LOGGER.isEnabledFor(logging.DEBUG):
             self._reset_latency_trace()
@@ -484,7 +507,7 @@ class LightBinding:
         self._latency_trace_sequence += 1
         self._latency_trace_started_at = now
         self._latency_trace_target_seen = False
-        self._log_latency_stage("short_release", now=now)
+        self._log_latency_stage(stage, now=now)
 
     def _reset_latency_trace(self) -> None:
         """Discard transient latency measurement state."""
@@ -556,6 +579,7 @@ class LightBinding:
                 "direction": current.direction,
                 "notches": current.notches,
                 "presses": current.presses,
+                "observed_duration_ms": current.observed_duration_ms,
                 "source": current.source,
                 "result": result,
                 "dispatch_status": status,

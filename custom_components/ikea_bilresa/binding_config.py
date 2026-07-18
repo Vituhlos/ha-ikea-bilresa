@@ -15,6 +15,7 @@ import voluptuous as vol
 
 from .const import (
     BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_INSTANT,
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
@@ -227,6 +228,11 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
         data.get(CONF_DOUBLE_TARGET) or data.get(CONF_TRIPLE_TARGET)
     ):
         errors[CONF_BUTTON_RESPONSE] = "fast_response_conflicts_with_multi_press"
+    if data.get(CONF_BUTTON_RESPONSE) == BUTTON_RESPONSE_INSTANT:
+        if data.get(CONF_DOUBLE_TARGET) or data.get(CONF_TRIPLE_TARGET):
+            errors[CONF_BUTTON_RESPONSE] = "instant_response_conflicts_with_multi_press"
+        elif data.get(CONF_HOLD_ACTION) != HOLD_NONE:
+            errors[CONF_BUTTON_RESPONSE] = "instant_response_conflicts_with_hold"
     return errors
 
 

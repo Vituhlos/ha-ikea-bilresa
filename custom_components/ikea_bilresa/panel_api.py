@@ -325,6 +325,7 @@ def ws_activity_subscribe(
                     "direction": data.get("direction"),
                     "notches": data.get("notches"),
                     "presses": data.get("presses"),
+                    "observed_duration_ms": data.get("observed_duration_ms"),
                     "source": data.get("source", "matter"),
                     "result": data.get("result"),
                     "dispatch_status": data.get("dispatch_status", "received"),

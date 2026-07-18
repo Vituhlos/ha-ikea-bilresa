@@ -206,7 +206,64 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
 
 No complete hardware run has been recorded yet.
 
-No BILRESA dual button (E2489) hardware run has been recorded yet.
+### 2026-07-18 — E2489 B4 partial run on `v0.6.0-rc.2`
+
+Tester: owner performing physical gestures, Codex observing Home Assistant,
+recorder, integration diagnostics and sanitized Matter Server logs read-only.
+
+Environment:
+
+- Home Assistant Core `2026.7.2`, Home Assistant OS `18.1`, Python `3.14.6`;
+- Matter Server add-on `9.1.0`, matterjs-server `1.2.6`,
+  matter.js `0.17.6-alpha.0-20260715-3585d95fe`;
+- WebSocket server schema `12`, minimum supported client schema `11`;
+- installed custom integration `v0.6.0-rc.2`, event source
+  `core_matter_client`, no fallback;
+- one E2489 on firmware `1.9.15`, hardware `P2.0`, two Switch endpoints,
+  `MultiPressMax = 2` on each;
+- two wheels, one dual button and six configured bindings in the integration;
+  household names, entity IDs, node IDs, serials and network identifiers omitted.
+
+Observed results:
+
+- **PASS F1:** System Health reported two wheels and one dual button; the E2489
+  appeared as a buttons device with one custom event entity per physical
+  button. Both bindings were restored and the diagnostic dump redacted node,
+  serial and target identifiers.
+- **PASS F2:** button 1 and button 2 each produced a single press, a double
+  press, one hold and exactly one release. Core Matter and custom event
+  entities agreed on endpoint and gesture. Both endpoints advertised only
+  single/double/hold/release, never triple.
+- **PASS F2 timing boundary:** deliberately slow pairs completed as two
+  separate singles; fast pairs completed as doubles.
+- **PASS F3:** separate single-press targets toggled only their configured
+  lights. A configured button-1 hold target toggled exactly once. Button 2,
+  configured with hold action `none`, still emitted hold/release and changed
+  neither its single nor double target. A configured double target changed
+  only on a completed double. A button-1 double with no double target changed
+  nothing.
+- **FAIL F2 overflow on the installed RC.2:** three rapid physical taps ended
+  with the real device's Matter 1.6 `MultiPressComplete(0)`. RC.2's
+  `decoded.get("count") or 1` converted zero to one, published a false single
+  press and toggled the single-press target.
+- **PASS recovery after the failure:** the endpoint position returned to zero;
+  the next physical single press completed as count one and toggled its target
+  normally. No recurring exception, task warning or reconnect spam appeared.
+- **OPEN:** public `ikea_bilresa_event` and device-trigger agreement were not
+  independently subscribed during this capture; only the two event-entity
+  surfaces were compared.
+- **OPEN:** installed-candidate overflow retest, approximately 15-minute
+  idle-resume, dual-button/wheel concurrent no-leak, unavailable-target,
+  watchdog/lost-release, integration/HA restore and controlled Matter Server
+  reconnect remain.
+
+The working tree already contains the G0 fix that rejects zero and counts above
+the endpoint's advertised maximum, plus a deterministic regression test. That
+implementation does not change this RC.2 result into a pass. It must be
+published, installed and physically retested on the exact candidate.
+
+Verdict: **FAIL on RC.2 overflow handling; otherwise the captured B4 gesture
+and configured-binding subset passes. Overall B4 remains IN PROGRESS.**
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

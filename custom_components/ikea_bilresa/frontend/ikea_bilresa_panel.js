@@ -1102,6 +1102,7 @@ const STYLES = `
     margin-block-start: var(--_space-5);
     font-size: var(--ha-font-size-l, 16px);
   }
+  .live-setup-action { margin-block-start: var(--_space-5); }
   .gesture-caption {
     display: flex;
     flex-wrap: wrap;
@@ -1170,7 +1171,19 @@ const STYLES = `
     font-size: var(--ha-font-size-s, 12px);
   }
   .recent h4 { padding-block-end: var(--_space-3); }
-  .recent ol { margin: 0; padding: 0; list-style: none; }
+  .recent ol {
+    max-block-size: 320px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    list-style: none;
+  }
+  .recent ol:focus-visible {
+    outline: 2px solid var(--_ink);
+    outline-offset: -2px;
+  }
   .recent li {
     padding: var(--_space-3) var(--_space-4);
     font-size: var(--ha-font-size-m, 14px);
@@ -2416,7 +2429,7 @@ class IkeaBilresaPanel extends HTMLElement {
       this._selectField(
         "button_response",
         this._t("field_button_response"),
-        ["multi_press", "fast"].map((response) => ({
+        ["multi_press", "fast", "instant"].map((response) => ({
           value: response,
           label: this._t(
             `${isButton ? "dual_button_response" : "button_response"}_${response}`,
@@ -2848,9 +2861,12 @@ class IkeaBilresaPanel extends HTMLElement {
         hold: "gesture_button_hold",
         release: "gesture_button_release",
       };
-      return this._t(keys[activity.gesture] || "gesture_button_unknown", {
-        button,
-      });
+      return this._withObservedDuration(
+        this._t(keys[activity.gesture] || "gesture_button_unknown", {
+          button,
+        }),
+        activity,
+      );
     }
     const channel = activity.channel ?? "?";
     if (activity.gesture === "rotate") {
@@ -2872,11 +2888,36 @@ class IkeaBilresaPanel extends HTMLElement {
             : "gesture_press_single";
       return this._t(key, { channel });
     }
-    if (activity.gesture === "hold") return this._t("gesture_hold", { channel });
+    if (activity.gesture === "hold") {
+      return this._withObservedDuration(
+        this._t("gesture_hold", { channel }),
+        activity,
+      );
+    }
     if (activity.gesture === "release") {
-      return this._t("gesture_release", { channel });
+      return this._withObservedDuration(
+        this._t("gesture_release", { channel }),
+        activity,
+      );
     }
     return this._t("gesture_unknown", { channel });
+  }
+
+  _withObservedDuration(label, activity) {
+    const milliseconds = Number(activity.observed_duration_ms);
+    if (
+      !Number.isFinite(milliseconds) ||
+      milliseconds < 0 ||
+      !["hold", "release"].includes(activity.gesture)
+    ) {
+      return label;
+    }
+    const seconds = new Intl.NumberFormat(this._language || "en", {
+      maximumFractionDigits: 2,
+    }).format(milliseconds / 1000);
+    return `${label} · ${this._t("gesture_observed_duration", {
+      duration: seconds,
+    })}`;
   }
 
   _dispatchLabel(activity) {
@@ -2886,7 +2927,7 @@ class IkeaBilresaPanel extends HTMLElement {
       failed: ["failed", "dispatch_failed"],
       skipped: ["failed", "dispatch_skipped"],
       not_configured: [
-        "failed",
+        "unknown",
         activity.button !== null && activity.button !== undefined
           ? "dispatch_not_configured_button"
           : "dispatch_not_configured",
@@ -2939,6 +2980,71 @@ class IkeaBilresaPanel extends HTMLElement {
       return this._t("result_fast_press_complete");
     }
     return JSON.stringify(result);
+  }
+
+  _recognizedResult(activity) {
+    if (activity.gesture === "press") {
+      const press =
+        activity.presses === 2
+          ? "result_gesture_double_press"
+          : activity.presses === 3
+            ? "result_gesture_triple_press"
+            : "result_gesture_press";
+      return this._t(press);
+    }
+    const labels = {
+      rotate: "result_gesture_rotate",
+      hold: "result_gesture_hold",
+      release: "result_gesture_release",
+    };
+    return this._t(labels[activity.gesture] || "result_gesture_received");
+  }
+
+  _liveResult(activity) {
+    return activity.result === null || activity.result === undefined
+      ? this._recognizedResult(activity)
+      : this._formatResult(activity.result);
+  }
+
+  _liveResultLabel(activity) {
+    return this._t(
+      activity.result === null || activity.result === undefined
+        ? "live_event_label"
+        : "live_result_label",
+    );
+  }
+
+  _liveExplanation(activity) {
+    if (activity.result !== null && activity.result !== undefined) return null;
+    if (activity.dispatch_status === "not_configured") {
+      return this._t(
+        activity.button !== null && activity.button !== undefined
+          ? "result_not_configured_button_detail"
+          : "result_not_configured_channel_detail",
+      );
+    }
+    if (
+      activity.dispatch_status === "received" ||
+      activity.dispatch_status === "pending"
+    ) {
+      return this._t("result_pending_detail");
+    }
+    return this._t("result_unavailable_detail");
+  }
+
+  _configureFromLive(wheel, activity) {
+    const number =
+      wheel.variant === "dual_button" ? activity.button : activity.channel;
+    const control = this._controlsFor(wheel).find(
+      (item) => this._controlNumber(wheel, item) === number,
+    );
+    if (!control) return;
+    this._stopActivity();
+    this._activityError = false;
+    this._view = wheel.variant === "dual_button" ? "buttons" : "channels";
+    if (wheel.variant === "dual_button") this._openButton = number;
+    else this._openChannel = number;
+    this._startEditor(wheel, control);
   }
 
   async _testBinding(wheel, control, gesture, extra = {}) {
@@ -3165,16 +3271,13 @@ class IkeaBilresaPanel extends HTMLElement {
       output.appendChild(body);
     } else {
       body.appendChild(
-        el("div", "live-result-label", this._t("live_result_label")),
+        el("div", "live-result-label", this._liveResultLabel(latest)),
       );
-      body.appendChild(el("div", "live-result", this._formatResult(latest.result)));
-      if (latest.result === null || latest.result === undefined) {
+      body.appendChild(el("div", "live-result", this._liveResult(latest)));
+      const explanation = this._liveExplanation(latest);
+      if (explanation) {
         body.appendChild(
-          el(
-            "div",
-            "live-explanation",
-            this._t("result_unavailable_detail"),
-          ),
+          el("div", "live-explanation", explanation),
         );
       }
       const [dispatchState, dispatchKey] = this._dispatchLabel(latest);
@@ -3182,6 +3285,27 @@ class IkeaBilresaPanel extends HTMLElement {
       dispatch.appendChild(this._statusDot(dispatchState));
       dispatch.appendChild(el("span", null, this._t(dispatchKey)));
       body.appendChild(dispatch);
+      if (latest.dispatch_status === "not_configured") {
+        const number = isButton ? latest.button : latest.channel;
+        const control = this._controlsFor(wheel).find(
+          (item) => this._controlNumber(wheel, item) === number,
+        );
+        if (control) {
+          const configure = el(
+            "button",
+            "action-button live-setup-action",
+            this._t(isButton ? "live_setup_button" : "live_setup_channel", {
+              [isButton ? "button" : "channel"]: number,
+            }),
+          );
+          configure.type = "button";
+          configure.dataset.primary = "true";
+          configure.addEventListener("click", () =>
+            this._configureFromLive(wheel, latest),
+          );
+          body.appendChild(configure);
+        }
+      }
       output.appendChild(body);
 
       output.appendChild(el("div", "gesture-caption", this._gestureLabel(latest)));
@@ -3200,8 +3324,13 @@ class IkeaBilresaPanel extends HTMLElement {
     side.appendChild(this._liveControls(wheel));
     if (this._activities.length) {
       const recent = el("section", "detail-card recent");
-      recent.appendChild(el("h4", null, this._t("live_recent")));
+      const recentHeading = el("h4", null, this._t("live_recent"));
+      recentHeading.id = `live-recent-${wheel.key}`;
+      recent.appendChild(recentHeading);
       const list = el("ol");
+      list.id = `live-recent-list-${wheel.key}`;
+      list.tabIndex = 0;
+      list.setAttribute("aria-labelledby", recentHeading.id);
       for (const activity of this._activities) {
         const item = el("li");
         item.appendChild(el("span", null, this._gestureLabel(activity)));

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.3] - 2026-07-18
+
+### Changed
+- Live test now treats an unconfigured physical gesture as a successful
+  hardware-recognition state instead of showing the internal fallback
+  "calculated result not reported". It explains that the control does not
+  operate a target yet and offers a direct action to configure that exact
+  channel or button.
+- The live-test introduction and status text now distinguish gesture
+  recognition from a configured target action. The side summary is titled
+  simply "Channels" or "Buttons" because it includes configured and
+  unconfigured controls.
+- Recent live events use a bounded, keyboard-focusable scroll region, so an
+  event burst no longer keeps extending the page.
+- Matter Server add-on 9.1.0 / matterjs-server 1.2.6 is accepted through its
+  supported schema-11 compatibility profile while System Health distinguishes
+  the server's schema 12 from the client compatibility schema.
+- `node_updated`, `attribute_updated` and `server_shutdown` now have explicit
+  passive handling. Switch `CurrentPosition` is used only to clear stale
+  gesture state, never to manufacture a click.
+- Button response now has three truthful policies: Instant initial press, Fast
+  release and Multi-press aware. Instant is accepted only for an unambiguous
+  single action with hold disabled, and completion is suppressed from executing
+  that direct binding twice while public gesture events remain unchanged.
+- Hold/release actions carry `observed_duration_ms` when one uninterrupted
+  monotonic press observation exists. Live test labels it as integration-
+  observed duration; reconnect or a release safety hint clears it rather than
+  inventing a value.
+
+### Fixed
+- A Matter 1.6 multi-press completion with count `0` (overflow past
+  `MultiPressMax`) is no longer misread as a single press. Positive counts
+  above the endpoint's advertised maximum are ignored as invalid as well.
+
 ## [0.6.0-rc.2] - 2026-07-18
 
 ### Fixed
@@ -508,7 +542,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.2...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.3...HEAD
+[0.6.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.2...v0.6.0-rc.3
 [0.6.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...v0.6.0-rc.2
 [0.6.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.9-rc.12...v0.6.0-rc.1
 [0.5.7-rc.8]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.7...v0.5.7-rc.8

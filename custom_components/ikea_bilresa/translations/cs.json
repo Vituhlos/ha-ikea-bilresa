@@ -59,7 +59,7 @@
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           },
           "data_description": {
-            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá další akci podle počtu stisků, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
+            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané."
           }
         },
         "profile": {
@@ -94,12 +94,14 @@
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           },
           "data_description": {
-            "button_response": "Rychlá odezva provede akci jednoduchého stisku tohoto propojení hned při prvním uvolnění. Pokud propojení používá další akci podle počtu stisků, zvol rozpoznání více stisků. Veřejné události BILRESA zůstávají v obou režimech plně rozpoznané."
+            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané."
           }
         }
       },
       "error": {
         "fast_response_conflicts_with_multi_press": "Rychlou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeber nebo zvol rozpoznání více stisků.",
+        "instant_response_conflicts_with_multi_press": "Okamžitou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeber nebo zvol rozpoznání více stisků.",
+        "instant_response_conflicts_with_hold": "Okamžitou odezvu nelze kombinovat se samostatnou akcí podržení. Nastav podržení na Nedělat nic nebo zvol Rychlé uvolnění / Rozpoznání více stisků.",
         "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním scrollu. Vyber odpovídající entitu nebo změň, co scroll ovládá.",
         "target_required": "Vyber cíl této akce, nebo nastav Nedělat nic.",
         "ramp_requires_light": "Plynulá změna při podržení vyžaduje jako cíl světlo."
@@ -149,13 +151,15 @@
     },
     "button_response": {
       "options": {
-        "fast": "Rychlý jednoduchý stisk",
+        "instant": "Okamžitě při stisku",
+        "fast": "Rychle po uvolnění",
         "multi_press": "Rozpoznat jeden, dva nebo tři stisky"
       }
     },
     "dual_button_response": {
       "options": {
-        "fast": "Rychlý jednoduchý stisk",
+        "instant": "Okamžitě při stisku",
+        "fast": "Rychle po uvolnění",
         "multi_press": "Rozpoznat jeden nebo dva stisky"
       }
     },

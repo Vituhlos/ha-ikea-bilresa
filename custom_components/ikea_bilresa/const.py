@@ -24,6 +24,7 @@ ATTR_BASIC_PRODUCT_NAME = 3
 # Switch cluster attribute (cluster 0x003B). MultiPressMax is the highest press
 # count the endpoint will ever report; the dual button reports 2, the wheel's
 # buttons report 3. An endpoint never emits a completion above this value.
+ATTR_SWITCH_CURRENT_POSITION = 0  # 0x0000  Switch.CurrentPosition
 ATTR_SWITCH_MULTI_PRESS_MAX = 2  # 0x0002  Switch.MultiPressMax
 
 IKEA_VENDOR_ID = 4476  # 0x117C
@@ -209,9 +210,14 @@ DEFAULT_CLICK_ACTION = "toggle"
 
 # When the configured single-press action runs.  Missing values intentionally
 # keep the historic completion-aware behavior for existing stored bindings.
+BUTTON_RESPONSE_INSTANT = "instant"
 BUTTON_RESPONSE_FAST = "fast"
 BUTTON_RESPONSE_MULTI_PRESS = "multi_press"
-BUTTON_RESPONSES = [BUTTON_RESPONSE_FAST, BUTTON_RESPONSE_MULTI_PRESS]
+BUTTON_RESPONSES = [
+    BUTTON_RESPONSE_INSTANT,
+    BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_MULTI_PRESS,
+]
 DEFAULT_BUTTON_RESPONSE = BUTTON_RESPONSE_MULTI_PRESS
 
 # Scroll modes: what a rotation changes on the target entity.

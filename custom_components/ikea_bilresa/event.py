@@ -36,6 +36,13 @@ from .model import BilresaWheel
 _LOGGER = logging.getLogger(__name__)
 
 
+def _duration_attributes(action: WheelAction) -> dict[str, int] | None:
+    """Expose a duration only when one uninterrupted host observation exists."""
+    if action.observed_duration_ms is None:
+        return None
+    return {"observed_duration_ms": action.observed_duration_ms}
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -208,9 +215,15 @@ class BilresaChannelEvent(EventEntity):
             event_type = PRESS_EVENT_TYPES.get(action.presses, PRESS_EVENT_TYPES[1])
             self._trigger_event(event_type, {"presses": action.presses})
         elif action.type == ACTION_HOLD:
-            self._trigger_event(ET_HOLD)
+            if attributes := _duration_attributes(action):
+                self._trigger_event(ET_HOLD, attributes)
+            else:
+                self._trigger_event(ET_HOLD)
         elif action.type == ACTION_RELEASE:
-            self._trigger_event(ET_RELEASE)
+            if attributes := _duration_attributes(action):
+                self._trigger_event(ET_RELEASE, attributes)
+            else:
+                self._trigger_event(ET_RELEASE)
         else:
             return
         self.async_write_ha_state()
@@ -309,9 +322,15 @@ class BilresaButtonEvent(EventEntity):
                 return
             self._trigger_event(event_type, {"presses": action.presses})
         elif action.type == ACTION_HOLD:
-            self._trigger_event(ET_HOLD)
+            if attributes := _duration_attributes(action):
+                self._trigger_event(ET_HOLD, attributes)
+            else:
+                self._trigger_event(ET_HOLD)
         elif action.type == ACTION_RELEASE:
-            self._trigger_event(ET_RELEASE)
+            if attributes := _duration_attributes(action):
+                self._trigger_event(ET_RELEASE, attributes)
+            else:
+                self._trigger_event(ET_RELEASE)
         else:
             return
         self.async_write_ha_state()

@@ -203,6 +203,76 @@ test("structured results lead with the human-readable outcome", () => {
   );
 });
 
+test("an unconfigured button leads with recognized hardware, not a missing result", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        live_event_label: "Poslední gesto",
+        result_gesture_press: "Stisk rozpoznán",
+        result_not_configured_button_detail:
+          "Gesto dorazilo do Home Assistantu.",
+      },
+    },
+  };
+  const activity = {
+    button: 1,
+    gesture: "press",
+    presses: 1,
+    dispatch_status: "not_configured",
+    result: null,
+  };
+
+  assert.equal(panel._liveResultLabel(activity), "Poslední gesto");
+  assert.equal(panel._liveResult(activity), "Stisk rozpoznán");
+  assert.equal(
+    panel._liveExplanation(activity),
+    "Gesto dorazilo do Home Assistantu.",
+  );
+  assert.deepEqual(panel._dispatchLabel(activity), [
+    "unknown",
+    "dispatch_not_configured_button",
+  ]);
+});
+
+test("recognized multi-press copy keeps the physical gesture specific", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        result_gesture_double_press: "Dvojitý stisk rozpoznán",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._recognizedResult({ gesture: "press", presses: 2 }),
+    "Dvojitý stisk rozpoznán",
+  );
+});
+
+test("live setup opens the matching dual-button editor", () => {
+  const panel = newPanel();
+  const wheel = {
+    variant: "dual_button",
+    buttons: [
+      { button: 1, configured: false, binding: null },
+      { button: 2, configured: false, binding: null },
+    ],
+  };
+
+  panel._configureFromLive(wheel, {
+    button: 2,
+    gesture: "press",
+    dispatch_status: "not_configured",
+  });
+
+  assert.equal(panel._view, "buttons");
+  assert.equal(panel._openButton, 2);
+  assert.equal(panel._editingChannel, 2);
+  assert.equal(panel._editingKind, "button");
+});
+
 test("dual button keeps the existing detail shell and adapted live test", () => {
   const panel = newPanel();
 
@@ -234,6 +304,28 @@ test("dual-button live activity names its safe button number", () => {
       presses: 2,
     }),
     "Tlačítko 2 · dvojitý stisk",
+  );
+});
+
+test("hold activity labels integration-observed duration honestly", () => {
+  const panel = newPanel();
+  panel._language = "cs";
+  panel._panel = {
+    config: {
+      labels: {
+        gesture_button_release: "Tlačítko {button} · uvolnění",
+        gesture_observed_duration: "zachyceno {duration} s",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._gestureLabel({
+      button: 1,
+      gesture: "release",
+      observed_duration_ms: 2250,
+    }),
+    "Tlačítko 1 · uvolnění · zachyceno 2,25 s",
   );
 });
 

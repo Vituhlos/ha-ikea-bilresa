@@ -233,6 +233,24 @@ def test_activity_listens_to_the_public_bus_event(monkeypatch) -> None:
     assert payload["notches"] == 6
 
 
+def test_activity_forwards_only_safe_observed_duration(monkeypatch) -> None:
+    hass, connection = _hass(), _connection()
+    _fire(
+        hass,
+        connection,
+        monkeypatch,
+        {
+            "node_id": NODE_A,
+            "channel": 1,
+            "type": "release",
+            "observed_duration_ms": 2250,
+        },
+    )
+
+    payload = connection.send_message.call_args.args[0]["event"]
+    assert payload["observed_duration_ms"] == 2250
+
+
 def test_activity_strips_every_identifier(monkeypatch) -> None:
     """The bus payload carries node_id, wheel_name and endpoint_id. None may pass."""
     hass, connection = _hass(), _connection()

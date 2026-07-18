@@ -106,3 +106,17 @@ def test_button_event_maps_hold_and_release() -> None:
     entity._trigger_event.reset_mock()
     entity._handle_action(_action(1, ACTION_RELEASE))
     entity._trigger_event.assert_called_once_with(ET_RELEASE)
+
+
+def test_button_release_exposes_observed_duration_when_available() -> None:
+    entity = _button(1)
+    entity._trigger_event = Mock()
+    entity.async_write_ha_state = Mock()
+    action = _action(1, ACTION_RELEASE)
+    action.observed_duration_ms = 2250
+
+    entity._handle_action(action)
+
+    entity._trigger_event.assert_called_once_with(
+        ET_RELEASE, {"observed_duration_ms": 2250}
+    )

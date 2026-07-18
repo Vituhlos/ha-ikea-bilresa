@@ -17,6 +17,7 @@ from custom_components.ikea_bilresa.const import (
     BINDING_PROFILE_MEDIA,
     BINDING_PROFILE_SCENES,
     BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_INSTANT,
     BUTTON_RESPONSE_MULTI_PRESS,
     CLICK_NONE,
     CONF_ACCELERATION,
@@ -379,6 +380,44 @@ def test_multi_press_response_accepts_configured_multi_press_target() -> None:
             {
                 CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_MULTI_PRESS,
                 CONF_DOUBLE_TARGET: "switch.test",
+                CONF_MODE: MODE_BRIGHTNESS,
+                CONF_TARGET: "light.test",
+            }
+        )
+        == {}
+    )
+
+
+def test_instant_response_rejects_multi_press_target() -> None:
+    assert BindingSubentryFlowHandler._validate_binding(
+        {
+            CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_INSTANT,
+            CONF_DOUBLE_TARGET: "switch.test",
+            CONF_HOLD_ACTION: HOLD_NONE,
+            CONF_MODE: MODE_BRIGHTNESS,
+            CONF_TARGET: "light.test",
+        }
+    ) == {CONF_BUTTON_RESPONSE: "instant_response_conflicts_with_multi_press"}
+
+
+def test_instant_response_rejects_separate_hold_action() -> None:
+    assert BindingSubentryFlowHandler._validate_binding(
+        {
+            CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_INSTANT,
+            CONF_HOLD_ACTION: HOLD_RAMP,
+            CONF_HOLD_TARGET: "light.test",
+            CONF_MODE: MODE_BRIGHTNESS,
+            CONF_TARGET: "light.test",
+        }
+    ) == {CONF_BUTTON_RESPONSE: "instant_response_conflicts_with_hold"}
+
+
+def test_instant_response_accepts_unambiguous_single_action() -> None:
+    assert (
+        BindingSubentryFlowHandler._validate_binding(
+            {
+                CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_INSTANT,
+                CONF_HOLD_ACTION: HOLD_NONE,
                 CONF_MODE: MODE_BRIGHTNESS,
                 CONF_TARGET: "light.test",
             }

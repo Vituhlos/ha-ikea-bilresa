@@ -15,6 +15,7 @@ from custom_components.ikea_bilresa.const import (
     ACTION_RELEASE,
     ACTION_ROTATE,
     BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_INSTANT,
     BUTTON_RESPONSE_MULTI_PRESS,
     CONF_ACCELERATION,
     CONF_BUTTON_RESPONSE,
@@ -279,6 +280,63 @@ def test_fast_single_press_runs_once_and_suppresses_completion(
 
     binding._handle_raw_button("short_release")
     assert binding._single_press.call_count == 2
+
+
+def test_instant_single_press_runs_on_initial_press_exactly_once(
+    monkeypatch,
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_INSTANT,
+            CONF_HOLD_ACTION: HOLD_NONE,
+        },
+    )
+    binding._single_press = Mock()
+
+    binding._handle_raw_button("initial_press")
+    binding._handle_raw_button("short_release")
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    binding._single_press.assert_called_once()
+
+
+def test_instant_press_guard_recovers_on_later_gesture(monkeypatch) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_INSTANT,
+            CONF_HOLD_ACTION: HOLD_NONE,
+        },
+    )
+    binding._single_press = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic",
+        _monotonic_values(1.0, 1.0, 4.0, 4.0),
+    )
+
+    binding._handle_raw_button("initial_press")
+    binding._handle_raw_button("initial_press")
+
+    assert binding._single_press.call_count == 2
+
+
+def test_ambiguous_stored_instant_policy_falls_back_to_completion(
+    monkeypatch,
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_INSTANT,
+            CONF_HOLD_ACTION: HOLD_RAMP,
+        },
+    )
+    binding._single_press = Mock()
+
+    binding._handle_raw_button("initial_press")
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    binding._single_press.assert_called_once()
 
 
 def test_explicit_multi_press_response_waits_for_completion(

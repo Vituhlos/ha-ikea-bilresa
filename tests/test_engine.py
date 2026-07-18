@@ -118,3 +118,68 @@ def test_button_hold_and_release(wheel: BilresaWheel) -> None:
     release = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_release"))
     assert hold.type == ACTION_HOLD
     assert release.type == ACTION_RELEASE
+
+
+def test_hold_duration_uses_one_uninterrupted_monotonic_press(
+    wheel: BilresaWheel,
+) -> None:
+    times = iter((10.0, 10.6, 12.25))
+    engine = GestureEngine(clock=lambda: next(times))
+
+    engine.process(wheel, _decoded(3, ROLE_BUTTON, "initial_press"))
+    hold = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_press"))
+    release = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_release"))
+
+    assert hold is not None
+    assert hold.observed_duration_ms == 600
+    assert release is not None
+    assert release.observed_duration_ms == 2250
+
+
+def test_current_position_release_invalidates_observed_duration(
+    wheel: BilresaWheel,
+) -> None:
+    engine = GestureEngine(clock=lambda: 10.0)
+    engine.process(wheel, _decoded(3, ROLE_BUTTON, "initial_press"))
+    engine.observe_position(NODE, 3, 0)
+
+    release = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_release"))
+
+    assert release is not None
+    assert release.observed_duration_ms is None
+
+
+def test_zero_press_completion_is_not_reinterpreted_as_single(
+    wheel: BilresaWheel,
+) -> None:
+    engine = GestureEngine()
+    assert (
+        engine.process(wheel, _decoded(3, ROLE_BUTTON, "multi_press_complete", 0))
+        is None
+    )
+
+
+def test_button_count_above_reported_multi_press_max_is_ignored(
+    wheel: BilresaWheel,
+) -> None:
+    wheel.endpoints[3].multi_press_max = 2
+    engine = GestureEngine()
+    assert (
+        engine.process(wheel, _decoded(3, ROLE_BUTTON, "multi_press_complete", 3))
+        is None
+    )
+
+
+def test_released_current_position_clears_scroll_baseline(
+    wheel: BilresaWheel,
+) -> None:
+    engine = GestureEngine()
+    engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "multi_press_ongoing", 8))
+    engine.observe_position(NODE, 1, 0)
+
+    action = engine.process(
+        wheel, _decoded(1, ROLE_SCROLL_UP, "multi_press_ongoing", 3)
+    )
+
+    assert action is not None
+    assert action.notches == 3

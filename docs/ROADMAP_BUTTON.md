@@ -6,10 +6,10 @@ separate from the scroll-wheel `ROADMAP.md` on purpose: the dual button is a
 different device class (buttons only, no rotary channels), and mixing the two
 would blur which gates apply to which hardware.
 
-Read this together with `PROJECT_STATUS.md`, `docs/DEVICE_REFERENCE.md` and
-`docs/HARDWARE_TEST.md`. The validation vocabulary (Implemented / Static / Unit /
-CI / Hardware / Released) and the rule that these states are never collapsed both
-apply here unchanged.
+Read this together with `PROJECT_STATUS.md`, `docs/DEVICE_REFERENCE.md`,
+`docs/HARDWARE_TEST.md` and `docs/ADVANCED_GESTURES.md`. The validation
+vocabulary (Implemented / Static / Unit / CI / Hardware / Released) and the rule
+that these states are never collapsed both apply here unchanged.
 
 This document is the implementation contract; the current phase-by-phase
 validation state is recorded in `PROJECT_STATUS.md`.

@@ -49,7 +49,7 @@ pairing/reset control is not a Matter switch and produces no Home Assistant even
   hard difference from the wheel's buttons (max 3) — the dual button has **no
   triple press**.
 
-## Observed gestures (Home Assistant filtered surface, 2026-07-17)
+## Observed gestures
 
 Captured live via HA history on firmware `1.9.15`, both buttons. This is the
 **filtered** core-Matter surface (the derived `multi_press_N` events), not the raw
@@ -71,6 +71,32 @@ Switch stream — the raw `initial_press` / `short_release` / `multi_press_ongoi
 - Rapid repeated taps outside the multi-press window complete as a stream of
   separate `multi_press_1` events rather than a higher count.
 
+### Raw Matter Server 9.1.0 stream (2026-07-18)
+
+Captured from Matter Server add-on `9.1.0`, matterjs-server `1.2.6`,
+matter.js `0.17.6-alpha.0-20260715-3585d95fe`, server schema `12`, minimum
+client schema `11`, firmware `1.9.15`. Both physical endpoints produced the
+same gesture grammar:
+
+| Physical gesture | Ordered Switch events |
+|---|---|
+| single | `InitialPress` → `ShortRelease` → `MultiPressComplete(1)` |
+| double | `InitialPress` → `ShortRelease` → `InitialPress` → `MultiPressOngoing(2)` → `ShortRelease` → `MultiPressComplete(2)` |
+| hold/release | `InitialPress` → `LongPress` → `LongRelease` |
+| three rapid physical taps | two reported press/release phases with `MultiPressOngoing(2)`, then `MultiPressComplete(0)` |
+
+The observed long-press threshold was about `716–722 ms` from `InitialPress`.
+One release followed about `0.68 s` later on button 1 and `1.63 s` later on
+button 2; both CurrentPosition sensors returned to zero.
+
+The three-tap capture confirms the Matter 1.6 overflow contract on the real
+E2489: exceeding `MultiPressMax = 2` can complete with count zero. The installed
+`v0.6.0-rc.2` incorrectly converted that zero to a single press and toggled the
+configured target. A subsequent normal single press completed as count one,
+showing that the device and integration were not left stuck. The working-tree
+G0 safeguard ignores zero and above-max completion counts, but requires an
+installed-candidate retest before it can be marked Hardware-verified.
+
 ## How the integration consumes it
 
 - `model.py` classifies the exact two channel-less switch endpoints as the
@@ -84,6 +110,9 @@ Switch stream — the raw `initial_press` / `short_release` / `multi_press_ongoi
   Runtime keys tag endpoint and channel addresses separately, so both buttons
   on every physical dual button can keep independent targets even when several
   devices expose the same endpoint numbers.
-- The gesture engine's button path is stateless (acts on
-  `MultiPressComplete` / `LongPress` / `LongRelease` only), so a press beyond the
-  device maximum simply yields no event and cannot get stuck.
+- The corrected gesture engine acts on valid `MultiPressComplete`,
+  `LongPress`, and `LongRelease` events. It ignores zero and above-max
+  completion counts and uses CurrentPosition only to clear stale safety state;
+  it never synthesizes a click from that attribute. This is implemented and
+  unit-tested in the working tree. The installed-candidate overflow retest is
+  still required.

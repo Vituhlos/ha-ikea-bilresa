@@ -20,6 +20,7 @@ from homeassistant.helpers.event import async_call_later
 
 from .binding import LightBinding
 from .const import (
+    ATTR_SWITCH_CURRENT_POSITION,
     CLUSTER_SWITCH,
     CONF_CHANNEL,
     CONF_ENDPOINT,
@@ -207,10 +208,14 @@ class BilresaCoordinator:
             self._set_connected(False)
         elif event_type == "__nodes__":
             self._handle_nodes(data)
-        elif event_type == "node_added":
+        elif event_type in ("node_added", "node_updated"):
             self._add_node(data)
         elif event_type == "node_removed":
             self._remove_node(data)
+        elif event_type == "attribute_updated":
+            self._handle_attribute_updated(data)
+        elif event_type == "server_shutdown":
+            self._set_connected(False)
         elif event_type == "node_event" and isinstance(data, dict):
             self._last_event_at = datetime.now(UTC)
             self._recent_events.append(
@@ -224,6 +229,41 @@ class BilresaCoordinator:
             self._handle_node_event(data)
         else:
             self._ignored_counts["unsupported_event"] += 1
+
+    @callback
+    def _handle_attribute_updated(self, data: Any) -> None:
+        """Consume Switch.CurrentPosition as a release/stuck-state safety hint."""
+        if not isinstance(data, (list, tuple)) or len(data) != 3:
+            self._ignored_counts["malformed_attribute_update"] += 1
+            return
+        node_id, path, value = data
+        if not isinstance(node_id, int) or not isinstance(path, str):
+            self._ignored_counts["malformed_attribute_update"] += 1
+            return
+        wheel = self.wheels.get(node_id)
+        if wheel is None:
+            self._ignored_counts["unknown_attribute_node"] += 1
+            return
+        parts = path.split("/")
+        if len(parts) != 3:
+            self._ignored_counts["malformed_attribute_path"] += 1
+            return
+        try:
+            endpoint_id, cluster_id, attribute_id = (int(part) for part in parts)
+        except ValueError:
+            self._ignored_counts["malformed_attribute_path"] += 1
+            return
+        if (
+            cluster_id != CLUSTER_SWITCH
+            or attribute_id != ATTR_SWITCH_CURRENT_POSITION
+            or endpoint_id not in wheel.endpoints
+        ):
+            self._ignored_counts["irrelevant_attribute_update"] += 1
+            return
+        if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
+            self._ignored_counts["invalid_switch_position"] += 1
+            return
+        self._engine.observe_position(node_id, endpoint_id, value)
 
     @callback
     def _handle_node_event(self, data: dict) -> None:

@@ -160,10 +160,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "ramp_direction_alternate": "Alternate up and down",
         "ramp_direction_up": "Always brighten",
         "ramp_direction_down": "Always dim",
+        "button_response_instant": "Run on initial press",
+        "button_response_fast": "Run after the first short release",
         "button_response_multi_press": "Wait for single/double/triple press",
-        "button_response_fast": "Run single press immediately",
+        "dual_button_response_instant": "Run on initial press",
+        "dual_button_response_fast": "Run after the first short release",
         "dual_button_response_multi_press": "Wait for single or double press",
-        "dual_button_response_fast": "Run single press immediately",
         "save_binding": "Save binding",
         "cancel_edit": "Cancel editing",
         "delete_binding": "Delete binding",
@@ -211,7 +213,13 @@ STRINGS: dict[str, dict[str, str]] = {
             "Maximum brightness must be greater than minimum brightness."
         ),
         "validation_fast_response_conflicts_with_multi_press": (
-            "Immediate single press cannot be combined with double or triple press."
+            "Fast release cannot be combined with double or triple press."
+        ),
+        "validation_instant_response_conflicts_with_multi_press": (
+            "Instant response cannot be combined with double or triple press."
+        ),
+        "validation_instant_response_conflicts_with_hold": (
+            "Instant response requires the hold action to be set to No action."
         ),
         "binding_gesture_rotation": "Rotate left / right",
         "binding_gesture_short_press": "Short press",
@@ -237,14 +245,15 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         # live test
         "live_intro": (
-            "The panel only listens. The largest figure answers whether the "
-            "action actually reached its target."
+            "Turn or press the wheel. You will see the recognized gesture first "
+            "and, for configured channels, the action sent to its target."
         ),
         "live_button_intro": (
-            "The panel listens to both physical buttons. The largest figure shows "
-            "whether the pressed button actually reached its target."
+            "Press either button. You will see the recognized gesture first and, "
+            "for configured buttons, the action sent to its target."
         ),
-        "live_result_label": "Last result",
+        "live_result_label": "Action result",
+        "live_event_label": "Latest gesture",
         "live_listening": "Listening",
         "live_stopped": "Listening stopped",
         "live_waiting_title": "Waiting for the wheel",
@@ -259,20 +268,30 @@ STRINGS: dict[str, dict[str, str]] = {
         "live_error": (
             "Live activity stopped. Leave and reopen Live test to try again."
         ),
-        "result_unavailable": "Calculated result not reported",
+        "result_unavailable": "Gesture recognized",
         "result_unavailable_detail": (
-            "The binding runtime does not expose its calculated result in this version."
+            "No detailed result is available for this event."
         ),
+        "result_pending_detail": "Waiting for the configured action to finish.",
+        "result_not_configured_channel_detail": ("The gesture reached Home Assistant."),
+        "result_not_configured_button_detail": ("The gesture reached Home Assistant."),
+        "result_gesture_rotate": "Rotation recognized",
+        "result_gesture_press": "Press recognized",
+        "result_gesture_double_press": "Double press recognized",
+        "result_gesture_triple_press": "Triple press recognized",
+        "result_gesture_hold": "Hold recognized",
+        "result_gesture_release": "Release recognized",
+        "result_gesture_received": "Gesture recognized",
         "dispatch_success": "Action dispatched",
         "dispatch_accepted": "Home Assistant accepted the action",
         "dispatch_pending": "Sending action to Home Assistant",
         "dispatch_skipped": "Binding skipped the action",
-        "dispatch_not_configured": "No binding is configured for this channel",
-        "dispatch_not_configured_button": ("No binding is configured for this button"),
-        "dispatch_completed": "Local binding action completed",
-        "dispatch_received": "Gesture received; calculating result",
+        "dispatch_not_configured": "This channel does not control anything yet",
+        "dispatch_not_configured_button": ("This button does not control anything yet"),
+        "dispatch_completed": "Binding action completed",
+        "dispatch_received": "Gesture received; waiting for the result",
         "dispatch_failed": "Action not dispatched",
-        "dispatch_unknown": "Dispatch outcome not reported",
+        "dispatch_unknown": "Action status is not available",
         "result_kind_brightness": "Brightness",
         "result_kind_color_temperature": "Colour temperature",
         "result_kind_color": "Colour",
@@ -284,7 +303,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "result_scene": "Scene {position}/{total} · {target}",
         "result_entity_action": "{action} · {target}",
         "result_ramp_stopped": "Hold ramp stopped",
-        "result_fast_press_complete": "Immediate single press already dispatched",
+        "result_fast_press_complete": "Single press dispatched immediately",
         "service_toggle": "Toggle",
         "service_turn_on": "Turn on",
         "service_turn_off": "Turn off",
@@ -318,14 +337,17 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_hold": "Channel {channel} · hold",
         "gesture_release": "Channel {channel} · release",
         "gesture_unknown": "Channel {channel} · activity received",
-        "live_channels_heading": "Configured channels",
+        "live_channels_heading": "Channels",
         "gesture_button_press_single": "Button {button} · single press",
         "gesture_button_press_double": "Button {button} · double press",
         "gesture_button_hold": "Button {button} · hold",
         "gesture_button_release": "Button {button} · release",
         "gesture_button_unknown": "Button {button} · activity received",
-        "live_buttons_heading": "Configured buttons",
+        "gesture_observed_duration": "{duration} s observed",
+        "live_buttons_heading": "Buttons",
         "live_recent": "Latest events",
+        "live_setup_channel": "Configure channel {channel}",
+        "live_setup_button": "Configure button {button}",
         # diagnostics
         "diagnostics_heading": "Device status",
         "diagnostics_intro": (
@@ -485,10 +507,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "ramp_direction_alternate": "Střídat zesílení a zeslabení",
         "ramp_direction_up": "Vždy zesílit",
         "ramp_direction_down": "Vždy zeslabit",
+        "button_response_instant": "Spustit už při prvním stisku",
+        "button_response_fast": "Spustit po prvním krátkém uvolnění",
         "button_response_multi_press": "Počkat na jednoduchý/dvojitý/trojitý stisk",
-        "button_response_fast": "Spustit jednoduchý stisk okamžitě",
+        "dual_button_response_instant": "Spustit už při prvním stisku",
+        "dual_button_response_fast": "Spustit po prvním krátkém uvolnění",
         "dual_button_response_multi_press": "Počkat na jednoduchý nebo dvojitý stisk",
-        "dual_button_response_fast": "Spustit jednoduchý stisk okamžitě",
         "save_binding": "Uložit propojení",
         "cancel_edit": "Zrušit úpravy",
         "delete_binding": "Smazat propojení",
@@ -535,7 +559,13 @@ STRINGS: dict[str, dict[str, str]] = {
             "Maximální jas musí být vyšší než minimální jas."
         ),
         "validation_fast_response_conflicts_with_multi_press": (
-            "Okamžitý jednoduchý stisk nelze kombinovat s dvojitým nebo trojitým."
+            "Rychlé uvolnění nelze kombinovat s dvojitým nebo trojitým stiskem."
+        ),
+        "validation_instant_response_conflicts_with_multi_press": (
+            "Okamžitou odezvu nelze kombinovat s dvojitým nebo trojitým stiskem."
+        ),
+        "validation_instant_response_conflicts_with_hold": (
+            "Okamžitá odezva vyžaduje nastavit podržení na Bez akce."
         ),
         "binding_gesture_rotation": "Otočení doleva / doprava",
         "binding_gesture_short_press": "Krátký stisk",
@@ -560,14 +590,15 @@ STRINGS: dict[str, dict[str, str]] = {
             "přehled."
         ),
         "live_intro": (
-            "Panel pouze naslouchá. Největší údaj odpovídá na otázku, zda akce "
-            "skutečně dorazila k cíli."
+            "Otočte kolečkem nebo ho stiskněte. Hned uvidíte rozpoznané gesto "
+            "a u nastaveného kanálu také akci odeslanou do cíle."
         ),
         "live_button_intro": (
-            "Panel naslouchá oběma fyzickým tlačítkům. Největší údaj ukazuje, zda "
-            "stisknuté tlačítko skutečně ovládlo svůj cíl."
+            "Stiskněte jedno z tlačítek. Hned uvidíte rozpoznané gesto a u "
+            "nastaveného tlačítka také akci odeslanou do cíle."
         ),
-        "live_result_label": "Poslední výsledek",
+        "live_result_label": "Výsledek akce",
+        "live_event_label": "Poslední gesto",
         "live_listening": "Naslouchám",
         "live_stopped": "Naslouchání zastaveno",
         "live_waiting_title": "Čekám na kolečko",
@@ -583,20 +614,30 @@ STRINGS: dict[str, dict[str, str]] = {
         "live_error": (
             "Živá aktivita se zastavila. Odejděte z Živého testu a znovu ho otevřete."
         ),
-        "result_unavailable": "Vypočtený výsledek se nehlásí",
+        "result_unavailable": "Gesto rozpoznáno",
         "result_unavailable_detail": (
-            "Běh propojení v této verzi nezveřejňuje vypočtený výsledek."
+            "Pro tuto událost nejsou dostupné podrobnosti výsledku."
         ),
+        "result_pending_detail": "Čekám na dokončení nastavené akce.",
+        "result_not_configured_channel_detail": ("Gesto dorazilo do Home Assistantu."),
+        "result_not_configured_button_detail": ("Gesto dorazilo do Home Assistantu."),
+        "result_gesture_rotate": "Otočení rozpoznáno",
+        "result_gesture_press": "Stisk rozpoznán",
+        "result_gesture_double_press": "Dvojitý stisk rozpoznán",
+        "result_gesture_triple_press": "Trojitý stisk rozpoznán",
+        "result_gesture_hold": "Podržení rozpoznáno",
+        "result_gesture_release": "Uvolnění rozpoznáno",
+        "result_gesture_received": "Gesto rozpoznáno",
         "dispatch_success": "Akce byla odeslána",
         "dispatch_accepted": "Home Assistant akci přijal",
         "dispatch_pending": "Odesílám akci do Home Assistantu",
         "dispatch_skipped": "Propojení akci přeskočilo",
-        "dispatch_not_configured": "Tento kanál nemá nastavené propojení",
-        "dispatch_not_configured_button": ("Toto tlačítko nemá nastavené propojení"),
-        "dispatch_completed": "Místní akce propojení byla dokončena",
-        "dispatch_received": "Gesto přijato; počítám výsledek",
+        "dispatch_not_configured": "Tento kanál zatím nic neovládá",
+        "dispatch_not_configured_button": ("Toto tlačítko zatím nic neovládá"),
+        "dispatch_completed": "Akce propojení byla dokončena",
+        "dispatch_received": "Gesto přijato; čekám na výsledek",
         "dispatch_failed": "Akce nebyla odeslána",
-        "dispatch_unknown": "Výsledek odeslání se nehlásí",
+        "dispatch_unknown": "Stav akce není dostupný",
         "result_kind_brightness": "Jas",
         "result_kind_color_temperature": "Teplota barvy",
         "result_kind_color": "Barva",
@@ -608,7 +649,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "result_scene": "Scéna {position}/{total} · {target}",
         "result_entity_action": "{action} · {target}",
         "result_ramp_stopped": "Plynulá změna byla zastavena",
-        "result_fast_press_complete": ("Okamžitý jednoduchý stisk už byl odeslán"),
+        "result_fast_press_complete": ("Jednoduchý stisk byl odeslán okamžitě"),
         "service_toggle": "Přepnout",
         "service_turn_on": "Zapnout",
         "service_turn_off": "Vypnout",
@@ -642,14 +683,17 @@ STRINGS: dict[str, dict[str, str]] = {
         "gesture_hold": "Kanál {channel} · podržení",
         "gesture_release": "Kanál {channel} · uvolnění",
         "gesture_unknown": "Kanál {channel} · přijata aktivita",
-        "live_channels_heading": "Nastavené kanály",
+        "live_channels_heading": "Kanály",
         "gesture_button_press_single": "Tlačítko {button} · jednoduchý stisk",
         "gesture_button_press_double": "Tlačítko {button} · dvojitý stisk",
         "gesture_button_hold": "Tlačítko {button} · podržení",
         "gesture_button_release": "Tlačítko {button} · uvolnění",
         "gesture_button_unknown": "Tlačítko {button} · přijata aktivita",
-        "live_buttons_heading": "Nastavená tlačítka",
+        "gesture_observed_duration": "zachyceno {duration} s",
+        "live_buttons_heading": "Tlačítka",
         "live_recent": "Poslední události",
+        "live_setup_channel": "Nastavit kanál {channel}",
+        "live_setup_button": "Nastavit tlačítko {button}",
         "diagnostics_heading": "Stav zařízení",
         "diagnostics_intro": (
             "Stav z Home Assistantu pouze pro čtení. Soukromé identifikátory Matter "

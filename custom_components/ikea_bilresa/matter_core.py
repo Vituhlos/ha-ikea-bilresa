@@ -24,6 +24,8 @@ EventCallback = Callable[[str, Any], None]
 UnavailableCallback = Callable[[str], None]
 _CLIENT_CHECK_INTERVAL = timedelta(seconds=5)
 _UNAVAILABLE_CHECKS_BEFORE_FALLBACK = 2
+_SWITCH_CLUSTER_ID = 0x003B
+_SWITCH_CURRENT_POSITION_ATTRIBUTE_ID = 0
 
 
 class CoreMatterUnavailable(RuntimeError):
@@ -65,6 +67,7 @@ class CoreMatterEventSource:
         self._monitor_unsubscribe: Callable[[], None] | None = None
         self._connected = False
         self._unavailable_checks = 0
+        self._switch_positions: dict[tuple[int, str], Any] = {}
 
     @property
     def server_info(self) -> dict[str, Any] | None:
@@ -97,6 +100,7 @@ class CoreMatterEventSource:
             self._monitor_unsubscribe = None
         self._unsubscribe_safely()
         self._matter_client = None
+        self._switch_positions.clear()
         self._set_connected(False)
 
     def _get_loaded_client(self) -> Any:
@@ -121,6 +125,7 @@ class CoreMatterEventSource:
         self._matter_client = matter_client
         self._unsubscribe = matter_client.subscribe_events(callback=self._handle_event)
         nodes = [self._node_to_mapping(node) for node in matter_client.get_nodes()]
+        self._switch_positions = self._switch_position_snapshot(nodes)
         self._set_connected(True)
         self._unavailable_checks = 0
         self._on_event("__nodes__", nodes)
@@ -165,8 +170,58 @@ class CoreMatterEventSource:
             self._on_event("node_removed", data)
         elif event_name == "node_event":
             self._on_event("node_event", _as_mapping(data))
+        elif event_name == "attribute_updated":
+            # The Python client's catch-all callback intentionally supplies
+            # only the new value. Its node cache is updated before callbacks,
+            # so compare the cached Switch.CurrentPosition paths and restore
+            # the full wire tuple expected by the local listener interface.
+            self._forward_switch_position_updates()
         elif event_name == "server_shutdown":
             self._set_connected(False)
+
+    @staticmethod
+    def _switch_position_snapshot(
+        nodes: list[dict[str, Any]],
+    ) -> dict[tuple[int, str], Any]:
+        """Return Switch.CurrentPosition values from cached Matter nodes."""
+        positions: dict[tuple[int, str], Any] = {}
+        for node in nodes:
+            node_id = node.get("node_id")
+            attributes = node.get("attributes")
+            if not isinstance(node_id, int) or not isinstance(attributes, dict):
+                continue
+            for path, value in attributes.items():
+                if not isinstance(path, str):
+                    continue
+                parts = path.split("/")
+                if len(parts) != 3:
+                    continue
+                try:
+                    _endpoint, cluster, attribute = (int(part) for part in parts)
+                except ValueError:
+                    continue
+                if (
+                    cluster == _SWITCH_CLUSTER_ID
+                    and attribute == _SWITCH_CURRENT_POSITION_ATTRIBUTE_ID
+                ):
+                    positions[(node_id, path)] = value
+        return positions
+
+    @callback
+    def _forward_switch_position_updates(self) -> None:
+        """Forward changed CurrentPosition values with node and path context."""
+        if self._matter_client is None:
+            return
+        nodes = [
+            self._node_to_mapping(node) for node in self._matter_client.get_nodes()
+        ]
+        current = self._switch_position_snapshot(nodes)
+        for key, value in current.items():
+            if self._switch_positions.get(key) == value:
+                continue
+            node_id, path = key
+            self._on_event("attribute_updated", [node_id, path, value])
+        self._switch_positions = current
 
     @staticmethod
     def _node_to_mapping(node: Any) -> dict[str, Any]:

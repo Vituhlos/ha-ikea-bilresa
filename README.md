@@ -11,12 +11,14 @@ wheel and dual button** (Matter over Thread). The wheel reacts to real-time
 `MultiPressOngoing` events for DIRIGERA-like smoothness; the dual button gains
 independent events, bindings, device triggers and the same BILRESA panel.
 
-> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.2** adds the
+> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.3** adds the
 > BILRESA dual button through roadmap phases B0-B3. Its two buttons have
 > independent events, triggers and bindings; the existing panel adapts its
 > `1 / 2 / 3` wheel workbench to buttons `1 / 2` and retains an adapted Live
-> test. RC.2 corrects discovery for the real device's channel-less endpoints
-> carrying semantic up/down tags. Physical verification remains B4.
+> test. RC.3 keeps the corrected real-device discovery, supports Matter Server
+> 9.1.0/schema 12 through its schema-11 compatibility profile, and fixes the
+> real E2489 overflow where `MultiPressComplete(0)` was incorrectly treated as
+> a single press. Physical verification remains B4.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
@@ -154,20 +156,22 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
 - the **single-press action** (toggle / on / off / nothing) and an optional
   **button target entity** — so a press can act on a *different* entity than the
   dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch),
-- the **button response**: fast single press for immediate direct control, or
-  exact single/double/triple recognition for multi-press bindings,
+- the **button response**: instant initial press, fast short release, or exact
+  single/double/triple recognition for multi-press bindings,
 - an optional ordered list of **scenes** to cycle on single presses (this takes
   precedence over the normal single-press action),
 - the **hold action**: toggle an entity, continuously ramp the scroll target,
   or do nothing. Hold-to-ramp starts upward and alternates direction after each
   completed hold because the BILRESA long-press event carries no direction.
 
-For responsive lighting, select **Fast single press** to run that binding's
-single-press action as soon as the button is released. Select multi-press
-recognition when the binding uses double/triple targets; it waits for the
-BILRESA completion event. Existing bindings without this setting retain the
-completion-aware behavior until explicitly changed. Public event entities and
-device triggers keep exact single/double/triple classification in either mode.
+For the lowest direct-control latency, select **Instant initial press**. Because
+the initial event cannot yet know whether the gesture will become a double
+press or hold, Instant is accepted only when those separate actions are
+disabled. **Fast release** runs after the first short release and remains safe
+for a normal hold; multi-press aware waits for the BILRESA completion event.
+Existing bindings without this setting retain the completion-aware behavior
+until explicitly changed. Public event entities and device triggers keep exact
+single/double/triple classification in every mode.
 
 The integration then dims that light in real time. Add as many bindings as you
 like — one per wheel channel — so this scales to any number of wheels with no

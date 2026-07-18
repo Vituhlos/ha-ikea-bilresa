@@ -15,12 +15,14 @@ Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, ta
 je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
 propojení, device triggery a stejný panel BILRESA.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.2**
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.3**
 > přidává dvoutlačítko BILRESA v rozsahu B0–B3. Obě tlačítka mají nezávislé
 > eventy, triggery a propojení; existující panel mění pracovní plochu kolečka
-> `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. RC.2
-> opravuje rozpoznání reálných endpointů bez kanálu se sémantickými značkami
-> nahoru/dolů. Fyzické ověření zůstává B4.
+> `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. RC.3
+> zachovává opravené rozpoznání reálného zařízení, podporuje Matter Server
+> 9.1.0/schema 12 přes kompatibilní profil schématu 11 a opravuje reálný overflow
+> E2489, při kterém se `MultiPressComplete(0)` chybně vyhodnotil jako jednoduchý
+> stisk. Fyzické ověření zůstává B4.
 >
 > Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
 > [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
@@ -152,7 +154,7 @@ Nechceš psát automatizace? U položky **IKEA BILRESA**
 - **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
   **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
   (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači),
-- **odezvu tlačítka**: rychlý jednoduchý stisk pro okamžité přímé ovládání,
+- **odezvu tlačítka**: okamžitě při prvním stisku, rychle po krátkém uvolnění,
   nebo přesné rozpoznání jednoho, dvou či tří stisků,
 - volitelný seřazený seznam **scén**, které jednoduché stisky postupně aktivují
   (má přednost před běžnou akcí jednoduchého stisku),
@@ -160,12 +162,14 @@ Nechceš psát automatizace? U položky **IKEA BILRESA**
   Rampování začne nahoru a po každém dokončeném podržení obrátí směr, protože
   událost dlouhého stisku BILRESY sama žádný směr nenese.
 
-Pro rychlou odezvu zvol **Rychlý jednoduchý stisk**; akce tohoto propojení se
-provede hned po uvolnění tlačítka. Pokud propojení používá cíle pro dvojstisk či
-trojstisk, zvol rozpoznání více stisků, které počká na dokončovací událost
-BILRESY. Existující propojení bez uložené volby zachovají dosavadní čekání,
-dokud režim výslovně nezměníš. Veřejné event entity a device triggery přesně
-rozlišují jeden, dva a tři stisky v obou režimech.
+Pro nejnižší latenci přímého ovládání zvol **Okamžitě při stisku**. Protože při
+prvním eventu ještě nelze poznat, zda vznikne dvojstisk nebo podržení, lze tento
+režim uložit jen tehdy, když jsou tyto samostatné akce vypnuté. **Rychle po
+uvolnění** reaguje po prvním krátkém uvolnění a zůstává bezpečné pro běžné
+podržení; rozpoznání více stisků čeká na dokončovací událost BILRESY. Existující
+propojení bez uložené volby zachovají dosavadní čekání, dokud režim výslovně
+nezměníš. Veřejné event entity a device triggery přesně rozlišují jeden, dva a
+tři stisky ve všech režimech.
 
 Integrace pak to světlo stmívá v reálném čase. Přidej si klidně víc propojení —
 jedno na kanál kolečka — takže to škáluje na libovolný počet koleček bez YAML.

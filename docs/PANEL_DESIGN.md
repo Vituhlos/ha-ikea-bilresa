@@ -431,6 +431,18 @@ configured-channel/recent-activity column on the right. Panel-driven synthetic
 tests are secondary, collapsed by default, and explicitly warn that they may
 change real target entities.
 
+An unconfigured control is not a failed hardware test. When a physical gesture
+arrives without a binding, the hero must lead with the recognized gesture
+(`Press recognized`, `Rotation recognized`, and so on), then explain that the
+control does not operate a target yet and offer to configure that exact channel
+or button. Internal fallbacks such as `calculated result not reported` must not
+be shown for this ordinary first-run state.
+
+The recent-event list is bounded both in memory and on screen. Its list has a
+maximum visual height and its own vertical scroll region, labelled and
+keyboard-focusable so Page Up/Down and arrow scrolling work without a pointer.
+New activity must not keep extending the whole device-detail page.
+
 ### Diagnostics
 
 The default diagnostic view should remain understandable:

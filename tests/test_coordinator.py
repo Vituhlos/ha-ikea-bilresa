@@ -129,6 +129,61 @@ def test_existing_wheel_metadata_is_refreshed(monkeypatch) -> None:
     assert coordinator._register_wheel({}) is False
 
 
+def test_schema_12_node_updated_refreshes_metadata(monkeypatch) -> None:
+    hass = SimpleNamespace()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    coordinator._add_node = Mock()
+
+    payload = {"node_id": 12, "attributes": {}}
+    coordinator._on_event("node_updated", payload)
+
+    coordinator._add_node.assert_called_once_with(payload)
+
+
+def test_current_position_is_forwarded_only_as_engine_safety_hint(
+    monkeypatch,
+) -> None:
+    hass = SimpleNamespace()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    coordinator.wheels[12] = BilresaWheel(
+        node_id=12,
+        name="Test button",
+        product_name="BILRESA dual button",
+        serial=None,
+        endpoints={1: SimpleNamespace()},
+    )
+    coordinator._engine.observe_position = Mock()
+    coordinator._dispatch = Mock()
+
+    coordinator._on_event("attribute_updated", [12, "1/59/0", 0])
+
+    coordinator._engine.observe_position.assert_called_once_with(12, 1, 0)
+    coordinator._dispatch.assert_not_called()
+
+
+def test_server_shutdown_marks_connection_disconnected(monkeypatch) -> None:
+    hass = SimpleNamespace()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    coordinator.connected = True
+    coordinator._set_connected = Mock()
+
+    coordinator._on_event("server_shutdown", None)
+
+    coordinator._set_connected.assert_called_once_with(False)
+
+
 def test_raw_gesture_hint_is_dispatched_only_internally(monkeypatch) -> None:
     hass = SimpleNamespace()
     monkeypatch.setattr(

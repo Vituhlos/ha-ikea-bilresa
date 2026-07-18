@@ -38,7 +38,7 @@ class FakeEventType:
 class FakeMatterClient:
     def __init__(self, node_id: int = 12) -> None:
         self.server_info = SimpleNamespace(sdk_version="test-sdk")
-        self._nodes = [SimpleNamespace(node_data=FakeNodeData(node_id, {}))]
+        self._nodes = [SimpleNamespace(node_data=FakeNodeData(node_id, {"1/59/0": 0}))]
         self.callback = None
         self.unsubscribe = Mock()
 
@@ -48,6 +48,9 @@ class FakeMatterClient:
 
     def get_nodes(self):
         return self._nodes
+
+    def set_position(self, endpoint_id: int, value: int) -> None:
+        self._nodes[0].node_data.attributes[f"{endpoint_id}/59/0"] = value
 
 
 class FakeConfigEntries:
@@ -106,6 +109,28 @@ async def test_reuses_nodes_and_node_events(monkeypatch) -> None:
     client.unsubscribe.assert_called_once()
     monitor_unsubscribe.assert_called_once()
     assert events[-1] == ("__disconnected__", None)
+
+
+@pytest.mark.asyncio
+async def test_restores_attribute_path_context_from_core_node_cache(
+    monkeypatch,
+) -> None:
+    client = FakeMatterClient()
+    hass = SimpleNamespace(config_entries=FakeConfigEntries(client))
+    events: list[tuple[str, Any]] = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.matter_core.async_track_time_interval",
+        lambda *_args: Mock(),
+    )
+    source = CoreMatterEventSource(
+        hass, "ws://matter/ws", lambda event, data: events.append((event, data))
+    )
+    await source.start()
+
+    client.set_position(1, 1)
+    client.callback(FakeEventType("attribute_updated"), 1)
+
+    assert events[-1] == ("attribute_updated", [12, "1/59/0", 1])
 
 
 @pytest.mark.asyncio
