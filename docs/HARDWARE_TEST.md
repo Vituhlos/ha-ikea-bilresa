@@ -131,13 +131,13 @@ Repeat on all three channels:
 - [ ] Scene cycling follows the configured order and wraps to the first scene.
 - [ ] Scene cycling overrides the normal single-press action only when scenes
       are configured.
-- [ ] Hold-to-ramp begins on `hold` and stops immediately on `release`.
-- [ ] A deliberately missing `release` is stopped by the 30-second watchdog.
+- [x] Hold-to-ramp begins on `hold` and stops immediately on `release`.
+- [x] A deliberately missing `release` is stopped by the 30-second watchdog.
 - [ ] Disconnecting Matter or starting another gesture stops an active ramp.
 - [ ] The first ramp goes upward; the next completed hold goes downward.
 - [ ] Reconfiguring/unloading during a hold cancels the timer cleanly.
-- [ ] Hold action `toggle` preserves the legacy behavior.
-- [ ] Hold action `none` performs no service call.
+- [x] Hold action `toggle` preserves the legacy behavior.
+- [x] Hold action `none` performs no service call.
 - [ ] Each binding profile preselects the expected mode without saving the
       flow-only profile field into the subentry.
 - [ ] Copying a binding prepopulates its options, can be edited independently,
@@ -188,11 +188,11 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
 ### F3. Button binding behaviour
 
 - [x] Single/double/hold targets affect only their configured entities.
-- [ ] Hold action `toggle`/`none` behave as configured; a missing `release` is
+- [x] Hold action `toggle`/`none` behave as configured; a missing `release` is
       stopped by the watchdog.
 - [ ] Paired hold-to-ramp (button 1 up / button 2 down on a shared target), if
       configured, begins on `hold` and stops on `release`.
-- [ ] Unavailable/unknown targets cause no errors or runaway commands.
+- [x] Unavailable/unknown targets cause no errors or runaway commands.
 
 ### F4. Reliability and no-leak
 
@@ -206,11 +206,14 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       across Matter nodes. **PASS bounded adjacent-use check on RC.3: endpoint
       2 single followed by eight channel-3 rotate batches; only those two
       surfaces and their expected binding actions advanced.**
-- [ ] Logs contain no recurring exceptions, task warnings, or reconnect spam.
+- [x] Logs contain no recurring integration exceptions, task warnings, or
+      reconnect spam during the recorded B4 run.
 
 ## Recorded runs
 
-No complete hardware run has been recorded yet.
+A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
+below. Unchecked items belong to the broader all-features matrix and are not
+claims made by B4.
 
 ### 2026-07-18 — E2489 B4 partial run on `v0.6.0-rc.2`
 
@@ -378,8 +381,55 @@ coverage for reattachment without fallback.
 
 Verdict: **PASS RC.4 controlled Matter Server restart recovery and PASS first
 post-restart physical single without loss, duplication or cross-button leak.**
-The unavailable-target and lost-release/watchdog failure-injection gates remain
-open, so overall B4 remains **IN PROGRESS**.
+The targeted failure-injection follow-up below closes the two remaining B4
+gates.
+
+### 2026-07-18 — `v0.6.0-rc.4` targeted B4 failure injection
+
+- Home Assistant Core `2026.7.2`, Home Assistant OS `18.1`, Matter Server app
+  `9.1.0`, server schema 12 / client compatibility schema 11 and installed
+  integration `v0.6.0-rc.4` were unchanged.
+- The owner explicitly selected a safe dimmable target. Button 2 was
+  temporarily changed from hold-none to hold-ramp-up while its single and
+  double targets stayed unchanged. Its exact original payload and revision
+  were captured before the change.
+- The first bounded hold produced `long_press` at `13:30:55.975` and
+  `long_release` 21.825 seconds later. It correctly stopped on release but did
+  not qualify as a watchdog test. Two later physical singles affected only
+  Button 2's configured single target and left the other observed targets
+  unchanged.
+- The deliberate lost-release run produced `long_press` at `13:32:44.658`.
+  The integration logged
+  `Stopping hold-to-ramp after 30 seconds without a release event` at
+  `13:33:14.664`, 30.006 seconds later. The physical `long_release` arrived
+  afterward at `13:34:03.490`; it did not restart the ramp or dispatch a stale
+  command.
+- The source stayed `core_matter_client`, connection count stayed one and
+  fallback count stayed zero. The safe dimmable target remained at the prepared
+  100% ceiling; the other observed targets did not change during the qualifying
+  watchdog run.
+- Button 2 was then restored through the revision-checked panel API. The
+  original revision `73c03e349fe721d3` returned exactly, its hold action was
+  again `none`, and the safe target returned to its original `off` state.
+- With the existing channel-2 wheel target naturally `unavailable` while its
+  power relay was off, two physical detent batches were decoded. The binding
+  emitted one transition-deduplicated
+  `Skipping BILRESA action while target ... is unavailable` warning, made no
+  target change and produced no recurring command, integration error or
+  fallback.
+- Power was restored and the target recovered from `unavailable` to `on`.
+  A clean clockwise detent decoded through the channel's up endpoint and moved
+  brightness from 128 to 135 (the configured 3% step). This confirms normal
+  operation and physical clockwise-to-brighten direction after recovery. The
+  target was finally restored to its original 100% brightness.
+
+Verdict: **B4 HARDWARE PASS on `v0.6.0-rc.4`.** The complete recorded run now
+covers real E2489 discovery and grammar, both endpoints, normal and overflow
+multi-press behavior, independent binding outcomes, hold toggle/none,
+lost-release watchdog, idle resume, cross-endpoint/node isolation, config-entry
+reload, Matter Server restart recovery, unavailable-target suppression and
+normal-path recovery. The optional paired two-button hold-ramp profile was not
+configured and is not claimed.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

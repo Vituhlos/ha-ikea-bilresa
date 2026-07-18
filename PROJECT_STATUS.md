@@ -2558,8 +2558,42 @@ The release/deployment follow-up completed on 2026-07-18:
 
 RC.4 therefore has Static, Unit, exact-revision CI, Released, deployed and
 Hardware evidence for the Matter Server restart recovery and first post-restart
-single. Targeted unavailable-target and lost-release/watchdog failure injection
-remain open.
+single.
+
+The owner then authorized the two remaining targeted B4 failure-injection
+checks with a reversible safe dimmable target. Button 2 was temporarily changed
+from hold-none to hold-ramp-up while its existing single/double targets were
+preserved. A qualifying real hold produced `long_press` at `13:32:44.658`; the
+30-second watchdog fired at `13:33:14.664`, and the later
+`long_release` at `13:34:03.490` neither restarted the ramp nor emitted a stale
+command. There was no cross-target change, reconnect or fallback. The exact
+original Button 2 payload was restored, including its original
+`73c03e349fe721d3` revision, and the safe target returned to its original off
+state.
+
+The already configured wheel channel-2 target was then naturally unavailable
+while its power relay was off. Two physical detent batches were decoded and
+skipped with one transition-deduplicated availability warning, no target
+change, no recurring command, no integration error and no fallback. After
+power recovery, a clean physical clockwise detent decoded as up and moved the
+target from brightness 128 to 135, proving normal-path recovery and the
+expected clockwise-to-brighten mapping. The target was restored to its original
+100% brightness.
+
+RC.4 therefore has **B4 Hardware PASS**. The run covers the real E2489 grammar,
+both endpoints, independent binding outcomes, overflow safeguard, idle resume,
+cross-endpoint/node isolation, config-entry reload, Matter Server restart,
+lost-release watchdog, unavailable-target suppression and recovery. The
+optional paired two-button hold-ramp profile was not configured and is not
+claimed.
+
+This follow-up changes documentation only. `git diff --check` passed and the 20
+Node frontend tests passed. A fresh `python -m pytest -q` attempt did not reach
+test execution because the current system Python lacks the `homeassistant`
+package; all 18 collection modules reported that same missing dependency. This
+is a local-environment limitation, not a Python-test pass. The installed code
+remains the exact `v0.6.0-rc.4` release whose Python suite and six CI jobs
+already passed; no runtime source or test file changed in this follow-up.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2589,11 +2623,10 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-Plan the remaining B4 failure injection without mutating stored bindings:
-exercise an unavailable target and a lost-release/watchdog path only with a
-reversible, explicitly identified safe target. Verify no stale action, queued
-gesture, cross-button leak or fallback, then restore and recheck the normal
-path.
+Review the remaining unchecked all-features hardware matrix independently from
+the now-complete B4 package, then decide whether `v0.6.0-rc.4` needs a final
+soak-only RC follow-up or is ready for the explicitly authorized stable-release
+gate.
 
 ## Next-agent handoff
 
@@ -2615,8 +2648,10 @@ path.
    fallback. RC.4 release commit `90076cf` fixes that lifecycle path and is
    locally validated, exact-revision CI-green, Released, deployed and Hardware
    PASS for the controlled restart plus first physical post-restart single.
-5. Do not mutate real bindings or run target-changing panel tests unless the
-   owner identifies a safe binding/target for that check.
+5. The owner selected a safe dimmable target for the bounded watchdog check.
+   The temporary binding and target state were restored exactly; do not repeat
+   target-changing tests without fresh authorization.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
-   Do not promote RC.3 to stable. RC.4 is the current prerelease and has Hardware
-   evidence for restart recovery; remaining B4 failure injection is still open.
+   Do not promote RC.3 to stable. RC.4 is the current prerelease and now has
+   complete B4 Hardware evidence, including restart recovery, watchdog,
+   unavailable-target suppression and normal-path recovery.
