@@ -29,6 +29,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_NODE_ID,
     CONF_RAMP_DIRECTION,
     CONF_TARGET,
+    CONF_TRANSITION,
     DIRECTION_DOWN,
     DIRECTION_UP,
     HOLD_NONE,
@@ -914,6 +915,97 @@ def test_own_transition_echo_does_not_rebase_tracking(monkeypatch) -> None:
     binding._handle_target_state_change(event)
 
     assert binding._tracked == 220
+
+
+def test_delayed_zero_transition_echo_does_not_drop_active_gesture_steps(
+    monkeypatch,
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+    binding._handle_raw_input("scroll_down", "initial_press", 2)
+
+    binding._rotate_brightness(1, False)
+    now[0] = 0.2
+    binding._rotate_brightness(2, False)
+
+    # Shelly may acknowledge an older absolute target after the fixed
+    # zero-transition echo margin while the Matter gesture is still active.
+    now[0] = 0.6
+    stale_echo = SimpleNamespace(state="on", attributes={"brightness": 247})
+    binding.hass.states.get.return_value = stale_echo
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": stale_echo}))
+
+    now[0] = 0.7
+    binding._rotate_brightness(1, False)
+
+    assert binding.hass.services.async_call.call_args.args[2]["brightness"] == 224
+
+
+def test_scroll_tracking_survives_overlapping_direction_boundaries(monkeypatch) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._tracked = 180
+    binding._command_authoritative_until = 0.25
+
+    binding._handle_raw_input("scroll_up", "initial_press", 1)
+    now[0] = 0.4
+    binding._handle_raw_input("scroll_down", "initial_press", 2)
+    binding._handle_raw_input("scroll_up", "multi_press_complete", 1)
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 80})
+            }
+        )
+    )
+
+    assert binding._tracked == 180
+
+    now[0] = 0.8
+    binding._handle_raw_input("scroll_down", "multi_press_complete", 2)
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 80})
+            }
+        )
+    )
+
+    assert binding._tracked is None
+
+
+def test_missing_scroll_completion_expires_target_authority(monkeypatch) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._tracked = 180
+    binding._command_authoritative_until = 0.25
+    binding._handle_raw_input("scroll_up", "initial_press", 1)
+
+    now[0] = 2.1
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 80})
+            }
+        )
+    )
+
+    assert binding._tracked is None
+    assert binding._active_scrolls == {}
 
 
 def test_unavailable_state_event_stops_ramp_and_clears_tracking(monkeypatch) -> None:

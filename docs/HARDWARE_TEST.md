@@ -221,10 +221,11 @@ or duplicated raw notch.
 
 Current hardware note (2026-07-18): Home Assistant's device registry confirms
 that both commissioned physical scroll wheels, as well as the dual button, now
-run firmware `1.9.15`. Section G therefore exercises both independent wheel
-nodes on that firmware. Earlier `1.8.7` observations remain valid historical
-evidence, but that firmware is no longer available for this candidate and must
-not be claimed as RC.5 hardware coverage.
+run firmware `1.9.15`. The owner selected only `Kolečko Obývák` for controlled
+RC.5 wheel tuning. Results below therefore apply only to that wheel; they must
+not be generalized to `Kolečko Nelča`. Earlier `1.8.7` observations remain
+valid historical evidence, but that firmware is no longer available for this
+candidate and must not be claimed as RC.5 hardware coverage.
 
 - [ ] On each of the two firmware-1.9.15 wheels, rotate one deliberate notch in
       each direction. Confirm one immediate action follows InitialPress and the
@@ -277,6 +278,55 @@ Post-restart telemetry received scroll traffic, including cumulative count 18,
 but those movements were not performed under one controlled instruction.
 They are not credited to section G. No G checklist item is checked by this
 deployment baseline.
+
+### 2026-07-18 — E2490 RC.5 controlled response and accounting runs
+
+Tester: owner operating only `Kolečko Obývák`; Codex observing Home Assistant,
+the integration diagnostics, recorder and sanitized Matter Server events
+through MCP. Channel 1 targeted `light.linka` (Shelly Plus 0-10V Dimmer), with
+step 3%, acceleration 0%, minimum 1% and maximum 100%.
+
+- One deliberate slow upward notch produced its public action approximately
+  18 ms after the raw InitialPress, with exactly one notch and no trailing
+  duplicate. The owner noted that a single 3% change was too subtle for a
+  useful subjective brightness judgement.
+- One deliberate slow downward notch produced its public action approximately
+  20 ms after InitialPress, with exactly one notch and no trailing duplicate.
+  The target changed from brightness 201 to 194; this was also too subtle for a
+  useful subjective latency judgement.
+- In a controlled fast downward run at transition 1.0 seconds, Matter
+  cumulative accounting decoded into deltas `1 + 1 + 2 + 2 + 5 = 11`.
+  The public event sum matched exactly, the target changed from brightness 194
+  to 110, and no trailing duplicate appeared. The owner perceived a delay.
+- Channel 1 was then reconfigured through the normal Home Assistant config
+  subentry flow to transition 0.0 seconds; target, mode, step, acceleration and
+  bounds remained unchanged. No restart was required.
+- In the controlled transition-0 run, Matter reported 18 notches and the public
+  BILRESA event sum was also exactly 18. First target-state acknowledgement
+  improved from approximately 906 ms in the transition-1 run to 548 ms, and the
+  owner described the perceived delay as the smallest so far.
+- **FAIL exact target outcome on installed RC.5:** brightness changed from 255
+  to 140, equivalent to only 15 configured steps rather than all 18. A failing
+  regression proved that a delayed Shelly state echo could clear the binding's
+  calculated absolute target after the 250 ms zero-transition margin while the
+  same Matter scroll was still active.
+- A local, not-deployed candidate tracks active rotary endpoints independently
+  until their raw completion, with a two-second lost-completion safety expiry.
+  The regression that previously produced brightness 239 instead of the
+  required 224 now passes, including reversal and timeout coverage. Binding and
+  engine tests pass locally (116 tests), and the full Python suite passes
+  locally (316 tests). Static checks also pass. This is Static/Unit evidence
+  only, not corrective Hardware evidence.
+- A later rapid back-and-forth stress run was not performed under one bounded
+  instruction and is diagnostic only. It showed irregular valid public batches
+  including 14, 9, 6 and 14 notches. Transition 0.0 renders those batches as
+  visible jumps, while the configured min/max legitimately suppress identical
+  service calls and can create stationary periods during continuing input.
+
+The exact-target failure keeps section G open. The target-tracking correction
+must be validated and deployed before another controlled run. Perceived
+smoothing is a separate A/B after exact accounting passes: retain the eager
+first notch, then compare short measured transitions for later large batches.
 
 ### 2026-07-18 — E2489 B4 partial run on `v0.6.0-rc.2`
 

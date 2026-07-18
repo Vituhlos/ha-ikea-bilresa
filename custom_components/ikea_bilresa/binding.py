@@ -123,6 +123,10 @@ _STATE_ECHO_MARGIN = 0.25
 
 # A missing gesture boundary must not suppress rotation indefinitely.
 _TRAILING_GESTURE_TIMEOUT = 2.0
+# Matter rotary batches observed on the physical E2490 arrive roughly every
+# 0.5 seconds. Four such intervals protect an active target calculation while
+# still recovering promptly if MultiPressComplete is lost.
+_ACTIVE_SCROLL_TIMEOUT = 2.0
 
 # Acceleration is derived from recent decoded velocity, never a single Matter
 # batch size. Defaults remain disabled until physical tuning is complete.
@@ -220,6 +224,7 @@ class LightBinding:
         self._saturation = 100.0
         self._last = 0.0
         self._scroll_gesture = 0
+        self._active_scrolls: dict[int | None, float] = {}
         self._button_scroll_boundary: int | None = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
@@ -396,6 +401,7 @@ class LightBinding:
         self._tracked = None
         self._command_authoritative_until = 0.0
         self._last_direction = None
+        self._active_scrolls.clear()
         self._button_scroll_boundary = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
@@ -413,10 +419,22 @@ class LightBinding:
             self._command_authoritative_until = 0.0
             self._stop_ramp(change_direction=False)
             return
-        # Ignore bounded state echoes from our own in-flight service/transition.
-        # Once that window closes, any state event invalidates the desired value
-        # and the next wheel action reads reality again.
-        if time.monotonic() >= self._command_authoritative_until:
+        # Matter may batch one continuous scroll for several seconds while the
+        # target reports older absolute values between decoded deltas. Keep the
+        # newest calculated target authoritative until the raw gesture ends;
+        # otherwise a delayed zero-transition echo can erase confirmed notches.
+        now = time.monotonic()
+        self._active_scrolls = {
+            endpoint_id: last_seen
+            for endpoint_id, last_seen in self._active_scrolls.items()
+            if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
+        }
+        if self._active_scrolls:
+            return
+        # Outside an active gesture, ignore only state echoes covered by the
+        # configured service transition. A later external update invalidates
+        # the desired value so the next gesture reads reality again.
+        if now >= self._command_authoritative_until:
             self._tracked = None
 
     @callback
@@ -439,12 +457,17 @@ class LightBinding:
         if self._endpoint_id is not None and endpoint_id != self._endpoint_id:
             return
         if role in (ROLE_SCROLL_UP, ROLE_SCROLL_DOWN):
+            now = time.monotonic()
             if event_type == _INITIAL_PRESS:
                 self._scroll_gesture += 1
+                self._active_scrolls[endpoint_id] = now
                 self._reset_velocity()
             elif event_type == _COMPLETE:
                 # The raw completion precedes its possible final delta action.
+                self._active_scrolls.pop(endpoint_id, None)
                 self._reset_velocity_after_rotate = True
+            elif endpoint_id in self._active_scrolls:
+                self._active_scrolls[endpoint_id] = now
             return
         if role != ROLE_BUTTON:
             return

@@ -20,6 +20,51 @@ references before making changes.
 Never collapse these states or infer Hardware from Static, Unit, CI, MCP, or
 earlier device-reference observations.
 
+## RC.5 zero-transition finding and `v0.6.0-rc.6` corrective candidate
+
+Status: **RC.5 Hardware diagnosis + local Implemented + Static + local Unit.
+Owner-authorized for the `v0.6.0-rc.6` prerelease. Not CI, Released, deployed
+or corrective Hardware.**
+
+All controlled RC.5 tuning below used only the owner's selected
+`Kolečko Obývák`, channel 1, with acceleration disabled, step 3%, and
+`light.linka` as its target. No RC.5 Hardware claim is made for
+`Kolečko Nelča`.
+
+With the configured transition reduced from 1.0 seconds to 0.0 seconds, the
+first Home Assistant target acknowledgement improved from approximately 906 ms
+to 548 ms, and the owner described the perceived delay as the smallest so far.
+Exact accounting still failed: Matter and the public BILRESA event stream both
+reported 18 notches, but the light moved from brightness 255 to 140, equivalent
+to only 15 configured 3% steps. This is not a decoder loss.
+
+The cause was reproduced in a failing unit regression. A Shelly Plus 0-10V
+Dimmer can report an older absolute brightness after the fixed 250 ms
+zero-transition echo margin while the Matter scroll is still delivering later
+cumulative deltas. That report cleared the binding's newest calculated target,
+so the next delta rebased from stale physical state. The old code produced
+brightness 239 where the confirmed four-notch sequence required 224.
+
+The local candidate now keeps its calculated target authoritative for the
+duration of each raw scroll endpoint. Opposite directions are tracked
+independently, completion clears only its own endpoint, unavailable targets
+still fail closed, reconnect clears all activity, and a missing completion
+expires after two seconds. This timeout is four times the roughly 0.5-second
+batch spacing observed on the physical E2490; it prevents indefinite authority
+without truncating an ordinarily active sequence. The new regression and full
+Python suite pass locally (316 tests); compileall, Ruff format/lint, mypy,
+frontend syntax and diff checks also pass.
+
+A later uncontrolled rapid back-and-forth stress run confirmed a separate
+presentation issue. The E2490/Matter stream emits the eager first notch and
+then irregular cumulative batches such as 14, 9, 6 and 14 notches. At transition
+0.0 seconds those valid batches appear as visible jumps; when the configured
+minimum or maximum is reached, unchanged service calls are intentionally
+suppressed and the light can appear stationary while raw events continue. This
+cannot be corrected by the target-tracking fix alone. Smoothing must retain the
+immediate first notch and apply only a short, measured transition to later
+large batches; no duration is accepted without a controlled Hardware A/B.
+
 ## Scroll first-response optimization (`v0.6.0-rc.5` candidate, 2026-07-18)
 
 Status: **Implemented + Static + local Unit + CI + Released + deployed.
@@ -27,9 +72,10 @@ Physical section G is in progress; no G Hardware item is claimed yet.**
 
 Before publication, a read-only Home Assistant registry recheck confirmed both
 physical E2490 scroll wheels and the E2489 dual button now run firmware
-`1.9.15`. Section G therefore tests both independent wheel nodes on the same
-current firmware. The earlier `1.8.7` observations remain historical evidence,
-not an available RC.5 comparison target.
+`1.9.15`. Both wheel nodes were therefore available on the same current
+firmware, but the owner selected only `Kolečko Obývák` for controlled RC.5
+tuning. The earlier `1.8.7` observations remain historical evidence, not an
+available RC.5 comparison target.
 
 Annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
 `e17797ac9be1f6183c6867738aed597824843487`. GitHub Actions run `29645572829`

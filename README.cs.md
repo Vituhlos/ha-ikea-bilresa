@@ -15,7 +15,7 @@ Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, ta
 je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
 propojení, device triggery a stejný panel BILRESA.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.5**
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.6**
 > přidává dvoutlačítko BILRESA v rozsahu B0–B3. Obě tlačítka mají nezávislé
 > eventy, triggery a propojení; existující panel mění pracovní plochu kolečka
 > `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. RC.3
@@ -28,8 +28,10 @@ propojení, device triggery a stejný panel BILRESA.
 > stisk doručil právě jednou; následně prošel i cílenou simulací poruch B4.
 > RC.5 provede každý potvrzený rotační `InitialPress` okamžitě, přesně jej
 > odečte od pozdějších kumulativních počtů a na mezích cíle neopakuje totožné
-> volání služby. Automatické ověření je hotové; po nasazení následuje fyzická
-> sekce G na obou dostupných kolečkách s firmwarem 1.9.15.
+> volání služby. RC.6 navíc brání opožděnému hlášení stavu cíle, aby během
+> aktivního otáčení nesmazalo potvrzené kroky, a to ani při rychlé změně směru.
+> Automatické ověření je hotové; řízené ladění sekce G používá uživatelem
+> vybrané `Kolečko Obývák`.
 >
 > Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
 > [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
