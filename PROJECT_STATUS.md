@@ -22,17 +22,37 @@ earlier device-reference observations.
 
 ## Scroll first-response optimization (`v0.6.0-rc.5` candidate, 2026-07-18)
 
-Status: **Implemented + Static + local Unit + CI for implementation commit
-`d12707c`. Owner-authorized for `v0.6.0-rc.5` prerelease and controlled HACS
-deployment. Not yet released, deployed, or Hardware-verified for this
-candidate.**
+Status: **Implemented + Static + local Unit + CI + Released + deployed.
+Physical section G is in progress; no G Hardware item is claimed yet.**
 
 Before publication, a read-only Home Assistant registry recheck confirmed both
 physical E2490 scroll wheels and the E2489 dual button now run firmware
 `1.9.15`. Section G therefore tests both independent wheel nodes on the same
 current firmware. The earlier `1.8.7` observations remain historical evidence,
-not an available RC.5 comparison target. The currently loaded integration is
-still exact `v0.6.0-rc.4`; its configuration check is valid.
+not an available RC.5 comparison target.
+
+Annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
+`e17797ac9be1f6183c6867738aed597824843487`. GitHub Actions run `29645572829`
+passed all six jobs for that exact revision. HACS then installed the explicit
+prerelease tag, the pre-restart configuration check was valid, and Home
+Assistant restarted normally.
+
+Post-restart evidence confirms:
+
+- HACS installed version `v0.6.0-rc.5` and the loaded integration manifest
+  reports `0.6.0-rc.5`;
+- the config entry is loaded at logger level `WARNING`, with no integration
+  issues and no integration error in the post-restart system log;
+- Matter Server add-on `9.1.0` / matterjs-server `1.2.6` is connected on
+  WebSocket schema 12 through compatibility schema 11;
+- the active source is `core_matter_client`, fallback reason is `none`, and the
+  inventory remains two wheels, one dual button and six bindings;
+- the post-restart configuration check remains valid.
+
+Matter Server and integration telemetry also received scroll traffic after the
+restart, including cumulative count 18. Because those movements were not
+performed under a single controlled instruction, they are reconnaissance only
+and do not check any section G box.
 
 A controlled baseline on the installed `v0.6.0-rc.4` used Matter Server add-on
 9.1.0 / matterjs-server 1.2.6 native sanitized Switch-event logging. The
@@ -111,13 +131,12 @@ git diff --check                                                 passed
 ```
 
 The five local warnings are dependency deprecations from Home Assistant,
-`aiohttp` and `backoff`, not test failures. Exact deployed code, physical
-single-notch onset, exact fast-scroll total, direction reversal, count-18/wrap
-and both physical firmware-1.9.15 wheels remain unverified for this candidate.
+`aiohttp` and `backoff`, not test failures. Controlled physical single-notch
+onset, exact fast-scroll total, direction reversal, count-18/wrap and both
+physical firmware-1.9.15 wheels remain unverified for this candidate.
 Suppression of redundant service calls is locally unit-tested at both limits
 for all seven bounded modes; the exact live service-call count during
-saturation is still a Hardware item. The next gate is publication and
-controlled deployment of `v0.6.0-rc.5`, followed by
+saturation is still a Hardware item. The active gate is
 `docs/HARDWARE_TEST.md` section G on both physical wheels.
 
 GitHub Actions run `29645493522` passed all six jobs for exact implementation

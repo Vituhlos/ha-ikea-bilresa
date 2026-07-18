@@ -256,6 +256,28 @@ A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
 below. Unchecked items belong to the broader all-features matrix and are not
 claims made by B4.
 
+### 2026-07-18 — `v0.6.0-rc.5` deployment baseline
+
+- annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
+  `e17797ac9be1f6183c6867738aed597824843487`;
+- exact-revision GitHub Actions run `29645572829` passed hassfest, HACS
+  validation, Ruff, mypy, frontend checks and the full Python suite;
+- HACS installed exact `v0.6.0-rc.5`; configuration validation passed before
+  restart and again after Home Assistant returned;
+- loaded diagnostics report manifest `0.6.0-rc.5`, Matter Server add-on `9.1.0`
+  / matterjs-server `1.2.6`, server schema 12, compatibility schema 11,
+  `core_matter_client`, no fallback, two wheels, one dual button and six
+  bindings;
+- the integration config entry is loaded at logger level `WARNING`, diagnostics
+  list no integration issues, and post-restart logs contain no integration
+  error (only Home Assistant's standard custom-component warning);
+- all three physical BILRESA devices are currently on firmware `1.9.15`.
+
+Post-restart telemetry received scroll traffic, including cumulative count 18,
+but those movements were not performed under one controlled instruction.
+They are not credited to section G. No G checklist item is checked by this
+deployment baseline.
+
 ### 2026-07-18 — E2489 B4 partial run on `v0.6.0-rc.2`
 
 Tester: owner performing physical gestures, Codex observing Home Assistant,
