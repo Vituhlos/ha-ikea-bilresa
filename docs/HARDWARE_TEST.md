@@ -294,12 +294,16 @@ Physical overflow follow-up:
   advance or publish a false single;
 - the configured target state did not change during the gesture;
 - both integration and Home Assistant logs remained free of a matching error.
+- an immediate normal single on the same endpoint completed as count one,
+  advanced the custom and core event entities once, increased
+  `actions_dispatched` from zero to one and changed only its configured target
+  once; the other observed light remained unchanged.
 
 Verdict: **PASS deployment smoke and PASS real zero-count overflow safeguard.**
 This confirms that RC.3 loads on Matter Server 9.1.0/schema 12 and correctly
-ignores the real E2489 `MultiPressComplete(0)`. A deliberate normal single
-immediately after this ignored completion is the next recovery check. Overall
-B4 remains **IN PROGRESS** for idle-resume, no-leak and lifecycle gates.
+ignores the real E2489 `MultiPressComplete(0)`. **PASS immediate recovery:** the
+next valid single was neither lost nor duplicated. Overall B4 remains
+**IN PROGRESS** for idle-resume, no-leak and lifecycle gates.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

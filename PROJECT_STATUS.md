@@ -2485,7 +2485,11 @@ nor the core Matter event entity advanced, the configured target stayed
 unchanged, and no `ikea_bilresa` error appeared. The G0 zero-count safeguard is
 therefore **Hardware PASS** on the exact released candidate. Above-max rejection
 remains Unit evidence because the real device represents this overflow as zero.
-The remaining B4 lifecycle, idle-resume and no-leak checks are still open.
+An immediate deliberate normal single then produced
+`MultiPressComplete(1)`, advanced both event surfaces once, dispatched exactly
+one binding action and changed only the configured target once. Recovery after
+the ignored overflow is also **Hardware PASS**. The remaining B4 lifecycle,
+idle-resume and no-leak checks are still open.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2515,11 +2519,10 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-On the same RC.3 button immediately perform one deliberate normal single press.
-Confirm one public single and exactly one intended target change; this proves
-that ignoring the zero completion did not leave endpoint state stuck. Then
-continue the remaining B4 idle-resume, no-leak and reconnect checks before
-enabling G1/G2 advanced timing or combinations.
+Leave the installed RC.3 dual button idle for at least 15 minutes, then perform
+one normal single on the same side. Confirm one public single and exactly one
+target change without a queued burst. This covers the matterjs-server idle
+resubscribe risk before the remaining no-leak and lifecycle checks.
 
 ## Next-agent handoff
 
@@ -2531,7 +2534,8 @@ enabling G1/G2 advanced timing or combinations.
    B4 Hardware evidence but failed three-tap overflow handling. RC.3 has Static,
    Python Unit, frontend Unit, exact-revision CI, Released and successful
    Matter Server 9.1.0/schema-12 deployment-smoke evidence; its zero-count
-   overflow fix passed the exact physical retest.
+   overflow fix and immediate normal-single recovery passed the exact physical
+   retest.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.

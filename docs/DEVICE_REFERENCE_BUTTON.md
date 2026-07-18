@@ -99,7 +99,10 @@ The exact overflow was repeated after installing `v0.6.0-rc.3`. Matter Server
 again reported `MultiPressComplete(0)`, while RC.3 dispatched zero actions,
 left both the public custom event entity and the core Matter event entity
 unchanged, did not change the configured target, and logged no integration
-error. This Hardware-verifies the G0 safeguard for a zero completion count.
+error. An immediate deliberate normal single then completed with count one,
+advanced both event entities once and changed only its configured target once.
+This Hardware-verifies both the G0 safeguard for a zero completion count and
+clean recovery of the same endpoint afterward.
 
 ## How the integration consumes it
 
