@@ -2377,8 +2377,9 @@ mixed into their real-phone verification.
 
 ### Matter Server 9.1.0 compatibility audit and G0 safeguards (2026-07-18)
 
-Status: **Implemented + Static + local Python Unit + frontend regression. Not
-committed, not published, not deployed, not Hardware-verified.**
+Status: **Implemented + Static + Python Unit + frontend regression +
+exact-revision CI + Released + real-HA deployment smoke. G0 overflow fix is not
+yet Hardware-verified.**
 
 The official Home Assistant add-on 9.1.0 changelog, matterjs-server 1.2.6 tag,
 WebSocket API/schema changelog, Python client and Matter 1.6 Switch definition
@@ -2454,13 +2455,30 @@ ruff check custom_components tests                   passed
 mypy custom_components/ikea_bilresa                  passed (20 source files)
 python -m compileall -q custom_components tests      passed
 node --check panel                                   passed
-node --test panel + icon frontend tests              passed (16 tests)
+node --test panel + icon frontend tests              passed (20 tests)
 git diff --check                                     passed (CRLF warnings only)
 ```
 
-No Matter Server add-on update, HA restart/reload, real binding mutation,
-physical target action, commit, push, tag, release or HACS deployment was
-performed. Add-on 9.1.0 Hardware compatibility remains a B4 claim.
+Publication and controlled deployment completed on 2026-07-18:
+
+- candidate commit `e6e67eb` was pushed on `agent/dual-button-0.6`;
+- GitHub Actions run `29636673855` passed hassfest, HACS validation, Ruff,
+  mypy, frontend tests and Python unit tests;
+- annotated tag and prerelease `v0.6.0-rc.3` resolve to exact candidate
+  `e6e67eb`;
+- the pre-restart Home Assistant configuration check was valid, HACS installed
+  exactly `v0.6.0-rc.3`, and Home Assistant restarted normally;
+- post-restart diagnostics reported integration manifest `0.6.0-rc.3`, config
+  entry `loaded`, Matter Server add-on `9.1.0` started, server schema `12`,
+  client compatibility schema `11`, event source `core_matter_client`, no
+  fallback, two wheels, one dual button and all six stored bindings;
+- no `ikea_bilresa` system-log entry appeared after startup.
+
+No binding, automation, target or device configuration was changed during
+deployment, and no physical gesture was performed. This establishes a
+successful server-side deployment smoke on Matter Server 9.1.0/schema 12. The
+G0 overflow safeguard and remaining B4 behavior still require physical
+verification on this exact installed candidate.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2490,23 +2508,24 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-Review the combined dirty tree as two explicit packages (Live-test polish and
-G0 compatibility safeguards), then publish only an owner-approved RC. Install
-that exact candidate on the already-running Matter Server add-on 9.1.0 and
-repeat the B4 overflow, single/double/hold/release, idle-resume and reconnect
-capture before enabling G1/G2 advanced timing or combinations.
+On the installed `v0.6.0-rc.3`, repeat the real E2489 overflow gesture: three
+rapid taps on one physical button. Confirm that raw Matter still completes with
+count zero but RC.3 ignores it—no public false single and no target action.
+Then continue the remaining B4 idle-resume, no-leak and reconnect checks before
+enabling G1/G2 advanced timing or combinations.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from RC.2 release commit `fb290d3` plus the deployment-record follow-up
-   on `agent/dual-button-0.6`; then re-check HEAD, branch and status.
+2. Start from RC.3 release commit `e6e67eb` plus its deployment-record
+   follow-up on `agent/dual-button-0.6`; then re-check HEAD, branch and status.
 3. Do not move the `v0.6.0-rc.1` tag away from runtime commit `b0c139a`.
-4. RC.1 has Static, Python Unit, frontend Unit, exact-revision CI and Released
-   evidence, but its real E2489 discovery/panel result failed. RC.2 has the same
-   gates plus a successful real-HA server-side deployment smoke; every B4
-   physical Hardware outcome remains pending.
+4. RC.1 failed real E2489 discovery. RC.2 fixed discovery and supplied partial
+   B4 Hardware evidence but failed three-tap overflow handling. RC.3 has Static,
+   Python Unit, frontend Unit, exact-revision CI, Released and successful
+   Matter Server 9.1.0/schema-12 deployment-smoke evidence; its overflow fix
+   still needs the exact physical retest.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
-6. The post-RC.2 Live-test polish is a dirty, fully locally validated tree.
-   It has no commit, CI, tag, deployment or post-change real-HA visual evidence.
+6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
+   Do not promote RC.3 to stable until the remaining B4 physical gates pass.

@@ -265,6 +265,31 @@ published, installed and physically retested on the exact candidate.
 Verdict: **FAIL on RC.2 overflow handling; otherwise the captured B4 gesture
 and configured-binding subset passes. Overall B4 remains IN PROGRESS.**
 
+### 2026-07-18 — `v0.6.0-rc.3` deployment baseline
+
+The owner authorized publication and deployment of the G0 compatibility
+candidate. No physical button, wheel or controlled target was exercised during
+this baseline.
+
+- exact release tag `v0.6.0-rc.3` resolves to candidate commit `e6e67eb`;
+- all six GitHub Actions jobs passed for that revision;
+- Home Assistant configuration validation passed before restart;
+- HACS installed exactly `v0.6.0-rc.3` and Home Assistant restarted normally;
+- post-restart diagnostics reported integration manifest `0.6.0-rc.3`, config
+  entry `loaded`, Matter Server add-on `9.1.0` started, server schema `12`,
+  minimum/client compatibility schema `11`, `core_matter_client`, no fallback,
+  two wheels, one dual button and six restored bindings;
+- the integration rediscovered both E2489 endpoints with
+  `MultiPressMax = 2`;
+- the post-start system log contained no matching `ikea_bilresa` entry.
+
+Verdict: **PASS deployment smoke only.** This confirms that RC.3 loads and
+restores the installation on Matter Server 9.1.0/schema 12. It does not yet
+prove that the G0 safeguard ignores the real E2489
+`MultiPressComplete(0)`. The next physical step is the same three-rapid-tap
+overflow reproduction used against RC.2, with target state and public-event
+observation.
+
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 
 Tester: owner with Codex read-only MCP observation.
