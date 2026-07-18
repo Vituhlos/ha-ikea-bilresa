@@ -35,9 +35,10 @@ earlier device-reference observations.
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
 - Latest stable release remains `v0.5.0`. The latest published and deployed
-  prerelease is corrective `v0.6.0-rc.3`; its controlled Matter Server restart
-  gate failed and a local, unreleased `v0.6.0-rc.4` candidate addresses that
-  defect. RC.3 fixed the count-zero overflow reproduced on RC.2. RC.1 exposed
+  prerelease is corrective `v0.6.0-rc.4`; its controlled Matter Server restart
+  recovery and first physical post-restart single passed on the exact installed
+  candidate. RC.3 fixed the count-zero overflow reproduced on RC.2 but failed
+  the restart lifecycle gate. RC.1 exposed
   a separate real-device discovery defect and is explicitly marked known-bad
   for the E2489. Panel Phases 0-3
   were published as
@@ -2534,7 +2535,31 @@ Python tests, 20 frontend tests, Ruff format/lint, mypy, compileall, panel
 syntax and diff checks. Candidate commit `5a39f90` is pushed on
 `agent/dual-button-0.6`; GitHub Actions run `29641407216` passed hassfest, HACS
 validation, Ruff, mypy, frontend checks and Python unit tests on that exact
-revision. The candidate is not yet Released, deployed or Hardware-verified.
+revision.
+
+The release/deployment follow-up completed on 2026-07-18:
+
+- release commit `90076cf` passed exact-revision GitHub Actions run
+  `29641472813`;
+- annotated tag and prerelease `v0.6.0-rc.4` resolve to `90076cf`;
+- HACS installed exactly `v0.6.0-rc.4`; configuration validation passed and
+  Home Assistant restarted normally;
+- the loaded manifest reported `0.6.0-rc.4`, with Matter Server 9.1.0/schema 12,
+  client compatibility schema 11, `core_matter_client`, two wheels, one dual
+  button, six bindings and no fallback;
+- a controlled restart of only the Matter Server app produced one disconnect
+  and one successful core-client reattach. Connection count advanced to two,
+  fallback count stayed zero through the full grace window, all devices and
+  bindings returned, and no matching integration error appeared;
+- the first physical Button 1 single afterward advanced the custom and core
+  Matter event surfaces once, dispatched exactly one action and changed only
+  its intended light from off to on. Button 2 and the other observed targets
+  stayed unchanged.
+
+RC.4 therefore has Static, Unit, exact-revision CI, Released, deployed and
+Hardware evidence for the Matter Server restart recovery and first post-restart
+single. Targeted unavailable-target and lost-release/watchdog failure injection
+remain open.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2564,11 +2589,11 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-After explicit owner approval, release and deploy the CI-green
-`v0.6.0-rc.4` candidate, then repeat the same controlled Matter Server restart.
-It must recover through `core_matter_client` without fallback, restore all
-three devices and six bindings, and deliver one subsequent normal press exactly
-once.
+Plan the remaining B4 failure injection without mutating stored bindings:
+exercise an unavailable target and a lost-release/watchdog path only with a
+reversible, explicitly identified safe target. Verify no stale action, queued
+gesture, cross-button leak or fallback, then restore and recheck the normal
+path.
 
 ## Next-agent handoff
 
@@ -2587,11 +2612,11 @@ once.
    config-entry reload restored all devices/bindings and its first single
    exactly once. Its controlled Matter Server restart then failed because the
    temporary core-entry unload triggered a permanent dedicated-WebSocket
-   fallback. RC.4 candidate commit `5a39f90` fixes that lifecycle path and is
-   locally validated, pushed and exact-revision CI-green, but has no Released,
-   deployment or Hardware evidence yet.
+   fallback. RC.4 release commit `90076cf` fixes that lifecycle path and is
+   locally validated, exact-revision CI-green, Released, deployed and Hardware
+   PASS for the controlled restart plus first physical post-restart single.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
-   Do not promote RC.3 to stable. Do not claim the restart fix as Hardware
-   evidence until the exact RC.4 candidate is released, deployed and retested.
+   Do not promote RC.3 to stable. RC.4 is the current prerelease and has Hardware
+   evidence for restart recovery; remaining B4 failure injection is still open.

@@ -15,7 +15,7 @@ Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, ta
 je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
 propojení, device triggery a stejný panel BILRESA.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.3**
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.4**
 > přidává dvoutlačítko BILRESA v rozsahu B0–B3. Obě tlačítka mají nezávislé
 > eventy, triggery a propojení; existující panel mění pracovní plochu kolečka
 > `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. RC.3
@@ -23,8 +23,9 @@ propojení, device triggery a stejný panel BILRESA.
 > 9.1.0/schema 12 přes kompatibilní profil schématu 11 a opravuje reálný overflow
 > E2489, při kterém se `MultiPressComplete(0)` chybně vyhodnotil jako jednoduchý
 > stisk. Řízený restart Matter Serveru v RC.3 odhalil předčasné přepnutí na
-> záložní zdroj; nevydaný kandidát **v0.6.0-rc.4** zachovává hlavní Matter
-> klient i během dočasné mezery při restartu. Fyzické ověření zůstává B4.
+> záložní zdroj. RC.4 zachovává hlavní Matter klient i během této dočasné mezery;
+> přesně nainstalovaný kandidát prošel návratem bez fallbacku a první fyzický
+> stisk doručil právě jednou. V B4 zbývá cílená simulace poruch.
 >
 > Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
 > [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).

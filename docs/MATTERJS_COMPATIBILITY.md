@@ -68,15 +68,23 @@ checks, permanently selected the dedicated compatibility WebSocket for that
 integration load. The BILRESA config entry was reloaded afterward and returned
 to the supported core Matter client with all devices and bindings restored.
 
-The unreleased `v0.6.0-rc.4` candidate treats an absent loaded Matter entry as
-a temporary runtime outage. It keeps the core source preferred for twelve
+Released `v0.6.0-rc.4` treats an absent loaded Matter entry as a temporary
+runtime outage. It keeps the core source preferred for twelve
 five-second checks and reattaches when Home Assistant supplies the replacement
 client. Initial setup with a genuinely unsupported client still falls back
 immediately; persistent runtime incompatibility still falls back after the
 one-minute grace period. Automated coverage reproduces the temporary empty
-entry and verifies reattachment without fallback. The exact controlled restart
-must pass on the installed candidate before this lifecycle gate is Hardware
-evidence.
+entry and verifies reattachment without fallback.
+
+The exact released candidate was installed through HACS on 2026-07-18. A
+controlled Matter Server 9.1.0 restart then produced one disconnect and one
+reattach to the replacement core client, with two connection snapshots, zero
+fallbacks, all three BILRESA devices and all six bindings restored. The source
+remained `core_matter_client` after the full grace window and no matching
+integration error was logged. The first physical E2489 single afterward
+advanced both event surfaces once, dispatched one binding action, toggled only
+its intended target once, and left the other button and observed targets
+unchanged. This lifecycle path is therefore Hardware-verified on RC.4.
 
 ## Compatibility still requiring evidence
 

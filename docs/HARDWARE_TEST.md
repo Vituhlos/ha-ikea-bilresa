@@ -352,9 +352,34 @@ Controlled Matter Server restart follow-up:
   active fallback.
 
 Verdict amendment: **RC.3 FAILS the controlled Matter Server restart gate.**
-The local `v0.6.0-rc.4` candidate adds a one-minute runtime restart grace and
-has deterministic Unit coverage for reattachment without fallback. It is not
-Released, deployed or Hardware-verified yet.
+RC.4 adds a one-minute runtime restart grace and has deterministic Unit
+coverage for reattachment without fallback.
+
+### 2026-07-18 — `v0.6.0-rc.4` restart recovery retest
+
+- annotated tag and prerelease `v0.6.0-rc.4` resolve to exact release commit
+  `90076cf`;
+- exact-revision GitHub Actions run `29641472813` passed all six jobs;
+- HACS installed exactly `v0.6.0-rc.4`, the pre-restart configuration check was
+  valid and Home Assistant restarted normally;
+- diagnostics confirmed manifest `0.6.0-rc.4`, Matter Server `9.1.0`, server
+  schema 12, client compatibility schema 11, `core_matter_client`, two wheels,
+  one dual button, six bindings and zero fallback;
+- only the Matter Server app was then restarted. RC.4 recorded one disconnect,
+  attached to the replacement core client, refreshed its node snapshot and
+  stayed on `core_matter_client` for the full one-minute grace window;
+- connection count advanced from one to two while fallback count remained zero;
+  all three devices stayed represented and all six bindings remained present;
+- no matching `ikea_bilresa` system-log entry appeared;
+- the first physical Button 1 single afterward advanced both the custom and
+  core Matter event entities once and dispatched exactly one binding action;
+- its intended light changed from off to on once. Button 2 and the three other
+  observed light targets remained unchanged.
+
+Verdict: **PASS RC.4 controlled Matter Server restart recovery and PASS first
+post-restart physical single without loss, duplication or cross-button leak.**
+The unavailable-target and lost-release/watchdog failure-injection gates remain
+open, so overall B4 remains **IN PROGRESS**.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 
