@@ -28,12 +28,23 @@ pairing/reset control is not a Matter switch and produces no Home Assistant even
 
 | Endpoint | Role | FeatureMap | MultiPressMax |
 |---|---|---:|---:|
-| button A | button | 30 *(confirm)* | 2 |
-| button B | button | 30 *(confirm)* | 2 |
+| button A | physical button; semantic tag `up` | 30 *(confirm)* | 2 |
+| button B | physical button; semantic tag `down` | 30 *(confirm)* | 2 |
 
-- Endpoints carry **no numeric channel label and no up/down switch tag** — this
-  shape (button-only, no rotary) is what `model.py` uses to classify the device as
-  the `dual_button` variant rather than a wheel.
+- Endpoints carry **no numeric channel label**, but do carry the semantic
+  **up/down switch tags**. The first `v0.6.0-rc.1` deployment proved that these
+  tags describe the two physical button faces; treating them as rotary roles
+  misclassified the device as an empty wheel. `model.py` therefore classifies
+  the exact pair of channel-less switch endpoints as `dual_button` and
+  normalizes both roles to `button`. The official Matter Switches namespace
+  defines tag `0x0003` as `Up` and `0x0004` as `Down`; these are semantic
+  function tags, not evidence that the physical control rotates:
+  [connectedhomeip Namespace-Switches.xml](https://github.com/project-chip/connectedhomeip/blob/master/data_model/1.6/namespaces/Namespace-Switches.xml).
+- Sanitized raw `TagList` facts captured from core Matter diagnostics:
+  button A has Common Position tag `2` plus Switches `On`, `Up`, and Custom
+  label `button 1`; button B has Common Position tag `3` plus Switches `Off`,
+  `Down`, and Custom label `button 2`. The committed regression fixture keeps
+  only these protocol fields with a synthetic node id.
 - `MultiPressMax = 2`: the device never reports a press count above 2. This is the
   hard difference from the wheel's buttons (max 3) — the dual button has **no
   triple press**.
@@ -62,8 +73,9 @@ Switch stream — the raw `initial_press` / `short_release` / `multi_press_ongoi
 
 ## How the integration consumes it
 
-- `model.py` classifies the node as the `dual_button` variant from endpoint shape
-  and parses `Switch.MultiPressMax` (`ep/59/2`) per endpoint.
+- `model.py` classifies the exact two channel-less switch endpoints as the
+  `dual_button` variant, normalizes their semantic up/down tags to physical
+  button roles, and parses `Switch.MultiPressMax` (`ep/59/2`) per endpoint.
 - `event.py` builds one `BilresaButtonEvent` per button, advertising
   `press`, `double_press`, `hold`, `release` — capped by MultiPressMax, so no
   `triple_press` is offered here. Both endpoints report `channel = None` and share

@@ -11,11 +11,12 @@ wheel and dual button** (Matter over Thread). The wheel reacts to real-time
 `MultiPressOngoing` events for DIRIGERA-like smoothness; the dual button gains
 independent events, bindings, device triggers and the same BILRESA panel.
 
-> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.1** adds the
+> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.2** adds the
 > BILRESA dual button through roadmap phases B0-B3. Its two buttons have
 > independent events, triggers and bindings; the existing panel adapts its
 > `1 / 2 / 3` wheel workbench to buttons `1 / 2` and retains an adapted Live
-> test. Physical verification is deliberately left for B4.
+> test. RC.2 corrects discovery for the real device's channel-less endpoints
+> carrying semantic up/down tags. Physical verification remains B4.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared

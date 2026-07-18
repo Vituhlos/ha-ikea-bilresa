@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -49,7 +51,15 @@ from custom_components.ikea_bilresa.const import (
     ROLE_SCROLL_UP,
     SUBENTRY_BINDING,
 )
-from custom_components.ikea_bilresa.model import BilresaWheel, SwitchEndpoint
+from custom_components.ikea_bilresa.model import (
+    BilresaWheel,
+    SwitchEndpoint,
+    parse_node,
+)
+
+DUAL_BUTTON_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "bilresa_dual_button_node.json"
+)
 
 
 @pytest.mark.parametrize(
@@ -208,6 +218,27 @@ def test_dual_button_schema_uses_real_endpoint_shape_and_hides_rotary_fields() -
     # A second physical dual button may reuse endpoint ids without sharing a
     # node/address; both still expose their own two independent controls.
     assert flow._button_options("202") == flow._button_options("101")
+
+
+def test_live_e2489_shape_offers_endpoint_binding_schema() -> None:
+    """Regression: the exact live TagList must unlock button bindings."""
+    device = parse_node(json.loads(DUAL_BUTTON_FIXTURE.read_text(encoding="utf-8")))
+    assert device is not None
+    flow = object.__new__(BindingSubentryFlowHandler)
+    flow._get_entry = lambda: SimpleNamespace(
+        runtime_data=SimpleNamespace(wheels={9001: device}),
+        subentries={},
+    )
+
+    keys = _schema_keys(flow._schema({CONF_NODE_ID: "9001"}))
+
+    assert CONF_ENDPOINT in keys
+    assert {
+        CONF_CHANNEL,
+        CONF_MODE,
+        CONF_SCENES,
+        CONF_TRIPLE_TARGET,
+    }.isdisjoint(keys)
 
 
 def test_wheel_schema_keeps_rotary_and_triple_press_options() -> None:

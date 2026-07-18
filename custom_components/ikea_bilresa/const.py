@@ -73,9 +73,11 @@ ROLE_SCROLL_DOWN = "scroll_down"
 ROLE_BUTTON = "button"
 
 # Device variants, distinguished by endpoint shape rather than product code.
-# A scroll wheel exposes rotary (up/down) endpoints; the dual button (E2489)
-# exposes button endpoints only. Matching on shape, not on the "BILRESA" product
-# string, keeps discovery descriptor-driven. See docs/ROADMAP_BUTTON.md.
+# A scroll wheel groups its switch endpoints under numeric channel labels. The
+# dual button (E2489) has exactly two switch endpoints without channel labels;
+# their semantic tags are up/down even though both are physical buttons.
+# Matching on shape, not on the "BILRESA" product string, keeps discovery
+# descriptor-driven. See docs/ROADMAP_BUTTON.md.
 VARIANT_WHEEL = "wheel"
 VARIANT_DUAL_BUTTON = "dual_button"
 

@@ -15,11 +15,12 @@ Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, ta
 je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
 propojení, device triggery a stejný panel BILRESA.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.1**
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.2**
 > přidává dvoutlačítko BILRESA v rozsahu B0–B3. Obě tlačítka mají nezávislé
 > eventy, triggery a propojení; existující panel mění pracovní plochu kolečka
-> `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. Fyzické
-> ověření je záměrně B4.
+> `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. RC.2
+> opravuje rozpoznání reálných endpointů bez kanálu se sémantickými značkami
+> nahoru/dolů. Fyzické ověření zůstává B4.
 >
 > Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
 > [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).

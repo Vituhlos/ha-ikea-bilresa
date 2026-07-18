@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -20,7 +22,15 @@ from custom_components.ikea_bilresa.const import (
     ROLE_BUTTON,
     ROLE_SCROLL_UP,
 )
-from custom_components.ikea_bilresa.model import BilresaWheel, SwitchEndpoint
+from custom_components.ikea_bilresa.model import (
+    BilresaWheel,
+    SwitchEndpoint,
+    parse_node,
+)
+
+DUAL_BUTTON_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "bilresa_dual_button_node.json"
+)
 
 
 def _dual_button(node_id: int = 15) -> BilresaWheel:
@@ -83,6 +93,22 @@ async def test_dual_button_offers_button_triggers(monkeypatch) -> None:
     assert ET_ROTATE_UP not in types
     assert ET_TRIPLE_PRESS not in types
     assert {ET_PRESS, ET_DOUBLE_PRESS, ET_HOLD, ET_RELEASE} <= types
+
+
+@pytest.mark.asyncio
+async def test_live_e2489_shape_offers_two_button_triggers(monkeypatch) -> None:
+    """Regression: parser roles must reach the device-trigger surface."""
+    wheel = parse_node(json.loads(DUAL_BUTTON_FIXTURE.read_text(encoding="utf-8")))
+    assert wheel is not None
+    hass, device_id = _hass(wheel, monkeypatch)
+
+    triggers = await device_trigger.async_get_triggers(hass, device_id)
+
+    assert {trigger["subtype"] for trigger in triggers} == {
+        "button_1",
+        "button_2",
+    }
+    assert ET_ROTATE_UP not in {trigger["type"] for trigger in triggers}
 
 
 @pytest.mark.asyncio

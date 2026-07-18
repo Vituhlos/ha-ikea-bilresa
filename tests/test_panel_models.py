@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -25,7 +27,11 @@ from custom_components.ikea_bilresa.const import (
     SUBENTRY_BINDING,
 )
 from custom_components.ikea_bilresa.device_link import MatterDeviceLink
-from custom_components.ikea_bilresa.model import BilresaWheel, SwitchEndpoint
+from custom_components.ikea_bilresa.model import (
+    BilresaWheel,
+    SwitchEndpoint,
+    parse_node,
+)
 from custom_components.ikea_bilresa.panel_models import (
     CONTRACT_VERSION,
     async_overview_snapshot,
@@ -35,6 +41,9 @@ from custom_components.ikea_bilresa.panel_models import (
 NODE_A = 13
 NODE_B = 14
 SERIAL = "household-serial"
+DUAL_BUTTON_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "bilresa_dual_button_node.json"
+)
 
 
 def _wheel(node_id: int, channels: tuple[int, ...] = (1, 2, 3)) -> BilresaWheel:
@@ -204,6 +213,19 @@ def test_snapshot_includes_dual_button_as_two_buttons(monkeypatch) -> None:
     assert button["channels"] == []
     assert [item["button"] for item in button["buttons"]] == [1, 2]
     assert all(item["binding"] is None for item in button["buttons"])
+
+
+def test_live_e2489_shape_reaches_panel_as_two_buttons(monkeypatch) -> None:
+    """Regression: exercise parser → variant → panel with the live TagList."""
+    device = parse_node(json.loads(DUAL_BUTTON_FIXTURE.read_text(encoding="utf-8")))
+    assert device is not None
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+
+    snapshot = async_overview_snapshot(_hass(), _entry([device]))["wheels"][0]
+
+    assert snapshot["variant"] == "dual_button"
+    assert snapshot["channels"] == []
+    assert [control["button"] for control in snapshot["buttons"]] == [1, 2]
 
 
 def test_dual_button_bindings_are_independent_and_hide_endpoints(monkeypatch) -> None:

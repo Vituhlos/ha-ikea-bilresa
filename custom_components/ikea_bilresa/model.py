@@ -36,8 +36,6 @@ from .const import (
     VARIANT_WHEEL,
 )
 
-_ROTARY_ROLES = frozenset({ROLE_SCROLL_UP, ROLE_SCROLL_DOWN})
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -49,6 +47,22 @@ class SwitchEndpoint:
     channel: int | None
     role: str  # ROLE_SCROLL_UP / ROLE_SCROLL_DOWN / ROLE_BUTTON
     multi_press_max: int | None = None  # Switch.MultiPressMax, if the node reports it
+
+
+def _is_dual_button_shape(endpoints: dict[int, SwitchEndpoint]) -> bool:
+    """Return whether endpoint structure matches the two-button E2489.
+
+    The real E2489 labels its two physical buttons with the Matter semantic
+    tags ``up`` and ``down``. Those tags describe the face of the remote; they
+    do not make the device a rotary wheel. The stable structural distinction is
+    that both endpoints lack the wheel's numeric channel label.
+
+    Requiring exactly two endpoints keeps a partial or malformed wheel dump
+    from being promoted to a supported dual button.
+    """
+    return len(endpoints) == 2 and all(
+        endpoint.channel is None for endpoint in endpoints.values()
+    )
 
 
 @dataclass(slots=True)
@@ -69,9 +83,9 @@ class BilresaWheel:
     @property
     def variant(self) -> str:
         """Return the device variant from endpoint shape (wheel vs dual button)."""
-        if any(e.role in _ROTARY_ROLES for e in self.endpoints.values()):
-            return VARIANT_WHEEL
-        return VARIANT_DUAL_BUTTON
+        if _is_dual_button_shape(self.endpoints):
+            return VARIANT_DUAL_BUTTON
+        return VARIANT_WHEEL
 
     @property
     def is_dual_button(self) -> bool:
@@ -152,6 +166,14 @@ def parse_node(node: dict[str, Any]) -> BilresaWheel | None:
 
     if not endpoints:
         return None
+
+    if _is_dual_button_shape(endpoints):
+        # E2489 uses the semantic up/down tags for its two physical buttons.
+        # Normalize both endpoints here so every downstream consumer (gesture
+        # engine, event entities, device triggers, bindings and panel) sees the
+        # button semantics that the hardware actually exposes.
+        for endpoint in endpoints.values():
+            endpoint.role = ROLE_BUTTON
 
     serial = node.get("attributes", {}).get(f"0/{CLUSTER_BASIC_INFO}/15")
     return BilresaWheel(

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.2] - 2026-07-18
+
+### Fixed
+- The real E2489's two physical buttons carry Matter semantic `up` / `down`
+  tags even though neither endpoint has a numeric wheel channel. RC.1 treated
+  those tags as rotary evidence, so the already discovered device still showed
+  the wheel icon, an empty three-channel view and no button-binding controls.
+- Variant discovery now uses the stable live endpoint shape: exactly two Switch
+  endpoints without numeric channel labels identify the dual button. Their
+  semantic roles are normalized to buttons before the gesture engine, event
+  entities, device triggers, config flow and panel consume them.
+- Downloadable diagnostics now expose the sanitized device variant and each
+  endpoint's `MultiPressMax`, making future hardware-shape regressions visible
+  without leaking household identifiers.
+
 ## [0.6.0-rc.1] - 2026-07-17
 
 ### Added
@@ -493,7 +508,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.2...HEAD
+[0.6.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...v0.6.0-rc.2
 [0.6.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.9-rc.12...v0.6.0-rc.1
 [0.5.7-rc.8]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.7...v0.5.7-rc.8
 [0.5.7-rc.7]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.6...v0.5.7-rc.7

@@ -35,8 +35,9 @@ earlier device-reference observations.
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
 - Latest stable release remains `v0.5.0`. The latest published prerelease is
-  `v0.5.9-rc.12`; `v0.6.0-rc.1` is the owner-authorized B0-B3 candidate now
-  being prepared. Panel Phases 0-3 were published as
+  `v0.6.0-rc.1`; it exposed a real-device discovery defect and must be replaced
+  by corrective candidate `v0.6.0-rc.2` before B4 continues. Panel Phases 0-3
+  were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
   deployed as `v0.5.9-rc.2`, the duplicate-back/channel-detail follow-up as
@@ -587,9 +588,68 @@ an older, already-public commit remains recorded above. The owner has now
 explicitly requested another repository release from this same public history;
 the release must not copy any such identifiers into notes, logs or chat.
 
-Pending at this point: commit/push, draft PR, exact-revision CI, prerelease,
-pre-deployment HA configuration check, HACS download, restart and loaded-version
-smoke check. Record each concrete result here; authorization is not proof.
+Concrete publication and deployment results:
+
+- B0/B1 commit `7446194` and B2/B3/release commit `b0c139a` were pushed on
+  `agent/dual-button-0.6`;
+- draft PR `#2` targets `agent/stabilize-0.5-x`, keeping the `0.6.x` train
+  separate from the wheel stabilization line;
+- exact-revision CI run `29612854755` passed on full commit
+  `b0c139ae45d60f925f18041758f60853830f81c3`: Ruff, frontend checks, mypy,
+  246 Python tests, HACS validation and hassfest all succeeded;
+- GitHub prerelease `v0.6.0-rc.1` was published, and its lightweight tag points
+  directly to that exact CI-verified commit;
+- the pre-deployment Home Assistant configuration check was valid; HACS
+  installed the exact tag and reported `v0.6.0-rc.1` pending restart;
+- Home Assistant restarted normally. The post-restart configuration check is
+  valid, the BILRESA config entry is `loaded`, Matter is connected through
+  `core_matter_client`, and HACS reports `v0.6.0-rc.1` installed;
+- post-restart integration health reports three existing wheels, four existing
+  bindings and the new `discovered_buttons` field. It currently reports zero
+  discovered dual buttons, so discovery and all gesture/binding outcomes remain
+  B4 Hardware work rather than a release claim;
+- no BILRESA error was present after startup. The only matching log lines are
+  Home Assistant's standard warning for an unreviewed custom integration.
+
+This establishes publication plus install/startup smoke for the RC.1 package,
+not functional Hardware evidence for B0-B3.
+
+The owner's first real-panel check then disproved the RC.1 discovery fixture:
+
+- the already commissioned E2489 remained visible with the wheel glyph;
+- its detail still showed wheel copy and an empty three-channel surface;
+- no button-binding controls were offered;
+- sanitized live diagnostics showed exactly two endpoints with
+  `channel = null`, but semantic roles `scroll_up` and `scroll_down`;
+- System Health therefore reported three wheels and zero dual buttons.
+
+This is not a browser-cache defect. The server sent `variant = wheel`.
+The real E2489 uses Matter up/down semantic tags for its two physical buttons;
+the invented RC.1 fixture incorrectly omitted those tags. Corrective
+`v0.6.0-rc.2` classifies the exact pair of channel-less switch endpoints as a
+dual button and normalizes both downstream roles to `button`. Until RC.2 passes
+CI and the same real panel reports two buttons, B0 and B3 are not Hardware and
+RC.1 is not a valid B4 test baseline.
+
+Corrective RC.2 candidate preparation:
+
+- `tests/fixtures/bilresa_dual_button_node.json` contains only the minimal,
+  sanitized raw endpoint facts captured from core Matter diagnostics, with a
+  synthetic node id and no serial, network, entity or household identifiers;
+- the fixture includes the complete observed TagLists, FeatureMap `30` and
+  `MultiPressMax = 2` for both endpoints;
+- the same fixture now drives parser/decoder, panel-read-model and config-flow
+  regression tests, so those layers cannot silently substitute an invented
+  button shape again;
+- the official connectedhomeip Switches namespace confirms tags `0x0003` /
+  `0x0004` as semantic Up/Down functions, not physical rotation evidence;
+- local validation on 2026-07-18: JSON parsing and compileall passed; Ruff
+  format/check passed; mypy passed 20 source files; 251 Python tests and 16
+  frontend tests passed; `git diff --check` passed with CRLF warnings only.
+
+Still pending: corrective commit/push, exact-revision CI, RC.2 prerelease, HACS
+update/restart and real-HA server-side verification of two wheels plus one dual
+button, two event entities, panel variant/controls and button-binding schema.
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
@@ -2214,22 +2274,22 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-`v0.5.9-rc.12` is deployed and loaded (deployment smoke clean). Open the panel
-in a **completely fresh** browser tab — an existing tab keeps the old custom
-element and the web platform does not allow redefining it. Then visually check
-the channel spine, the corrected rail (accent icon + weight on the open wheel,
-no stray tick row), the lighter unconfigured channels, the result-led Live test
-with its detent strip, and the tab strip with no scrollbar. Capture screenshots
-against a non-default theme, which the harness could not exercise.
+Finish corrective `v0.6.0-rc.2`: run the full local suite, exact-revision CI,
+publish a new prerelease without moving the RC.1 tag, install it through HACS
+and restart. Before asking the owner for another screenshot, verify that System
+Health changes from three wheels / zero buttons to two wheels / one button and
+that the server-side panel snapshot exposes variant `dual_button` with controls
+`1 / 2`. Only then continue B4 gestures and binding outcomes.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from implementation commit `f676bb7` plus the deployment-record
-   follow-up on `agent/stabilize-0.5-x`; then re-check HEAD, branch and status.
-3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
-4. For the icon package, Static, Python Unit, frontend Unit, exact-revision CI,
-   release and backend deployment smoke are established. Real HA visual review
-   and Hardware remain pending.
+2. Start from release commit `b0c139a` plus the uncommitted RC.1 deployment and
+   corrective RC.2 record on `agent/dual-button-0.6`; then re-check HEAD, branch
+   and status.
+3. Do not move the `v0.6.0-rc.1` tag away from runtime commit `b0c139a`.
+4. RC.1 has Static, Python Unit, frontend Unit, exact-revision CI and Released
+   evidence, but its real E2489 discovery/panel result failed. RC.2 and every B4
+   Hardware outcome remain pending.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.

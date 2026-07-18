@@ -41,8 +41,10 @@ instrumentation note under Phase B4).
 - Implied Switch `FeatureMap = 30` *(confirm)*: MomentarySwitch (bit1),
   MomentarySwitchRelease (bit2), MomentarySwitchLongPress (bit3),
   MomentarySwitchMultiPress (bit4) — same as the wheel's button endpoints.
-- Descriptor `TagList`: **no numeric channel label and no up/down switch tags**
-  *(confirm)*. This is exactly why the current code mis-handles it (below).
+- Descriptor `TagList`: **no numeric channel label**, but the real device does
+  carry the semantic **up/down switch tags** for its two physical buttons.
+  This was confirmed by the sanitized diagnostics from the first
+  `v0.6.0-rc.1` deployment.
 
 ### Firmware quirk to design around
 
@@ -58,16 +60,19 @@ via a timeout, not wait forever.
 `model.parse_node` matches any product whose name contains `"bilresa"`, so the
 dual button is already claimed by the integration:
 
-- both endpoints are decoded with `role = ROLE_BUTTON`, `channel = None`
-  (`model.py` `parse_taglist`: no up/down tag, no numeric label);
+- both endpoints have `channel = None`, but their semantic tags initially decode
+  as `ROLE_SCROLL_UP` / `ROLE_SCROLL_DOWN`;
 - the node lands in `coordinator.wheels` and gets `("ikea_bilresa", "<node>")`
   device identifiers via `reconcile_wheel_device`;
 - but `event.py` builds entities only for `channel is not None`, so the device
   gets **zero** custom entities;
 - System Health and the panel then count it as a **wheel with no channels**.
 
-So today the dual button is half-adopted and misrepresented. Phase B0 stops the
-misrepresentation before any feature is added.
+The original invented no-tag fixture allowed this defect to survive B0-B3 and
+the first RC deployment. The corrected contract classifies the exact two
+channel-less switch endpoints as a dual button and normalizes their semantic
+up/down roles to physical-button roles before any downstream consumer sees
+them.
 
 ## Phases and exit gates
 
@@ -83,9 +88,10 @@ misrepresentation before any feature is added.
 
 - Introduce an explicit device variant on the parsed model, e.g.
   `BilresaWheel.variant ∈ {"wheel", "dual_button"}`, decided from endpoint
-  shape: a device with **no** rotary (up/down) endpoints and only button
-  endpoints is a `dual_button`; the existing three-per-channel layout stays
-  `wheel`.
+  shape: exactly two switch endpoints with **no numeric channel labels** form a
+  `dual_button`; the existing endpoints grouped by numeric channels stay
+  `wheel`. Do not use up/down semantic tags as evidence of rotation by
+  themselves.
 - Keep discovery descriptor-driven; do **not** match on the product string
   `E2489`/`E2490`. "BILRESA" is an IKEA range, not a device — match on node shape
   (this is the same lesson recorded for the wheel).
@@ -95,9 +101,10 @@ misrepresentation before any feature is added.
   exclude it from the wheel-channel entity build and from any "wheel" counts in
   System Health, or present it as an explicit "buttons" device with no channels.
 - Model/coordinator/System Health unit tests for the new variant. Fixtures must
-  use the **real** dual-button node shape (two button endpoints, no channel
-  label), not an invented one — the wheel's panel-model bugs came from fixtures
-  that agreed with the code instead of the device.
+  use the **real** dual-button node shape (two channel-less endpoints carrying
+  the up/down semantic tags), not an invented one — the first RC failure and
+  the wheel's panel-model bugs both came from fixtures that agreed with the code
+  instead of the device.
 
 ### B1 — Button event entities and device triggers
 
