@@ -22,9 +22,15 @@ earlier device-reference observations.
 
 ## RC.5 zero-transition finding and `v0.6.0-rc.6` corrective candidate
 
-Status: **RC.5 Hardware diagnosis + local Implemented + Static + local Unit.
-Owner-authorized for the `v0.6.0-rc.6` prerelease. Not CI, Released, deployed
-or corrective Hardware.**
+Status: **RC.5 Hardware diagnosis + Implemented + Static + local Unit + CI +
+Released. Not deployed or corrective Hardware.**
+
+Annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit
+`dd14521d03786ea63a6bbe6cc365a8dbf0088f1c`. GitHub Actions run `29647018640`
+passed hassfest, HACS validation, Ruff, mypy, frontend checks and the full
+Python suite for that exact revision. The loaded Home Assistant instance still
+runs `v0.6.0-rc.5`; no corrective Hardware result is claimed before explicit
+installation and testing.
 
 All controlled RC.5 tuning below used only the owner's selected
 `Kolečko Obývák`, channel 1, with acceleration disabled, step 3%, and
@@ -45,7 +51,7 @@ cumulative deltas. That report cleared the binding's newest calculated target,
 so the next delta rebased from stale physical state. The old code produced
 brightness 239 where the confirmed four-notch sequence required 224.
 
-The local candidate now keeps its calculated target authoritative for the
+The released RC.6 candidate now keeps its calculated target authoritative for the
 duration of each raw scroll endpoint. Opposite directions are tracked
 independently, completion clears only its own endpoint, unavailable targets
 still fail closed, reconnect clears all activity, and a missing completion

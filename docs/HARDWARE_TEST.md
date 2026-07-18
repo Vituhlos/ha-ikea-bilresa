@@ -310,7 +310,7 @@ step 3%, acceleration 0%, minimum 1% and maximum 100%.
   regression proved that a delayed Shelly state echo could clear the binding's
   calculated absolute target after the 250 ms zero-transition margin while the
   same Matter scroll was still active.
-- A local, not-deployed candidate tracks active rotary endpoints independently
+- The released, not-deployed RC.6 candidate tracks active rotary endpoints independently
   until their raw completion, with a two-second lost-completion safety expiry.
   The regression that previously produced brightness 239 instead of the
   required 224 now passes, including reversal and timeout coverage. Binding and
