@@ -2495,8 +2495,17 @@ Switch gesture on that endpoint. Matter Server emitted exactly one completion
 with count one; both event surfaces advanced once and the binding action count
 increased by one. There was no queued Switch burst, reconnect, fallback or
 matching integration error. The B4 idle-resume gate is therefore
-**Hardware PASS**. The remaining lifecycle and cross-endpoint/node no-leak
-checks are still open.
+**Hardware PASS**.
+
+The owner then pressed the other E2489 side and immediately operated the living
+room wheel. Only the second dual-button endpoint advanced and it toggled only
+its configured target once; the first endpoint stayed unchanged. The wheel
+then emitted eight real-time rotate-up batches on channel 3 and the integration
+dispatched exactly eight corresponding wheel actions. Wheel channels 1/2 and
+the observed dual-button targets did not change from the wheel activity. No
+reconnect, fallback or matching error appeared. Cross-endpoint and cross-node
+no-leak are therefore **Hardware PASS** for this bounded adjacent-use test. The
+remaining B4 lifecycle/reconnect checks are still open.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2526,10 +2535,10 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-Exercise the other physical side once, then immediately operate one wheel.
-Confirm that each event stays on its own endpoint/node and changes only its
-configured target. This is the smallest remaining B4 cross-endpoint/node
-no-leak check before the controlled lifecycle/reconnect checks.
+Perform a controlled reload of only the IKEA BILRESA config entry, verify that
+all three devices and six bindings return through the core Matter client, then
+make one normal press. This covers integration restore without restarting Home
+Assistant before the final controlled Matter Server reconnect check.
 
 ## Next-agent handoff
 
@@ -2543,7 +2552,8 @@ no-leak check before the controlled lifecycle/reconnect checks.
    Matter Server 9.1.0/schema-12 deployment-smoke evidence; its zero-count
    overflow fix and immediate normal-single recovery passed the exact physical
    retest, and a later single passed after approximately 2 hours 11 minutes
-   idle with no queued burst or reconnect.
+   idle with no queued burst or reconnect. Adjacent use of the other dual-button
+   endpoint and wheel channel 3 also passed cross-endpoint/node no-leak.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.

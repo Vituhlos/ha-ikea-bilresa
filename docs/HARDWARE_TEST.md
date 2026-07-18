@@ -199,9 +199,12 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       delivered; note whether queued presses burst on resubscribe. **PASS on
       RC.3 after ~2 h 11 min: one completion, one action, no queued Switch
       burst, reconnect or fallback.**
-- [ ] The two buttons do not leak actions into each other.
-- [ ] A dual button and a scroll wheel used concurrently do not leak actions
-      across Matter nodes.
+- [x] The two buttons do not leak actions into each other. **PASS on RC.3:
+      pressing endpoint 2 advanced only Button 2 and left Button 1 unchanged.**
+- [x] A dual button and a scroll wheel used concurrently do not leak actions
+      across Matter nodes. **PASS bounded adjacent-use check on RC.3: endpoint
+      2 single followed by eight channel-3 rotate batches; only those two
+      surfaces and their expected binding actions advanced.**
 - [ ] Logs contain no recurring exceptions, task warnings, or reconnect spam.
 
 ## Recorded runs
@@ -305,13 +308,24 @@ Physical overflow follow-up:
   both event surfaces once and increased `actions_dispatched` from one to two;
   no queued Switch burst, reconnect, fallback or matching integration error
   appeared.
+- the other E2489 endpoint then completed one single and only its Button 2
+  surfaces advanced; its configured target toggled once while Button 1 stayed
+  unchanged;
+- the living-room wheel immediately followed on channel 3 with eight decoded
+  rotate-up batches and exactly eight corresponding binding actions; wheel
+  channels 1/2 and the observed dual-button targets stayed unchanged during
+  the wheel activity;
+- connection count remained one, fallback count remained zero and no matching
+  integration error appeared.
 
 Verdict: **PASS deployment smoke and PASS real zero-count overflow safeguard.**
 This confirms that RC.3 loads on Matter Server 9.1.0/schema 12 and correctly
 ignores the real E2489 `MultiPressComplete(0)`. **PASS immediate recovery:** the
 next valid single was neither lost nor duplicated. **PASS idle-resume:** a
 single after ~2 hours 11 minutes was delivered once without a queued burst.
-Overall B4 remains **IN PROGRESS** for no-leak and lifecycle gates.
+**PASS bounded no-leak:** the two dual-button endpoints and wheel channel 3
+remained isolated during adjacent use. Overall B4 remains **IN PROGRESS** for
+lifecycle/reconnect gates.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 
