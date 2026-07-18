@@ -163,30 +163,31 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
 
 ### F1. Discovery and presentation
 
-- [ ] The dual button is discovered from its node shape (two button endpoints,
+- [x] The dual button is discovered from its node shape (two button endpoints,
       no channel label), not from the product string.
-- [ ] It is presented as a **buttons** device, not as a wheel with zero channels,
+- [x] It is presented as a **buttons** device, not as a wheel with zero channels,
       and is excluded from any "wheel" count in System Health.
-- [ ] Each of the two buttons appears once as its own event entity.
-- [ ] Restarting Home Assistant restores the device and any button bindings.
-- [ ] Diagnostics redact node IDs, serials, names and target entity IDs.
+- [x] Each of the two buttons appears once as its own event entity.
+- [x] Restarting Home Assistant restores the device and any button bindings.
+- [x] Diagnostics redact node IDs, serials, names and target entity IDs.
 
 ### F2. Raw button gestures (capture the raw stream)
 
-- [ ] Single press on button 1 and button 2 each classify as one press.
-- [ ] Double press on each button classifies as a double press.
-- [ ] Long press emits `hold`; release emits `release` exactly once, per button.
-- [ ] Advertised event types match the endpoint's `MultiPressMax`: **no triple
+- [x] Single press on button 1 and button 2 each classify as one press.
+- [x] Double press on each button classifies as a double press.
+- [x] Long press emits `hold`; release emits `release` exactly once, per button.
+- [x] Advertised event types match the endpoint's `MultiPressMax`: **no triple
       press** is offered for a `MultiPressMax = 2` device.
-- [ ] Pressing **more than max** (≥3 fast presses): confirm from the raw capture
-      that the firmware stops emitting (no `MultiPressComplete`), and that the
-      integration terminates the gesture via timeout instead of getting stuck.
+- [x] Pressing **more than max** (≥3 fast presses): capture the actual firmware
+      completion contract and confirm the integration neither gets stuck nor
+      emits a false action. **Real E2489 emits `MultiPressComplete(0)`; RC.3
+      ignores it and accepts the next valid single exactly once.**
 - [ ] Event entity, device trigger and `ikea_bilresa_event` agree for each
       gesture on each button.
 
 ### F3. Button binding behaviour
 
-- [ ] Single/double/hold targets affect only their configured entities.
+- [x] Single/double/hold targets affect only their configured entities.
 - [ ] Hold action `toggle`/`none` behave as configured; a missing `release` is
       stopped by the watchdog.
 - [ ] Paired hold-to-ramp (button 1 up / button 2 down on a shared target), if
@@ -317,6 +318,13 @@ Physical overflow follow-up:
   the wheel activity;
 - connection count remained one, fallback count remained zero and no matching
   integration error appeared.
+- a controlled reload of only the IKEA BILRESA config entry returned `loaded`
+  through `core_matter_client`, rediscovered two wheels and one dual button and
+  restored all six bindings;
+- the first physical single after that reload produced the expected
+  InitialPress/ShortRelease/complete-one sequence, advanced both event surfaces
+  once, dispatched one action and changed its intended target once; no old
+  event replayed and no fallback or matching error appeared.
 
 Verdict: **PASS deployment smoke and PASS real zero-count overflow safeguard.**
 This confirms that RC.3 loads on Matter Server 9.1.0/schema 12 and correctly
@@ -324,8 +332,10 @@ ignores the real E2489 `MultiPressComplete(0)`. **PASS immediate recovery:** the
 next valid single was neither lost nor duplicated. **PASS idle-resume:** a
 single after ~2 hours 11 minutes was delivered once without a queued burst.
 **PASS bounded no-leak:** the two dual-button endpoints and wheel channel 3
-remained isolated during adjacent use. Overall B4 remains **IN PROGRESS** for
-lifecycle/reconnect gates.
+remained isolated during adjacent use. **PASS config-entry restore:** all
+devices/bindings returned and the first post-reload single executed once.
+Overall B4 remains **IN PROGRESS** for the Matter Server reconnect and targeted
+failure-injection gates.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

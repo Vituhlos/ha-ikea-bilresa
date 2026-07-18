@@ -2505,7 +2505,14 @@ dispatched exactly eight corresponding wheel actions. Wheel channels 1/2 and
 the observed dual-button targets did not change from the wheel activity. No
 reconnect, fallback or matching error appeared. Cross-endpoint and cross-node
 no-leak are therefore **Hardware PASS** for this bounded adjacent-use test. The
-remaining B4 lifecycle/reconnect checks are still open.
+integration config entry was then reloaded without restarting Home Assistant.
+It returned `loaded` through `core_matter_client` with two wheels, one dual
+button and all six stored bindings. Its first post-reload physical single
+produced exactly one completion, one public event, one binding action and one
+intended target change; no old event replayed and no fallback or error
+appeared. Config-entry restore is therefore **Hardware PASS**. The final
+controlled Matter Server reconnect and remaining failure-injection checks are
+still open.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2535,10 +2542,11 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-Perform a controlled reload of only the IKEA BILRESA config entry, verify that
-all three devices and six bindings return through the core Matter client, then
-make one normal press. This covers integration restore without restarting Home
-Assistant before the final controlled Matter Server reconnect check.
+Perform a controlled restart of the Matter Server app, verify that the core
+Matter integration and IKEA BILRESA reconnect without fallback, that all three
+devices and six bindings return, then make one normal press. This is the final
+normal lifecycle gate before targeted unavailable-target/watchdog failure
+injection.
 
 ## Next-agent handoff
 
@@ -2553,7 +2561,9 @@ Assistant before the final controlled Matter Server reconnect check.
    overflow fix and immediate normal-single recovery passed the exact physical
    retest, and a later single passed after approximately 2 hours 11 minutes
    idle with no queued burst or reconnect. Adjacent use of the other dual-button
-   endpoint and wheel channel 3 also passed cross-endpoint/node no-leak.
+   endpoint and wheel channel 3 also passed cross-endpoint/node no-leak. A
+   config-entry reload restored all devices/bindings and its first single
+   exactly once.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
