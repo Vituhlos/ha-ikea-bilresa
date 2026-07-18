@@ -195,8 +195,10 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
 
 ### F4. Reliability and no-leak
 
-- [ ] After ~15 min idle (matterjs-server #526), the next press is still
-      delivered; note whether queued presses burst on resubscribe.
+- [x] After ~15 min idle (matterjs-server #526), the next press is still
+      delivered; note whether queued presses burst on resubscribe. **PASS on
+      RC.3 after ~2 h 11 min: one completion, one action, no queued Switch
+      burst, reconnect or fallback.**
 - [ ] The two buttons do not leak actions into each other.
 - [ ] A dual button and a scroll wheel used concurrently do not leak actions
       across Matter nodes.
@@ -298,12 +300,18 @@ Physical overflow follow-up:
   advanced the custom and core event entities once, increased
   `actions_dispatched` from zero to one and changed only its configured target
   once; the other observed light remained unchanged.
+- after approximately 2 hours 11 minutes without another valid Switch gesture
+  on that endpoint, the next normal single completed as count one, advanced
+  both event surfaces once and increased `actions_dispatched` from one to two;
+  no queued Switch burst, reconnect, fallback or matching integration error
+  appeared.
 
 Verdict: **PASS deployment smoke and PASS real zero-count overflow safeguard.**
 This confirms that RC.3 loads on Matter Server 9.1.0/schema 12 and correctly
 ignores the real E2489 `MultiPressComplete(0)`. **PASS immediate recovery:** the
-next valid single was neither lost nor duplicated. Overall B4 remains
-**IN PROGRESS** for idle-resume, no-leak and lifecycle gates.
+next valid single was neither lost nor duplicated. **PASS idle-resume:** a
+single after ~2 hours 11 minutes was delivered once without a queued burst.
+Overall B4 remains **IN PROGRESS** for no-leak and lifecycle gates.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 
