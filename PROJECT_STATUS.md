@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-17 by Codex**
+Last updated: **2026-07-18 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -34,9 +34,9 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. The latest published prerelease is
-  `v0.6.0-rc.1`; it exposed a real-device discovery defect and must be replaced
-  by corrective candidate `v0.6.0-rc.2` before B4 continues. Panel Phases 0-3
+- Latest stable release remains `v0.5.0`. The latest published and deployed
+  prerelease is corrective `v0.6.0-rc.2`; RC.1 exposed a real-device discovery
+  defect and is explicitly marked known-bad for the E2489. Panel Phases 0-3
   were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
@@ -647,9 +647,46 @@ Corrective RC.2 candidate preparation:
   format/check passed; mypy passed 20 source files; 251 Python tests and 16
   frontend tests passed; `git diff --check` passed with CRLF warnings only.
 
-Still pending: corrective commit/push, exact-revision CI, RC.2 prerelease, HACS
-update/restart and real-HA server-side verification of two wheels plus one dual
-button, two event entities, panel variant/controls and button-binding schema.
+Corrective RC.2 publication and controlled deployment completed on 2026-07-18:
+
+- corrective commit `fb290d3` (`fix: classify the real BILRESA dual button
+  shape`) was pushed to `agent/dual-button-0.6`; draft PR #2 was updated;
+- exact-revision GitHub Actions run `29633850027` passed all six jobs for full
+  commit `fb290d3e2d0d38faa1a5a5222412ab5bd0cfc528`: Ruff, mypy, frontend,
+  251 Python tests, HACS validation and hassfest;
+- prerelease `v0.6.0-rc.2` was published from that exact commit:
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.2;
+  the RC.1 release notes were amended to identify its known E2489 defect, and
+  the RC.1 tag was not moved;
+- the pre-restart Home Assistant config check was valid; HACS installed exactly
+  `v0.6.0-rc.2`; Home Assistant restarted and the config entry returned to
+  `loaded` with the post-restart config check valid;
+- System Health changed from **3 wheels / 0 buttons** on RC.1 to **2 wheels /
+  1 dual button** on RC.2. Matter is connected through `core_matter_client`,
+  no fallback is active, and all four existing wheel bindings were preserved;
+- sanitized integration diagnostics report version `0.6.0-rc.2` and the real
+  dual-button shape as `variant = dual_button`: two channel-less endpoints,
+  both normalized to role `button`, each with `MultiPressMax = 2`;
+- the Home Assistant device registry now contains two enabled
+  `ikea_bilresa` event entities for that device, Button 1 and Button 2, with the
+  HA button event device class;
+- the live server-side `ikea_bilresa/overview` snapshot returns the existing
+  panel contract (`contract_version = 4`) with the same device shell,
+  `variant = dual_button`, `channels = []` and independent unconfigured button
+  controls `1 / 2`. The frontend maps that variant to the dedicated dual-button
+  glyph, the `Tlačítka / Živý test / Diagnostika` tabs, and `Přidat propojení`
+  for each control;
+- the config-subentry create schema lists the dual-button device alongside both
+  wheels, so the native add-binding path can select it. No real binding was
+  created and no target-changing panel test was run;
+- the only matching startup log line is Home Assistant's standard warning for
+  an unreviewed custom integration; no BILRESA runtime error was recorded.
+
+This is **Implemented + Static + Unit + CI + Released + real-HA server-side
+deployment smoke** for RC.2. It corrects the precise server-side failure shown
+by the owner's RC.1 screenshots. It is deliberately not labelled Hardware:
+the owner still needs to open a completely fresh panel tab and physically press
+both buttons to verify gesture delivery and real target outcomes in B4.
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
@@ -2274,22 +2311,23 @@ mixed into their real-phone verification.
 
 ## Single best next action
 
-Finish corrective `v0.6.0-rc.2`: run the full local suite, exact-revision CI,
-publish a new prerelease without moving the RC.1 tag, install it through HACS
-and restart. Before asking the owner for another screenshot, verify that System
-Health changes from three wheels / zero buttons to two wheels / one button and
-that the server-side panel snapshot exposes variant `dual_button` with controls
-`1 / 2`. Only then continue B4 gestures and binding outcomes.
+Run B4 against deployed `v0.6.0-rc.2`: first open the panel in a completely
+fresh browser tab and confirm the dual-button glyph plus the shared `1 / 2`
+workbench. Then capture physical Button 1/2 single, double, hold and release in
+the adapted Live test before creating safe test bindings. Finally verify two
+independent targets and a shared light with fixed brighten/dim hold directions.
+Record each physical result and the exact device/HA versions without publishing
+installation-specific identifiers.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from release commit `b0c139a` plus the uncommitted RC.1 deployment and
-   corrective RC.2 record on `agent/dual-button-0.6`; then re-check HEAD, branch
-   and status.
+2. Start from RC.2 release commit `fb290d3` plus the deployment-record follow-up
+   on `agent/dual-button-0.6`; then re-check HEAD, branch and status.
 3. Do not move the `v0.6.0-rc.1` tag away from runtime commit `b0c139a`.
 4. RC.1 has Static, Python Unit, frontend Unit, exact-revision CI and Released
-   evidence, but its real E2489 discovery/panel result failed. RC.2 and every B4
-   Hardware outcome remain pending.
+   evidence, but its real E2489 discovery/panel result failed. RC.2 has the same
+   gates plus a successful real-HA server-side deployment smoke; every B4
+   physical Hardware outcome remains pending.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
