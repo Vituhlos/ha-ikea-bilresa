@@ -58,10 +58,15 @@ async def async_get_config_entry_diagnostics(
                 "node_id": node_id,
                 "name": wheel.name,
                 "serial": wheel.serial,
+                "variant": wheel.variant,
                 "linked_to_matter": link.device is not None,
                 "availability": wheel_availability(hass, link.device),
                 "endpoints": {
-                    ep: {"channel": e.channel, "role": e.role}
+                    ep: {
+                        "channel": e.channel,
+                        "role": e.role,
+                        "multi_press_max": e.multi_press_max,
+                    }
                     for ep, e in wheel.endpoints.items()
                 },
             }

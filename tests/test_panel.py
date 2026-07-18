@@ -540,7 +540,7 @@ def test_an_unconfigured_channel_stays_lighter_than_a_configured_one() -> None:
     )[0]
 
     assert 'el("div", "channel-empty")' in channel
-    assert 'this._t("channel_empty_title"' in channel
+    assert '"channel_empty_title"' in channel
     assert "min-block-size: 100%;" not in asset
 
     # Dimmed, never italic: HA does not italicise state, and an italic label is
@@ -559,7 +559,7 @@ def test_an_unconfigured_channel_stays_lighter_than_a_configured_one() -> None:
 def test_overview_rows_do_not_promise_per_channel_navigation() -> None:
     """Only the wheel card opens detail, so channel rows must not draw chevrons."""
     asset = _asset()
-    channel = asset.split("  _overviewChannel(channel) {", 1)[1].split(
+    channel = asset.split("  _overviewControl(device, control) {", 1)[1].split(
         "  _wheel(wheel) {", 1
     )[0]
     wheel = asset.split("  _wheel(wheel) {", 1)[1].split(
@@ -568,6 +568,44 @@ def test_overview_rows_do_not_promise_per_channel_navigation() -> None:
 
     assert "ICON.chevron" not in channel
     assert 'svg(ICON.chevron, "wheel-open")' in wheel
+
+
+def test_dual_button_reuses_the_panel_shell_with_two_button_controls() -> None:
+    """B3 is a variant of the existing panel, not a second application."""
+    asset = _asset()
+    buttons = asset.split("  _buttonsView(wheel) {", 1)[1].split(
+        "  _gestureLabel(activity) {", 1
+    )[0]
+    views = asset.split("  _viewsFor(device) {", 1)[1].split(
+        "  _controlsFor(device) {", 1
+    )[0]
+    form = asset.split("  _bindingForm(wheel, control) {", 1)[1].split(
+        "  _channelDetail(wheel, channel) {", 1
+    )[0]
+
+    assert 'el("div", "detail-shell")' in asset
+    assert 'el("div", "channel-workbench")' in buttons
+    assert 'el("div", "channel-spine")' in buttons
+    assert 'el("div", "channel-surface")' in buttons
+    assert "buttons.forEach((button, index) => {" in buttons
+    assert "this._openButtonAt(button.button)" in buttons
+    assert "this._channelDetail(wheel, open)" in buttons
+    assert '"button-list"' not in asset
+    assert '"button-surface"' not in asset
+    assert '["buttons", "live", "diagnostics"]' in views
+    assert "if (!isButton) primary.appendChild(this._scenesField())" in form
+    assert "if (!isButton) {" in form
+    assert '"triple_press_target"' in form
+    assert '"ramp_direction"' in form
+
+
+def test_binding_editor_offers_three_truthful_response_points() -> None:
+    asset = _asset()
+    form = asset.split("  _bindingForm(wheel, control) {", 1)[1].split(
+        "  _channelDetail(wheel, channel) {", 1
+    )[0]
+
+    assert '["multi_press", "fast", "instant"]' in form
 
 
 def test_panel_detail_tabs_follow_the_aria_keyboard_contract() -> None:
@@ -602,10 +640,36 @@ def test_live_test_leads_with_result_and_hides_synthetic_controls() -> None:
     asset = _asset()
 
     assert 'el("section", "detail-card live-output")' in asset
-    assert 'el("div", "live-result", this._formatResult(latest.result))' in asset
+    assert 'el("div", "live-result", this._liveResult(latest))' in asset
     assert 'el("section", "detail-card live-channels")' in asset
+    assert "this._liveControls(wheel)" in asset
     assert 'el("details", "detail-card test-panel")' in asset
     assert 'el("summary", null, this._t("test_controls_heading"))' in asset
+
+
+def test_live_test_turns_an_unconfigured_gesture_into_a_useful_empty_state() -> None:
+    """Recognized hardware is success even when no target has been configured."""
+    asset = _asset()
+
+    assert '"result_gesture_press"' in asset
+    assert '"result_not_configured_button_detail"' in asset
+    assert 'this._t(isButton ? "live_setup_button" : "live_setup_channel"' in asset
+    assert "this._configureFromLive(wheel, latest)" in asset
+    assert 'not_configured: [\n        "unknown",' in asset
+
+
+def test_recent_live_events_form_a_keyboard_scroll_region() -> None:
+    """A burst stays bounded on screen and remains reachable without a pointer."""
+    asset = _asset()
+
+    assert ".recent ol {" in asset
+    assert "max-block-size: 320px;" in asset
+    assert "overflow-y: auto;" in asset
+    assert "overscroll-behavior: contain;" in asset
+    assert "scrollbar-gutter: stable;" in asset
+    assert "list.tabIndex = 0;" in asset
+    assert 'list.setAttribute("aria-labelledby", recentHeading.id);' in asset
+    assert ".recent ol:focus-visible {" in asset
 
 
 def test_the_detent_strip_is_scaled_to_observed_hardware() -> None:
@@ -671,7 +735,8 @@ def test_binding_editor_uses_revision_checked_websocket_mutations() -> None:
     assert "expected_revision: this._editorBinding?.revision" in asset
     assert "binding_id: this._editorBinding?.id" in asset
     assert 'this._t("binding_conflict")' in asset
-    assert 'this._t("delete_binding_confirm")' in asset
+    assert '"delete_binding_confirm"' in asset
+    assert '"delete_button_binding_confirm"' in asset
 
 
 def test_panel_detail_has_a_back_path_at_every_width() -> None:

@@ -21,6 +21,12 @@ ATTR_BASIC_VENDOR_NAME = 1
 ATTR_BASIC_VENDOR_ID = 2
 ATTR_BASIC_PRODUCT_NAME = 3
 
+# Switch cluster attribute (cluster 0x003B). MultiPressMax is the highest press
+# count the endpoint will ever report; the dual button reports 2, the wheel's
+# buttons report 3. An endpoint never emits a completion above this value.
+ATTR_SWITCH_CURRENT_POSITION = 0  # 0x0000  Switch.CurrentPosition
+ATTR_SWITCH_MULTI_PRESS_MAX = 2  # 0x0002  Switch.MultiPressMax
+
 IKEA_VENDOR_ID = 4476  # 0x117C
 BILRESA_PRODUCT_MATCH = "bilresa"
 
@@ -67,6 +73,15 @@ ROLE_SCROLL_UP = "scroll_up"
 ROLE_SCROLL_DOWN = "scroll_down"
 ROLE_BUTTON = "button"
 
+# Device variants, distinguished by endpoint shape rather than product code.
+# A scroll wheel groups its switch endpoints under numeric channel labels. The
+# dual button (E2489) has exactly two switch endpoints without channel labels;
+# their semantic tags are up/down even though both are physical buttons.
+# Matching on shape, not on the "BILRESA" product string, keeps discovery
+# descriptor-driven. See docs/ROADMAP_BUTTON.md.
+VARIANT_WHEEL = "wheel"
+VARIANT_DUAL_BUTTON = "dual_button"
+
 # HA event-bus event fired for every decoded wheel action
 EVENT_BILRESA = "ikea_bilresa_event"
 
@@ -107,11 +122,31 @@ WHEEL_EVENT_TYPES = [
 
 PRESS_EVENT_TYPES = {1: ET_PRESS, 2: ET_DOUBLE_PRESS, 3: ET_TRIPLE_PRESS}
 
+
+def button_event_types(multi_press_max: int | None) -> list[str]:
+    """Event types a button endpoint advertises, capped by its MultiPressMax.
+
+    A device that never emits a triple press (the dual button, MultiPressMax 2)
+    must not advertise one — an automation offering a trigger the device cannot
+    fire is a lie. When the max is unknown, expose single + double (the dual
+    button's shape) but not triple. Rotation is deliberately absent: a button is
+    not a wheel channel.
+    """
+    types = [ET_PRESS]
+    if multi_press_max is None or multi_press_max >= 2:
+        types.append(ET_DOUBLE_PRESS)
+    if multi_press_max is not None and multi_press_max >= 3:
+        types.append(ET_TRIPLE_PRESS)
+    types.extend([ET_HOLD, ET_RELEASE])
+    return types
+
+
 # --- config subentries (GUI light bindings) -----------------------------
 SUBENTRY_BINDING = "binding"
 
 CONF_NODE_ID = "node_id"
 CONF_CHANNEL = "channel"
+CONF_ENDPOINT = "endpoint"
 CONF_TARGET = "target"
 CONF_MODE = "mode"
 CONF_STEP = "step"
@@ -126,6 +161,7 @@ CONF_DOUBLE_TARGET = "double_press_target"
 CONF_TRIPLE_TARGET = "triple_press_target"
 CONF_HOLD_TARGET = "hold_target"
 CONF_HOLD_ACTION = "hold_action"
+CONF_RAMP_DIRECTION = "ramp_direction"
 CONF_SCENES = "scenes"
 
 # Flow-only convenience fields used when creating a binding.
@@ -153,6 +189,18 @@ HOLD_NONE = "none"
 HOLD_ACTIONS = [HOLD_TOGGLE, HOLD_RAMP, HOLD_NONE]
 DEFAULT_HOLD_ACTION = HOLD_TOGGLE
 
+# A dual-button hold ramp may alternate like the historic wheel behavior or
+# take a fixed role so two endpoints form a software dimmer pair.
+RAMP_DIRECTION_ALTERNATE = "alternate"
+RAMP_DIRECTION_UP = "up"
+RAMP_DIRECTION_DOWN = "down"
+RAMP_DIRECTIONS = [
+    RAMP_DIRECTION_ALTERNATE,
+    RAMP_DIRECTION_UP,
+    RAMP_DIRECTION_DOWN,
+]
+DEFAULT_RAMP_DIRECTION = RAMP_DIRECTION_ALTERNATE
+
 DEFAULT_STEP = 3
 DEFAULT_ACCELERATION = 0
 DEFAULT_MIN_BRIGHTNESS = 1
@@ -162,9 +210,14 @@ DEFAULT_CLICK_ACTION = "toggle"
 
 # When the configured single-press action runs.  Missing values intentionally
 # keep the historic completion-aware behavior for existing stored bindings.
+BUTTON_RESPONSE_INSTANT = "instant"
 BUTTON_RESPONSE_FAST = "fast"
 BUTTON_RESPONSE_MULTI_PRESS = "multi_press"
-BUTTON_RESPONSES = [BUTTON_RESPONSE_FAST, BUTTON_RESPONSE_MULTI_PRESS]
+BUTTON_RESPONSES = [
+    BUTTON_RESPONSE_INSTANT,
+    BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_MULTI_PRESS,
+]
 DEFAULT_BUTTON_RESPONSE = BUTTON_RESPONSE_MULTI_PRESS
 
 # Scroll modes: what a rotation changes on the target entity.
@@ -240,10 +293,10 @@ DISCONNECT_GRACE_SECONDS = 60
 
 
 def signal_channel(node_id: int, channel: int | None) -> str:
-    """Per wheel-channel dispatcher signal carrying decoded WheelActions."""
+    """Per-node/channel signal; button endpoints share channel=None and filter."""
     return f"{DOMAIN}_action_{node_id}_{channel}"
 
 
 def signal_raw_button(node_id: int, channel: int | None) -> str:
-    """Internal per-channel signal carrying raw button event names."""
+    """Internal per-node/channel raw signal carrying endpoint metadata."""
     return f"{DOMAIN}_raw_button_{node_id}_{channel}"

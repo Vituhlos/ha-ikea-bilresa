@@ -22,17 +22,26 @@ The panel has **two layers**. Earlier revisions of this document described the
 top level three different ways; the following is the only valid reading.
 
 1. **Overview — the landing layer.** A responsive grid with one card per
-   physical wheel. Each card carries the wheel's name, area, status, last
-   activity and all three channel summaries. This layer answers the first
-   question in `Product intent`: what does each wheel control.
-2. **Wheel detail — opened from a card.** A 256 px wheel rail on the left and
-   the opened wheel on the right, with `Channels`, `Live test` and
-   `Diagnostics` as views of that wheel. The rail is a *switcher*, not the
-   overview: it makes moving between wheels one click without returning to the
+   physical BILRESA device. A wheel card carries all three channel summaries; a
+   dual-button card carries its two button summaries. Both carry the device
+   name, area, status and last activity. This layer answers the first question
+   in `Product intent`: what does each device control.
+2. **Device detail — opened from a card.** A 256 px BILRESA rail on the left
+   and the opened device on the right. A wheel has `Channels`, `Live test` and
+   `Diagnostics`; a dual button has `Buttons`, an adapted `Live test`, and
+   `Diagnostics`. The rail is a *switcher*, not the overview: it makes moving
+   between every discovered BILRESA device one click without returning to the
    grid.
 
 The live test is therefore a view inside an opened wheel, never the landing
 page.
+
+The dual-button detail is not a second visual direction. It reuses the wheel's
+existing numbered workbench: the grey `1 / 2 / 3` channel spine becomes a grey
+`1 / 2` button spine, and the selected button is shown in the same right-hand
+action ledger. The Live test remains, but reports button 1/2 press, double
+press, hold, release and the binding result. Only capabilities the hardware
+does not expose are removed: rotation, triple press and the detent strip.
 
 ### Why the rail is not the landing layer
 
@@ -421,6 +430,18 @@ The production layout keeps the large outcome surface on the left and a compact
 configured-channel/recent-activity column on the right. Panel-driven synthetic
 tests are secondary, collapsed by default, and explicitly warn that they may
 change real target entities.
+
+An unconfigured control is not a failed hardware test. When a physical gesture
+arrives without a binding, the hero must lead with the recognized gesture
+(`Press recognized`, `Rotation recognized`, and so on), then explain that the
+control does not operate a target yet and offer to configure that exact channel
+or button. Internal fallbacks such as `calculated result not reported` must not
+be shown for this ordinary first-run state.
+
+The recent-event list is bounded both in memory and on screen. Its list has a
+maximum visual height and its own vertical scroll region, labelled and
+keyboard-focusable so Page Up/Down and arrow scrolling work without a pointer.
+New activity must not keep extending the whole device-detail page.
 
 ### Diagnostics
 

@@ -20,7 +20,10 @@ from homeassistant.helpers.event import async_call_later
 
 from .binding import LightBinding
 from .const import (
+    ATTR_SWITCH_CURRENT_POSITION,
     CLUSTER_SWITCH,
+    CONF_CHANNEL,
+    CONF_ENDPOINT,
     DISCONNECT_GRACE_SECONDS,
     DOMAIN,
     EVENT_BILRESA,
@@ -38,6 +41,15 @@ from .matter_ws import MatterWSClient
 from .model import BilresaWheel, decode_event, parse_node
 
 _LOGGER = logging.getLogger(__name__)
+
+BindingKey = tuple[int, str, int]
+
+
+def _action_binding_key(action: WheelAction) -> BindingKey:
+    """Address wheel channels and button endpoints without sharing a keyspace."""
+    if action.channel is not None:
+        return (action.node_id, CONF_CHANNEL, action.channel)
+    return (action.node_id, CONF_ENDPOINT, action.endpoint_id)
 
 
 class BilresaCoordinator:
@@ -60,8 +72,8 @@ class BilresaCoordinator:
         self._source_switch_lock = asyncio.Lock()
         self._stopping = False
         self._binding_unsubs: list[Callable[[], None]] = []
-        self._binding_keys: set[tuple[int, int]] = set()
-        self._bindings: dict[tuple[int, int], LightBinding] = {}
+        self._binding_keys: set[BindingKey] = set()
+        self._bindings: dict[BindingKey, LightBinding] = {}
         self._disconnect_timer: Callable[[], None] | None = None
         self._event_counts: Counter[str] = Counter()
         self._ignored_counts: Counter[str] = Counter()
@@ -162,11 +174,11 @@ class BilresaCoordinator:
                 continue
             binding = LightBinding(self.hass, dict(subentry.data))
             self._binding_unsubs.append(binding.async_attach())
-            key = (binding.node_id, binding.channel)
+            key = binding.binding_key
             self._binding_keys.add(key)
             self._bindings[key] = binding
         if self._binding_unsubs:
-            _LOGGER.debug("Attached %s light binding(s)", len(self._binding_unsubs))
+            _LOGGER.debug("Attached %s control binding(s)", len(self._binding_unsubs))
 
     @callback
     def _detach_bindings(self) -> None:
@@ -179,7 +191,7 @@ class BilresaCoordinator:
     @callback
     def test_binding_action(self, action: WheelAction) -> bool:
         """Execute a synthetic panel test through one configured binding."""
-        binding = self._bindings.get((action.node_id, action.channel or 0))
+        binding = self._bindings.get(_action_binding_key(action))
         if binding is None:
             return False
         binding.test_action(action)
@@ -196,10 +208,14 @@ class BilresaCoordinator:
             self._set_connected(False)
         elif event_type == "__nodes__":
             self._handle_nodes(data)
-        elif event_type == "node_added":
+        elif event_type in ("node_added", "node_updated"):
             self._add_node(data)
         elif event_type == "node_removed":
             self._remove_node(data)
+        elif event_type == "attribute_updated":
+            self._handle_attribute_updated(data)
+        elif event_type == "server_shutdown":
+            self._set_connected(False)
         elif event_type == "node_event" and isinstance(data, dict):
             self._last_event_at = datetime.now(UTC)
             self._recent_events.append(
@@ -213,6 +229,41 @@ class BilresaCoordinator:
             self._handle_node_event(data)
         else:
             self._ignored_counts["unsupported_event"] += 1
+
+    @callback
+    def _handle_attribute_updated(self, data: Any) -> None:
+        """Consume Switch.CurrentPosition as a release/stuck-state safety hint."""
+        if not isinstance(data, (list, tuple)) or len(data) != 3:
+            self._ignored_counts["malformed_attribute_update"] += 1
+            return
+        node_id, path, value = data
+        if not isinstance(node_id, int) or not isinstance(path, str):
+            self._ignored_counts["malformed_attribute_update"] += 1
+            return
+        wheel = self.wheels.get(node_id)
+        if wheel is None:
+            self._ignored_counts["unknown_attribute_node"] += 1
+            return
+        parts = path.split("/")
+        if len(parts) != 3:
+            self._ignored_counts["malformed_attribute_path"] += 1
+            return
+        try:
+            endpoint_id, cluster_id, attribute_id = (int(part) for part in parts)
+        except ValueError:
+            self._ignored_counts["malformed_attribute_path"] += 1
+            return
+        if (
+            cluster_id != CLUSTER_SWITCH
+            or attribute_id != ATTR_SWITCH_CURRENT_POSITION
+            or endpoint_id not in wheel.endpoints
+        ):
+            self._ignored_counts["irrelevant_attribute_update"] += 1
+            return
+        if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
+            self._ignored_counts["invalid_switch_position"] += 1
+            return
+        self._engine.observe_position(node_id, endpoint_id, value)
 
     @callback
     def _handle_node_event(self, data: dict) -> None:
@@ -236,6 +287,7 @@ class BilresaCoordinator:
             signal_raw_button(wheel.node_id, decoded["channel"]),
             decoded["role"],
             decoded["event_type"],
+            decoded["endpoint_id"],
         )
         action = self._engine.process(wheel, decoded)
         if action is not None:
@@ -265,7 +317,7 @@ class BilresaCoordinator:
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )
-        if (action.node_id, action.channel) not in self._binding_keys:
+        if _action_binding_key(action) not in self._binding_keys:
             async_dispatcher_send(
                 self.hass,
                 SIGNAL_BINDING_ACTIVITY,
@@ -310,7 +362,8 @@ class BilresaCoordinator:
             _LOGGER.info("Updated BILRESA wheel metadata for node %s", wheel.node_id)
             return True
         _LOGGER.info(
-            "Discovered BILRESA wheel: node %s '%s' -> %s",
+            "Discovered BILRESA %s: node %s '%s' -> %s",
+            wheel.variant,
             wheel.node_id,
             wheel.name,
             {ep: (e.channel, e.role) for ep, e in wheel.endpoints.items()},

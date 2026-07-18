@@ -15,6 +15,11 @@ def generated_binding_title(label: str, channel: str) -> str:
     return f"{label} · CH {channel}"
 
 
+def generated_button_binding_title(label: str, button: str) -> str:
+    """Return a compact, language-neutral title for a button binding."""
+    return f"{label} · BTN {button}"
+
+
 def migrate_generated_binding_title(title: str) -> str:
     """Normalize only titles created by earlier integration versions."""
     match = _GENERATED_BINDING_SUFFIX.fullmatch(title)

@@ -7,6 +7,121 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.6] - 2026-07-18
+
+### Fixed
+- A delayed target-state report can no longer rebase an absolute wheel target
+  while the same raw Matter scroll is still active. Active scrolls are tracked
+  independently by endpoint, so a quick direction reversal cannot let the old
+  direction's completion erase confirmed steps from the new direction. Lost
+  completion events expire after a bounded safety window.
+
+## [0.6.0-rc.5] - 2026-07-18
+
+### Changed
+- Scroll-wheel bindings now react to every confirmed Matter `InitialPress`
+  immediately, then subtract those eager notches from later cumulative counts.
+  This removes the firmware's batching wait without applying a step twice.
+- Switch `CurrentPosition = 0` no longer clears an active rotary cumulative
+  sequence; it remains a release/stuck-state hint for physical buttons.
+- Missing, malformed, zero-overflow and above-`MultiPressMax` rotary completion
+  counts now end local accounting safely instead of leaking stale state into the
+  next gesture.
+- Bounded rotation modes no longer repeat an identical Home Assistant service
+  call after brightness, color temperature, volume, cover position, climate
+  temperature, fan speed or number value reaches its effective limit. The live
+  test records the gesture as completed with an unchanged value; cyclic hue
+  rotation continues to wrap normally.
+- Hold-to-ramp pauses its recurring interval at a target limit while retaining
+  release-direction handling and the lost-release watchdog.
+
+## [0.6.0-rc.4] - 2026-07-18
+
+### Fixed
+- A controlled Matter Server restart no longer makes the integration abandon
+  Home Assistant's supported core Matter client during the temporary
+  config-entry unload. Runtime monitoring now allows a one-minute restart
+  grace period and reattaches to the replacement core client when it returns.
+  Initial incompatibility still falls back immediately, while a persistent
+  runtime incompatibility still falls back after the grace period.
+
+## [0.6.0-rc.3] - 2026-07-18
+
+### Changed
+- Live test now treats an unconfigured physical gesture as a successful
+  hardware-recognition state instead of showing the internal fallback
+  "calculated result not reported". It explains that the control does not
+  operate a target yet and offers a direct action to configure that exact
+  channel or button.
+- The live-test introduction and status text now distinguish gesture
+  recognition from a configured target action. The side summary is titled
+  simply "Channels" or "Buttons" because it includes configured and
+  unconfigured controls.
+- Recent live events use a bounded, keyboard-focusable scroll region, so an
+  event burst no longer keeps extending the page.
+- Matter Server add-on 9.1.0 / matterjs-server 1.2.6 is accepted through its
+  supported schema-11 compatibility profile while System Health distinguishes
+  the server's schema 12 from the client compatibility schema.
+- `node_updated`, `attribute_updated` and `server_shutdown` now have explicit
+  passive handling. Switch `CurrentPosition` is used only to clear stale
+  gesture state, never to manufacture a click.
+- Button response now has three truthful policies: Instant initial press, Fast
+  release and Multi-press aware. Instant is accepted only for an unambiguous
+  single action with hold disabled, and completion is suppressed from executing
+  that direct binding twice while public gesture events remain unchanged.
+- Hold/release actions carry `observed_duration_ms` when one uninterrupted
+  monotonic press observation exists. Live test labels it as integration-
+  observed duration; reconnect or a release safety hint clears it rather than
+  inventing a value.
+
+### Fixed
+- A Matter 1.6 multi-press completion with count `0` (overflow past
+  `MultiPressMax`) is no longer misread as a single press. Positive counts
+  above the endpoint's advertised maximum are ignored as invalid as well.
+
+## [0.6.0-rc.2] - 2026-07-18
+
+### Fixed
+- The real E2489's two physical buttons carry Matter semantic `up` / `down`
+  tags even though neither endpoint has a numeric wheel channel. RC.1 treated
+  those tags as rotary evidence, so the already discovered device still showed
+  the wheel icon, an empty three-channel view and no button-binding controls.
+- Variant discovery now uses the stable live endpoint shape: exactly two Switch
+  endpoints without numeric channel labels identify the dual button. Their
+  semantic roles are normalized to buttons before the gesture engine, event
+  entities, device triggers, config flow and panel consume them.
+- Downloadable diagnostics now expose the sanitized device variant and each
+  endpoint's `MultiPressMax`, making future hardware-shape regressions visible
+  without leaking household identifiers.
+
+## [0.6.0-rc.1] - 2026-07-17
+
+### Added
+- BILRESA devices are now classified from their Matter endpoint shape as either
+  a scroll wheel or an E2489 dual button, so a button-only device is no longer
+  presented as an empty wheel.
+- Each physical dual-button control gets its own event entity and device
+  triggers for single press, double press, hold and release. Rotation and
+  triple press are never advertised for `MultiPressMax = 2`.
+- Dual-button bindings are stored and dispatched by Matter endpoint, so both
+  buttons on each device — and any number of dual-button devices — can keep
+  independent single-press, double-press and hold targets without colliding on
+  their shared `channel = None` signal.
+- Dual-button hold-to-ramp supports fixed brighten/dim roles for a
+  two-button "software DIRIGERA" pair, or the existing alternating direction,
+  with the same release, reconnect, new-gesture and watchdog safety stops.
+- The native config flow now builds a hardware-specific form after the device
+  is selected. Dual buttons never show rotary, scene or triple-press options;
+  wheel profiles and their existing rotary options are unchanged.
+- A bundled `bilresa:dual-button` two-path glyph now identifies dual-button
+  event entities through both supported Home Assistant custom-icon contracts.
+- The existing BILRESA panel now includes every dual-button device alongside
+  the wheels. Its unchanged detail workbench adapts the numbered channel spine
+  from `1 / 2 / 3` to independently configurable buttons `1 / 2`, while
+  omitting only rotation, triple-press and detent controls the hardware does
+  not have. The existing Live test reports which button was pressed and the
+  resulting action outcome. Matter endpoint ids remain server-side.
+
 ## [0.5.9-rc.12] - 2026-07-17
 
 ### Changed
@@ -465,7 +580,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.8...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.6...HEAD
+[0.6.0-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.5...v0.6.0-rc.6
+[0.6.0-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.4...v0.6.0-rc.5
+[0.6.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.3...v0.6.0-rc.4
+[0.6.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.2...v0.6.0-rc.3
+[0.6.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...v0.6.0-rc.2
+[0.6.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.9-rc.12...v0.6.0-rc.1
 [0.5.7-rc.8]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.7...v0.5.7-rc.8
 [0.5.7-rc.7]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.6...v0.5.7-rc.7
 [0.5.7-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.5...v0.5.7-rc.6

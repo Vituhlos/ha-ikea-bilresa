@@ -1,11 +1,11 @@
 """Turnkey control bindings configured via config subentries.
 
-A binding subscribes to one wheel channel and drives a target entity directly.
-Depending on its *mode*, scrolling adjusts a light's brightness / colour
-temperature / colour, a media player's volume, a cover's position, a climate
-target temperature, a fan's speed, or a number's value. A single / double /
-triple press and a hold each run an optional action, which may target a
-*different* entity (e.g. dim a bulb but toggle the Shelly in the wall switch).
+A binding subscribes either to one wheel channel or to one endpoint of a dual
+button. Depending on its *mode*, wheel scrolling adjusts a light's brightness /
+colour temperature / colour, a media player's volume, a cover's position, a
+climate target temperature, a fan's speed, or a number's value. Button-only
+bindings omit all rotary configuration while retaining single / double press
+and hold actions.
 
 Values are tracked internally as an absolute target rather than issued as
 relative steps. This avoids reading a mid-transition value back from the entity
@@ -41,6 +41,7 @@ from .const import (
     ACTION_RELEASE,
     ACTION_ROTATE,
     BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_INSTANT,
     CLICK_NONE,
     CLICK_OFF,
     CLICK_ON,
@@ -50,12 +51,14 @@ from .const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
+    CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_STEP,
     CONF_TARGET,
@@ -68,6 +71,7 @@ from .const import (
     DEFAULT_MAX_BRIGHTNESS,
     DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_MODE,
+    DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_TRANSITION,
     DIRECTION_UP,
@@ -76,6 +80,7 @@ from .const import (
     EVT_SHORT_RELEASE,
     FALLBACK_MAX_KELVIN,
     FALLBACK_MIN_KELVIN,
+    HOLD_NONE,
     HOLD_RAMP,
     HOLD_TOGGLE,
     MODE_COLOR,
@@ -85,6 +90,8 @@ from .const import (
     MODE_NUMBER,
     MODE_TEMPERATURE,
     MODE_VOLUME,
+    RAMP_DIRECTION_ALTERNATE,
+    RAMP_DIRECTION_DOWN,
     ROLE_BUTTON,
     ROLE_SCROLL_DOWN,
     ROLE_SCROLL_UP,
@@ -116,6 +123,10 @@ _STATE_ECHO_MARGIN = 0.25
 
 # A missing gesture boundary must not suppress rotation indefinitely.
 _TRAILING_GESTURE_TIMEOUT = 2.0
+# Matter rotary batches observed on the physical E2490 arrive roughly every
+# 0.5 seconds. Four such intervals protect an active target calculation while
+# still recovering promptly if MultiPressComplete is lost.
+_ACTIVE_SCROLL_TIMEOUT = 2.0
 
 # Acceleration is derived from recent decoded velocity, never a single Matter
 # batch size. Defaults remain disabled until physical tuning is complete.
@@ -152,16 +163,36 @@ def _as_float(value: Any) -> float | None:
 
 
 class LightBinding:
-    """Runtime for one GUI-configured wheel-channel -> entity binding."""
+    """Runtime for one GUI-configured wheel channel or button endpoint."""
 
     def __init__(self, hass: HomeAssistant, data: dict[str, Any]) -> None:
         self.hass = hass
         self._node_id = int(data[CONF_NODE_ID])
-        self._channel = int(data[CONF_CHANNEL])
-        self._target = data[CONF_TARGET]
+        raw_channel = data.get(CONF_CHANNEL)
+        raw_endpoint = data.get(CONF_ENDPOINT)
+        self._channel = int(raw_channel) if raw_channel is not None else None
+        self._endpoint_id = int(raw_endpoint) if raw_endpoint is not None else None
+        if (self._channel is None) == (self._endpoint_id is None):
+            raise ValueError(
+                "A BILRESA binding must contain exactly one of channel or endpoint"
+            )
+        self._hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
+        self._hold_target = data.get(CONF_HOLD_TARGET)
+        self._target: str = data.get(CONF_TARGET) or ""
+        if self._endpoint_id is not None and self._hold_action == HOLD_RAMP:
+            # A button has no rotary target. Its hold target becomes the
+            # brightness-ramp target while the rotary-only mode remains hidden.
+            self._target = self._hold_target or ""
+        if self._channel is not None and not self._target:
+            raise ValueError("A wheel-channel binding requires a target")
         self._mode = data.get(CONF_MODE, DEFAULT_MODE)
-        self._mode_target_valid = mode_supports_target(self._mode, self._target)
-        if not self._mode_target_valid:
+        self._mode_target_valid = bool(self._target) and mode_supports_target(
+            self._mode, self._target
+        )
+        if not self._mode_target_valid and (
+            self._channel is not None
+            or (self._endpoint_id is not None and self._hold_action == HOLD_RAMP)
+        ):
             _LOGGER.error(
                 "Disabling incompatible BILRESA binding mode %s for target %s",
                 self._mode,
@@ -177,14 +208,14 @@ class LightBinding:
         )
         self._transition = float(data.get(CONF_TRANSITION, DEFAULT_TRANSITION))
         self._click = data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION)
-        self._click_target = data.get(CONF_CLICK_TARGET) or self._target
+        self._click_target: str | None = data.get(CONF_CLICK_TARGET) or self._target
         self._double_target = data.get(CONF_DOUBLE_TARGET)
         self._triple_target = data.get(CONF_TRIPLE_TARGET)
-        self._hold_target = data.get(CONF_HOLD_TARGET)
-        self._hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
         self._scenes: list[str] = list(data.get(CONF_SCENES) or [])
         self._scene_index = 0
-        self._ramp_up = True
+        self._ramp_direction = data.get(CONF_RAMP_DIRECTION, DEFAULT_RAMP_DIRECTION)
+        self._ramp_up = self._ramp_direction != RAMP_DIRECTION_DOWN
+        self._ramp_active = False
         self._ramp_unsub: Callable[[], None] | None = None
         self._ramp_watchdog_unsub: Callable[[], None] | None = None
         self._tracked: float | None = None
@@ -193,6 +224,7 @@ class LightBinding:
         self._saturation = 100.0
         self._last = 0.0
         self._scroll_gesture = 0
+        self._active_scrolls: dict[int | None, float] = {}
         self._button_scroll_boundary: int | None = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
@@ -200,10 +232,20 @@ class LightBinding:
         self._velocity_direction: str | None = None
         self._reset_velocity_after_rotate = False
         self._unavailable_targets: set[str] = set()
-        self._fast_single = (
-            data.get(CONF_BUTTON_RESPONSE, DEFAULT_BUTTON_RESPONSE)
-            == BUTTON_RESPONSE_FAST
+        button_response = data.get(CONF_BUTTON_RESPONSE, DEFAULT_BUTTON_RESPONSE)
+        instant_requested = button_response == BUTTON_RESPONSE_INSTANT
+        self._instant_single = (
+            instant_requested
+            and self._double_target is None
+            and self._triple_target is None
+            and self._hold_action == HOLD_NONE
         )
+        if instant_requested and not self._instant_single:
+            _LOGGER.error(
+                "Disabling ambiguous BILRESA Instant response; use validation "
+                "to remove multi-press and hold actions"
+            )
+        self._fast_single = button_response == BUTTON_RESPONSE_FAST
         self._fast_press_started: float | None = None
         self._latency_trace_sequence = 0
         self._latency_trace_started_at: float | None = None
@@ -217,9 +259,22 @@ class LightBinding:
         return self._node_id
 
     @property
-    def channel(self) -> int:
-        """Physical channel this binding listens to."""
+    def channel(self) -> int | None:
+        """Physical wheel channel, or None for a button endpoint binding."""
         return self._channel
+
+    @property
+    def endpoint_id(self) -> int | None:
+        """Physical button endpoint, or None for a wheel-channel binding."""
+        return self._endpoint_id
+
+    @property
+    def binding_key(self) -> tuple[int, str, int]:
+        """Collision-free runtime key across wheels, buttons and devices."""
+        if self._channel is not None:
+            return (self._node_id, CONF_CHANNEL, self._channel)
+        assert self._endpoint_id is not None
+        return (self._node_id, CONF_ENDPOINT, self._endpoint_id)
 
     @callback
     def test_action(self, action: WheelAction) -> None:
@@ -232,7 +287,7 @@ class LightBinding:
         action_unsub = async_dispatcher_connect(
             self.hass,
             signal_channel(self._node_id, self._channel),
-            self._handle_action,
+            self._handle_dispatched_action,
         )
         raw_button_unsub = async_dispatcher_connect(
             self.hass,
@@ -242,8 +297,12 @@ class LightBinding:
         connection_unsub = async_dispatcher_connect(
             self.hass, SIGNAL_CONNECTION, self._handle_connection_change
         )
-        state_unsub = async_track_state_change_event(
-            self.hass, [self._target], self._handle_target_state_change
+        state_unsub = (
+            async_track_state_change_event(
+                self.hass, [self._target], self._handle_target_state_change
+            )
+            if self._target
+            else None
         )
         trace_state_unsub = (
             async_track_state_change_event(
@@ -251,7 +310,7 @@ class LightBinding:
                 [self._click_target],
                 self._handle_latency_target_state_change,
             )
-            if self._click_target != self._target
+            if self._click_target is not None and self._click_target != self._target
             else None
         )
 
@@ -262,7 +321,8 @@ class LightBinding:
             self._reset_latency_trace()
             if trace_state_unsub is not None:
                 trace_state_unsub()
-            state_unsub()
+            if state_unsub is not None:
+                state_unsub()
             connection_unsub()
             raw_button_unsub()
             action_unsub()
@@ -270,13 +330,23 @@ class LightBinding:
         return unsubscribe
 
     @callback
+    def _handle_dispatched_action(self, action: WheelAction) -> None:
+        """Filter the shared channel=None signal to this physical endpoint."""
+        if action.node_id != self._node_id or (
+            self._endpoint_id is not None and action.endpoint_id != self._endpoint_id
+        ):
+            return
+        self._handle_action(action)
+
+    @callback
     def _handle_action(self, action: WheelAction) -> None:
         previous_action = self._active_action
         self._active_action = action
         try:
-            if self._ramp_unsub is not None and action.type in (
+            if self._ramp_active and action.type in (
                 ACTION_ROTATE,
                 ACTION_PRESS,
+                ACTION_HOLD,
             ):
                 # Any new gesture supersedes a hold whose release may have been lost.
                 self._stop_ramp(change_direction=False)
@@ -331,6 +401,7 @@ class LightBinding:
         self._tracked = None
         self._command_authoritative_until = 0.0
         self._last_direction = None
+        self._active_scrolls.clear()
         self._button_scroll_boundary = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
@@ -348,10 +419,22 @@ class LightBinding:
             self._command_authoritative_until = 0.0
             self._stop_ramp(change_direction=False)
             return
-        # Ignore bounded state echoes from our own in-flight service/transition.
-        # Once that window closes, any state event invalidates the desired value
-        # and the next wheel action reads reality again.
-        if time.monotonic() >= self._command_authoritative_until:
+        # Matter may batch one continuous scroll for several seconds while the
+        # target reports older absolute values between decoded deltas. Keep the
+        # newest calculated target authoritative until the raw gesture ends;
+        # otherwise a delayed zero-transition echo can erase confirmed notches.
+        now = time.monotonic()
+        self._active_scrolls = {
+            endpoint_id: last_seen
+            for endpoint_id, last_seen in self._active_scrolls.items()
+            if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
+        }
+        if self._active_scrolls:
+            return
+        # Outside an active gesture, ignore only state echoes covered by the
+        # configured service transition. A later external update invalidates
+        # the desired value so the next gesture reads reality again.
+        if now >= self._command_authoritative_until:
             self._tracked = None
 
     @callback
@@ -367,15 +450,24 @@ class LightBinding:
         self._log_latency_stage("target_state_change")
 
     @callback
-    def _handle_raw_input(self, role: str, event_type: str) -> None:
+    def _handle_raw_input(
+        self, role: str, event_type: str, endpoint_id: int | None = None
+    ) -> None:
         """Track private gesture boundaries and forward button hints."""
+        if self._endpoint_id is not None and endpoint_id != self._endpoint_id:
+            return
         if role in (ROLE_SCROLL_UP, ROLE_SCROLL_DOWN):
+            now = time.monotonic()
             if event_type == _INITIAL_PRESS:
                 self._scroll_gesture += 1
+                self._active_scrolls[endpoint_id] = now
                 self._reset_velocity()
             elif event_type == _COMPLETE:
                 # The raw completion precedes its possible final delta action.
+                self._active_scrolls.pop(endpoint_id, None)
                 self._reset_velocity_after_rotate = True
+            elif endpoint_id in self._active_scrolls:
+                self._active_scrolls[endpoint_id] = now
             return
         if role != ROLE_BUTTON:
             return
@@ -385,8 +477,8 @@ class LightBinding:
 
     @callback
     def _handle_raw_button(self, event_type: str) -> None:
-        """Run an unambiguous single-press binding on ShortRelease."""
-        if not self._fast_single:
+        """Run an unambiguous early single-press binding exactly once."""
+        if not self._fast_single and not self._instant_single:
             return
         now = time.monotonic()
         if event_type == _INITIAL_PRESS:
@@ -395,16 +487,27 @@ class LightBinding:
                 and now - self._fast_press_started > _FAST_PRESS_GESTURE_TIMEOUT
             ):
                 self._fast_press_started = None
+            if self._instant_single and self._fast_press_started is None:
+                self._run_early_single(now, _INITIAL_PRESS)
             return
-        if event_type != _SHORT_RELEASE or self._fast_press_started is not None:
+        if (
+            not self._fast_single
+            or event_type != _SHORT_RELEASE
+            or self._fast_press_started is not None
+        ):
             return
 
         # A hold ends with LongRelease, so ShortRelease is safe for the normal
         # click action. Further releases in the same multi-press gesture are
         # collapsed until its public MultiPressComplete action arrives.
+        self._run_early_single(now, _SHORT_RELEASE)
+
+    @callback
+    def _run_early_single(self, now: float, stage: str) -> None:
+        """Execute the configured single action and arm completion suppression."""
         self._fast_press_started = now
-        self._start_latency_trace(now)
-        if self._ramp_unsub is not None:
+        self._start_latency_trace(now, stage)
+        if self._ramp_active:
             self._stop_ramp(change_direction=False)
         self._hold_off_rotation()
         previous_action = self._active_action
@@ -412,7 +515,7 @@ class LightBinding:
             node_id=self._node_id,
             wheel_name="",
             channel=self._channel,
-            endpoint_id=0,
+            endpoint_id=self._endpoint_id or 0,
             type=ACTION_PRESS,
             presses=1,
         )
@@ -421,7 +524,7 @@ class LightBinding:
         finally:
             self._active_action = previous_action
 
-    def _start_latency_trace(self, now: float) -> None:
+    def _start_latency_trace(self, now: float, stage: str) -> None:
         """Start a privacy-safe fast-press trace only while DEBUG is enabled."""
         if not _LOGGER.isEnabledFor(logging.DEBUG):
             self._reset_latency_trace()
@@ -429,7 +532,7 @@ class LightBinding:
         self._latency_trace_sequence += 1
         self._latency_trace_started_at = now
         self._latency_trace_target_seen = False
-        self._log_latency_stage("short_release", now=now)
+        self._log_latency_stage(stage, now=now)
 
     def _reset_latency_trace(self) -> None:
         """Discard transient latency measurement state."""
@@ -496,10 +599,12 @@ class LightBinding:
                 "action_id": current.action_id,
                 "node_id": self._node_id,
                 "channel": self._channel,
+                "endpoint_id": self._endpoint_id,
                 "type": current.type,
                 "direction": current.direction,
                 "notches": current.notches,
                 "presses": current.presses,
+                "observed_duration_ms": current.observed_duration_ms,
                 "source": current.source,
                 "result": result,
                 "dispatch_status": status,
@@ -522,6 +627,28 @@ class LightBinding:
             "after": after,
             "unit": unit,
         }
+
+    @callback
+    def _call_value_if_changed(
+        self,
+        domain: str,
+        service: str,
+        data: dict[str, Any],
+        *,
+        before: float | int,
+        after: float | int,
+        result: dict[str, Any],
+    ) -> bool:
+        """Dispatch a bounded value only when its service payload can change."""
+        if before == after:
+            self._report_activity(
+                "completed",
+                result=result,
+                reason="target_unchanged",
+            )
+            return False
+        self._call(domain, service, data, result=result)
+        return True
 
     # -- rotation ---------------------------------------------------------
 
@@ -551,50 +678,54 @@ class LightBinding:
         return False
 
     @callback
-    def _rotate_by(self, notches: int, up: bool) -> None:
+    def _rotate_by(self, notches: int, up: bool) -> bool:
         if not self._mode_target_valid:
             self._report_activity("skipped", reason="mode_target_mismatch")
             self._tracked = None
             self._stop_ramp(change_direction=False)
-            return
+            return False
         if self._available_state(self._target) is None:
             self._report_activity("skipped", reason="target_unavailable")
             self._tracked = None
             self._stop_ramp(change_direction=False)
-            return
+            return False
         if self._mode == MODE_COLOR_TEMP:
-            self._rotate_color_temp(notches, up)
-        elif self._mode == MODE_COLOR:
-            self._rotate_color(notches, up)
-        elif self._mode == MODE_VOLUME:
-            self._rotate_volume(notches, up)
-        elif self._mode == MODE_COVER:
-            self._rotate_cover(notches, up)
-        elif self._mode == MODE_TEMPERATURE:
-            self._rotate_temperature(notches, up)
-        elif self._mode == MODE_FAN:
-            self._rotate_fan(notches, up)
-        elif self._mode == MODE_NUMBER:
-            self._rotate_number(notches, up)
-        else:
-            self._rotate_brightness(notches, up)
+            return self._rotate_color_temp(notches, up)
+        if self._mode == MODE_COLOR:
+            return self._rotate_color(notches, up)
+        if self._mode == MODE_VOLUME:
+            return self._rotate_volume(notches, up)
+        if self._mode == MODE_COVER:
+            return self._rotate_cover(notches, up)
+        if self._mode == MODE_TEMPERATURE:
+            return self._rotate_temperature(notches, up)
+        if self._mode == MODE_FAN:
+            return self._rotate_fan(notches, up)
+        if self._mode == MODE_NUMBER:
+            return self._rotate_number(notches, up)
+        return self._rotate_brightness(notches, up)
 
     # -- hold-to-ramp -----------------------------------------------------
 
     @callback
     def _start_ramp(self) -> None:
         if (
-            self._ramp_unsub is not None
+            self._ramp_active
+            or not self._target
             or not self._mode_target_valid
             or self._available_state(self._target) is None
         ):
             self._report_activity("skipped", reason="ramp_unavailable")
             return
+        self._ramp_active = True
         self._ramp_action = self._active_action
-        self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
-        self._ramp_unsub = async_track_time_interval(
-            self.hass, self._ramp_tick, _RAMP_INTERVAL
-        )
+        changed = self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+        if not self._ramp_active:
+            return
+        if changed:
+            self._ramp_unsub = async_track_time_interval(
+                self.hass, self._ramp_tick, _RAMP_INTERVAL
+            )
         self._ramp_watchdog_unsub = async_call_later(
             self.hass, _RAMP_WATCHDOG_SECONDS, self._ramp_watchdog
         )
@@ -604,9 +735,18 @@ class LightBinding:
         previous_action = self._active_action
         self._active_action = self._ramp_action
         try:
-            self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+            if not self._rotate_by(_RAMP_NOTCHES, self._ramp_up):
+                self._pause_ramp_at_limit()
         finally:
             self._active_action = previous_action
+
+    @callback
+    def _pause_ramp_at_limit(self) -> None:
+        """Stop recurring ticks while retaining release/watchdog accounting."""
+        if self._ramp_unsub is None:
+            return
+        self._ramp_unsub()
+        self._ramp_unsub = None
 
     @callback
     def _ramp_watchdog(self, _now) -> None:
@@ -619,15 +759,22 @@ class LightBinding:
 
     @callback
     def _stop_ramp(self, *, change_direction: bool) -> None:
-        if self._ramp_unsub is None:
+        if (
+            not self._ramp_active
+            and self._ramp_action is None
+            and self._ramp_unsub is None
+            and self._ramp_watchdog_unsub is None
+        ):
             return
-        self._ramp_unsub()
-        self._ramp_unsub = None
+        if self._ramp_unsub is not None:
+            self._ramp_unsub()
+            self._ramp_unsub = None
         if self._ramp_watchdog_unsub is not None:
             self._ramp_watchdog_unsub()
             self._ramp_watchdog_unsub = None
-        if change_direction:
+        if change_direction and self._ramp_direction == RAMP_DIRECTION_ALTERNATE:
             self._ramp_up = not self._ramp_up
+        self._ramp_active = False
         self._ramp_action = None
 
     def _accelerate(self, notches: int, direction: str | None = None) -> int:
@@ -690,16 +837,16 @@ class LightBinding:
         return magnitude if up else -magnitude
 
     @callback
-    def _rotate_brightness(self, notches: int, up: bool) -> None:
+    def _rotate_brightness(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         state_on = state.state == "on"
         current = state.attributes.get(ATTR_BRIGHTNESS) if state_on else 0
         tracked = self._resync(current, 0)
         if not state_on and tracked <= 0 and not up:
             self._report_activity("skipped", reason="light_already_off")
-            return  # don't switch a light on by scrolling down
+            return False  # don't switch a light on by scrolling down
 
         if not state_on and up:
             first_step = self._delta(self._step, 255, 1, True)
@@ -723,26 +870,29 @@ class LightBinding:
                         "%",
                     ),
                 )
-                return
+                return True
             target = self._min_units
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "brightness",
+            round(tracked / 255 * 100),
+            round(target / 255 * 100),
+            "%",
+        )
+        return self._call_value_if_changed(
             "light",
             "turn_on",
             {ATTR_BRIGHTNESS: round(target), ATTR_TRANSITION: self._transition},
-            result=self._value_result(
-                "brightness",
-                round(tracked / 255 * 100),
-                round(target / 255 * 100),
-                "%",
-            ),
+            before=round(tracked),
+            after=round(target),
+            result=result,
         )
 
     @callback
-    def _rotate_color_temp(self, notches: int, up: bool) -> None:
+    def _rotate_color_temp(self, notches: int, up: bool) -> bool:
         state = self._lit_state()
         if state is None:
-            return
+            return False
         min_k = state.attributes.get(ATTR_MIN_KELVIN, FALLBACK_MIN_KELVIN)
         max_k = state.attributes.get(ATTR_MAX_KELVIN, FALLBACK_MAX_KELVIN)
         tracked = self._resync(
@@ -751,20 +901,23 @@ class LightBinding:
         target = tracked + self._delta(self._step, max(max_k - min_k, 1), notches, up)
         target = min(max_k, max(min_k, target))
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "color_temperature", round(tracked), round(target), "K"
+        )
+        return self._call_value_if_changed(
             "light",
             "turn_on",
             {ATTR_COLOR_TEMP_KELVIN: round(target), ATTR_TRANSITION: self._transition},
-            result=self._value_result(
-                "color_temperature", round(tracked), round(target), "K"
-            ),
+            before=round(tracked),
+            after=round(target),
+            result=result,
         )
 
     @callback
-    def _rotate_color(self, notches: int, up: bool) -> None:
+    def _rotate_color(self, notches: int, up: bool) -> bool:
         state = self._lit_state()
         if state is None:
-            return
+            return False
         hs_color = state.attributes.get(ATTR_HS_COLOR)
         if hs_color:
             self._saturation = float(hs_color[1])
@@ -780,46 +933,53 @@ class LightBinding:
             },
             result=self._value_result("hue", round(tracked, 1), round(hue, 1), "°"),
         )
+        return True
 
     @callback
-    def _rotate_volume(self, notches: int, up: bool) -> None:
+    def _rotate_volume(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
         target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "volume", round(tracked * 100), round(target * 100), "%"
+        )
+        return self._call_value_if_changed(
             "media_player",
             "volume_set",
             {"volume_level": round(target, 3)},
-            result=self._value_result(
-                "volume", round(tracked * 100), round(target * 100), "%"
-            ),
+            before=round(tracked, 3),
+            after=round(target, 3),
+            result=result,
         )
 
     @callback
-    def _rotate_cover(self, notches: int, up: bool) -> None:
+    def _rotate_cover(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         tracked = self._resync(_as_float(state.attributes.get("current_position")), 50)
         target = min(
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
         self._tracked = target
-        self._call(
+        result = self._value_result("cover_position", round(tracked), target, "%")
+        return self._call_value_if_changed(
             "cover",
             "set_cover_position",
             {"position": target},
-            result=self._value_result("cover_position", round(tracked), target, "%"),
+            before=round(tracked),
+            after=target,
+            result=result,
         )
 
     @callback
-    def _rotate_temperature(self, notches: int, up: bool) -> None:
+    def _rotate_temperature(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         min_t = _as_float(state.attributes.get("min_temp")) or 7.0
         max_t = _as_float(state.attributes.get("max_temp")) or 35.0
         temp_step = _as_float(state.attributes.get("target_temp_step")) or 0.5
@@ -829,40 +989,46 @@ class LightBinding:
         target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
         target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "temperature",
+            round(tracked, 2),
+            round(target, 2),
+            str(state.attributes.get("unit_of_measurement") or "°"),
+        )
+        return self._call_value_if_changed(
             "climate",
             "set_temperature",
             {"temperature": round(target, 2)},
-            result=self._value_result(
-                "temperature",
-                round(tracked, 2),
-                round(target, 2),
-                str(state.attributes.get("unit_of_measurement") or "°"),
-            ),
+            before=round(tracked, 2),
+            after=round(target, 2),
+            result=result,
         )
 
     @callback
-    def _rotate_fan(self, notches: int, up: bool) -> None:
+    def _rotate_fan(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         tracked = self._resync(_as_float(state.attributes.get("percentage")), 50)
         target = min(
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
         self._tracked = target
-        self._call(
+        result = self._value_result("fan_speed", round(tracked), target, "%")
+        return self._call_value_if_changed(
             "fan",
             "set_percentage",
             {"percentage": target},
-            result=self._value_result("fan_speed", round(tracked), target, "%"),
+            before=round(tracked),
+            after=target,
+            result=result,
         )
 
     @callback
-    def _rotate_number(self, notches: int, up: bool) -> None:
+    def _rotate_number(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         min_n = _as_float(state.attributes.get("min")) or 0.0
         max_n = _as_float(state.attributes.get("max")) or 100.0
         num_step = _as_float(state.attributes.get("step")) or 1.0
@@ -874,16 +1040,19 @@ class LightBinding:
         target = min(max_n, max(min_n, round(target / num_step) * num_step))
         self._tracked = target
         domain = self._target.split(".", 1)[0]
-        self._call(
+        result = self._value_result(
+            "number",
+            round(tracked, 4),
+            round(target, 4),
+            str(state.attributes.get("unit_of_measurement") or ""),
+        )
+        return self._call_value_if_changed(
             domain,
             "set_value",
             {"value": round(target, 4)},
-            result=self._value_result(
-                "number",
-                round(tracked, 4),
-                round(target, 4),
-                str(state.attributes.get("unit_of_measurement") or ""),
-            ),
+            before=round(tracked, 4),
+            after=round(target, 4),
+            result=result,
         )
 
     def _lit_state(self) -> State | None:
@@ -939,6 +1108,9 @@ class LightBinding:
             self._report_activity("skipped", reason="short_press_not_configured")
             return
         service = _CLICK_SERVICE.get(self._click, "toggle")
+        if self._click_target is None:
+            self._report_activity("skipped", reason="target_not_configured")
+            return
         self._call_entity(
             "homeassistant",
             service,

@@ -2,12 +2,14 @@
 
 from custom_components.ikea_bilresa.presentation import (
     generated_binding_title,
+    generated_button_binding_title,
     migrate_generated_binding_title,
 )
 
 
 def test_generated_binding_title_is_compact_and_language_neutral() -> None:
     assert generated_binding_title("Kitchen wheel", "2") == "Kitchen wheel · CH 2"
+    assert generated_button_binding_title("Hall buttons", "1") == "Hall buttons · BTN 1"
 
 
 def test_migration_normalizes_only_generated_titles() -> None:

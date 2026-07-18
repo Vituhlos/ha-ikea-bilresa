@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-17 by Claude Code**
+Last updated: **2026-07-18 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -20,10 +20,196 @@ references before making changes.
 Never collapse these states or infer Hardware from Static, Unit, CI, MCP, or
 earlier device-reference observations.
 
+## RC.5 zero-transition finding and `v0.6.0-rc.6` corrective candidate
+
+Status: **RC.5 Hardware diagnosis + Implemented + Static + local Unit + CI +
+Released + deployed. Not corrective Hardware.**
+
+Annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit
+`dd14521d03786ea63a6bbe6cc365a8dbf0088f1c`. GitHub Actions run `29647018640`
+passed hassfest, HACS validation, Ruff, mypy, frontend checks and the full
+Python suite for that exact revision.
+
+HACS installed exact `v0.6.0-rc.6`. The pre-restart Home Assistant
+configuration check was valid, Home Assistant restarted normally, and the
+post-restart check remained valid. Loaded diagnostics now report manifest
+`0.6.0-rc.6`, config entry state `loaded`, Matter Server add-on `9.1.0` /
+matterjs-server `1.2.6`, server schema 12 through compatibility schema 11,
+`core_matter_client`, no fallback, two wheels, one dual button and all six
+bindings. `Kolečko Obývák` channel 1 retained transition 0.0 seconds. Diagnostics
+list no integration issue; the post-restart log contains only Home Assistant's
+standard custom-component warning. No corrective Hardware result is claimed
+before a new controlled gesture.
+
+All controlled RC.5 tuning below used only the owner's selected
+`Kolečko Obývák`, channel 1, with acceleration disabled, step 3%, and
+`light.linka` as its target. No RC.5 Hardware claim is made for
+`Kolečko Nelča`.
+
+With the configured transition reduced from 1.0 seconds to 0.0 seconds, the
+first Home Assistant target acknowledgement improved from approximately 906 ms
+to 548 ms, and the owner described the perceived delay as the smallest so far.
+Exact accounting still failed: Matter and the public BILRESA event stream both
+reported 18 notches, but the light moved from brightness 255 to 140, equivalent
+to only 15 configured 3% steps. This is not a decoder loss.
+
+The cause was reproduced in a failing unit regression. A Shelly Plus 0-10V
+Dimmer can report an older absolute brightness after the fixed 250 ms
+zero-transition echo margin while the Matter scroll is still delivering later
+cumulative deltas. That report cleared the binding's newest calculated target,
+so the next delta rebased from stale physical state. The old code produced
+brightness 239 where the confirmed four-notch sequence required 224.
+
+The released RC.6 candidate now keeps its calculated target authoritative for the
+duration of each raw scroll endpoint. Opposite directions are tracked
+independently, completion clears only its own endpoint, unavailable targets
+still fail closed, reconnect clears all activity, and a missing completion
+expires after two seconds. This timeout is four times the roughly 0.5-second
+batch spacing observed on the physical E2490; it prevents indefinite authority
+without truncating an ordinarily active sequence. The new regression and full
+Python suite pass locally (316 tests); compileall, Ruff format/lint, mypy,
+frontend syntax and diff checks also pass.
+
+A later uncontrolled rapid back-and-forth stress run confirmed a separate
+presentation issue. The E2490/Matter stream emits the eager first notch and
+then irregular cumulative batches such as 14, 9, 6 and 14 notches. At transition
+0.0 seconds those valid batches appear as visible jumps; when the configured
+minimum or maximum is reached, unchanged service calls are intentionally
+suppressed and the light can appear stationary while raw events continue. This
+cannot be corrected by the target-tracking fix alone. Smoothing must retain the
+immediate first notch and apply only a short, measured transition to later
+large batches; no duration is accepted without a controlled Hardware A/B.
+
+## Scroll first-response optimization (`v0.6.0-rc.5` candidate, 2026-07-18)
+
+Status: **Implemented + Static + local Unit + CI + Released + deployed.
+Physical section G is in progress; no G Hardware item is claimed yet.**
+
+Before publication, a read-only Home Assistant registry recheck confirmed both
+physical E2490 scroll wheels and the E2489 dual button now run firmware
+`1.9.15`. Both wheel nodes were therefore available on the same current
+firmware, but the owner selected only `Kolečko Obývák` for controlled RC.5
+tuning. The earlier `1.8.7` observations remain historical evidence, not an
+available RC.5 comparison target.
+
+Annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
+`e17797ac9be1f6183c6867738aed597824843487`. GitHub Actions run `29645572829`
+passed all six jobs for that exact revision. HACS then installed the explicit
+prerelease tag, the pre-restart configuration check was valid, and Home
+Assistant restarted normally.
+
+Post-restart evidence confirms:
+
+- HACS installed version `v0.6.0-rc.5` and the loaded integration manifest
+  reports `0.6.0-rc.5`;
+- the config entry is loaded at logger level `WARNING`, with no integration
+  issues and no integration error in the post-restart system log;
+- Matter Server add-on `9.1.0` / matterjs-server `1.2.6` is connected on
+  WebSocket schema 12 through compatibility schema 11;
+- the active source is `core_matter_client`, fallback reason is `none`, and the
+  inventory remains two wheels, one dual button and six bindings;
+- the post-restart configuration check remains valid.
+
+Matter Server and integration telemetry also received scroll traffic after the
+restart, including cumulative count 18. Because those movements were not
+performed under a single controlled instruction, they are reconnaissance only
+and do not check any section G box.
+
+A controlled baseline on the installed `v0.6.0-rc.4` used Matter Server add-on
+9.1.0 / matterjs-server 1.2.6 native sanitized Switch-event logging. The
+integration preserved every observed cumulative rotary count and dispatched
+approximately 4-10 ms after the corresponding raw completion. Slow deliberate
+movement also showed that a perceived physical detent is not a reliable raw
+event counter; the integration neither invented nor dropped events.
+
+Fast rotation exposed the actual perceived-latency source. Matter delivered
+`InitialPress`, but the engine waited roughly 0.5-0.6 seconds for the first
+cumulative count before producing any rotary action. Transition A/B testing
+showed that 0.5 seconds improved target acknowledgement over 1.0 second, while
+0.3 seconds produced no repeatable additional gain. Transition tuning did not
+remove the initial wait. The temporary binding change and scoped DEBUG logger
+were returned to their exact original values after measurement.
+
+The working-tree candidate now emits one eager notch from every rotary
+`InitialPress`. It retains those notches as credits and subtracts them from
+cumulative ongoing/completion reports, so the final total stays exact. This is
+grounded in both the public Matter Switch sequence (InitialPress for every
+detected press; coincident MultiPressOngoing directly afterward) and the
+sanitized BILRESA stream. The exact recorded fast sequence
+`5 → 10 → 13 → 16 → 18`, then `3 → 7 → 11 → 14`, is replayed as a unit test.
+An equal duplicate count emits nothing; a decreased count starts a new
+baseline. Missing, malformed, negative, zero-overflow and above-max completion
+counts end local accounting safely. State remains keyed by node and endpoint,
+preserving isolation across any number of wheels, channels and directions.
+
+`CurrentPosition = 0` no longer clears rotary counts. The attribute represents
+an individual release and may occur while the cumulative multi-press sequence
+is still active; using it as the sequence boundary could duplicate a later
+batch. It still invalidates button hold-duration observation, while reconnect
+`reset()` clears rotary counts and eager credits.
+
+The real fast stream continued after its brightness target had already reached
+the configured maximum. Because eager dispatch increases the number of useful
+early actions, the binding now suppresses an identical value service payload at
+the effective minimum or maximum. This is applied to every bounded value mode:
+brightness, color temperature, volume, cover position, climate temperature,
+fan speed and number. It is deliberately not applied to hue, whose supported
+behavior is cyclic wraparound. A no-change gesture is reported to Live test as
+completed with equal before/after values, rather than as a failed dispatch.
+Hold-to-ramp also pauses its 200 ms recurring interval at a limit, while
+retaining the release needed for alternating direction and the 30-second
+lost-release watchdog.
+
+Files:
+
+- `custom_components/ikea_bilresa/binding.py`;
+- `custom_components/ikea_bilresa/engine.py`;
+- `tests/test_binding.py`;
+- `tests/test_engine.py`;
+- `custom_components/ikea_bilresa/manifest.json`;
+- `CHANGELOG.md`;
+- `README.md`;
+- `README.cs.md`;
+- `docs/DEVICE_REFERENCE.md`;
+- `docs/MATTERJS_COMPATIBILITY.md`;
+- `docs/SCROLL_PERFORMANCE.md`;
+- `docs/HARDWARE_TEST.md`;
+- this handoff.
+
+Local validation:
+
+```text
+pytest ... test_engine/test_binding                              113 passed
+pytest -q -p pytest_asyncio.plugin                               313 passed
+python -m compileall -q custom_components tests                  passed
+JSON parse for strings + EN/CS translations                      passed
+ruff format --check custom_components tests                      passed (39 files)
+ruff check custom_components tests                               passed
+mypy custom_components/ikea_bilresa                              passed (20 files)
+node --check panel asset                                         passed
+node panel + icon frontend tests                                 passed (20 tests)
+git diff --check                                                 passed
+```
+
+The five local warnings are dependency deprecations from Home Assistant,
+`aiohttp` and `backoff`, not test failures. Controlled physical single-notch
+onset, exact fast-scroll total, direction reversal, count-18/wrap and both
+physical firmware-1.9.15 wheels remain unverified for this candidate.
+Suppression of redundant service calls is locally unit-tested at both limits
+for all seven bounded modes; the exact live service-call count during
+saturation is still a Hardware item. The active gate is
+`docs/HARDWARE_TEST.md` section G on both physical wheels.
+
+GitHub Actions run `29645493522` passed all six jobs for exact implementation
+commit `d12707c769239e14ff9f4e709efbeba0c3891fb2`: hassfest, HACS validation,
+Ruff, mypy, frontend checks and the full Python unit suite. The subsequent
+documentation-only release record must pass CI on its own exact revision before
+that revision is tagged.
+
 ## Repository state
 
-- Active publication branch: `agent/stabilize-0.5-x`, created from `main` at
-  `f1e7583`.
+- Active publication branch: `agent/dual-button-0.6`, branched from the
+  deployed `agent/stabilize-0.5-x` line after local B0/B1 commit `7446194`.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
@@ -34,8 +220,14 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. The latest prerelease is
-  `v0.5.9-rc.11`. Panel Phases 0-3 were published as
+- Latest stable release remains `v0.5.0`. The latest published and deployed
+  prerelease is corrective `v0.6.0-rc.4`; its controlled Matter Server restart
+  recovery and first physical post-restart single passed on the exact installed
+  candidate. RC.3 fixed the count-zero overflow reproduced on RC.2 but failed
+  the restart lifecycle gate. RC.1 exposed
+  a separate real-device discovery defect and is explicitly marked known-bad
+  for the E2489. Panel Phases 0-3
+  were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
   deployed as `v0.5.9-rc.2`, the duplicate-back/channel-detail follow-up as
@@ -266,6 +458,488 @@ not implemented:
 
 Read-only MCP was used only to read the device; no Home Assistant state changed.
 Dual-button facts marked *(confirm)* in the roadmap still need a raw capture.
+
+### B0 — device-variant discovery (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit. mypy not run locally (not
+installed). CI has not run. Not deployed, no Hardware.**
+
+The first `ROADMAP_BUTTON.md` package: stop mis-presenting the dual button as a
+wheel with zero channels, before adding any feature. No entities, triggers or
+bindings for the dual button yet — that is B1.
+
+- `model.py`: `BilresaWheel` gains derived `variant` / `is_dual_button`
+  **properties** (not stored fields), computed from endpoint shape — a device
+  with rotary (up/down) endpoints is `wheel`, one with only button endpoints is
+  `dual_button` (`VARIANT_*` in `const.py`). Derived, so it can never disagree
+  with the endpoints, and no constructor/fixture anywhere needed changing.
+  Discovery still matches on the `"bilresa"` product substring; the variant is
+  the shape distinction, not a new product-code match.
+- `system_health.py`: `discovered_wheels` now counts wheel-variant devices only,
+  and a new `discovered_buttons` counts dual buttons — so the button no longer
+  inflates the wheel count.
+- `event.py`: `_sync` skips dual buttons, so no channelless wheel device is
+  reconciled/built for them (they already produced zero entities; this also stops
+  asserting a wheel link).
+- `panel_models.py`: `async_overview_snapshot` skips dual buttons, so the grid
+  no longer renders a zero-channel wheel card.
+- `coordinator.py`: the discovery log says the variant instead of always "wheel".
+- Tests: `test_model.py` (dual-button node fixture with the real shape — two
+  button endpoints, no channel label — variant assertions), `test_system_health.py`
+  (separate wheel/button counts) and `test_panel_models.py` (overview excludes the
+  dual button).
+
+Not done on purpose (deferred): a pre-existing merged `ikea_bilresa` identifier
+on an already-discovered dual button is not un-merged here; registry migration
+belongs with B1 when the device gets its real entities.
+
+Local validation on Windows / Python 3.14:
+
+```text
+python -m compileall (changed files)                 passed
+ruff format --check custom_components tests           passed (38 files)
+ruff check custom_components tests                    passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -p pytest_asyncio.plugin                            216 passed
+mypy                                                  not run (not installed locally)
+```
+
+Files: `custom_components/ikea_bilresa/const.py`, `model.py`, `system_health.py`,
+`event.py`, `panel_models.py`, `coordinator.py`, `tests/test_model.py`,
+`tests/test_system_health.py`, `tests/test_panel_models.py`, and this handoff.
+Owed before B0 closes: exact-revision CI (mypy/hassfest/HACS) and a deployed check
+that the dual button no longer shows as a wheel in System Health or the panel.
+
+### B1 (event entities) — dual button gestures in HA (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit (222 pytest pass on py3.14, ruff
+clean). mypy not run locally. CI has not run. Not deployed, no Hardware.**
+
+This is the event-surface slice of B1: the dual button now produces real Home
+Assistant event entities. Device triggers and button bindings are **not** in this
+slice (see "deferred" below).
+
+- `event.py`: `_sync` handles both variants — it reconciles the device for both,
+  then builds channel entities for a wheel and **button** entities for a dual
+  button. New `BilresaButtonEvent`: one entity per physical button, `unique_id`
+  `{node}_ep{endpoint}`, name `Button N` (1-based in endpoint order), device
+  model `BILRESA dual button` when unlinked.
+- **Addressing:** both button endpoints report `channel = None`, so they share the
+  one `signal_channel(node, None)` dispatcher signal. Each entity filters
+  `action.endpoint_id` to keep only its own button's gestures — no coordinator
+  hot-path change was needed (the actions were already being decoded and
+  dispatched; only the entity to receive them was missing).
+- **Advertised event types are capped by MultiPressMax:** `const.button_event_types`
+  returns `press`, `double_press`, `hold`, `release` for the dual button (max 2)
+  and adds `triple_press` only at max ≥ 3. No rotation. `model.py` now parses
+  `Switch.MultiPressMax` (attribute `ep/59/2`) into `SwitchEndpoint.multi_press_max`.
+  `_handle_action` also drops any press count not in the advertised list rather
+  than raising.
+- **The "past-max goes silent" quirk needs no new timeout here:** the engine's
+  button path is stateless (it acts only on `MultiPressComplete`/`LongPress`/
+  `LongRelease`, never accumulates), so an unclassified >max press simply produces
+  no event — correct, and it cannot get stuck. The timeout concern remains
+  relevant only to hold bindings (B2), which already have the ramp watchdog.
+- Tests: `test_model.py` (MultiPressMax parsing), `test_event.py`
+  (`button_event_types` cap, entity identity/types, endpoint filtering, dropped
+  over-max press, hold/release mapping).
+
+Local validation (Windows / Python 3.14): `compileall` passed, `ruff format
+--check` passed (38 files), `ruff check` passed, full `pytest` **222 passed**.
+mypy not run locally (not installed); CI is authoritative.
+
+Deferred to later B1/B2 slices, on purpose:
+- **Device triggers** for the buttons (the automation-UI dropdown). The event
+  entities are usable in automations now; the device-trigger sugar is next.
+- **Button binding profile** (click/double/hold targets, paired hold-to-ramp) —
+  that is B2.
+- **Un-merging the pre-existing `ikea_bilresa` identifier** off an already-linked
+  dual button: reconcile is now called for it and is idempotent, so no migration
+  is forced, but a dedicated registry migration for legacy state is still owed if
+  one is found in the field.
+
+Owed before this closes: exact-revision CI, and a deployed check that pressing the
+physical dual button drives its new `Button 1/2` event entities (single/double/
+hold/release), with no triple-press trigger advertised.
+
+### B1b — device triggers for the dual button (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit (226 pytest pass on py3.14, ruff
+clean, JSON valid). mypy not run locally. CI has not run. Not deployed, no
+Hardware.**
+
+Device-page automation triggers now match the device variant.
+
+- `device_trigger.py` is variant-aware. `async_get_triggers` looks up the
+  discovered device from the loaded coordinator (duck-typed, no import cycle):
+  a **dual button** offers `button_N` subtypes (one per physical button) with
+  only the gestures `button_event_types(MultiPressMax)` allows — press,
+  double_press, hold, release; **no rotation, no triple** at max 2. A wheel (or an
+  unknown device) keeps the existing `channel_1..3` triggers unchanged.
+- `async_attach_trigger` filters a button trigger on `endpoint_id` (buttons carry
+  `channel = None` and are told apart by endpoint), and keeps the channel filter
+  for wheels. `EVENT_BILRESA` already carries `endpoint_id`, so no coordinator
+  change was needed.
+- Strings: `button_1..4` subtypes added to `strings.json`, `translations/en.json`
+  and `translations/cs.json` (Tlačítko N); the existing `{subtype} pressed` /
+  `double-pressed` / `held` / `released` trigger-type strings already read
+  correctly for buttons.
+- **New `tests/test_device_trigger.py`** (there was none): dual button offers
+  button subtypes without rotate/triple, wheel still offers channels, the
+  `button_N → endpoint` mapping, and attach filters by endpoint not channel.
+
+Local validation (Windows / Python 3.14): `compileall` passed, JSON parse of the
+three string files passed, `ruff format --check` passed (39 files), `ruff check`
+passed, full `pytest` **226 passed**. mypy/hassfest not run locally; CI is
+authoritative (hassfest validates strings.json ↔ en.json alignment).
+
+Still deferred to B2: the button binding profile (click/double/hold targets,
+paired hold-to-ramp). The legacy-identifier registry migration is still owed if
+found in the field.
+
+Owed before B1b closes: exact-revision CI, and a deployed check that the dual
+button's device page lists Button 1/Button 2 triggers (press/double/hold/release,
+no triple, no rotation) and that one fires a test automation.
+
+### B2 — dual-button binding profile and config flow (Codex, 2026-07-17)
+
+Status: **Implemented + Static + local Unit. CI has not run. Not committed,
+deployed, HA-UI-verified or Hardware-verified.**
+
+B2 now treats each physical button as its own fully independent control binding,
+including when several dual buttons expose the same endpoint numbers:
+
+- **Stored/runtime address:** a wheel binding remains `node_id + channel`; a
+  dual-button binding stores `node_id + endpoint`. Runtime keys are explicitly
+  tagged `(node_id, "channel", channel)` or
+  `(node_id, "endpoint", endpoint_id)`, so the two buttons on one device cannot
+  collide and endpoint 1 on one physical dual button cannot collide with
+  endpoint 1 on another. Both button bindings still subscribe to the existing
+  shared `channel=None` action/raw signals and filter the action's `endpoint_id`
+  before running.
+- **Independent actions:** each endpoint has its own single-press action
+  (`toggle` / `on` / `off` / `none`) and target, optional double-press toggle
+  target, and hold action/target. Button 1 may therefore toggle one light while
+  button 2 toggles another; every other dual button has its own independent pair.
+- **No impossible UI:** creation selects the physical BILRESA first, then builds
+  the schema from its parsed variant. A dual button never receives mode, step,
+  acceleration, min/max brightness, transition, scene or triple-press fields.
+  Its multi-press selector says single/double only. Wheel profiles retain their
+  rotary and triple-press fields. Reconfigure may move a binding only between
+  devices of the same variant, preventing a channel-shaped entry from being
+  saved onto a button-shaped device.
+- **Copy flow:** copy-from-existing still pre-fills actions, but the selected
+  destination node is authoritative and unsupported source fields are omitted
+  before storage. Copying a wheel profile to a button cannot smuggle mode,
+  rotation, scene or triple-press fields into the button subentry.
+- **Hold-to-ramp / software DIRIGERA:** button bindings reuse the existing
+  brightness ramp, release/reconnect/new-gesture stops and 30-second watchdog.
+  A new button-only direction can be `up`, `down` or `alternate`, so two endpoint
+  bindings may share a light while button 1 always brightens and button 2 always
+  dims. The historic wheel behavior remains `alternate`.
+- **Icon:** `bilresa_icons.js` now contains the owner-supplied dual-button
+  primary and 0.32 secondary paths as the self-contained
+  `bilresa:dual-button` glyph. Both current and legacy Home Assistant icon
+  contracts resolve it, and `BilresaButtonEvent` uses it. The wheel glyph is
+  unchanged.
+- **Documentation:** the endpoint address decision and fixed-direction paired
+  ramp are recorded in `docs/ROADMAP_BUTTON.md` and
+  `docs/DEVICE_REFERENCE_BUTTON.md`; `CHANGELOG.md` records the user-visible
+  behavior.
+
+Tests use the real device shape (two `ROLE_BUTTON` endpoints, `channel=None`,
+`MultiPressMax=2`) and cover two endpoints on one device, the same endpoint ids
+on a second device, independent click targets, endpoint-filtered fast response,
+copy sanitization, hidden rotary/triple fields, wheel-schema preservation,
+fixed up/down shared-target ramps, release/watchdog safety, titles and both icon
+provider contracts.
+
+Exact local validation on Windows / Python 3.14:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+EN/CS/string recursive key alignment                 passed (163 paths each)
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel + icon provider                    passed
+node --test panel + icon frontend tests               passed (10 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                         passed (238 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Not run: hassfest, HACS validation and exact-revision GitHub CI. No Home
+Assistant config-flow screen was opened and no physical press changed a target,
+so neither HA UI nor Hardware is claimed. The existing identifier-registry
+migration was not needed and remains a separate owed item. B3 panel rendering
+was intentionally not touched by the B2 slice; its later implementation is
+recorded directly below.
+
+Known assumption: the config flow validates the selected endpoint against the
+currently discovered device, and stores the Matter endpoint rather than a
+derived button index. This is stable across multiple physical devices and does
+not assume endpoints are globally unique.
+
+Single best next action: after owner review of the combined B2+B3 tree, commit
+it and run exact-revision CI; only then deploy a candidate for the real-HA panel
+pass and execute `HARDWARE_TEST.md` F3 for independent button targets and the
+fixed up/down shared-light ramp.
+
+### B3 — existing panel adapted for the dual button (Codex, 2026-07-17)
+
+Status: **Implemented + Static + local Unit + browser-harness visual checks.
+Not committed, not run in exact-revision CI, not deployed to Home Assistant and
+not Hardware-verified.**
+
+B3 is an adaptation of the existing wheel panel, not a second panel or a new
+visual direction:
+
+- **Shared overview and rail:** every wheel and every dual-button device stays
+  in the same landing grid and the same 256 px detail switcher. Multiple
+  dual-button devices retain separate opaque device keys and each shows its own
+  button 1/2 summaries.
+- **The same workbench:** the dual-button detail literally reuses
+  `.channel-workbench`, `.channel-spine`, `.channel-position` and
+  `.channel-surface`. The wheel's vertical `1 / 2 / 3` selector becomes
+  `1 / 2`; selecting a number opens one button in the same right-hand gesture
+  ledger. An earlier two-stacked-card draft was rejected after owner review and
+  removed; no button-only card system or parallel panel remains.
+- **Independent binding editor:** button 1 and button 2 open the existing inline
+  editor with only their supported short press, double press and hold/release
+  fields. Saving sends the safe display button number; the server resolves and
+  stores the Matter endpoint. Endpoint ids never enter the frontend snapshot or
+  mutation response.
+- **Adapted Live test:** the existing `Live test` tab remains. The WebSocket
+  activity API maps a private endpoint to safe `button: 1|2` server-side, so the
+  UI reports the physical button, short/double/hold/release gesture, dispatch
+  state and structured binding result. Panel-triggered tests offer only single,
+  double, hold and release. Rotation, triple press and the detent strip remain
+  wheel-only.
+- **Variant-aware diagnostics and copy:** last activity names a button for the
+  dual device; device-level diagnostic wording no longer calls every BILRESA a
+  wheel. EN and CS panel dictionaries remain exactly aligned.
+
+The privacy/multi-device tests cover two dual-button devices with the same
+endpoint numbers, independent targets, safe endpoint-to-button activity
+mapping, binding mutations without leaked endpoint ids, and rejection of
+channel-shaped or unsupported rotary/triple requests.
+
+Browser harness checks used the production custom element and its production
+CSS, first at the owner's 1521 px reference width and then at 320 px. The
+desktop workbench matched the existing wheel composition with a vertical grey
+spine and one right-hand action surface. Light and custom dark themes had no
+document, host or main-pane horizontal overflow; both button positions were
+present; every visible control measured at least 44 px; and real Tab traversal
+showed a 2 px focus outline at every in-panel stop. The adapted Live test showed
+`Tlačítko 2 · dvojitý stisk`, its structured target result, no detent strip and
+only the four supported synthetic controls. This is harness evidence, **not** a
+real-HA visual pass.
+
+Exact local validation on Windows / Python 3.14 after B3:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+EN/CS/string recursive key alignment                 passed
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel + icon provider                    passed
+node --test panel + icon frontend tests               passed (16 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                         passed (246 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Still owed: exact-revision hassfest/HACS/Ruff/mypy/unit CI, a real Home
+Assistant light/dark/custom-theme visual and screen-reader pass, and B4 physical
+verification. No release, deployment or device control has been performed.
+
+### `v0.6.0-rc.1` publication and controlled deployment
+
+The owner explicitly authorized publication of B0-B3 as an RC and installation
+through the existing custom HACS repository on 2026-07-17, specifically to make
+the real-HA and physical checks in B4 possible.
+
+Candidate preparation:
+
+- branch: `agent/dual-button-0.6`, based on the currently deployed 0.5.x line;
+- version/tag: `0.6.0-rc.1` / `v0.6.0-rc.1`;
+- scope: B0 variant discovery, B1 event entities/device triggers, B2 independent
+  bindings/config flow, and B3 adaptation of the existing panel and Live test;
+- B4 remains open and this tag must be a **prerelease**, never stable;
+- local Static, Python Unit, frontend Unit and browser-harness results are
+  recorded in the B2/B3 sections above.
+
+The historical repository warning about installation-specific identifiers in
+an older, already-public commit remains recorded above. The owner has now
+explicitly requested another repository release from this same public history;
+the release must not copy any such identifiers into notes, logs or chat.
+
+Concrete publication and deployment results:
+
+- B0/B1 commit `7446194` and B2/B3/release commit `b0c139a` were pushed on
+  `agent/dual-button-0.6`;
+- draft PR `#2` targets `agent/stabilize-0.5-x`, keeping the `0.6.x` train
+  separate from the wheel stabilization line;
+- exact-revision CI run `29612854755` passed on full commit
+  `b0c139ae45d60f925f18041758f60853830f81c3`: Ruff, frontend checks, mypy,
+  246 Python tests, HACS validation and hassfest all succeeded;
+- GitHub prerelease `v0.6.0-rc.1` was published, and its lightweight tag points
+  directly to that exact CI-verified commit;
+- the pre-deployment Home Assistant configuration check was valid; HACS
+  installed the exact tag and reported `v0.6.0-rc.1` pending restart;
+- Home Assistant restarted normally. The post-restart configuration check is
+  valid, the BILRESA config entry is `loaded`, Matter is connected through
+  `core_matter_client`, and HACS reports `v0.6.0-rc.1` installed;
+- post-restart integration health reports three existing wheels, four existing
+  bindings and the new `discovered_buttons` field. It currently reports zero
+  discovered dual buttons, so discovery and all gesture/binding outcomes remain
+  B4 Hardware work rather than a release claim;
+- no BILRESA error was present after startup. The only matching log lines are
+  Home Assistant's standard warning for an unreviewed custom integration.
+
+This establishes publication plus install/startup smoke for the RC.1 package,
+not functional Hardware evidence for B0-B3.
+
+The owner's first real-panel check then disproved the RC.1 discovery fixture:
+
+- the already commissioned E2489 remained visible with the wheel glyph;
+- its detail still showed wheel copy and an empty three-channel surface;
+- no button-binding controls were offered;
+- sanitized live diagnostics showed exactly two endpoints with
+  `channel = null`, but semantic roles `scroll_up` and `scroll_down`;
+- System Health therefore reported three wheels and zero dual buttons.
+
+This is not a browser-cache defect. The server sent `variant = wheel`.
+The real E2489 uses Matter up/down semantic tags for its two physical buttons;
+the invented RC.1 fixture incorrectly omitted those tags. Corrective
+`v0.6.0-rc.2` classifies the exact pair of channel-less switch endpoints as a
+dual button and normalizes both downstream roles to `button`. Until RC.2 passes
+CI and the same real panel reports two buttons, B0 and B3 are not Hardware and
+RC.1 is not a valid B4 test baseline.
+
+Corrective RC.2 candidate preparation:
+
+- `tests/fixtures/bilresa_dual_button_node.json` contains only the minimal,
+  sanitized raw endpoint facts captured from core Matter diagnostics, with a
+  synthetic node id and no serial, network, entity or household identifiers;
+- the fixture includes the complete observed TagLists, FeatureMap `30` and
+  `MultiPressMax = 2` for both endpoints;
+- the same fixture now drives parser/decoder, panel-read-model and config-flow
+  regression tests, so those layers cannot silently substitute an invented
+  button shape again;
+- the official connectedhomeip Switches namespace confirms tags `0x0003` /
+  `0x0004` as semantic Up/Down functions, not physical rotation evidence;
+- local validation on 2026-07-18: JSON parsing and compileall passed; Ruff
+  format/check passed; mypy passed 20 source files; 251 Python tests and 16
+  frontend tests passed; `git diff --check` passed with CRLF warnings only.
+
+Corrective RC.2 publication and controlled deployment completed on 2026-07-18:
+
+- corrective commit `fb290d3` (`fix: classify the real BILRESA dual button
+  shape`) was pushed to `agent/dual-button-0.6`; draft PR #2 was updated;
+- exact-revision GitHub Actions run `29633850027` passed all six jobs for full
+  commit `fb290d3e2d0d38faa1a5a5222412ab5bd0cfc528`: Ruff, mypy, frontend,
+  251 Python tests, HACS validation and hassfest;
+- prerelease `v0.6.0-rc.2` was published from that exact commit:
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.2;
+  the RC.1 release notes were amended to identify its known E2489 defect, and
+  the RC.1 tag was not moved;
+- the pre-restart Home Assistant config check was valid; HACS installed exactly
+  `v0.6.0-rc.2`; Home Assistant restarted and the config entry returned to
+  `loaded` with the post-restart config check valid;
+- System Health changed from **3 wheels / 0 buttons** on RC.1 to **2 wheels /
+  1 dual button** on RC.2. Matter is connected through `core_matter_client`,
+  no fallback is active, and all four existing wheel bindings were preserved;
+- sanitized integration diagnostics report version `0.6.0-rc.2` and the real
+  dual-button shape as `variant = dual_button`: two channel-less endpoints,
+  both normalized to role `button`, each with `MultiPressMax = 2`;
+- the Home Assistant device registry now contains two enabled
+  `ikea_bilresa` event entities for that device, Button 1 and Button 2, with the
+  HA button event device class;
+- the live server-side `ikea_bilresa/overview` snapshot returns the existing
+  panel contract (`contract_version = 4`) with the same device shell,
+  `variant = dual_button`, `channels = []` and independent unconfigured button
+  controls `1 / 2`. The frontend maps that variant to the dedicated dual-button
+  glyph, the `Tlačítka / Živý test / Diagnostika` tabs, and `Přidat propojení`
+  for each control;
+- the config-subentry create schema lists the dual-button device alongside both
+  wheels, so the native add-binding path can select it. No real binding was
+  created and no target-changing panel test was run;
+- the only matching startup log line is Home Assistant's standard warning for
+  an unreviewed custom integration; no BILRESA runtime error was recorded.
+
+This is **Implemented + Static + Unit + CI + Released + real-HA server-side
+deployment smoke** for RC.2. It corrects the precise server-side failure shown
+by the owner's RC.1 screenshots. It is deliberately not labelled Hardware:
+the owner still needs to open a completely fresh panel tab and physically press
+both buttons to verify gesture delivery and real target outcomes in B4.
+
+### Post-RC.2 Live-test empty-state and history pass (2026-07-18)
+
+Status: **Implemented + Static + local Python Unit + frontend Unit. Not
+committed, not published, not deployed, no new Hardware claim.**
+
+The owner's first correct dual-button screenshot proved physical single presses
+were reaching the adapted Live test, but also exposed two product defects:
+
+- an unconfigured press was presented as the internal fallback
+  `Vypočtený výsledek se nehlásí`, making successful hardware recognition read
+  like a runtime error;
+- the recent-event card had no bounded visual height, so its event rows would
+  keep extending the detail page instead of becoming a secondary history.
+
+The live-result model now separates **recognized gesture** from **configured
+target outcome**. A press with no binding leads with `Stisk rozpoznán`, explains
+that it reached Home Assistant but the button does not control a target yet,
+and offers `Nastavit tlačítko 1/2`, which opens the existing inline editor for
+that exact physical button. Wheel channels use the same state model. A
+not-configured control is neutral, not a failed dispatch.
+
+The Live-test copy was reviewed as one state system rather than as isolated
+phrases. The intro now promises gesture recognition first and target action
+second; result/event labels are contextual; runtime jargon was removed from
+ordinary empty states; and the side heading is `Tlačítka` / `Kanály`, because
+the list includes configured and unconfigured controls.
+
+The recent-event list remains bounded to eight records in memory and is now
+also capped at 320 px on screen with vertical overflow, contained overscroll,
+stable scrollbar space and a labelled keyboard-focusable ordered list. It keeps
+native list semantics and a visible inset focus ring.
+
+Files:
+
+- `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`
+- `custom_components/ikea_bilresa/panel_strings.py`
+- `tests/panel_frontend.test.mjs`
+- `tests/test_panel.py`
+- `tests/test_panel_strings.py`
+- `docs/PANEL_DESIGN.md`
+- `CHANGELOG.md`
+- `PROJECT_STATUS.md`
+
+Validation:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel                                   passed
+node --test panel + icon frontend tests               passed (19 tests)
+isolated Windows Python 3.14 pytest                   passed (254 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+The user-provided real-HA screenshot was inspected at its original resolution.
+No post-change real-HA screenshot was captured: the available authenticated
+screenshot service supports Lovelace dashboards, not this custom panel, and the
+Product Design browser workflow was not requested. Visual HA verification
+therefore remains pending and must not be inferred from code/tests.
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
@@ -1888,24 +2562,282 @@ mixed into their real-phone verification.
   accumulator unless `docs/SCROLL_PERFORMANCE.md` revisit criteria are met.
 - Brand icon, brands PR and default HACS publication remain the final phase.
 
+### Matter Server 9.1.0 compatibility audit and G0 safeguards (2026-07-18)
+
+Status: **Implemented + Static + Python Unit + frontend regression +
+exact-revision CI + Released + real-HA deployment smoke. G0 overflow fix is not
+yet Hardware-verified.**
+
+The official Home Assistant add-on 9.1.0 changelog, matterjs-server 1.2.6 tag,
+WebSocket API/schema changelog, Python client and Matter 1.6 Switch definition
+were reviewed. Matter Server 9.1.0 uses server schema 12 with minimum supported
+schema 11; its own Python client still advertises schema 11. The integration
+therefore correctly remains a schema-11 compatibility client and accepts the
+new server instead of claiming schema 12 and breaking older schema-11 servers.
+System Health now reports both values separately.
+
+The dedicated WebSocket path now handles `node_updated`,
+`attribute_updated` and `server_shutdown` explicitly. The core-client adapter
+restores node/path context for Switch `CurrentPosition` by comparing the
+already-updated Matter node cache. CurrentPosition is deliberately only a
+release/stuck-state hint because matterjs-server may coalesce attribute updates
+under backpressure. Every user-visible gesture remains derived from ordered
+`node_event` messages.
+
+The Matter 1.6 overflow contract exposed a real bug:
+`decoded.get("count") or 1` converted a valid zero completion count into a
+single press. Zero, non-integer and positive counts above the endpoint's
+advertised `MultiPressMax` are now ignored instead of executing a target.
+
+The post-B3 feature ideas are specified in `docs/ADVANCED_GESTURES.md` as G1–G4:
+Instant response and observed hold duration; opt-in dual-button chords and
+wheel-button rotation modifiers; HA scripts/scenes/sequences and named
+profiles; saturation and cover tilt. The contract keeps all state isolated by
+node/endpoint, preserves the existing panel workbench and leaves complex logic
+to Home Assistant rather than embedding a second automation engine.
+
+The first bounded G1 slice is also implemented locally. Bindings and the
+existing panel editor now distinguish three real response points:
+`Instant initial press`, `Fast release` and `Multi-press aware`. Instant reacts
+once on `InitialPress`; semantic validation rejects it when double/triple or
+hold behavior would make that early action ambiguous. The later public
+completion still reaches event entities, device triggers and the public event
+bus, but the direct binding cannot execute twice. Existing stored bindings keep
+their prior default.
+
+G1 also records `observed_duration_ms` for hold/release actions when
+`InitialPress` and the later boundary belong to one uninterrupted host-
+monotonic observation. The public event entity, event bus, binding activity and
+Live test carry the bounded value. The panel labels it as integration-observed
+time (for example `zachyceno 2,25 s`), not physical contact duration. A
+reconnect, reset or CurrentPosition release hint invalidates the measurement
+instead of manufacturing a number.
+
+Files added or materially changed by this package:
+
+- `custom_components/ikea_bilresa/matter_ws.py`
+- `custom_components/ikea_bilresa/matter_core.py`
+- `custom_components/ikea_bilresa/coordinator.py`
+- `custom_components/ikea_bilresa/engine.py`
+- `custom_components/ikea_bilresa/const.py`
+- `custom_components/ikea_bilresa/system_health.py`
+- `custom_components/ikea_bilresa/binding.py`
+- `custom_components/ikea_bilresa/binding_config.py`
+- `custom_components/ikea_bilresa/event.py`
+- `custom_components/ikea_bilresa/panel_api.py`
+- config-flow, panel and EN/CS response copy
+- `tests/fixtures/matterjs_1_2_6.json`
+- protocol/core/coordinator/engine/System Health tests
+- `docs/MATTERJS_COMPATIBILITY.md`
+- `docs/ADVANCED_GESTURES.md`
+- `docs/ROADMAP_BUTTON.md`
+- `CHANGELOG.md`
+
+Validation:
+
+```text
+isolated Windows Python 3.14 pytest                   passed (275 tests)
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+python -m compileall -q custom_components tests      passed
+node --check panel                                   passed
+node --test panel + icon frontend tests              passed (20 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Publication and controlled deployment completed on 2026-07-18:
+
+- candidate commit `e6e67eb` was pushed on `agent/dual-button-0.6`;
+- GitHub Actions run `29636673855` passed hassfest, HACS validation, Ruff,
+  mypy, frontend tests and Python unit tests;
+- annotated tag and prerelease `v0.6.0-rc.3` resolve to exact candidate
+  `e6e67eb`;
+- the pre-restart Home Assistant configuration check was valid, HACS installed
+  exactly `v0.6.0-rc.3`, and Home Assistant restarted normally;
+- post-restart diagnostics reported integration manifest `0.6.0-rc.3`, config
+  entry `loaded`, Matter Server add-on `9.1.0` started, server schema `12`,
+  client compatibility schema `11`, event source `core_matter_client`, no
+  fallback, two wheels, one dual button and all six stored bindings;
+- no `ikea_bilresa` system-log entry appeared after startup.
+
+No binding, automation, target or device configuration was changed during
+deployment. This establishes a successful server-side deployment smoke on
+Matter Server 9.1.0/schema 12.
+
+The owner then repeated the exact three-rapid-tap overflow gesture on the
+installed RC.3. Matter Server reported `MultiPressComplete(0)` on the E2489
+endpoint. RC.3 dispatched zero actions, neither the public custom event entity
+nor the core Matter event entity advanced, the configured target stayed
+unchanged, and no `ikea_bilresa` error appeared. The G0 zero-count safeguard is
+therefore **Hardware PASS** on the exact released candidate. Above-max rejection
+remains Unit evidence because the real device represents this overflow as zero.
+An immediate deliberate normal single then produced
+`MultiPressComplete(1)`, advanced both event surfaces once, dispatched exactly
+one binding action and changed only the configured target once. Recovery after
+the ignored overflow is also **Hardware PASS**.
+
+The next single arrived after approximately 2 hours 11 minutes without a valid
+Switch gesture on that endpoint. Matter Server emitted exactly one completion
+with count one; both event surfaces advanced once and the binding action count
+increased by one. There was no queued Switch burst, reconnect, fallback or
+matching integration error. The B4 idle-resume gate is therefore
+**Hardware PASS**.
+
+The owner then pressed the other E2489 side and immediately operated the living
+room wheel. Only the second dual-button endpoint advanced and it toggled only
+its configured target once; the first endpoint stayed unchanged. The wheel
+then emitted eight real-time rotate-up batches on channel 3 and the integration
+dispatched exactly eight corresponding wheel actions. Wheel channels 1/2 and
+the observed dual-button targets did not change from the wheel activity. No
+reconnect, fallback or matching error appeared. Cross-endpoint and cross-node
+no-leak are therefore **Hardware PASS** for this bounded adjacent-use test. The
+integration config entry was then reloaded without restarting Home Assistant.
+It returned `loaded` through `core_matter_client` with two wheels, one dual
+button and all six stored bindings. Its first post-reload physical single
+produced exactly one completion, one public event, one binding action and one
+intended target change; no old event replayed and no fallback or error
+appeared. Config-entry restore is therefore **Hardware PASS**.
+
+The subsequent controlled restart of only the Matter Server add-on exposed a
+real RC.3 lifecycle defect. While Home Assistant temporarily had no loaded core
+Matter config entry, `_get_loaded_client()` indexed an empty list and the
+ten-second runtime-unavailable threshold caused a permanent switch to
+`dedicated_websocket` for that integration load. Diagnostics recorded one
+fallback with reason `list index out of range`, and the dual button was
+temporarily unavailable. Reloading only the IKEA BILRESA config entry restored
+`loaded`, `core_matter_client`, two wheels, one dual button and all six
+bindings. RC.3 therefore **FAILS** the controlled Matter Server restart gate;
+the successful config-entry reload does not turn that result into a pass.
+
+The local `v0.6.0-rc.4` candidate explicitly represents the missing loaded
+Matter entry as a temporary runtime condition, extends the runtime grace from
+10 to 60 seconds, and reattaches to the replacement core client. Initial
+unsupported-client fallback remains immediate and persistent runtime
+incompatibility still falls back after the grace period. The exact regression
+test keeps the Matter entry absent for five monitor checks, restores a new
+client, and proves reattachment without fallback. Local validation passed 276
+Python tests, 20 frontend tests, Ruff format/lint, mypy, compileall, panel
+syntax and diff checks. Candidate commit `5a39f90` is pushed on
+`agent/dual-button-0.6`; GitHub Actions run `29641407216` passed hassfest, HACS
+validation, Ruff, mypy, frontend checks and Python unit tests on that exact
+revision.
+
+The release/deployment follow-up completed on 2026-07-18:
+
+- release commit `90076cf` passed exact-revision GitHub Actions run
+  `29641472813`;
+- annotated tag and prerelease `v0.6.0-rc.4` resolve to `90076cf`;
+- HACS installed exactly `v0.6.0-rc.4`; configuration validation passed and
+  Home Assistant restarted normally;
+- the loaded manifest reported `0.6.0-rc.4`, with Matter Server 9.1.0/schema 12,
+  client compatibility schema 11, `core_matter_client`, two wheels, one dual
+  button, six bindings and no fallback;
+- a controlled restart of only the Matter Server app produced one disconnect
+  and one successful core-client reattach. Connection count advanced to two,
+  fallback count stayed zero through the full grace window, all devices and
+  bindings returned, and no matching integration error appeared;
+- the first physical Button 1 single afterward advanced the custom and core
+  Matter event surfaces once, dispatched exactly one action and changed only
+  its intended light from off to on. Button 2 and the other observed targets
+  stayed unchanged.
+
+RC.4 therefore has Static, Unit, exact-revision CI, Released, deployed and
+Hardware evidence for the Matter Server restart recovery and first post-restart
+single.
+
+The owner then authorized the two remaining targeted B4 failure-injection
+checks with a reversible safe dimmable target. Button 2 was temporarily changed
+from hold-none to hold-ramp-up while its existing single/double targets were
+preserved. A qualifying real hold produced `long_press` at `13:32:44.658`; the
+30-second watchdog fired at `13:33:14.664`, and the later
+`long_release` at `13:34:03.490` neither restarted the ramp nor emitted a stale
+command. There was no cross-target change, reconnect or fallback. The exact
+original Button 2 payload was restored, including its original
+`73c03e349fe721d3` revision, and the safe target returned to its original off
+state.
+
+The already configured wheel channel-2 target was then naturally unavailable
+while its power relay was off. Two physical detent batches were decoded and
+skipped with one transition-deduplicated availability warning, no target
+change, no recurring command, no integration error and no fallback. After
+power recovery, a clean physical clockwise detent decoded as up and moved the
+target from brightness 128 to 135, proving normal-path recovery and the
+expected clockwise-to-brighten mapping. The target was restored to its original
+100% brightness.
+
+RC.4 therefore has **B4 Hardware PASS**. The run covers the real E2489 grammar,
+both endpoints, independent binding outcomes, overflow safeguard, idle resume,
+cross-endpoint/node isolation, config-entry reload, Matter Server restart,
+lost-release watchdog, unavailable-target suppression and recovery. The
+optional paired two-button hold-ramp profile was not configured and is not
+claimed.
+
+This follow-up changes documentation only. `git diff --check` passed and the 20
+Node frontend tests passed. A fresh `python -m pytest -q` attempt did not reach
+test execution because the current system Python lacks the `homeassistant`
+package; all 18 collection modules reported that same missing dependency. This
+is a local-environment limitation, not a Python-test pass. The installed code
+remains the exact `v0.6.0-rc.4` release whose Python suite and six CI jobs
+already passed; no runtime source or test file changed in this follow-up.
+
+### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
+
+The owner authorized and performed a controlled physical gesture run against
+the currently installed `v0.6.0-rc.2`; Codex observed Home Assistant state,
+recorder history, redacted integration diagnostics and sanitized Matter Server
+logs. No binding, integration option, logger level, automation or device
+configuration was changed.
+
+Both physical buttons passed single, double, long-press and long-release
+delivery. Slow pairs remained separate singles and fast pairs completed as
+doubles. Configured single, double, hold-toggle and hold-none outcomes affected
+only their intended targets. Both CurrentPosition values returned to zero and
+no matching integration error appeared.
+
+The real E2489 then reproduced the exact G0 overflow case: three rapid physical
+taps ended with `MultiPressComplete(0)`. Installed RC.2 converted zero to one,
+published a false single press and toggled its configured target. A subsequent
+normal single completed correctly, so the input was not left stuck. This is
+direct Hardware evidence that the local `count <= 0` safeguard is necessary;
+it is not Hardware evidence that the safeguard works until an exact candidate
+is installed and the same test passes without a target action.
+
+The raw grammar and sanitized environment were added to
+`docs/DEVICE_REFERENCE_BUTTON.md`; the partial verdict and remaining gates are
+recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
+
 ## Single best next action
 
-`v0.5.9-rc.12` is deployed and loaded (deployment smoke clean). Open the panel
-in a **completely fresh** browser tab — an existing tab keeps the old custom
-element and the web platform does not allow redefining it. Then visually check
-the channel spine, the corrected rail (accent icon + weight on the open wheel,
-no stray tick row), the lighter unconfigured channels, the result-led Live test
-with its detent strip, and the tab strip with no scrollbar. Capture screenshots
-against a non-default theme, which the harness could not exercise.
+Review the remaining unchecked all-features hardware matrix independently from
+the now-complete B4 package, then decide whether `v0.6.0-rc.4` needs a final
+soak-only RC follow-up or is ready for the explicitly authorized stable-release
+gate.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from implementation commit `f676bb7` plus the deployment-record
-   follow-up on `agent/stabilize-0.5-x`; then re-check HEAD, branch and status.
-3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
-4. For the icon package, Static, Python Unit, frontend Unit, exact-revision CI,
-   release and backend deployment smoke are established. Real HA visual review
-   and Hardware remain pending.
-5. Do not mutate real bindings or run target-changing panel tests unless the
-   owner identifies a safe binding/target for that check.
+2. Start from RC.3 release commit `e6e67eb` plus its deployment-record
+   follow-up on `agent/dual-button-0.6`; then re-check HEAD, branch and status.
+3. Do not move the `v0.6.0-rc.1` tag away from runtime commit `b0c139a`.
+4. RC.1 failed real E2489 discovery. RC.2 fixed discovery and supplied partial
+   B4 Hardware evidence but failed three-tap overflow handling. RC.3 has Static,
+   Python Unit, frontend Unit, exact-revision CI, Released and successful
+   Matter Server 9.1.0/schema-12 deployment-smoke evidence; its zero-count
+   overflow fix and immediate normal-single recovery passed the exact physical
+   retest, and a later single passed after approximately 2 hours 11 minutes
+   idle with no queued burst or reconnect. Adjacent use of the other dual-button
+   endpoint and wheel channel 3 also passed cross-endpoint/node no-leak. A
+   config-entry reload restored all devices/bindings and its first single
+   exactly once. Its controlled Matter Server restart then failed because the
+   temporary core-entry unload triggered a permanent dedicated-WebSocket
+   fallback. RC.4 release commit `90076cf` fixes that lifecycle path and is
+   locally validated, exact-revision CI-green, Released, deployed and Hardware
+   PASS for the controlled restart plus first physical post-restart single.
+5. The owner selected a safe dimmable target for the bounded watchdog check.
+   The temporary binding and target state were restored exactly; do not repeat
+   target-changing tests without fresh authorization.
+6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
+   Do not promote RC.3 to stable. RC.4 is the current prerelease and now has
+   complete B4 Hardware evidence, including restart recovery, watchdog,
+   unavailable-target suppression and normal-path recovery.

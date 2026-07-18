@@ -44,11 +44,13 @@ from .const import (
     ACTION_RELEASE,
     ACTION_ROTATE,
     CONF_CHANNEL,
+    CONF_ENDPOINT,
     CONF_NODE_ID,
     DIRECTION_DOWN,
     DIRECTION_UP,
     DOMAIN,
     EVENT_BILRESA,
+    ROLE_BUTTON,
     SIGNAL_BINDING_ACTIVITY,
     SIGNAL_BINDINGS_UPDATED,
     SIGNAL_CONNECTION,
@@ -57,7 +59,7 @@ from .const import (
 )
 from .engine import WheelAction
 from .panel_models import CONTRACT_VERSION, async_overview_snapshot, wheel_key
-from .presentation import generated_binding_title
+from .presentation import generated_binding_title, generated_button_binding_title
 
 TYPE_OVERVIEW = f"{DOMAIN}/overview"
 TYPE_OVERVIEW_SUBSCRIBE = f"{DOMAIN}/overview/subscribe"
@@ -118,17 +120,77 @@ def _binding_for_id(entry: Any, binding_id: str) -> Any | None:
 
 
 @callback
-def _binding_for_channel(entry: Any, node_id: int, channel: int) -> Any | None:
-    """Return the existing binding for a wheel channel, if any."""
+def _binding_for_address(
+    entry: Any,
+    node_id: int,
+    *,
+    channel: int | None = None,
+    endpoint: int | None = None,
+) -> Any | None:
+    """Return the existing binding for one channel or button endpoint."""
+    address_key = CONF_ENDPOINT if endpoint is not None else CONF_CHANNEL
+    address_value = endpoint if endpoint is not None else channel
     for subentry in entry.subentries.values():
         if subentry.subentry_type != SUBENTRY_BINDING:
             continue
         data = subentry.data
         if str(data.get(CONF_NODE_ID)) == str(node_id) and str(
-            data.get(CONF_CHANNEL)
-        ) == str(channel):
+            data.get(address_key)
+        ) == str(address_value):
             return subentry
     return None
+
+
+@callback
+def _control_address(
+    entry: Any, node_id: int, msg: dict[str, Any]
+) -> tuple[int | None, int | None, str | None]:
+    """Resolve a safe panel control number to its server-side binding address."""
+    wheel = entry.runtime_data.wheels[node_id]
+    if wheel.is_dual_button:
+        if "button" not in msg or "channel" in msg:
+            return (None, None, "control_mismatch")
+        endpoints = sorted(
+            endpoint.endpoint_id
+            for endpoint in wheel.endpoints.values()
+            if endpoint.role == ROLE_BUTTON
+        )
+        button = msg["button"]
+        if button < 1 or button > len(endpoints):
+            return (None, None, "control_missing")
+        return (None, endpoints[button - 1], None)
+
+    if "channel" not in msg or "button" in msg:
+        return (None, None, "control_mismatch")
+    channels = {
+        endpoint.channel
+        for endpoint in wheel.endpoints.values()
+        if endpoint.channel is not None
+    }
+    channel = msg["channel"]
+    if channel not in channels:
+        return (None, None, "control_missing")
+    return (channel, None, None)
+
+
+@callback
+def _button_index(entry: Any, node_id: int, endpoint_id: Any) -> int | None:
+    """Map a private endpoint id to the dual button's safe display number."""
+    if not isinstance(endpoint_id, int):
+        return None
+    wheels = getattr(entry.runtime_data, "wheels", {})
+    wheel = wheels.get(node_id)
+    if wheel is None or not wheel.is_dual_button:
+        return None
+    endpoints = sorted(
+        endpoint.endpoint_id
+        for endpoint in wheel.endpoints.values()
+        if endpoint.role == ROLE_BUTTON
+    )
+    try:
+        return endpoints.index(endpoint_id) + 1
+    except ValueError:
+        return None
 
 
 @callback
@@ -142,13 +204,23 @@ def _binding_payload(subentry: Any) -> dict[str, Any]:
 
 
 @callback
-def _binding_title(hass: HomeAssistant, entry: Any, wheel: str, channel: int) -> str:
+def _binding_title(
+    hass: HomeAssistant,
+    entry: Any,
+    wheel: str,
+    *,
+    channel: int | None = None,
+    button: int | None = None,
+) -> str:
     """Use the same human title style as the native config flow."""
     snapshot = async_overview_snapshot(hass, entry)
     name = next(
         (item["name"] for item in snapshot["wheels"] if item["key"] == wheel),
         "BILRESA",
     )
+    if button is not None:
+        return generated_button_binding_title(name, str(button))
+    assert channel is not None
     return generated_binding_title(name, str(channel))
 
 
@@ -235,6 +307,12 @@ def ws_activity_subscribe(
         node_id = data.get("node_id")
         if not isinstance(node_id, int):
             return
+        entry = _loaded_entry(hass)
+        button = (
+            _button_index(entry, node_id, data.get("endpoint_id"))
+            if entry is not None
+            else None
+        )
         connection.send_message(
             websocket_api.event_message(
                 msg["id"],
@@ -242,10 +320,12 @@ def ws_activity_subscribe(
                     "wheel": wheel_key(node_id),
                     "action_id": data.get("action_id"),
                     "channel": data.get("channel"),
+                    "button": button,
                     "gesture": data.get("type"),
                     "direction": data.get("direction"),
                     "notches": data.get("notches"),
                     "presses": data.get("presses"),
+                    "observed_duration_ms": data.get("observed_duration_ms"),
                     "source": data.get("source", "matter"),
                     "result": data.get("result"),
                     "dispatch_status": data.get("dispatch_status", "received"),
@@ -281,7 +361,8 @@ def ws_activity_subscribe(
     {
         vol.Required("type"): TYPE_BINDING_SAVE,
         vol.Required("wheel"): str,
-        vol.Required("channel"): vol.All(int, vol.Range(min=1, max=3)),
+        vol.Optional("channel"): vol.All(int, vol.Range(min=1)),
+        vol.Optional("button"): vol.All(int, vol.Range(min=1)),
         vol.Required("data"): dict,
         vol.Optional("binding_id"): str,
         vol.Optional("expected_revision"): str,
@@ -304,15 +385,25 @@ def ws_binding_save(
         connection.send_result(msg["id"], {"ok": False, "error": "wheel_missing"})
         return
 
-    channel = msg["channel"]
+    channel, endpoint, address_error = _control_address(entry, node_id, msg)
+    if address_error is not None:
+        connection.send_result(msg["id"], {"ok": False, "error": address_error})
+        return
+    button = msg.get("button") if endpoint is not None else None
     binding_id = msg.get("binding_id")
     existing = _binding_for_id(entry, binding_id) if binding_id else None
-    occupied = _binding_for_channel(entry, node_id, channel)
+    occupied = _binding_for_address(entry, node_id, channel=channel, endpoint=endpoint)
 
     if binding_id and existing is None:
         connection.send_result(msg["id"], {"ok": False, "error": "binding_missing"})
         return
     if existing is not None:
+        if occupied is not existing:
+            connection.send_result(
+                msg["id"],
+                {"ok": False, "error": "binding_address_mismatch"},
+            )
+            return
         current_revision = binding_revision(existing)
         if msg.get("expected_revision") != current_revision:
             connection.send_result(
@@ -329,14 +420,16 @@ def ws_binding_save(
             msg["id"],
             {
                 "ok": False,
-                "error": "channel_occupied",
+                "error": (
+                    "button_occupied" if endpoint is not None else "channel_occupied"
+                ),
                 "binding": _binding_payload(occupied),
             },
         )
         return
 
     normalized, errors = validate_binding_data(
-        msg["data"], node_id=node_id, channel=channel
+        msg["data"], node_id=node_id, channel=channel, endpoint=endpoint
     )
     if normalized is None:
         connection.send_result(
@@ -344,13 +437,22 @@ def ws_binding_save(
         )
         return
 
-    title = _binding_title(hass, entry, msg["wheel"], channel)
+    title = _binding_title(
+        hass,
+        entry,
+        msg["wheel"],
+        channel=channel,
+        button=button,
+    )
     if existing is None:
+        address_id = (
+            f"endpoint:{endpoint}" if endpoint is not None else f"channel:{channel}"
+        )
         new_subentry = ConfigSubentry(
             data=MappingProxyType(normalized),
             subentry_type=SUBENTRY_BINDING,
             title=title,
-            unique_id=f"{node_id}:{channel}",
+            unique_id=f"{node_id}:{address_id}",
         )
         hass.config_entries.async_add_subentry(entry, new_subentry)
         saved = new_subentry
@@ -407,7 +509,8 @@ def ws_binding_delete(
     {
         vol.Required("type"): TYPE_BINDING_TEST,
         vol.Required("wheel"): str,
-        vol.Required("channel"): vol.All(int, vol.Range(min=1, max=3)),
+        vol.Optional("channel"): vol.All(int, vol.Range(min=1)),
+        vol.Optional("button"): vol.All(int, vol.Range(min=1)),
         vol.Required("gesture"): vol.In(
             (ACTION_ROTATE, ACTION_PRESS, ACTION_HOLD, ACTION_RELEASE)
         ),
@@ -435,11 +538,18 @@ def ws_binding_test(
         connection.send_result(msg["id"], {"ok": False, "error": "wheel_missing"})
         return
     wheel = entry.runtime_data.wheels[node_id]
+    channel, endpoint, address_error = _control_address(entry, node_id, msg)
+    if address_error is not None:
+        connection.send_result(msg["id"], {"ok": False, "error": address_error})
+        return
+    if wheel.is_dual_button and (msg["gesture"] == ACTION_ROTATE or msg["presses"] > 2):
+        connection.send_result(msg["id"], {"ok": False, "error": "gesture_unsupported"})
+        return
     action = WheelAction(
         node_id=node_id,
         wheel_name=wheel.name,
-        channel=msg["channel"],
-        endpoint_id=0,
+        channel=channel,
+        endpoint_id=endpoint or 0,
         type=msg["gesture"],
         direction=msg["direction"] if msg["gesture"] == ACTION_ROTATE else None,
         notches=msg["notches"] if msg["gesture"] == ACTION_ROTATE else 0,
