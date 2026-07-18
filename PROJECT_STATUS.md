@@ -23,14 +23,23 @@ earlier device-reference observations.
 ## RC.5 zero-transition finding and `v0.6.0-rc.6` corrective candidate
 
 Status: **RC.5 Hardware diagnosis + Implemented + Static + local Unit + CI +
-Released. Not deployed or corrective Hardware.**
+Released + deployed. Not corrective Hardware.**
 
 Annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit
 `dd14521d03786ea63a6bbe6cc365a8dbf0088f1c`. GitHub Actions run `29647018640`
 passed hassfest, HACS validation, Ruff, mypy, frontend checks and the full
-Python suite for that exact revision. The loaded Home Assistant instance still
-runs `v0.6.0-rc.5`; no corrective Hardware result is claimed before explicit
-installation and testing.
+Python suite for that exact revision.
+
+HACS installed exact `v0.6.0-rc.6`. The pre-restart Home Assistant
+configuration check was valid, Home Assistant restarted normally, and the
+post-restart check remained valid. Loaded diagnostics now report manifest
+`0.6.0-rc.6`, config entry state `loaded`, Matter Server add-on `9.1.0` /
+matterjs-server `1.2.6`, server schema 12 through compatibility schema 11,
+`core_matter_client`, no fallback, two wheels, one dual button and all six
+bindings. `Kolečko Obývák` channel 1 retained transition 0.0 seconds. Diagnostics
+list no integration issue; the post-restart log contains only Home Assistant's
+standard custom-component warning. No corrective Hardware result is claimed
+before a new controlled gesture.
 
 All controlled RC.5 tuning below used only the owner's selected
 `Kolečko Obývák`, channel 1, with acceleration disabled, step 3%, and

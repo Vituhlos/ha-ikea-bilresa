@@ -257,6 +257,27 @@ A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
 below. Unchecked items belong to the broader all-features matrix and are not
 claims made by B4.
 
+### 2026-07-18 — `v0.6.0-rc.6` deployment baseline
+
+- annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit
+  `dd14521d03786ea63a6bbe6cc365a8dbf0088f1c`;
+- exact-revision GitHub Actions run `29647018640` passed hassfest, HACS
+  validation, Ruff, mypy, frontend checks and the full Python suite;
+- HACS installed exact `v0.6.0-rc.6`; configuration validation passed before
+  restart and again after Home Assistant returned;
+- loaded diagnostics report manifest `0.6.0-rc.6`, Matter Server add-on `9.1.0`
+  / matterjs-server `1.2.6`, server schema 12, compatibility schema 11,
+  `core_matter_client`, no fallback, two wheels, one dual button and six
+  bindings;
+- `Kolečko Obývák` channel 1 retained the controlled-test settings: brightness
+  mode, step 3%, acceleration 0%, bounds 1–100% and transition 0.0 seconds;
+- the integration config entry is loaded at logger level `WARNING`, diagnostics
+  list no integration issue, and post-restart logs contain no integration
+  exception (only Home Assistant's standard custom-component warning).
+
+This is deployment evidence only. No wheel gesture was requested after restart,
+so RC.6 has no corrective Hardware result yet and no section G item is checked.
+
 ### 2026-07-18 — `v0.6.0-rc.5` deployment baseline
 
 - annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
