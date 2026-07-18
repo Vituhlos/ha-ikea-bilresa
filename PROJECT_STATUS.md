@@ -35,11 +35,11 @@ earlier device-reference observations.
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
 - Latest stable release remains `v0.5.0`. The latest published and deployed
-  prerelease is corrective `v0.6.0-rc.2`; the owner authorized the local
-  compatibility and Live-test work as the `v0.6.0-rc.3` candidate after B4
-  reproduced RC.2's count-zero overflow defect. RC.1 exposed a separate
-  real-device discovery defect and is explicitly marked known-bad for the
-  E2489. Panel Phases 0-3
+  prerelease is corrective `v0.6.0-rc.3`; its controlled Matter Server restart
+  gate failed and a local, unreleased `v0.6.0-rc.4` candidate addresses that
+  defect. RC.3 fixed the count-zero overflow reproduced on RC.2. RC.1 exposed
+  a separate real-device discovery defect and is explicitly marked known-bad
+  for the E2489. Panel Phases 0-3
   were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
@@ -2510,9 +2510,29 @@ It returned `loaded` through `core_matter_client` with two wheels, one dual
 button and all six stored bindings. Its first post-reload physical single
 produced exactly one completion, one public event, one binding action and one
 intended target change; no old event replayed and no fallback or error
-appeared. Config-entry restore is therefore **Hardware PASS**. The final
-controlled Matter Server reconnect and remaining failure-injection checks are
-still open.
+appeared. Config-entry restore is therefore **Hardware PASS**.
+
+The subsequent controlled restart of only the Matter Server add-on exposed a
+real RC.3 lifecycle defect. While Home Assistant temporarily had no loaded core
+Matter config entry, `_get_loaded_client()` indexed an empty list and the
+ten-second runtime-unavailable threshold caused a permanent switch to
+`dedicated_websocket` for that integration load. Diagnostics recorded one
+fallback with reason `list index out of range`, and the dual button was
+temporarily unavailable. Reloading only the IKEA BILRESA config entry restored
+`loaded`, `core_matter_client`, two wheels, one dual button and all six
+bindings. RC.3 therefore **FAILS** the controlled Matter Server restart gate;
+the successful config-entry reload does not turn that result into a pass.
+
+The local `v0.6.0-rc.4` candidate explicitly represents the missing loaded
+Matter entry as a temporary runtime condition, extends the runtime grace from
+10 to 60 seconds, and reattaches to the replacement core client. Initial
+unsupported-client fallback remains immediate and persistent runtime
+incompatibility still falls back after the grace period. The exact regression
+test keeps the Matter entry absent for five monitor checks, restores a new
+client, and proves reattachment without fallback. Local validation passed 276
+Python tests, 20 frontend tests, Ruff format/lint, mypy, compileall, panel
+syntax and diff checks. The candidate is not yet committed, CI-verified,
+Released, deployed or Hardware-verified.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2542,11 +2562,11 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-Perform a controlled restart of the Matter Server app, verify that the core
-Matter integration and IKEA BILRESA reconnect without fallback, that all three
-devices and six bindings return, then make one normal press. This is the final
-normal lifecycle gate before targeted unavailable-target/watchdog failure
-injection.
+Commit and CI-verify the `v0.6.0-rc.4` candidate. After explicit owner approval,
+release and deploy that exact revision, then repeat the same controlled Matter
+Server restart. It must recover through `core_matter_client` without fallback,
+restore all three devices and six bindings, and deliver one subsequent normal
+press exactly once.
 
 ## Next-agent handoff
 
@@ -2563,8 +2583,12 @@ injection.
    idle with no queued burst or reconnect. Adjacent use of the other dual-button
    endpoint and wheel channel 3 also passed cross-endpoint/node no-leak. A
    config-entry reload restored all devices/bindings and its first single
-   exactly once.
+   exactly once. Its controlled Matter Server restart then failed because the
+   temporary core-entry unload triggered a permanent dedicated-WebSocket
+   fallback. The local RC.4 candidate fixes that lifecycle path but has no
+   Released, deployment or Hardware evidence yet.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
-   Do not promote RC.3 to stable until the remaining B4 physical gates pass.
+   Do not promote RC.3 to stable. Do not claim the restart fix as Hardware
+   evidence until the exact RC.4 candidate is released, deployed and retested.

@@ -337,6 +337,25 @@ devices/bindings returned and the first post-reload single executed once.
 Overall B4 remains **IN PROGRESS** for the Matter Server reconnect and targeted
 failure-injection gates.
 
+Controlled Matter Server restart follow-up:
+
+- only the Matter Server add-on was restarted; no binding, target, integration
+  option or automation was changed;
+- the add-on returned to `started`, but RC.3 observed the temporarily unloaded
+  core Matter config entry as `list index out of range`;
+- after two five-second checks RC.3 selected `dedicated_websocket`, recorded one
+  fallback and temporarily exposed the dual button as unavailable;
+- all six stored bindings remained present, but this is a **FAIL** because the
+  supported core Matter source did not recover in place;
+- reloading only the IKEA BILRESA config entry restored `loaded`,
+  `core_matter_client`, two wheels, one dual button, all six bindings and no
+  active fallback.
+
+Verdict amendment: **RC.3 FAILS the controlled Matter Server restart gate.**
+The local `v0.6.0-rc.4` candidate adds a one-minute runtime restart grace and
+has deterministic Unit coverage for reattachment without fallback. It is not
+Released, deployed or Hardware-verified yet.
+
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 
 Tester: owner with Codex read-only MCP observation.

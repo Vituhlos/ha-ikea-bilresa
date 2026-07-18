@@ -58,6 +58,26 @@ These decisions have static and unit-test evidence. A real add-on 9.1.0
 upgrade, reconnect and physical BILRESA gesture run are still required before
 claiming Hardware compatibility.
 
+## Controlled 9.1.0 restart finding
+
+A controlled restart of the installed Matter Server add-on on 2026-07-18
+exposed a lifecycle defect in `v0.6.0-rc.3`. Home Assistant temporarily
+unloaded its core Matter config entry while the server restarted. RC.3 indexed
+the resulting empty loaded-entry list and, after only two five-second monitor
+checks, permanently selected the dedicated compatibility WebSocket for that
+integration load. The BILRESA config entry was reloaded afterward and returned
+to the supported core Matter client with all devices and bindings restored.
+
+The unreleased `v0.6.0-rc.4` candidate treats an absent loaded Matter entry as
+a temporary runtime outage. It keeps the core source preferred for twelve
+five-second checks and reattaches when Home Assistant supplies the replacement
+client. Initial setup with a genuinely unsupported client still falls back
+immediately; persistent runtime incompatibility still falls back after the
+one-minute grace period. Automated coverage reproduces the temporary empty
+entry and verifies reattachment without fallback. The exact controlled restart
+must pass on the installed candidate before this lifecycle gate is Hardware
+evidence.
+
 ## Compatibility still requiring evidence
 
 These items are mandatory gates, not completed validation:
@@ -67,7 +87,8 @@ These items are mandatory gates, not completed validation:
 2. Verify `MultiPressOngoing`, `MultiPressComplete`, long-press, and long-release
    ordering on physical BILRESA firmware 1.9.15.
 3. Exercise both event sources against add-on 9.1.0 without duplicate delivery.
-4. Verify fallback after initial incompatibility and after a core Matter reload.
+4. Verify fallback after initial incompatibility and verify core-client
+   reattachment after a core Matter reload or Matter Server restart.
 5. Verify that a configured URL different from the core Matter entry never
    reuses the wrong client.
 6. Validate reconnect, node add/remove, and server shutdown behavior.

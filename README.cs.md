@@ -22,7 +22,9 @@ propojení, device triggery a stejný panel BILRESA.
 > zachovává opravené rozpoznání reálného zařízení, podporuje Matter Server
 > 9.1.0/schema 12 přes kompatibilní profil schématu 11 a opravuje reálný overflow
 > E2489, při kterém se `MultiPressComplete(0)` chybně vyhodnotil jako jednoduchý
-> stisk. Fyzické ověření zůstává B4.
+> stisk. Řízený restart Matter Serveru v RC.3 odhalil předčasné přepnutí na
+> záložní zdroj; nevydaný kandidát **v0.6.0-rc.4** zachovává hlavní Matter
+> klient i během dočasné mezery při restartu. Fyzické ověření zůstává B4.
 >
 > Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
 > [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).

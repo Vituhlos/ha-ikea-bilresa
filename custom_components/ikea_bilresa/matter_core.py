@@ -23,7 +23,10 @@ _LOGGER = logging.getLogger(__name__)
 EventCallback = Callable[[str, Any], None]
 UnavailableCallback = Callable[[str], None]
 _CLIENT_CHECK_INTERVAL = timedelta(seconds=5)
-_UNAVAILABLE_CHECKS_BEFORE_FALLBACK = 2
+# A Matter Server app restart temporarily unloads the core Matter config entry.
+# Keep preferring the supported core client for one minute before treating a
+# runtime outage as permanent enough to require the compatibility WebSocket.
+_UNAVAILABLE_CHECKS_BEFORE_FALLBACK = 12
 _SWITCH_CLUSTER_ID = 0x003B
 _SWITCH_CURRENT_POSITION_ATTRIBUTE_ID = 0
 
@@ -105,6 +108,8 @@ class CoreMatterEventSource:
 
     def _get_loaded_client(self) -> Any:
         entries = self._hass.config_entries.async_loaded_entries("matter")
+        if not entries:
+            raise RuntimeError("Core Matter config entry is temporarily not loaded")
         entry = entries[0]
         core_url = entry.data.get("url")
         if (
@@ -154,7 +159,7 @@ class CoreMatterEventSource:
         self._set_connected(False)
         try:
             self._attach_client(matter_client)
-        except (AttributeError, RuntimeError, TypeError) as err:
+        except (AttributeError, IndexError, RuntimeError, TypeError) as err:
             self._unsubscribe_safely()
             self._matter_client = None
             _LOGGER.warning("Failed to reattach to core Matter client: %s", err)

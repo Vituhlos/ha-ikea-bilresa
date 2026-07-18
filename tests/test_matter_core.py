@@ -10,6 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from custom_components.ikea_bilresa.matter_core import (
+    _UNAVAILABLE_CHECKS_BEFORE_FALLBACK,
     CoreMatterEventSource,
     CoreMatterUnavailable,
 )
@@ -161,6 +162,45 @@ async def test_reattaches_after_core_matter_reload(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_transient_core_matter_restart_reattaches_without_fallback(
+    monkeypatch,
+) -> None:
+    first = FakeMatterClient(12)
+    second = FakeMatterClient(13)
+    config_entries = FakeConfigEntries(first)
+    hass = SimpleNamespace(config_entries=config_entries)
+    events: list[tuple[str, Any]] = []
+    unavailable = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.matter_core.async_track_time_interval",
+        lambda *_args: Mock(),
+    )
+    source = CoreMatterEventSource(
+        hass,
+        "ws://matter/ws",
+        lambda event, data: events.append((event, data)),
+        on_unavailable=unavailable,
+    )
+    await source.start()
+
+    config_entries.client = None
+    for _ in range(5):
+        source._check_client(None)
+
+    unavailable.assert_not_called()
+    first.unsubscribe.assert_called_once()
+    assert events[-1] == ("__disconnected__", None)
+
+    config_entries.client = second
+    source._check_client(None)
+
+    unavailable.assert_not_called()
+    assert events[-2] == ("__connected__", None)
+    assert events[-1][0] == "__nodes__"
+    assert events[-1][1][0]["node_id"] == 13
+
+
+@pytest.mark.asyncio
 async def test_unavailable_without_loaded_matter_entry(monkeypatch) -> None:
     hass = SimpleNamespace(config_entries=FakeConfigEntries(None))
     monkeypatch.setattr(
@@ -206,7 +246,8 @@ async def test_runtime_incompatibility_requests_fallback(monkeypatch) -> None:
     await source.start()
 
     config_entries.url = "ws://different-matter/ws"
-    source._check_client(None)
-    unavailable.assert_not_called()
+    for _ in range(_UNAVAILABLE_CHECKS_BEFORE_FALLBACK - 1):
+        source._check_client(None)
+        unavailable.assert_not_called()
     source._check_client(None)
     unavailable.assert_called_once()

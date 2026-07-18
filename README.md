@@ -18,7 +18,10 @@ independent events, bindings, device triggers and the same BILRESA panel.
 > test. RC.3 keeps the corrected real-device discovery, supports Matter Server
 > 9.1.0/schema 12 through its schema-11 compatibility profile, and fixes the
 > real E2489 overflow where `MultiPressComplete(0)` was incorrectly treated as
-> a single press. Physical verification remains B4.
+> a single press. A controlled Matter Server restart exposed a premature
+> runtime fallback in RC.3; an unreleased **v0.6.0-rc.4 candidate** keeps the
+> core Matter source through the temporary restart gap. Physical verification
+> remains B4.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
