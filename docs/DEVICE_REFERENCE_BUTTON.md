@@ -93,9 +93,13 @@ The three-tap capture confirms the Matter 1.6 overflow contract on the real
 E2489: exceeding `MultiPressMax = 2` can complete with count zero. The installed
 `v0.6.0-rc.2` incorrectly converted that zero to a single press and toggled the
 configured target. A subsequent normal single press completed as count one,
-showing that the device and integration were not left stuck. The working-tree
-G0 safeguard ignores zero and above-max completion counts, but requires an
-installed-candidate retest before it can be marked Hardware-verified.
+showing that the device and integration were not left stuck.
+
+The exact overflow was repeated after installing `v0.6.0-rc.3`. Matter Server
+again reported `MultiPressComplete(0)`, while RC.3 dispatched zero actions,
+left both the public custom event entity and the core Matter event entity
+unchanged, did not change the configured target, and logged no integration
+error. This Hardware-verifies the G0 safeguard for a zero completion count.
 
 ## How the integration consumes it
 
@@ -114,5 +118,6 @@ installed-candidate retest before it can be marked Hardware-verified.
   `LongPress`, and `LongRelease` events. It ignores zero and above-max
   completion counts and uses CurrentPosition only to clear stale safety state;
   it never synthesizes a click from that attribute. This is implemented and
-  unit-tested in the working tree. The installed-candidate overflow retest is
-  still required.
+  unit-tested, released in `v0.6.0-rc.3`, and Hardware-verified for the real
+  E2489 zero-count overflow. An above-max count remains deterministic test
+  evidence only because this device signals physical overflow as zero.

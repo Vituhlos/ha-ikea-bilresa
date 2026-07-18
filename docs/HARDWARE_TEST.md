@@ -265,11 +265,11 @@ published, installed and physically retested on the exact candidate.
 Verdict: **FAIL on RC.2 overflow handling; otherwise the captured B4 gesture
 and configured-binding subset passes. Overall B4 remains IN PROGRESS.**
 
-### 2026-07-18 — `v0.6.0-rc.3` deployment baseline
+### 2026-07-18 — `v0.6.0-rc.3` deployment and overflow retest
 
 The owner authorized publication and deployment of the G0 compatibility
 candidate. No physical button, wheel or controlled target was exercised during
-this baseline.
+the deployment baseline.
 
 - exact release tag `v0.6.0-rc.3` resolves to candidate commit `e6e67eb`;
 - all six GitHub Actions jobs passed for that revision;
@@ -283,12 +283,23 @@ this baseline.
   `MultiPressMax = 2`;
 - the post-start system log contained no matching `ikea_bilresa` entry.
 
-Verdict: **PASS deployment smoke only.** This confirms that RC.3 loads and
-restores the installation on Matter Server 9.1.0/schema 12. It does not yet
-prove that the G0 safeguard ignores the real E2489
-`MultiPressComplete(0)`. The next physical step is the same three-rapid-tap
-overflow reproduction used against RC.2, with target state and public-event
-observation.
+Physical overflow follow-up:
+
+- the owner made three rapid taps on the same E2489 side used for the RC.2
+  failure;
+- Matter Server logged the expected `MultiPressComplete(0)`;
+- RC.3 received the ordered Switch sequence but diagnostics remained at
+  `actions_dispatched = 0`;
+- the public custom event entity and matching core Matter event entity did not
+  advance or publish a false single;
+- the configured target state did not change during the gesture;
+- both integration and Home Assistant logs remained free of a matching error.
+
+Verdict: **PASS deployment smoke and PASS real zero-count overflow safeguard.**
+This confirms that RC.3 loads on Matter Server 9.1.0/schema 12 and correctly
+ignores the real E2489 `MultiPressComplete(0)`. A deliberate normal single
+immediately after this ignored completion is the next recovery check. Overall
+B4 remains **IN PROGRESS** for idle-resume, no-leak and lifecycle gates.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

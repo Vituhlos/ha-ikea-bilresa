@@ -2475,10 +2475,17 @@ Publication and controlled deployment completed on 2026-07-18:
 - no `ikea_bilresa` system-log entry appeared after startup.
 
 No binding, automation, target or device configuration was changed during
-deployment, and no physical gesture was performed. This establishes a
-successful server-side deployment smoke on Matter Server 9.1.0/schema 12. The
-G0 overflow safeguard and remaining B4 behavior still require physical
-verification on this exact installed candidate.
+deployment. This establishes a successful server-side deployment smoke on
+Matter Server 9.1.0/schema 12.
+
+The owner then repeated the exact three-rapid-tap overflow gesture on the
+installed RC.3. Matter Server reported `MultiPressComplete(0)` on the E2489
+endpoint. RC.3 dispatched zero actions, neither the public custom event entity
+nor the core Matter event entity advanced, the configured target stayed
+unchanged, and no `ikea_bilresa` error appeared. The G0 zero-count safeguard is
+therefore **Hardware PASS** on the exact released candidate. Above-max rejection
+remains Unit evidence because the real device represents this overflow as zero.
+The remaining B4 lifecycle, idle-resume and no-leak checks are still open.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2508,10 +2515,10 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-On the installed `v0.6.0-rc.3`, repeat the real E2489 overflow gesture: three
-rapid taps on one physical button. Confirm that raw Matter still completes with
-count zero but RC.3 ignores it—no public false single and no target action.
-Then continue the remaining B4 idle-resume, no-leak and reconnect checks before
+On the same RC.3 button immediately perform one deliberate normal single press.
+Confirm one public single and exactly one intended target change; this proves
+that ignoring the zero completion did not leave endpoint state stuck. Then
+continue the remaining B4 idle-resume, no-leak and reconnect checks before
 enabling G1/G2 advanced timing or combinations.
 
 ## Next-agent handoff
@@ -2523,8 +2530,8 @@ enabling G1/G2 advanced timing or combinations.
 4. RC.1 failed real E2489 discovery. RC.2 fixed discovery and supplied partial
    B4 Hardware evidence but failed three-tap overflow handling. RC.3 has Static,
    Python Unit, frontend Unit, exact-revision CI, Released and successful
-   Matter Server 9.1.0/schema-12 deployment-smoke evidence; its overflow fix
-   still needs the exact physical retest.
+   Matter Server 9.1.0/schema-12 deployment-smoke evidence; its zero-count
+   overflow fix passed the exact physical retest.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
