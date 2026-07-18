@@ -2531,8 +2531,10 @@ incompatibility still falls back after the grace period. The exact regression
 test keeps the Matter entry absent for five monitor checks, restores a new
 client, and proves reattachment without fallback. Local validation passed 276
 Python tests, 20 frontend tests, Ruff format/lint, mypy, compileall, panel
-syntax and diff checks. The candidate is not yet committed, CI-verified,
-Released, deployed or Hardware-verified.
+syntax and diff checks. Candidate commit `5a39f90` is pushed on
+`agent/dual-button-0.6`; GitHub Actions run `29641407216` passed hassfest, HACS
+validation, Ruff, mypy, frontend checks and Python unit tests on that exact
+revision. The candidate is not yet Released, deployed or Hardware-verified.
 
 ### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
 
@@ -2562,11 +2564,11 @@ recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
 
 ## Single best next action
 
-Commit and CI-verify the `v0.6.0-rc.4` candidate. After explicit owner approval,
-release and deploy that exact revision, then repeat the same controlled Matter
-Server restart. It must recover through `core_matter_client` without fallback,
-restore all three devices and six bindings, and deliver one subsequent normal
-press exactly once.
+After explicit owner approval, release and deploy the CI-green
+`v0.6.0-rc.4` candidate, then repeat the same controlled Matter Server restart.
+It must recover through `core_matter_client` without fallback, restore all
+three devices and six bindings, and deliver one subsequent normal press exactly
+once.
 
 ## Next-agent handoff
 
@@ -2585,8 +2587,9 @@ press exactly once.
    config-entry reload restored all devices/bindings and its first single
    exactly once. Its controlled Matter Server restart then failed because the
    temporary core-entry unload triggered a permanent dedicated-WebSocket
-   fallback. The local RC.4 candidate fixes that lifecycle path but has no
-   Released, deployment or Hardware evidence yet.
+   fallback. RC.4 candidate commit `5a39f90` fixes that lifecycle path and is
+   locally validated, pushed and exact-revision CI-green, but has no Released,
+   deployment or Hardware evidence yet.
 5. Do not mutate real bindings or run target-changing panel tests unless the
    owner identifies a safe binding/target for that check.
 6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
