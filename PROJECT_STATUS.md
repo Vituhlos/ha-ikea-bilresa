@@ -22,9 +22,10 @@ earlier device-reference observations.
 
 ## Scroll first-response optimization (`v0.6.0-rc.5` candidate, 2026-07-18)
 
-Status: **Implemented + Static + local Unit. Owner-authorized for commit, CI,
-`v0.6.0-rc.5` prerelease and controlled HACS deployment. Not yet committed,
-CI-verified, released, deployed, or Hardware-verified for this candidate.**
+Status: **Implemented + Static + local Unit + CI for implementation commit
+`d12707c`. Owner-authorized for `v0.6.0-rc.5` prerelease and controlled HACS
+deployment. Not yet released, deployed, or Hardware-verified for this
+candidate.**
 
 Before publication, a read-only Home Assistant registry recheck confirmed both
 physical E2490 scroll wheels and the E2489 dual button now run firmware
@@ -110,15 +111,20 @@ git diff --check                                                 passed
 ```
 
 The five local warnings are dependency deprecations from Home Assistant,
-`aiohttp` and `backoff`, not test failures. CI, exact deployed code, physical
+`aiohttp` and `backoff`, not test failures. Exact deployed code, physical
 single-notch onset, exact fast-scroll total, direction reversal, count-18/wrap
 and both physical firmware-1.9.15 wheels remain unverified for this candidate.
-Suppression of
-redundant service calls is locally unit-tested at both limits for all seven
-bounded modes; the exact live service-call count during saturation is still a
-Hardware item. The next gate is publication and controlled deployment of
-`v0.6.0-rc.5`, followed by `docs/HARDWARE_TEST.md` section G on both physical
-wheels.
+Suppression of redundant service calls is locally unit-tested at both limits
+for all seven bounded modes; the exact live service-call count during
+saturation is still a Hardware item. The next gate is publication and
+controlled deployment of `v0.6.0-rc.5`, followed by
+`docs/HARDWARE_TEST.md` section G on both physical wheels.
+
+GitHub Actions run `29645493522` passed all six jobs for exact implementation
+commit `d12707c769239e14ff9f4e709efbeba0c3891fb2`: hassfest, HACS validation,
+Ruff, mypy, frontend checks and the full Python unit suite. The subsequent
+documentation-only release record must pass CI on its own exact revision before
+that revision is tagged.
 
 ## Repository state
 
