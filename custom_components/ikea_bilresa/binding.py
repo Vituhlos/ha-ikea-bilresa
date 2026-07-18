@@ -211,6 +211,7 @@ class LightBinding:
         self._scene_index = 0
         self._ramp_direction = data.get(CONF_RAMP_DIRECTION, DEFAULT_RAMP_DIRECTION)
         self._ramp_up = self._ramp_direction != RAMP_DIRECTION_DOWN
+        self._ramp_active = False
         self._ramp_unsub: Callable[[], None] | None = None
         self._ramp_watchdog_unsub: Callable[[], None] | None = None
         self._tracked: float | None = None
@@ -337,9 +338,10 @@ class LightBinding:
         previous_action = self._active_action
         self._active_action = action
         try:
-            if self._ramp_unsub is not None and action.type in (
+            if self._ramp_active and action.type in (
                 ACTION_ROTATE,
                 ACTION_PRESS,
+                ACTION_HOLD,
             ):
                 # Any new gesture supersedes a hold whose release may have been lost.
                 self._stop_ramp(change_direction=False)
@@ -482,7 +484,7 @@ class LightBinding:
         """Execute the configured single action and arm completion suppression."""
         self._fast_press_started = now
         self._start_latency_trace(now, stage)
-        if self._ramp_unsub is not None:
+        if self._ramp_active:
             self._stop_ramp(change_direction=False)
         self._hold_off_rotation()
         previous_action = self._active_action
@@ -603,6 +605,28 @@ class LightBinding:
             "unit": unit,
         }
 
+    @callback
+    def _call_value_if_changed(
+        self,
+        domain: str,
+        service: str,
+        data: dict[str, Any],
+        *,
+        before: float | int,
+        after: float | int,
+        result: dict[str, Any],
+    ) -> bool:
+        """Dispatch a bounded value only when its service payload can change."""
+        if before == after:
+            self._report_activity(
+                "completed",
+                result=result,
+                reason="target_unchanged",
+            )
+            return False
+        self._call(domain, service, data, result=result)
+        return True
+
     # -- rotation ---------------------------------------------------------
 
     @callback
@@ -631,51 +655,54 @@ class LightBinding:
         return False
 
     @callback
-    def _rotate_by(self, notches: int, up: bool) -> None:
+    def _rotate_by(self, notches: int, up: bool) -> bool:
         if not self._mode_target_valid:
             self._report_activity("skipped", reason="mode_target_mismatch")
             self._tracked = None
             self._stop_ramp(change_direction=False)
-            return
+            return False
         if self._available_state(self._target) is None:
             self._report_activity("skipped", reason="target_unavailable")
             self._tracked = None
             self._stop_ramp(change_direction=False)
-            return
+            return False
         if self._mode == MODE_COLOR_TEMP:
-            self._rotate_color_temp(notches, up)
-        elif self._mode == MODE_COLOR:
-            self._rotate_color(notches, up)
-        elif self._mode == MODE_VOLUME:
-            self._rotate_volume(notches, up)
-        elif self._mode == MODE_COVER:
-            self._rotate_cover(notches, up)
-        elif self._mode == MODE_TEMPERATURE:
-            self._rotate_temperature(notches, up)
-        elif self._mode == MODE_FAN:
-            self._rotate_fan(notches, up)
-        elif self._mode == MODE_NUMBER:
-            self._rotate_number(notches, up)
-        else:
-            self._rotate_brightness(notches, up)
+            return self._rotate_color_temp(notches, up)
+        if self._mode == MODE_COLOR:
+            return self._rotate_color(notches, up)
+        if self._mode == MODE_VOLUME:
+            return self._rotate_volume(notches, up)
+        if self._mode == MODE_COVER:
+            return self._rotate_cover(notches, up)
+        if self._mode == MODE_TEMPERATURE:
+            return self._rotate_temperature(notches, up)
+        if self._mode == MODE_FAN:
+            return self._rotate_fan(notches, up)
+        if self._mode == MODE_NUMBER:
+            return self._rotate_number(notches, up)
+        return self._rotate_brightness(notches, up)
 
     # -- hold-to-ramp -----------------------------------------------------
 
     @callback
     def _start_ramp(self) -> None:
         if (
-            self._ramp_unsub is not None
+            self._ramp_active
             or not self._target
             or not self._mode_target_valid
             or self._available_state(self._target) is None
         ):
             self._report_activity("skipped", reason="ramp_unavailable")
             return
+        self._ramp_active = True
         self._ramp_action = self._active_action
-        self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
-        self._ramp_unsub = async_track_time_interval(
-            self.hass, self._ramp_tick, _RAMP_INTERVAL
-        )
+        changed = self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+        if not self._ramp_active:
+            return
+        if changed:
+            self._ramp_unsub = async_track_time_interval(
+                self.hass, self._ramp_tick, _RAMP_INTERVAL
+            )
         self._ramp_watchdog_unsub = async_call_later(
             self.hass, _RAMP_WATCHDOG_SECONDS, self._ramp_watchdog
         )
@@ -685,9 +712,18 @@ class LightBinding:
         previous_action = self._active_action
         self._active_action = self._ramp_action
         try:
-            self._rotate_by(_RAMP_NOTCHES, self._ramp_up)
+            if not self._rotate_by(_RAMP_NOTCHES, self._ramp_up):
+                self._pause_ramp_at_limit()
         finally:
             self._active_action = previous_action
+
+    @callback
+    def _pause_ramp_at_limit(self) -> None:
+        """Stop recurring ticks while retaining release/watchdog accounting."""
+        if self._ramp_unsub is None:
+            return
+        self._ramp_unsub()
+        self._ramp_unsub = None
 
     @callback
     def _ramp_watchdog(self, _now) -> None:
@@ -700,15 +736,22 @@ class LightBinding:
 
     @callback
     def _stop_ramp(self, *, change_direction: bool) -> None:
-        if self._ramp_unsub is None:
+        if (
+            not self._ramp_active
+            and self._ramp_action is None
+            and self._ramp_unsub is None
+            and self._ramp_watchdog_unsub is None
+        ):
             return
-        self._ramp_unsub()
-        self._ramp_unsub = None
+        if self._ramp_unsub is not None:
+            self._ramp_unsub()
+            self._ramp_unsub = None
         if self._ramp_watchdog_unsub is not None:
             self._ramp_watchdog_unsub()
             self._ramp_watchdog_unsub = None
         if change_direction and self._ramp_direction == RAMP_DIRECTION_ALTERNATE:
             self._ramp_up = not self._ramp_up
+        self._ramp_active = False
         self._ramp_action = None
 
     def _accelerate(self, notches: int, direction: str | None = None) -> int:
@@ -771,16 +814,16 @@ class LightBinding:
         return magnitude if up else -magnitude
 
     @callback
-    def _rotate_brightness(self, notches: int, up: bool) -> None:
+    def _rotate_brightness(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         state_on = state.state == "on"
         current = state.attributes.get(ATTR_BRIGHTNESS) if state_on else 0
         tracked = self._resync(current, 0)
         if not state_on and tracked <= 0 and not up:
             self._report_activity("skipped", reason="light_already_off")
-            return  # don't switch a light on by scrolling down
+            return False  # don't switch a light on by scrolling down
 
         if not state_on and up:
             first_step = self._delta(self._step, 255, 1, True)
@@ -804,26 +847,29 @@ class LightBinding:
                         "%",
                     ),
                 )
-                return
+                return True
             target = self._min_units
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "brightness",
+            round(tracked / 255 * 100),
+            round(target / 255 * 100),
+            "%",
+        )
+        return self._call_value_if_changed(
             "light",
             "turn_on",
             {ATTR_BRIGHTNESS: round(target), ATTR_TRANSITION: self._transition},
-            result=self._value_result(
-                "brightness",
-                round(tracked / 255 * 100),
-                round(target / 255 * 100),
-                "%",
-            ),
+            before=round(tracked),
+            after=round(target),
+            result=result,
         )
 
     @callback
-    def _rotate_color_temp(self, notches: int, up: bool) -> None:
+    def _rotate_color_temp(self, notches: int, up: bool) -> bool:
         state = self._lit_state()
         if state is None:
-            return
+            return False
         min_k = state.attributes.get(ATTR_MIN_KELVIN, FALLBACK_MIN_KELVIN)
         max_k = state.attributes.get(ATTR_MAX_KELVIN, FALLBACK_MAX_KELVIN)
         tracked = self._resync(
@@ -832,20 +878,23 @@ class LightBinding:
         target = tracked + self._delta(self._step, max(max_k - min_k, 1), notches, up)
         target = min(max_k, max(min_k, target))
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "color_temperature", round(tracked), round(target), "K"
+        )
+        return self._call_value_if_changed(
             "light",
             "turn_on",
             {ATTR_COLOR_TEMP_KELVIN: round(target), ATTR_TRANSITION: self._transition},
-            result=self._value_result(
-                "color_temperature", round(tracked), round(target), "K"
-            ),
+            before=round(tracked),
+            after=round(target),
+            result=result,
         )
 
     @callback
-    def _rotate_color(self, notches: int, up: bool) -> None:
+    def _rotate_color(self, notches: int, up: bool) -> bool:
         state = self._lit_state()
         if state is None:
-            return
+            return False
         hs_color = state.attributes.get(ATTR_HS_COLOR)
         if hs_color:
             self._saturation = float(hs_color[1])
@@ -861,46 +910,53 @@ class LightBinding:
             },
             result=self._value_result("hue", round(tracked, 1), round(hue, 1), "°"),
         )
+        return True
 
     @callback
-    def _rotate_volume(self, notches: int, up: bool) -> None:
+    def _rotate_volume(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
         target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "volume", round(tracked * 100), round(target * 100), "%"
+        )
+        return self._call_value_if_changed(
             "media_player",
             "volume_set",
             {"volume_level": round(target, 3)},
-            result=self._value_result(
-                "volume", round(tracked * 100), round(target * 100), "%"
-            ),
+            before=round(tracked, 3),
+            after=round(target, 3),
+            result=result,
         )
 
     @callback
-    def _rotate_cover(self, notches: int, up: bool) -> None:
+    def _rotate_cover(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         tracked = self._resync(_as_float(state.attributes.get("current_position")), 50)
         target = min(
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
         self._tracked = target
-        self._call(
+        result = self._value_result("cover_position", round(tracked), target, "%")
+        return self._call_value_if_changed(
             "cover",
             "set_cover_position",
             {"position": target},
-            result=self._value_result("cover_position", round(tracked), target, "%"),
+            before=round(tracked),
+            after=target,
+            result=result,
         )
 
     @callback
-    def _rotate_temperature(self, notches: int, up: bool) -> None:
+    def _rotate_temperature(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         min_t = _as_float(state.attributes.get("min_temp")) or 7.0
         max_t = _as_float(state.attributes.get("max_temp")) or 35.0
         temp_step = _as_float(state.attributes.get("target_temp_step")) or 0.5
@@ -910,40 +966,46 @@ class LightBinding:
         target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
         target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
         self._tracked = target
-        self._call(
+        result = self._value_result(
+            "temperature",
+            round(tracked, 2),
+            round(target, 2),
+            str(state.attributes.get("unit_of_measurement") or "°"),
+        )
+        return self._call_value_if_changed(
             "climate",
             "set_temperature",
             {"temperature": round(target, 2)},
-            result=self._value_result(
-                "temperature",
-                round(tracked, 2),
-                round(target, 2),
-                str(state.attributes.get("unit_of_measurement") or "°"),
-            ),
+            before=round(tracked, 2),
+            after=round(target, 2),
+            result=result,
         )
 
     @callback
-    def _rotate_fan(self, notches: int, up: bool) -> None:
+    def _rotate_fan(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         tracked = self._resync(_as_float(state.attributes.get("percentage")), 50)
         target = min(
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
         self._tracked = target
-        self._call(
+        result = self._value_result("fan_speed", round(tracked), target, "%")
+        return self._call_value_if_changed(
             "fan",
             "set_percentage",
             {"percentage": target},
-            result=self._value_result("fan_speed", round(tracked), target, "%"),
+            before=round(tracked),
+            after=target,
+            result=result,
         )
 
     @callback
-    def _rotate_number(self, notches: int, up: bool) -> None:
+    def _rotate_number(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
         if state is None:
-            return
+            return False
         min_n = _as_float(state.attributes.get("min")) or 0.0
         max_n = _as_float(state.attributes.get("max")) or 100.0
         num_step = _as_float(state.attributes.get("step")) or 1.0
@@ -955,16 +1017,19 @@ class LightBinding:
         target = min(max_n, max(min_n, round(target / num_step) * num_step))
         self._tracked = target
         domain = self._target.split(".", 1)[0]
-        self._call(
+        result = self._value_result(
+            "number",
+            round(tracked, 4),
+            round(target, 4),
+            str(state.attributes.get("unit_of_measurement") or ""),
+        )
+        return self._call_value_if_changed(
             domain,
             "set_value",
             {"value": round(target, 4)},
-            result=self._value_result(
-                "number",
-                round(tracked, 4),
-                round(target, 4),
-                str(state.attributes.get("unit_of_measurement") or ""),
-            ),
+            before=round(tracked, 4),
+            after=round(target, 4),
+            result=result,
         )
 
     def _lit_state(self) -> State | None:

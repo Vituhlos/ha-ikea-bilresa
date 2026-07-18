@@ -11,7 +11,7 @@ wheel and dual button** (Matter over Thread). The wheel reacts to real-time
 `MultiPressOngoing` events for DIRIGERA-like smoothness; the dual button gains
 independent events, bindings, device triggers and the same BILRESA panel.
 
-> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.4** adds the
+> **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.5** adds the
 > BILRESA dual button through roadmap phases B0-B3. Its two buttons have
 > independent events, triggers and bindings; the existing panel adapts its
 > `1 / 2 / 3` wheel workbench to buttons `1 / 2` and retains an adapted Live
@@ -21,8 +21,12 @@ independent events, bindings, device triggers and the same BILRESA panel.
 > a single press. A controlled Matter Server restart exposed a premature
 > runtime fallback in RC.3. RC.4 keeps the core Matter source through that
 > temporary restart gap; its exact installed candidate passed reconnection
-> without fallback and delivered the first physical press exactly once.
-> Remaining targeted failure injection stays in B4.
+> without fallback and completed the targeted B4 failure-injection pass. RC.5
+> makes each confirmed rotary `InitialPress` act immediately, reconciles it
+> exactly against later cumulative counts, and stops repeating unchanged
+> service calls at bounded target limits. Its automated validation is complete;
+> physical section G covers both available firmware-1.9.15 wheels after
+> deployment.
 
 > **Development handoff:** current implementation state, validation level, and
 > prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared

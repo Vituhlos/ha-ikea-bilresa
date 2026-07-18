@@ -1,11 +1,14 @@
 """Turn raw BILRESA switch events into clean, per-gesture wheel actions.
 
-The device reports a scroll as a stream of ``multi_press_ongoing`` events whose
-``currentNumberOfPressesCounted`` is **cumulative within a gesture** and jumps
-by several notches at a time (the wheel batches them behind a ~1 s anti-flood
-delay), followed by a ``multi_press_complete`` with the final total. To move a
-light by the right amount in real time we therefore track the running count per
-endpoint and emit the **delta** on every update.
+The device starts a scroll with ``initial_press``, then reports
+``multi_press_ongoing`` counts that are **cumulative within a gesture** and may
+jump by several notches at a time behind a firmware batching delay. A final
+``multi_press_complete`` carries the total.
+
+Every confirmed notch carried by ``initial_press`` is emitted immediately.
+Later cumulative reports subtract those already-dispatched previews and emit
+only the remaining delta. This preserves exact totals while avoiding the
+firmware's wait before visible response.
 
 State is keyed by ``(node_id, endpoint_id)``, so any number of wheels and
 channels are handled independently.
@@ -43,6 +46,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _ONGOING = SWITCH_EVENT_NAMES[EVT_MULTI_PRESS_ONGOING]
 _COMPLETE = SWITCH_EVENT_NAMES[EVT_MULTI_PRESS_COMPLETE]
+_INITIAL_PRESS = SWITCH_EVENT_NAMES[EVT_INITIAL_PRESS]
 _LONG_PRESS = SWITCH_EVENT_NAMES[EVT_LONG_PRESS]
 _LONG_RELEASE = SWITCH_EVENT_NAMES[EVT_LONG_RELEASE]
 
@@ -71,6 +75,8 @@ class GestureEngine:
         self._clock = clock
         # cumulative press count seen so far in the current gesture, per endpoint
         self._counts: dict[tuple[int, int], int] = {}
+        # InitialPress notches already emitted before a cumulative report.
+        self._previewed_notches: dict[tuple[int, int], int] = {}
         self._press_started: dict[tuple[int, int], float] = {}
         # Best-effort Switch.CurrentPosition state. Attribute reports may be
         # coalesced by matterjs-server, so this is only a stuck-state safety
@@ -93,20 +99,50 @@ class GestureEngine:
         count = decoded.get("count")
         key = (wheel.node_id, decoded["endpoint_id"])
 
-        if event_type == _ONGOING and count is not None:
+        if event_type == _INITIAL_PRESS:
+            self._previewed_notches[key] = self._previewed_notches.get(key, 0) + 1
+            delta = 1
+        elif event_type in (_ONGOING, _COMPLETE):
+            switch = wheel.endpoints.get(decoded["endpoint_id"])
+            multi_press_max = switch.multi_press_max if switch is not None else None
+            valid_count = (
+                isinstance(count, int)
+                and not isinstance(count, bool)
+                and count >= 0
+                and (multi_press_max is None or count <= multi_press_max)
+            )
+            if not valid_count or count == 0:
+                # A completion is still an authoritative sequence boundary even
+                # when its uint8 count is absent, malformed or the Matter 1.6
+                # overflow sentinel zero. Confirmed InitialPress actions cannot
+                # be undone, but stale accounting must not leak forward.
+                if event_type == _COMPLETE:
+                    self._counts.pop(key, None)
+                    self._previewed_notches.pop(key, None)
+                return None
+
+            assert isinstance(count, int) and not isinstance(count, bool)
+            counted = count
             last = self._counts.get(key, 0)
-            if count <= last:  # counter wrapped -> a new gesture started
+            if counted < last:  # counter wrapped -> a new gesture started
                 last = 0
-            delta = count - last
-            self._counts[key] = count
-        elif event_type == _COMPLETE and count is not None:
-            last = self._counts.get(key, 0)
-            if count < last:
-                last = 0
-            delta = count - last
-            self._counts[key] = 0  # gesture finished, reset baseline
+            cumulative_delta = max(counted - last, 0)
+            previewed = self._previewed_notches.get(key, 0)
+            credited = min(cumulative_delta, previewed)
+            delta = cumulative_delta - credited
+            previewed -= credited
+
+            if event_type == _COMPLETE:
+                self._counts.pop(key, None)
+                self._previewed_notches.pop(key, None)
+            else:
+                self._counts[key] = counted
+                if previewed:
+                    self._previewed_notches[key] = previewed
+                else:
+                    self._previewed_notches.pop(key, None)
         else:
-            # initial_press / short_release / long_* carry no scroll delta
+            # short_release / long_* carry no additional scroll delta
             return None
 
         if delta <= 0:
@@ -190,17 +226,19 @@ class GestureEngine:
         """Observe Switch.CurrentPosition without synthesizing an action.
 
         matterjs-server 1.2.x coalesces attribute reports under backpressure.
-        A released position can therefore clear stale local gesture state, but
-        position changes must never be counted as clicks, chords or sequences.
+        Position changes must never be counted as clicks, chords or sequences.
+        A scroll endpoint returns to zero for an individual notch while its
+        cumulative multi-press sequence may still be active, so this hint must
+        not clear scroll counts or an eager first-notch credit.
         """
         key = (node_id, endpoint_id)
         self._positions[key] = position
         if position == 0:
-            self._counts.pop(key, None)
             self._press_started.pop(key, None)
 
     def reset(self) -> None:
         """Drop all gesture state (e.g. on reconnect)."""
         self._counts.clear()
+        self._previewed_notches.clear()
         self._positions.clear()
         self._press_started.clear()

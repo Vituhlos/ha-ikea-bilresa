@@ -124,3 +124,44 @@ to X, with the before/after numbers", or "keep 1.0 s because the remaining lag i
 in firmware and no binding knob moves it". Nothing changes in runtime code until
 that entry exists. This does not touch the dual-button work in
 `ROADMAP_BUTTON.md`; it is a wheel-behaviour item.
+
+## 2026-07-18 raw-event timing and first-notch finding
+
+A controlled run on Matter Server add-on 9.1.0 / matterjs-server 1.2.6 used its
+native sanitized Switch-event logging and integration DEBUG timestamps. The
+integration accounted for every cumulative notch without loss or duplication,
+and raw-event completion to integration dispatch took approximately 4-10 ms.
+The software dispatch path was therefore not the source of the perceived lag.
+
+The device emitted `InitialPress` before the first cumulative count, but the
+engine ignored it for rotation. The first actionable batch consequently arrived
+roughly 0.5-0.6 seconds later. A representative sanitized fast sequence began
+with counts `5 → 10 → 13 → 16 → 18`, completed, and continued in a new sequence
+`3 → 7 → 11 → 14`; each cumulative report followed an InitialPress in the
+observed stream. A 1.0 → 0.5 second target-transition comparison improved target
+acknowledgement, while 0.3 seconds showed no repeatable further gain; neither
+transition removed the initial wait.
+
+The Matter Switch sequence explicitly generates InitialPress for every detected
+press and orders a coincident MultiPressOngoing directly after it. The resulting
+candidate therefore emits one eager notch on every rotary `InitialPress` and
+credits all of them against cumulative ongoing/complete counts. Later counts
+remain the source of truth for every remaining notch. `CurrentPosition = 0`
+does not reset rotary accounting because it describes an individual release,
+not completion of the cumulative multi-press series.
+
+This is Implemented/Unit evidence only until an owner-authorized candidate is
+released, deployed, and physically checked for single-notch latency, exact
+fast-scroll totals, direction reversal, count wrap and both installed firmware
+versions.
+
+The same recorded fast stream also continued after the bound light had reached
+its configured maximum. The candidate therefore avoids sending another
+identical service payload once a bounded target is already at its effective
+limit. Unit tests cover both limits for brightness, color temperature, volume,
+cover position, climate temperature, fan speed and number value. Hue is
+excluded because its intended behavior wraps through 360 degrees. This reduces
+avoidable service traffic, but a deployed trace must still confirm that no
+queue or later state movement remains at saturation. Hold-to-ramp additionally
+pauses its recurring 200 ms interval when no further bounded change is possible;
+release-direction accounting and the lost-release watchdog remain active.

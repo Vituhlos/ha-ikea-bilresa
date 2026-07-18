@@ -192,6 +192,9 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       stopped by the watchdog.
 - [ ] Paired hold-to-ramp (button 1 up / button 2 down on a shared target), if
       configured, begins on `hold` and stops on `release`.
+- [ ] At a configured ramp limit, no recurring service calls continue; release
+      still arms the correct next alternating direction, and a lost release is
+      still cleared by the watchdog.
 - [x] Unavailable/unknown targets cause no errors or runaway commands.
 
 ### F4. Reliability and no-leak
@@ -208,6 +211,44 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       surfaces and their expected binding actions advanced.**
 - [x] Logs contain no recurring integration exceptions, task warnings, or
       reconnect spam during the recorded B4 run.
+
+## G. Eager first-notch scroll response
+
+Use this section for any candidate that emits a rotary action on
+`InitialPress`. Keep acceleration at zero for the exact-accounting checks first;
+test an accelerated profile separately so multiplication cannot hide a missing
+or duplicated raw notch.
+
+Current hardware note (2026-07-18): Home Assistant's device registry confirms
+that both commissioned physical scroll wheels, as well as the dual button, now
+run firmware `1.9.15`. Section G therefore exercises both independent wheel
+nodes on that firmware. Earlier `1.8.7` observations remain valid historical
+evidence, but that firmware is no longer available for this candidate and must
+not be claimed as RC.5 hardware coverage.
+
+- [ ] On each of the two firmware-1.9.15 wheels, rotate one deliberate notch in
+      each direction. Confirm one immediate action follows InitialPress and the
+      later completion adds no second notch.
+- [ ] On each wheel, perform one continuous faster rotation. Sum the eager
+      notch and every later delta; it must equal the final cumulative Matter
+      count, including a sequence reaching 18.
+- [ ] Confirm a duplicate/equal cumulative report produces no additional
+      action, and a decreased/wrapped count starts a new baseline.
+- [ ] Reverse direction during ordinary use. Up/down endpoint accounting must
+      stay independent and the target must not jump in the old direction.
+- [ ] Stop after a fast rotation and wait through completion. No trailing
+      brightness change may appear after the exact final delta.
+- [ ] Continue turning briefly after the configured brightness maximum and
+      minimum is reached. The raw/action count may continue, but the binding
+      must not repeat an identical light service call or create delayed target
+      movement. Record the sanitized service-call count.
+- [ ] Change the physical channel selector and verify no eager notch leaks to
+      the preceding or adjacent channel.
+- [ ] Reload the BILRESA config entry and repeat one notch. Reconnect must clear
+      every eager credit and cumulative baseline.
+- [ ] Compare the selected target transition only after exact accounting passes.
+      Record subjective onset separately from the Home Assistant target-state
+      acknowledgement; neither is proof of physical photon timing.
 
 ## Recorded runs
 

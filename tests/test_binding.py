@@ -252,6 +252,52 @@ def test_watchdog_stops_ramp_without_changing_direction(monkeypatch) -> None:
     assert binding._ramp_up is True
 
 
+def test_ramp_already_at_limit_waits_only_for_release_safety(monkeypatch) -> None:
+    binding, interval_unsub, watchdog_unsub = _binding(monkeypatch)
+    binding._rotate_by = LightBinding._rotate_by.__get__(binding)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on",
+        attributes={"brightness": 255},
+    )
+
+    binding._handle_action(_action(ACTION_HOLD))
+
+    assert binding._ramp_unsub is None
+    assert binding._ramp_action is not None
+    interval_unsub.assert_not_called()
+    watchdog_unsub.assert_not_called()
+
+    binding._handle_action(_action(ACTION_RELEASE))
+
+    watchdog_unsub.assert_called_once()
+    assert binding._ramp_action is None
+    assert binding._ramp_up is False
+
+
+def test_ramp_pauses_recurring_ticks_when_it_reaches_limit(monkeypatch) -> None:
+    binding, interval_unsub, watchdog_unsub = _binding(monkeypatch)
+    binding._rotate_by = LightBinding._rotate_by.__get__(binding)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on",
+        attributes={"brightness": 250},
+    )
+
+    binding._handle_action(_action(ACTION_HOLD))
+    assert binding._ramp_unsub is not None
+
+    binding._ramp_tick(None)
+
+    interval_unsub.assert_called_once()
+    assert binding._ramp_unsub is None
+    assert binding._ramp_action is not None
+
+    binding._handle_action(_action(ACTION_RELEASE))
+
+    watchdog_unsub.assert_called_once()
+    assert binding._ramp_action is None
+    assert binding._ramp_up is False
+
+
 def test_new_gesture_and_connection_change_stop_ramp(monkeypatch) -> None:
     binding, interval_unsub, _watchdog_unsub = _binding(monkeypatch)
     binding._start_ramp()
@@ -261,6 +307,26 @@ def test_new_gesture_and_connection_change_stop_ramp(monkeypatch) -> None:
     binding._start_ramp()
     binding._handle_connection_change()
     assert interval_unsub.call_count == 2
+
+
+def test_fast_press_stops_ramp_paused_at_limit(monkeypatch) -> None:
+    binding, interval_unsub, watchdog_unsub = _binding(
+        monkeypatch, **{CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST}
+    )
+    binding._single_press = Mock()
+    binding._start_ramp()
+    binding._pause_ramp_at_limit()
+
+    assert binding._ramp_active is True
+    assert binding._ramp_unsub is None
+
+    binding._handle_raw_button("short_release")
+
+    interval_unsub.assert_called_once()
+    watchdog_unsub.assert_called_once()
+    binding._single_press.assert_called_once()
+    assert binding._ramp_active is False
+    assert binding._ramp_action is None
 
 
 @pytest.mark.parametrize("presses", [1, 2, 3])
@@ -492,6 +558,116 @@ def test_rotation_modes_do_not_call_services_for_unavailable_target(
     getattr(binding, method_name)(1, True)
 
     binding.hass.async_create_task.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("method_name", "up", "state_name", "attributes"),
+    [
+        ("_rotate_brightness", True, "on", {"brightness": 255}),
+        ("_rotate_brightness", False, "on", {"brightness": 3}),
+        (
+            "_rotate_color_temp",
+            True,
+            "on",
+            {
+                "color_temp_kelvin": 6500,
+                "min_color_temp_kelvin": 2700,
+                "max_color_temp_kelvin": 6500,
+            },
+        ),
+        (
+            "_rotate_color_temp",
+            False,
+            "on",
+            {
+                "color_temp_kelvin": 2700,
+                "min_color_temp_kelvin": 2700,
+                "max_color_temp_kelvin": 6500,
+            },
+        ),
+        ("_rotate_volume", True, "on", {"volume_level": 1.0}),
+        ("_rotate_volume", False, "on", {"volume_level": 0.0}),
+        ("_rotate_cover", True, "open", {"current_position": 100}),
+        ("_rotate_cover", False, "closed", {"current_position": 0}),
+        (
+            "_rotate_temperature",
+            True,
+            "heat",
+            {
+                "temperature": 35.0,
+                "min_temp": 7.0,
+                "max_temp": 35.0,
+                "target_temp_step": 0.5,
+            },
+        ),
+        (
+            "_rotate_temperature",
+            False,
+            "heat",
+            {
+                "temperature": 7.0,
+                "min_temp": 7.0,
+                "max_temp": 35.0,
+                "target_temp_step": 0.5,
+            },
+        ),
+        ("_rotate_fan", True, "on", {"percentage": 100}),
+        ("_rotate_fan", False, "off", {"percentage": 0}),
+        (
+            "_rotate_number",
+            True,
+            "100",
+            {"min": 0.0, "max": 100.0, "step": 1.0},
+        ),
+        (
+            "_rotate_number",
+            False,
+            "0",
+            {"min": 0.0, "max": 100.0, "step": 1.0},
+        ),
+    ],
+)
+def test_bounded_rotation_does_not_repeat_service_at_limit(
+    monkeypatch,
+    method_name: str,
+    up: bool,
+    state_name: str,
+    attributes: dict,
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
+    updates = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_send",
+        lambda _hass, _signal, payload: updates.append(payload),
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=state_name,
+        attributes=attributes,
+    )
+    binding._active_action = _action(ACTION_ROTATE)
+
+    getattr(binding, method_name)(1, up)
+
+    binding.hass.services.async_call.assert_not_called()
+    binding.hass.async_create_task.assert_not_called()
+    assert updates[-1]["dispatch_status"] == "completed"
+    assert updates[-1]["reason"] == "target_unchanged"
+    assert updates[-1]["result"]["before"] == updates[-1]["result"]["after"]
+
+
+def test_color_rotation_still_wraps_instead_of_stopping_at_hue_boundary(
+    monkeypatch,
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on",
+        attributes={"hs_color": (359.0, 80.0)},
+    )
+
+    binding._rotate_color(1, True)
+
+    payload = binding.hass.services.async_call.call_args.args[2]
+    assert payload["hs_color"] == [9.8, 80.0]
 
 
 def test_unavailable_ramp_stops_without_recurring_commands(monkeypatch) -> None:

@@ -36,10 +36,12 @@ WebSocket interface. The integration relies only on this passive subset:
   refreshes BILRESA metadata but is never interpreted as a physical gesture.
 - `attribute_updated` uses
   `[node_id, "endpoint/cluster/attribute", value]`. Switch
-  `CurrentPosition` (`*/59/0`) is consumed only as a release/stuck-state safety
-  hint. Attribute updates may be coalesced under backpressure, so clicks,
-  chords, sequences and press counts remain derived exclusively from ordered
-  `node_event` messages.
+  `CurrentPosition` (`*/59/0`) is consumed only as a button release/stuck-state
+  safety hint. A rotary endpoint returns to zero for an individual notch while
+  its cumulative multi-press sequence may still be active, so the attribute
+  never clears rotary counts. Attribute updates may be coalesced under
+  backpressure, so clicks, chords, sequences and press counts remain derived
+  exclusively from ordered `node_event` messages.
 - `node_event` messages use the ordered server queue. A severely stalled
   consumer can still be disconnected or lose old queued entries at the
   server's safety cap; the integration callback therefore remains synchronous,

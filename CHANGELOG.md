@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.5] - 2026-07-18
+
+### Changed
+- Scroll-wheel bindings now react to every confirmed Matter `InitialPress`
+  immediately, then subtract those eager notches from later cumulative counts.
+  This removes the firmware's batching wait without applying a step twice.
+- Switch `CurrentPosition = 0` no longer clears an active rotary cumulative
+  sequence; it remains a release/stuck-state hint for physical buttons.
+- Missing, malformed, zero-overflow and above-`MultiPressMax` rotary completion
+  counts now end local accounting safely instead of leaking stale state into the
+  next gesture.
+- Bounded rotation modes no longer repeat an identical Home Assistant service
+  call after brightness, color temperature, volume, cover position, climate
+  temperature, fan speed or number value reaches its effective limit. The live
+  test records the gesture as completed with an unchanged value; cyclic hue
+  rotation continues to wrap normally.
+- Hold-to-ramp pauses its recurring interval at a target limit while retaining
+  release-direction handling and the lost-release watchdog.
+
 ## [0.6.0-rc.4] - 2026-07-18
 
 ### Fixed
@@ -552,7 +571,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.4...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.5...HEAD
+[0.6.0-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.4...v0.6.0-rc.5
 [0.6.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.3...v0.6.0-rc.4
 [0.6.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.2...v0.6.0-rc.3
 [0.6.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...v0.6.0-rc.2

@@ -1,7 +1,8 @@
 # IKEA BILRESA scroll wheel — device reference
 
 This is the canonical, sanitized reference for facts observed in the owner's
-Home Assistant environment on 2026-07-14/15. It intentionally omits household
+Home Assistant environment on 2026-07-14/15 and rechecked on 2026-07-18. It
+intentionally omits household
 names, node IDs, device and config-entry IDs, serial numbers, network addresses,
 entity IDs, automation names and account details. Do not add those values to a
 committed fixture or diagnostic report.
@@ -15,7 +16,9 @@ current working tree or any post-v0.5.0 feature is hardware-verified.
   4476 (`0x117C`), model `BILRESA scroll wheel`.
 - Matter over Thread sleepy end device using one AAA battery; a device may be
   commissioned to multiple Matter fabrics.
-- Firmware `1.9.15`, hardware `P2.0`.
+- As of 2026-07-18, both commissioned wheels run firmware `1.9.15` on hardware
+  `P2.0`. Earlier observations of one wheel on `1.8.7` remain historical
+  compatibility evidence only.
 - Home Assistant Core `2026.7.2` on HA OS `18.1`.
 - Matter Server add-on `9.0.4`: matterjs-server `1.1.7`, matter.js `0.17.4`,
   WebSocket schema `11`, matter-python-client `0.7.1`.
@@ -95,11 +98,21 @@ multi_press_complete count=18
 ```
 
 - Counts are cumulative within a gesture and may jump by several notches. Use
-  the difference from the preceding count, not one step per event.
+  the difference from the preceding count, crediting any first notch already
+  emitted from the gesture's InitialPress.
 - Firmware 1.9.15 batches fast rotation in the device. Ongoing events were
   observed roughly every 0.5–1 second, often advancing by 6–8 counts.
 - One notch may contain only InitialPress, ShortRelease and
   MultiPressComplete with count 1.
+- Matter's Switch contract generates InitialPress for every detected press and,
+  when both events coincide, orders MultiPressOngoing directly after it. The
+  owner's BILRESA raw stream follows that ordering but may report a cumulative
+  jump larger than the number of InitialPress events seen since the previous
+  report. Each received InitialPress is therefore an immediately safe lower
+  bound; the cumulative count supplies the remaining notches.
+  This ordering is specified in the public
+  [Matter 1.2 Application Cluster Specification](https://csa-iot.org/wp-content/uploads/2023/10/Matter-1.2-Application-Cluster-Specification.pdf),
+  Switch cluster multi-press sequence.
 - Button single/double/triple presses complete with count 1/2/3.
 - A hold is InitialPress, LongPress and LongRelease with no multi-press
   completion. The event carries no ramp direction.
@@ -142,9 +155,16 @@ Relevant event names are `node_added`, `node_updated`, `node_removed`,
 
 - Filter node events to Switch cluster 59 and map endpoint to channel and role
   using Descriptor TagList.
-- Convert ongoing and complete cumulative counts to deltas and reset after
-  completion or a decreased count.
-- Ignore InitialPress and ShortRelease for scroll delta generation.
+- Emit every confirmed scroll notch from InitialPress, then subtract those
+  eager credits from cumulative counts so no notch is applied twice.
+- Convert ongoing and complete cumulative counts to remaining deltas and reset
+  after completion or a decreased count.
+- Reject non-integer, negative and above-`MultiPressMax` counts. A completion
+  with a missing, invalid or Matter-overflow zero count still ends local
+  accounting so stale credit cannot affect the next gesture.
+- Ignore ShortRelease for scroll delta generation. CurrentPosition returning to
+  zero is not the end of the cumulative rotary sequence and must not clear its
+  count or eager credit.
 - Preserve MultiPressComplete so a single notch and a final unsent delta are not
   lost.
 - Use a target transition near the measured device batch interval to smooth

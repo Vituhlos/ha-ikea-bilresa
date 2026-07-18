@@ -20,6 +20,106 @@ references before making changes.
 Never collapse these states or infer Hardware from Static, Unit, CI, MCP, or
 earlier device-reference observations.
 
+## Scroll first-response optimization (`v0.6.0-rc.5` candidate, 2026-07-18)
+
+Status: **Implemented + Static + local Unit. Owner-authorized for commit, CI,
+`v0.6.0-rc.5` prerelease and controlled HACS deployment. Not yet committed,
+CI-verified, released, deployed, or Hardware-verified for this candidate.**
+
+Before publication, a read-only Home Assistant registry recheck confirmed both
+physical E2490 scroll wheels and the E2489 dual button now run firmware
+`1.9.15`. Section G therefore tests both independent wheel nodes on the same
+current firmware. The earlier `1.8.7` observations remain historical evidence,
+not an available RC.5 comparison target. The currently loaded integration is
+still exact `v0.6.0-rc.4`; its configuration check is valid.
+
+A controlled baseline on the installed `v0.6.0-rc.4` used Matter Server add-on
+9.1.0 / matterjs-server 1.2.6 native sanitized Switch-event logging. The
+integration preserved every observed cumulative rotary count and dispatched
+approximately 4-10 ms after the corresponding raw completion. Slow deliberate
+movement also showed that a perceived physical detent is not a reliable raw
+event counter; the integration neither invented nor dropped events.
+
+Fast rotation exposed the actual perceived-latency source. Matter delivered
+`InitialPress`, but the engine waited roughly 0.5-0.6 seconds for the first
+cumulative count before producing any rotary action. Transition A/B testing
+showed that 0.5 seconds improved target acknowledgement over 1.0 second, while
+0.3 seconds produced no repeatable additional gain. Transition tuning did not
+remove the initial wait. The temporary binding change and scoped DEBUG logger
+were returned to their exact original values after measurement.
+
+The working-tree candidate now emits one eager notch from every rotary
+`InitialPress`. It retains those notches as credits and subtracts them from
+cumulative ongoing/completion reports, so the final total stays exact. This is
+grounded in both the public Matter Switch sequence (InitialPress for every
+detected press; coincident MultiPressOngoing directly afterward) and the
+sanitized BILRESA stream. The exact recorded fast sequence
+`5 → 10 → 13 → 16 → 18`, then `3 → 7 → 11 → 14`, is replayed as a unit test.
+An equal duplicate count emits nothing; a decreased count starts a new
+baseline. Missing, malformed, negative, zero-overflow and above-max completion
+counts end local accounting safely. State remains keyed by node and endpoint,
+preserving isolation across any number of wheels, channels and directions.
+
+`CurrentPosition = 0` no longer clears rotary counts. The attribute represents
+an individual release and may occur while the cumulative multi-press sequence
+is still active; using it as the sequence boundary could duplicate a later
+batch. It still invalidates button hold-duration observation, while reconnect
+`reset()` clears rotary counts and eager credits.
+
+The real fast stream continued after its brightness target had already reached
+the configured maximum. Because eager dispatch increases the number of useful
+early actions, the binding now suppresses an identical value service payload at
+the effective minimum or maximum. This is applied to every bounded value mode:
+brightness, color temperature, volume, cover position, climate temperature,
+fan speed and number. It is deliberately not applied to hue, whose supported
+behavior is cyclic wraparound. A no-change gesture is reported to Live test as
+completed with equal before/after values, rather than as a failed dispatch.
+Hold-to-ramp also pauses its 200 ms recurring interval at a limit, while
+retaining the release needed for alternating direction and the 30-second
+lost-release watchdog.
+
+Files:
+
+- `custom_components/ikea_bilresa/binding.py`;
+- `custom_components/ikea_bilresa/engine.py`;
+- `tests/test_binding.py`;
+- `tests/test_engine.py`;
+- `custom_components/ikea_bilresa/manifest.json`;
+- `CHANGELOG.md`;
+- `README.md`;
+- `README.cs.md`;
+- `docs/DEVICE_REFERENCE.md`;
+- `docs/MATTERJS_COMPATIBILITY.md`;
+- `docs/SCROLL_PERFORMANCE.md`;
+- `docs/HARDWARE_TEST.md`;
+- this handoff.
+
+Local validation:
+
+```text
+pytest ... test_engine/test_binding                              113 passed
+pytest -q -p pytest_asyncio.plugin                               313 passed
+python -m compileall -q custom_components tests                  passed
+JSON parse for strings + EN/CS translations                      passed
+ruff format --check custom_components tests                      passed (39 files)
+ruff check custom_components tests                               passed
+mypy custom_components/ikea_bilresa                              passed (20 files)
+node --check panel asset                                         passed
+node panel + icon frontend tests                                 passed (20 tests)
+git diff --check                                                 passed
+```
+
+The five local warnings are dependency deprecations from Home Assistant,
+`aiohttp` and `backoff`, not test failures. CI, exact deployed code, physical
+single-notch onset, exact fast-scroll total, direction reversal, count-18/wrap
+and both physical firmware-1.9.15 wheels remain unverified for this candidate.
+Suppression of
+redundant service calls is locally unit-tested at both limits for all seven
+bounded modes; the exact live service-call count during saturation is still a
+Hardware item. The next gate is publication and controlled deployment of
+`v0.6.0-rc.5`, followed by `docs/HARDWARE_TEST.md` section G on both physical
+wheels.
+
 ## Repository state
 
 - Active publication branch: `agent/dual-button-0.6`, branched from the
