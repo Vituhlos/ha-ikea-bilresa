@@ -677,6 +677,22 @@ def test_a_gesture_without_an_action_takes_a_whole_row() -> None:
         assert "wide: true" in declaration, field
 
 
+def test_an_empty_wheel_short_press_target_says_what_it_falls_back_to() -> None:
+    """The ledger reports the rotation target, so the field must agree.
+
+    A wheel binding with no explicit short-press target uses the rotation
+    target at runtime. Labelling the empty option "no target configured"
+    contradicted the gesture row rendered directly above it.
+    """
+    form = _binding_form_source()
+    declaration = form.split('"click_target"', 1)[1].split("      ),", 1)[0]
+
+    assert 'this._t("target_same_as_rotation")' in declaration
+    # A dual button has no rotation to fall back to, so it keeps the plain
+    # placeholder and its own required-target behaviour.
+    assert "isButton ? undefined :" in declaration
+
+
 def test_a_button_editor_has_no_section_title_to_repeat_itself() -> None:
     """One group needs no heading; the editor's own title already says it."""
     form = _binding_form_source()

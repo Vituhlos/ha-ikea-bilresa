@@ -2123,13 +2123,20 @@ class IkeaBilresaPanel extends HTMLElement {
     return wrap;
   }
 
-  _selectField(name, label, options, { optional = false, help, wide = false } = {}) {
+  _selectField(
+    name,
+    label,
+    options,
+    { optional = false, help, wide = false, emptyLabel } = {},
+  ) {
     const wrap = this._fieldShell(name, label, help, wide);
     const select = el("select");
     select.id = `binding-${this._open}-${this._editingChannel}-${name}`;
     select.name = name;
     if (optional) {
-      const empty = el("option", null, this._t("target_none"));
+      // An empty optional target does not always mean "nothing happens", so the
+      // placeholder must say what leaving it empty actually does.
+      const empty = el("option", null, emptyLabel || this._t("target_none"));
       empty.value = "";
       select.appendChild(empty);
     } else {
@@ -2158,7 +2165,12 @@ class IkeaBilresaPanel extends HTMLElement {
     return wrap;
   }
 
-  _entityField(name, label, domains, { optional = false, help, wide = false } = {}) {
+  _entityField(
+    name,
+    label,
+    domains,
+    { optional = false, help, wide = false, emptyLabel } = {},
+  ) {
     const current = this._editorData[name];
     const records = this._entityRecords(domains);
     const options = records.map((state) => ({
@@ -2168,7 +2180,12 @@ class IkeaBilresaPanel extends HTMLElement {
     if (current && !options.some((option) => option.value === current)) {
       options.unshift({ value: current, label: current });
     }
-    return this._selectField(name, label, options, { optional, help, wide });
+    return this._selectField(name, label, options, {
+      optional,
+      help,
+      wide,
+      emptyLabel,
+    });
   }
 
   _numberField(name, label, min, max, step, unit) {
@@ -2419,7 +2436,13 @@ class IkeaBilresaPanel extends HTMLElement {
           "click_target",
           this._t("field_click_target"),
           ["light", "switch"],
-          { optional: !isButton },
+          {
+            optional: !isButton,
+            // A wheel with no explicit short-press target falls back to the
+            // rotation target, which the gesture ledger already reports. Saying
+            // "no target" here contradicted that on the same screen.
+            emptyLabel: isButton ? undefined : this._t("target_same_as_rotation"),
+          },
         ),
       );
     }

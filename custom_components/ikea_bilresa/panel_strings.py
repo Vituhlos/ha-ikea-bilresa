@@ -136,6 +136,9 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "button_title": "Button {button}",
         "target_none": "No target configured",
+        # A wheel's short press falls back to the rotation target when this is
+        # left empty, so the placeholder must not claim nothing happens.
+        "target_same_as_rotation": "Same as the rotation target",
         # binding editor
         "binding_editor_title": "Edit channel {channel} binding",
         "binding_editor_button_title": "Edit button {button} binding",
@@ -498,6 +501,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "button_title": "Tlačítko {button}",
         "target_none": "Není nastaven žádný cíl",
+        "target_same_as_rotation": "Stejný jako cíl otáčení",
         "binding_editor_title": "Upravit propojení kanálu {channel}",
         "binding_editor_button_title": "Upravit propojení tlačítka {button}",
         "field_mode": "Režim otáčení",
