@@ -90,6 +90,82 @@ Single best next action for this item: a controlled Hardware A/B on
 judging first-notch onset and the smoothness of fast rotation separately, then
 record the chosen value and whether it becomes the default.
 
+## Capture & replay, and what it already ruled out (2026-07-29)
+
+Status: **Implemented + Static + Unit (348 tests). Not committed, not released,
+not deployed. One real hardware decode sequence replays as a committed
+regression fixture.**
+
+The owner asked for a proper diagnostic instrument after a session where the
+cause could not be found from logs. Web research first settled one open
+question and raised one long-term one:
+
+- **Relative stepping would not have helped.** Home Assistant's own
+  `brightness_step_pct` reads the current brightness, adds the step and writes
+  the result, so it carries the same dependency on a fresh state read;
+  core issue #118009 documents the same mechanic breaking grouped lights. Our
+  absolute-target design stays.
+- **A linear 3 % step can never feel even.** Perceived brightness is
+  non-linear, so a fixed step is a large visible jump at the bottom and almost
+  nothing at the top. Not today's defect, but the ceiling any "make it feel
+  great" work eventually meets.
+- No established capture/replay pattern exists for HA integrations; snapshot
+  testing is the nearest thing and does not cover timed event streams.
+
+### The instrument
+
+`tests/replay.py` drives a real `LightBinding` through a capture offline — no
+Home Assistant, no Matter, no wheel. The capture (from `ikea_bilresa/trace`)
+now carries raw Matter gesture boundaries, the target's own state reports,
+arriving actions **before** any filter, and applied steps, each with a relative
+timestamp. `RotationTrace` gained `capture()`, an injectable clock, per-row
+relative time and a `describe_binding` record of the settings a replay needs.
+
+The simulated target models the real one: it applies any absolute value it is
+sent, but only *reports* a value when the capture says a report arrived. That
+gap is where the defect lives.
+
+Captures in `tests/fixtures/captures/*.json` with an `expect` block become
+regression tests automatically, with no new code.
+
+### What it ruled out on day one
+
+The real round-1 decode sequence from the physical wheel (21 actions,
+37 notches, exact timings) is committed as
+`hardware-2026-07-29-round1-decode-only.json`. Replayed with no state reports
+it lands exactly on the floor, as the arithmetic requires.
+
+A sweep then injected the report pattern a Shelly actually produces — echoing
+back the value we sent — across delays 0.05 s to 1.2 s and lags of zero to two
+batches. **Not one combination lost a step, and no target was ever discarded.**
+
+So the echo-recognition logic is not the cause, and the earlier suspicion that
+rc.7's value matching regressed against rc.6 is not supported.
+
+Two important caveats, both found by using the tool:
+
+- an early version of the sweep *did* show losses, purely because the capture
+  held only the first `initial_press`. The real device emits one per notch, so
+  the authority window is refreshed continuously; a capture without those
+  refreshes manufactures failures the hardware never had. Faithful raw rows are
+  mandatory, and rc.8 records them;
+- the trace recorded steps only in `_rotate_by`, i.e. after filtering, so an
+  action dropped on the way in was invisible. `_rotate` now records every
+  arriving action with its `suppressed` flag, held by a test.
+
+### What this leaves open
+
+The physical wheel applied 23 notches out of 37 decoded, and no simulated
+report pattern reproduces that. The remaining candidates are therefore: an
+input shape not yet simulated, actions dropped before reaching `_rotate_by`
+(now visible), or something between the binding and the entity that the trace
+does not cover.
+
+Single best next action: capture one real scroll on rc.8+ with tracing armed
+and replay it. If the capture reproduces the loss, the cause is in the rows.
+If it replays clean while the real light did not, the defect is downstream of
+the binding and needs a probe at the service-call layer.
+
 ## Hardware session on rc.7: #6 is NOT fixed, and a rotation trace was built (2026-07-29)
 
 Status: **Hardware evidence that the defect persists. Cause not yet identified.

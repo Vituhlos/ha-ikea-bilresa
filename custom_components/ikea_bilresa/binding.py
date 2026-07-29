@@ -259,6 +259,8 @@ class LightBinding:
         self._scroll_gesture = 0
         self._active_scrolls: dict[int | None, float] = {}
         self._last_scroll_seen: float | None = None
+        # Where the target last said it was. One end of the path it is on.
+        self._last_reported: float | None = None
         # Recently calculated targets with the range they were derived from,
         # so a later absolute state report can be recognized as our own echo.
         self._commanded: deque[tuple[float, float]] = deque(maxlen=_COMMAND_HISTORY)
@@ -312,6 +314,29 @@ class LightBinding:
             return (self._node_id, CONF_CHANNEL, self._channel)
         assert self._endpoint_id is not None
         return (self._node_id, CONF_ENDPOINT, self._endpoint_id)
+
+    @property
+    def trace_key(self) -> str:
+        """Stable, printable identity for this binding inside a capture."""
+        node, kind, address = self.binding_key
+        return f"{node}:{kind}:{address}"
+
+    @callback
+    def trace_config(self) -> dict[str, Any]:
+        """The settings a replay needs to rebuild this binding exactly.
+
+        Only rotation-relevant values, and the target is included so a replay
+        can seed its simulated entity — diagnostics redacts it by key.
+        """
+        return {
+            "mode": self._mode,
+            "target": self._target,
+            "step": self._step,
+            "acceleration": self._accel * 100,
+            "min_units": self._min_units,
+            "max_units": self._max_units,
+            "transition": self._transition,
+        }
 
     @callback
     def test_action(self, action: WheelAction) -> None:
@@ -436,6 +461,9 @@ class LightBinding:
         self._fast_press_started = None
         self._reset_latency_trace()
         self._forget_target("matter_connection_change")
+        # Across a reconnect nothing is known about where the target got to.
+        self._commanded.clear()
+        self._last_reported = None
         self._command_authoritative_until = 0.0
         self._last_direction = None
         self._active_scrolls.clear()
@@ -452,8 +480,20 @@ class LightBinding:
         if self._click_target == self._target:
             self._handle_latency_target_state_change(event)
         new_state = event.data.get("new_state")
+        # An input row: a replay needs the target's own reports, with their
+        # timing, to reproduce what the binding was reacting to.
+        if self._trace.enabled:
+            self._trace.record(
+                "state",
+                binding=self.trace_key,
+                state=None if new_state is None else new_state.state,
+                value=None if new_state is None else self._observed_value(new_state),
+            )
         if new_state is None or new_state.state in _UNAVAILABLE:
             self._forget_target("target_unavailable")
+            # An unavailable target is not travelling anywhere we can describe.
+            self._commanded.clear()
+            self._last_reported = None
             self._command_authoritative_until = 0.0
             self._stop_ramp(change_direction=False)
             return
@@ -470,8 +510,13 @@ class LightBinding:
             if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
         }
         observed = self._observed_value(new_state)
+        own_echo = self._is_own_echo(new_state)
+        # Recorded after the decision, so the next report is judged against
+        # where the target has actually got to.
+        if observed is not None:
+            self._last_reported = observed
         if self._scroll_authoritative(now):
-            if not self._is_own_echo(new_state):
+            if not own_echo:
                 self._forget_target("unrecognized_value_during_scroll", observed)
             else:
                 self._trace.record(
@@ -498,22 +543,42 @@ class LightBinding:
         return now - self._last_scroll_seen < _SCROLL_AUTHORITY_GRACE
 
     def _is_own_echo(self, state: State) -> bool:
-        """Report whether a state matches a value this binding recently sent.
+        """Report whether a report is consistent with the target catching up.
 
-        Absolute reports are quantized by the target device, so equality is
-        too strict. When the mode's value cannot be read at all, the report
-        carries no evidence of a third-party change and is treated as an echo.
+        Matching the reported value against the ones we sent is wrong for any
+        target that moves gradually. A dimmer with its own fade, a Zigbee bulb
+        with a default transition, a cover motor travelling for half a minute —
+        all report values *between* our commands, which are values we never
+        sent and equality can never recognize. Captured on a Shelly Plus 0-10V:
+        after commanding 84.15 the target reported 71, which sits between two
+        earlier commands, and treating it as somebody else's change threw away
+        nine notches at once.
+
+        What identifies our own movement is the trajectory, not the value: the
+        target travels from where it last reported towards the newest value we
+        gave it, so anything along that path — widened by the mode's own
+        quantization — is us. A report off that path is a third-party change.
+
+        Deliberately unaddressed: a light *group* reports the average of its
+        members, so no path we describe can contain it. See the group caveat in
+        PROJECT_STATUS.
         """
         observed = self._observed_value(state)
         if observed is None or not self._commanded:
             return True
-        for value, span in self._commanded:
-            distance = abs(observed - value)
-            if self._mode == MODE_COLOR:
-                distance = min(distance, span - distance)
-            if distance <= span * _ECHO_MATCH_FRACTION:
-                return True
-        return False
+        values = [value for value, _span in self._commanded]
+        if self._last_reported is not None:
+            values.append(self._last_reported)
+        span = max(span for _value, span in self._commanded)
+        tolerance = span * _ECHO_MATCH_FRACTION
+        if self._mode == MODE_COLOR:
+            # Hue wraps, so "between two values" has no meaning; proximity to
+            # something we sent is the only usable test.
+            return any(
+                min(abs(observed - value), span - abs(observed - value)) <= tolerance
+                for value in values
+            )
+        return min(values) - tolerance <= observed <= max(values) + tolerance
 
     def _observed_value(self, state: State) -> float | None:
         """Return the state value this binding's mode actually rotates."""
@@ -565,7 +630,10 @@ class LightBinding:
                 recent_commands=[round(value, 2) for value, _span in self._commanded],
             )
         self._tracked = None
-        self._commanded.clear()
+        # The command history is deliberately kept. It describes where the
+        # target is still travelling to, and that stays true after we give up
+        # our calculated value — clearing it made the very next report look
+        # unrecognizable too, turning one rebase into a cascade.
 
     @callback
     def _handle_latency_target_state_change(self, event) -> None:
@@ -586,6 +654,17 @@ class LightBinding:
         """Track private gesture boundaries and forward button hints."""
         if self._endpoint_id is not None and endpoint_id != self._endpoint_id:
             return
+        if self._trace.enabled:
+            # An input row: gesture boundaries drive the authority window, so a
+            # replay is not faithful without them.
+            self._trace.describe_binding(self.trace_key, self.trace_config())
+            self._trace.record(
+                "raw",
+                binding=self.trace_key,
+                role=role,
+                event_type=event_type,
+                endpoint=endpoint_id,
+            )
         if role in (ROLE_SCROLL_UP, ROLE_SCROLL_DOWN):
             now = time.monotonic()
             # Every raw scroll event extends the window in which our own
@@ -789,7 +868,20 @@ class LightBinding:
 
     @callback
     def _rotate(self, action: WheelAction) -> None:
-        if self._suppress_trailing_rotation():
+        # The arriving action, before any filter. A capture that only records
+        # applied steps cannot show a notch the binding dropped on the way in,
+        # which is exactly the kind of loss worth finding.
+        suppressed = self._suppress_trailing_rotation()
+        if self._trace.enabled:
+            self._trace.describe_binding(self.trace_key, self.trace_config())
+            self._trace.record(
+                "action",
+                binding=self.trace_key,
+                notches=action.notches,
+                direction=action.direction,
+                suppressed=suppressed,
+            )
+        if suppressed:
             return
         # A direction reversal intentionally starts from the last desired
         # target, not a mid-transition state echo, preventing a visible jump.
@@ -835,8 +927,10 @@ class LightBinding:
         state = self._available_state(self._target)
         observed = self._observed_value(state) if state is not None else None
         changed = self._rotate_mode(notches, up)
+        self._trace.describe_binding(self.trace_key, self.trace_config())
         self._trace.record(
             "rotate",
+            binding=self.trace_key,
             node_id=self._node_id,
             channel=self._channel,
             endpoint=self._endpoint_id,
@@ -997,6 +1091,12 @@ class LightBinding:
         value = current if current is not None else fallback
         self._trace_source = "state" if current is not None else "fallback"
         self._trace_from = value
+        if current is not None:
+            # Where the target stands as we start moving it: the far end of the
+            # path any report during this gesture will be travelling along.
+            # Without it, the first report from a slow target — a cover motor
+            # that has barely set off — looks like it came from nowhere.
+            self._last_reported = current
         self._tracked = value
         return value
 

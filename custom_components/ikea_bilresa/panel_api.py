@@ -266,7 +266,9 @@ def ws_trace(
         trace.set_enabled(msg["enabled"])
     if msg.get("clear"):
         trace.clear()
-    connection.send_result(msg["id"], {"enabled": trace.enabled, "rows": trace.dump()})
+    # The whole capture, not just the rows: `tests/replay.py` needs the binding
+    # settings alongside them to reconstruct the run offline.
+    connection.send_result(msg["id"], {"enabled": trace.enabled, **trace.capture()})
 
 
 @websocket_api.websocket_command({vol.Required("type"): TYPE_OVERVIEW_SUBSCRIBE})

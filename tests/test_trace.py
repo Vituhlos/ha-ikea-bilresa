@@ -5,11 +5,14 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from custom_components.ikea_bilresa.const import (
+    ACTION_ROTATE,
     CONF_ACCELERATION,
     CONF_STEP,
     CONF_TRANSITION,
+    DIRECTION_DOWN,
     ROLE_SCROLL_DOWN,
 )
+from custom_components.ikea_bilresa.engine import WheelAction
 from custom_components.ikea_bilresa.trace import RotationTrace
 
 from .test_binding import _binding
@@ -124,6 +127,37 @@ def test_a_recognized_echo_is_recorded_as_kept(monkeypatch) -> None:
     assert len(kept) == 1
     assert kept[0]["reported"] == 247
     assert binding._tracked == 247.35
+
+
+def test_an_arriving_action_is_recorded_before_any_filter(monkeypatch) -> None:
+    """A notch dropped on the way in must still appear in the capture.
+
+    Recording only applied steps hides exactly the losses worth finding: the
+    capture would show a shorter gesture rather than a dropped action.
+    """
+    binding, trace = _traced(monkeypatch)
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 0.0
+    )
+    # Arm the post-button suppression window the same way a real press does.
+    binding._suppress_scroll_through = binding._scroll_gesture
+    binding._suppress_scroll_until = 5.0
+
+    binding._rotate(
+        WheelAction(
+            node_id=101,
+            wheel_name="",
+            channel=1,
+            endpoint_id=2,
+            type=ACTION_ROTATE,
+            direction=DIRECTION_DOWN,
+            notches=4,
+        )
+    )
+
+    actions = [row for row in trace.dump() if row["kind"] == "action"]
+    assert [(row["notches"], row["suppressed"]) for row in actions] == [(4, True)]
+    assert not [row for row in trace.dump() if row["kind"] == "rotate"]
 
 
 def test_a_binding_without_tracing_records_nothing(monkeypatch) -> None:
