@@ -1,6 +1,119 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-18 by Codex**
+Last updated: **2026-07-29 by Claude Code**
+
+## Checklist item #6 — the RC.5 brightness accounting anomaly is explained and fixed
+
+Status: **Diagnosed + Implemented + Static + local Unit (320 tests). mypy and
+hassfest not run locally. CI has not run. Not committed, not released, not
+deployed, no Hardware.**
+
+`docs/V0.6.0_CHECKLIST.md` item #6 asked whether the RC.5 anomaly (18 decoded
+notches moved `light.linka` from 255 to 140, worth about 15 configured 3 %
+steps) was expected clamping or a real bug. It is a real bug, it is **not**
+closed by RC.6, and it now has a failing-then-passing regression.
+
+**The arithmetic identifies the mechanism exactly.** At step 3 % a notch is
+7.65 units, so the recorded deltas produce targets `247 → 217 → 179 → 156 →
+133 → 117`. One rebase from a state echo reporting `156` — the value from two
+batches earlier — before the final two-notch batch yields
+`156 − 2 × 7.65 = 140.7`. That is the observed 140/141, and exactly three lost
+notches. 140 sits mid-range, so it is neither a clamp nor rounding.
+
+**The loss has a single vector.** `_resync` returns the tracked target whenever
+it exists and is younger than `_RESYNC_AFTER` (3.0 s), and `_tracked` is a
+float that accumulates without intermediate rounding, so batching alone cannot
+lose steps. The only place the target is discarded is
+`_handle_target_state_change`.
+
+**Why RC.6 does not close it.** RC.6 protects the target while
+`_active_scrolls` is non-empty, but `multi_press_complete` pops the endpoint,
+after which only `_command_authoritative_until` (last dispatch + transition +
+0.25 s) remains. At transition 0.0 s that window is shorter than the observed
+0.5-second batch spacing. One continuous physical rotation is delivered as
+**several Matter gestures** — the sanitized capture already in
+`tests/test_engine.py` shows `…→ 18`, `multi_press_complete 18`, then a second
+gesture `3 → 7 → 11 → 14`. A delayed echo landing in that inter-gesture gap
+cleared the target and the next gesture rebased from state that was still
+catching up. This also explains why the anomaly appeared in the very run where
+the transition was lowered from 1.0 s to 0.0 s: at 1.0 s the margin was 1.25 s
+and swallowed the same echoes.
+
+Decoding was verified innocent: the real `GestureEngine` returns exactly 18 and
+14 notches for that capture, matching `PROJECT_STATUS.md`'s "not a decoder
+loss".
+
+**The fix (owner selected policy A+B on 2026-07-29).** A state report is
+ignored only when *both* hold:
+
+- the scroll still owns the value — an active raw scroll, or the new
+  `_SCROLL_AUTHORITY_GRACE` (1.0 s, two observed batch intervals) since the
+  last raw scroll event, still bounded by `_ACTIVE_SCROLL_TIMEOUT`; and
+- the reported value matches one of the last `_COMMAND_HISTORY` (8) calculated
+  targets within `_ECHO_MATCH_FRACTION` (1 %) of that mode's range, which
+  absorbs the target's own quantization (a Shelly Plus 0-10V stores whole
+  percent, so a dispatched 156 returns as 155).
+
+A report that fails the value match is a genuine third-party change and rebases
+immediately, **including mid-scroll** — that is stricter than RC.6, which
+ignored every report during an active gesture. `_set_target` / `_forget_target`
+keep the tracked value and its command history in step; `_observed_value` reads
+the attribute each mode actually rotates, and an unreadable value is treated as
+an echo because it carries no evidence of an external change.
+
+Files: `custom_components/ikea_bilresa/binding.py`, `tests/test_binding.py`,
+`CHANGELOG.md`, `docs/V0.6.0_CHECKLIST.md`, this handoff.
+
+One existing test changed meaning, deliberately:
+`test_scroll_tracking_survives_overlapping_direction_boundaries` asserted that
+authority ends at `multi_press_complete`. It now asserts the grace window keeps
+it, and that authority expires afterwards. That is the behavior change, not an
+accommodation of the test.
+
+New regressions in `tests/test_binding.py`:
+`test_recorded_fast_scroll_applies_every_notch_exactly` (the full recorded
+capture through the real decoder and binding lands on the single-shot
+arithmetic), `test_stale_echo_between_two_gestures_of_one_scroll_keeps_
+accounting` (the anomaly itself), `test_quantized_echo_of_our_own_value_is_
+recognized`, and `test_third_party_change_during_a_scroll_rebases_immediately`.
+The anomaly regression was confirmed to **fail** when both new behaviors are
+reverted to their RC.6 values, so it genuinely holds the fix.
+
+Local validation on Windows / Python 3.14:
+
+```text
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                        320 passed
+git diff --check                                     passed (CRLF warnings only)
+mypy                                                 not run (not installed locally)
+hassfest / HACS validation                           not run (CI only)
+```
+
+Known risks and assumptions:
+
+- `_SCROLL_AUTHORITY_GRACE = 1.0` is derived from the roughly 0.5-second batch
+  spacing recorded on the physical E2490, not from a controlled measurement of
+  the inter-gesture gap. If a real rotation ever pauses longer than that
+  between gestures, the next gesture rebases from reality — audible as the same
+  class of step loss, just rarer.
+- `_ECHO_MATCH_FRACTION = 1 %` of the mode's range was chosen to clear a whole-
+  percent dimmer (0.5 % of range) with margin while staying well under one
+  3 % notch. An external change smaller than that fraction is read as an echo.
+- Mid-scroll third-party changes now win. That is the safer default, but it is
+  new behavior and no device has been observed doing it.
+- Two adjacent constants still disagree in spirit: `_RESYNC_AFTER` (3.0 s) lets
+  `_resync` trust a target far longer than the echo path protects it. Not
+  touched here — it is a separate decision.
+
+Single best next action: exact-revision CI for this tree (mypy/hassfest are the
+gates local Python 3.14 cannot supply), then a controlled Hardware A/B on the
+owner's `Kolečko Obývák` — one slow 18-notch rotation and one fast one from
+brightness 255 at step 3 %, checking the final value equals the single-shot
+arithmetic. That same gesture also discharges checklist item #2.
+
+Last updated before this entry: **2026-07-18 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing

@@ -127,6 +127,20 @@ _TRAILING_GESTURE_TIMEOUT = 2.0
 # 0.5 seconds. Four such intervals protect an active target calculation while
 # still recovering promptly if MultiPressComplete is lost.
 _ACTIVE_SCROLL_TIMEOUT = 2.0
+# One continuous physical scroll reaches Home Assistant as several Matter
+# gestures: MultiPressComplete ends one and the next InitialPress opens the
+# following one. A delayed absolute echo landing in that gap would otherwise
+# rebase the next notch from state that is still catching up. Two observed
+# batch intervals, bounded by the same hard timeout as an active gesture.
+_SCROLL_AUTHORITY_GRACE = 1.0
+# A target echoes an absolute value quantized to its own resolution — a Shelly
+# Plus 0-10V dimmer stores whole percent, so 156/255 returns as 155. Recognize
+# our own value within a fraction of the mode's full range instead of by
+# equality; anything further away is a genuine third-party change.
+_ECHO_MATCH_FRACTION = 0.01
+# Enough dispatched values to cover several delayed batches without keeping an
+# unbounded history.
+_COMMAND_HISTORY = 8
 
 # Acceleration is derived from recent decoded velocity, never a single Matter
 # batch size. Defaults remain disabled until physical tuning is complete.
@@ -225,6 +239,10 @@ class LightBinding:
         self._last = 0.0
         self._scroll_gesture = 0
         self._active_scrolls: dict[int | None, float] = {}
+        self._last_scroll_seen: float | None = None
+        # Recently calculated targets with the range they were derived from,
+        # so a later absolute state report can be recognized as our own echo.
+        self._commanded: deque[tuple[float, float]] = deque(maxlen=_COMMAND_HISTORY)
         self._button_scroll_boundary: int | None = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
@@ -398,10 +416,11 @@ class LightBinding:
         """Stop safety-critical timers whenever Matter connectivity changes."""
         self._fast_press_started = None
         self._reset_latency_trace()
-        self._tracked = None
+        self._forget_target()
         self._command_authoritative_until = 0.0
         self._last_direction = None
         self._active_scrolls.clear()
+        self._last_scroll_seen = None
         self._button_scroll_boundary = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
@@ -415,27 +434,91 @@ class LightBinding:
             self._handle_latency_target_state_change(event)
         new_state = event.data.get("new_state")
         if new_state is None or new_state.state in _UNAVAILABLE:
-            self._tracked = None
+            self._forget_target()
             self._command_authoritative_until = 0.0
             self._stop_ramp(change_direction=False)
             return
         # Matter may batch one continuous scroll for several seconds while the
         # target reports older absolute values between decoded deltas. Keep the
-        # newest calculated target authoritative until the raw gesture ends;
-        # otherwise a delayed zero-transition echo can erase confirmed notches.
+        # newest calculated target authoritative for as long as that scroll is
+        # under way; otherwise a delayed zero-transition echo erases confirmed
+        # notches. A report that is not one of our own recent values is a real
+        # third-party change and still rebases immediately, even mid-scroll.
         now = time.monotonic()
         self._active_scrolls = {
             endpoint_id: last_seen
             for endpoint_id, last_seen in self._active_scrolls.items()
             if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
         }
-        if self._active_scrolls:
+        if self._scroll_authoritative(now):
+            if not self._is_own_echo(new_state):
+                self._forget_target()
             return
-        # Outside an active gesture, ignore only state echoes covered by the
-        # configured service transition. A later external update invalidates
-        # the desired value so the next gesture reads reality again.
+        # Outside a scroll, ignore only state echoes covered by the configured
+        # service transition. A later external update invalidates the desired
+        # value so the next gesture reads reality again.
         if now >= self._command_authoritative_until:
-            self._tracked = None
+            self._forget_target()
+
+    def _scroll_authoritative(self, now: float) -> bool:
+        """Report whether one continuous scroll still owns the target value."""
+        if self._active_scrolls:
+            return True
+        if self._last_scroll_seen is None:
+            return False
+        return now - self._last_scroll_seen < _SCROLL_AUTHORITY_GRACE
+
+    def _is_own_echo(self, state: State) -> bool:
+        """Report whether a state matches a value this binding recently sent.
+
+        Absolute reports are quantized by the target device, so equality is
+        too strict. When the mode's value cannot be read at all, the report
+        carries no evidence of a third-party change and is treated as an echo.
+        """
+        observed = self._observed_value(state)
+        if observed is None or not self._commanded:
+            return True
+        for value, span in self._commanded:
+            distance = abs(observed - value)
+            if self._mode == MODE_COLOR:
+                distance = min(distance, span - distance)
+            if distance <= span * _ECHO_MATCH_FRACTION:
+                return True
+        return False
+
+    def _observed_value(self, state: State) -> float | None:
+        """Return the state value this binding's mode actually rotates."""
+        attributes = state.attributes
+        if self._mode == MODE_COLOR_TEMP:
+            return _as_float(attributes.get(ATTR_COLOR_TEMP_KELVIN))
+        if self._mode == MODE_COLOR:
+            hs_color = attributes.get(ATTR_HS_COLOR)
+            return _as_float(hs_color[0]) if hs_color else None
+        if self._mode == MODE_VOLUME:
+            return _as_float(attributes.get("volume_level"))
+        if self._mode == MODE_COVER:
+            return _as_float(attributes.get("current_position"))
+        if self._mode == MODE_TEMPERATURE:
+            return _as_float(attributes.get("temperature"))
+        if self._mode == MODE_FAN:
+            return _as_float(attributes.get("percentage"))
+        if self._mode == MODE_NUMBER:
+            return _as_float(state.state)
+        if state.state != "on":
+            return 0.0
+        return _as_float(attributes.get(ATTR_BRIGHTNESS))
+
+    @callback
+    def _set_target(self, value: float, span: float) -> None:
+        """Record the newest calculated target and the range it came from."""
+        self._tracked = value
+        self._commanded.append((value, max(span, 1e-9)))
+
+    @callback
+    def _forget_target(self) -> None:
+        """Drop the calculated target so the next rotation reads reality."""
+        self._tracked = None
+        self._commanded.clear()
 
     @callback
     def _handle_latency_target_state_change(self, event) -> None:
@@ -458,6 +541,11 @@ class LightBinding:
             return
         if role in (ROLE_SCROLL_UP, ROLE_SCROLL_DOWN):
             now = time.monotonic()
+            # Every raw scroll event extends the window in which our own
+            # calculated target outranks a lagging absolute state report,
+            # including the completion that ends one Matter gesture of a
+            # longer physical rotation.
+            self._last_scroll_seen = now
             if event_type == _INITIAL_PRESS:
                 self._scroll_gesture += 1
                 self._active_scrolls[endpoint_id] = now
@@ -681,12 +769,12 @@ class LightBinding:
     def _rotate_by(self, notches: int, up: bool) -> bool:
         if not self._mode_target_valid:
             self._report_activity("skipped", reason="mode_target_mismatch")
-            self._tracked = None
+            self._forget_target()
             self._stop_ramp(change_direction=False)
             return False
         if self._available_state(self._target) is None:
             self._report_activity("skipped", reason="target_unavailable")
-            self._tracked = None
+            self._forget_target()
             self._stop_ramp(change_direction=False)
             return False
         if self._mode == MODE_COLOR_TEMP:
@@ -858,7 +946,7 @@ class LightBinding:
             target = self._max_units
         elif target <= self._min_units:
             if self._min_units <= 0:
-                self._tracked = 0
+                self._set_target(0, 255)
                 self._call(
                     "light",
                     "turn_off",
@@ -872,7 +960,7 @@ class LightBinding:
                 )
                 return True
             target = self._min_units
-        self._tracked = target
+        self._set_target(target, 255)
         result = self._value_result(
             "brightness",
             round(tracked / 255 * 100),
@@ -900,7 +988,7 @@ class LightBinding:
         )
         target = tracked + self._delta(self._step, max(max_k - min_k, 1), notches, up)
         target = min(max_k, max(min_k, target))
-        self._tracked = target
+        self._set_target(target, max(max_k - min_k, 1))
         result = self._value_result(
             "color_temperature", round(tracked), round(target), "K"
         )
@@ -923,7 +1011,7 @@ class LightBinding:
             self._saturation = float(hs_color[1])
         tracked = self._resync(hs_color[0] if hs_color else None, 0.0)
         hue = (tracked + self._delta(self._step, 360, notches, up)) % 360
-        self._tracked = hue
+        self._set_target(hue, 360)
         self._call(
             "light",
             "turn_on",
@@ -942,7 +1030,7 @@ class LightBinding:
             return False
         tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
         target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
-        self._tracked = target
+        self._set_target(target, 1)
         result = self._value_result(
             "volume", round(tracked * 100), round(target * 100), "%"
         )
@@ -964,7 +1052,7 @@ class LightBinding:
         target = min(
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
-        self._tracked = target
+        self._set_target(target, 100)
         result = self._value_result("cover_position", round(tracked), target, "%")
         return self._call_value_if_changed(
             "cover",
@@ -988,7 +1076,7 @@ class LightBinding:
         )
         target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
         target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
-        self._tracked = target
+        self._set_target(target, max(max_t - min_t, 1))
         result = self._value_result(
             "temperature",
             round(tracked, 2),
@@ -1013,7 +1101,7 @@ class LightBinding:
         target = min(
             100, max(0, round(tracked + self._delta(self._step, 100, notches, up)))
         )
-        self._tracked = target
+        self._set_target(target, 100)
         result = self._value_result("fan_speed", round(tracked), target, "%")
         return self._call_value_if_changed(
             "fan",
@@ -1038,7 +1126,7 @@ class LightBinding:
             self._step, max(max_n - min_n, num_step), notches, up
         )
         target = min(max_n, max(min_n, round(target / num_step) * num_step))
-        self._tracked = target
+        self._set_target(target, max(max_n - min_n, num_step))
         domain = self._target.split(".", 1)[0]
         result = self._value_result(
             "number",
@@ -1080,7 +1168,7 @@ class LightBinding:
         if entity_id in self._unavailable_targets:
             self._unavailable_targets.remove(entity_id)
             if entity_id == self._target:
-                self._tracked = None
+                self._forget_target()
             _LOGGER.info("BILRESA target %s is available again", entity_id)
         return state
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- A long physical rotation reaches Home Assistant as several Matter gestures,
+  and a target-state report arriving in the gap between two of them could
+  rebase the next notch from a value the target had not finished applying —
+  losing steps from an otherwise exactly decoded scroll. The calculated target
+  now stays authoritative across that gap.
+- A state report is only treated as this binding's own echo when its value
+  matches one of the recently dispatched targets, allowing for the target's own
+  quantization. A genuine change made from elsewhere is now honored
+  immediately, including in the middle of a scroll.
+
 ## [0.6.0-rc.6] - 2026-07-18
 
 ### Fixed

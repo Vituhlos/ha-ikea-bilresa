@@ -28,6 +28,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_MODE,
     CONF_NODE_ID,
     CONF_RAMP_DIRECTION,
+    CONF_STEP,
     CONF_TARGET,
     CONF_TRANSITION,
     DIRECTION_DOWN,
@@ -37,8 +38,10 @@ from custom_components.ikea_bilresa.const import (
     MODE_VOLUME,
     RAMP_DIRECTION_DOWN,
     RAMP_DIRECTION_UP,
+    ROLE_SCROLL_DOWN,
 )
-from custom_components.ikea_bilresa.engine import WheelAction
+from custom_components.ikea_bilresa.engine import GestureEngine, WheelAction
+from custom_components.ikea_bilresa.model import BilresaWheel, SwitchEndpoint
 
 
 def _monotonic_values(*values: float):
@@ -981,6 +984,183 @@ def test_scroll_tracking_survives_overlapping_direction_boundaries(monkeypatch) 
             }
         )
     )
+
+    # A completion ends one Matter gesture, not necessarily the physical
+    # rotation, so the grace window still owns the calculated target.
+    assert binding._tracked == 180
+
+    now[0] = 2.0
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 80})
+            }
+        )
+    )
+
+    assert binding._tracked is None
+
+
+def _replay_recorded_fast_scroll(binding, now, *, step_seconds: float = 0.05):
+    """Drive the exact recorded capture through the real decoder and binding.
+
+    The raw sequence is the sanitized Matter Server 9.1.0 trace already
+    replayed by ``test_sanitized_bilresa_fast_trace_preserves_both_cumulative_
+    sequences``: one continuous physical rotation the firmware splits into two
+    gestures of 18 and 14 notches.
+    """
+    engine = GestureEngine()
+    wheel = BilresaWheel(
+        node_id=101,
+        name="Test wheel",
+        product_name="BILRESA scroll wheel",
+        serial="SER123",
+        endpoints={2: SwitchEndpoint(2, 1, ROLE_SCROLL_DOWN)},
+    )
+    events = [
+        ("initial_press", None),
+        ("initial_press", None),
+        ("multi_press_ongoing", 5),
+        ("initial_press", None),
+        ("multi_press_ongoing", 10),
+        ("initial_press", None),
+        ("multi_press_ongoing", 13),
+        ("initial_press", None),
+        ("multi_press_ongoing", 16),
+        ("initial_press", None),
+        ("multi_press_ongoing", 18),
+        ("multi_press_complete", 18),
+        ("initial_press", None),
+        ("initial_press", None),
+        ("multi_press_ongoing", 3),
+        ("initial_press", None),
+        ("multi_press_ongoing", 7),
+        ("initial_press", None),
+        ("multi_press_ongoing", 11),
+        ("initial_press", None),
+        ("multi_press_ongoing", 14),
+        ("multi_press_complete", 14),
+    ]
+
+    def _pump(event_type, count):
+        # Exactly the coordinator's order: raw hint first, then the decoded
+        # action, both inside one synchronous block.
+        binding._handle_raw_input(ROLE_SCROLL_DOWN, event_type, 2)
+        action = engine.process(
+            wheel,
+            {
+                "node_id": 101,
+                "wheel_name": "Test wheel",
+                "endpoint_id": 2,
+                "channel": 1,
+                "role": ROLE_SCROLL_DOWN,
+                "event_type": event_type,
+                "count": count,
+                "raw": {},
+            },
+        )
+        if action is not None:
+            binding._rotate_brightness(action.notches, up=False)
+
+    for index, (event_type, count) in enumerate(events):
+        now[0] = index * step_seconds
+        _pump(event_type, count)
+        if event_type == "multi_press_complete" and count == 18:
+            yield now[0]
+
+
+def test_recorded_fast_scroll_applies_every_notch_exactly(monkeypatch) -> None:
+    """Both gestures of one rotation must land on the single-shot arithmetic."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    for _gap in _replay_recorded_fast_scroll(binding, now):
+        pass
+
+    # 32 notches of 3 % from 255: 255 - 32 * 7.65 = 10.2
+    assert binding.hass.services.async_call.call_args.args[2]["brightness"] == 10
+
+
+def test_stale_echo_between_two_gestures_of_one_scroll_keeps_accounting(
+    monkeypatch,
+) -> None:
+    """The gap after MultiPressComplete must not rebase the next gesture.
+
+    A Shelly Plus 0-10V dimmer acknowledges an older absolute brightness after
+    the 250 ms zero-transition margin has already expired. Landing between two
+    gestures of one physical rotation, that echo used to erase confirmed
+    notches — the RC.5 accounting anomaly (18 notches moved the light by 15).
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    for gap in _replay_recorded_fast_scroll(binding, now):
+        # Two batches behind: the value dispatched before the last one.
+        stale = SimpleNamespace(state="on", attributes={"brightness": 133})
+        binding.hass.states.get.return_value = stale
+        now[0] = gap + 0.3
+        binding._handle_target_state_change(SimpleNamespace(data={"new_state": stale}))
+
+    assert binding.hass.services.async_call.call_args.args[2]["brightness"] == 10
+
+
+def test_quantized_echo_of_our_own_value_is_recognized(monkeypatch) -> None:
+    """A dimmer storing whole percent returns 155 for a dispatched 156."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 156}
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+    dispatched = binding._tracked
+
+    now[0] = 0.4
+    quantized = SimpleNamespace(state="on", attributes={"brightness": 147})
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": quantized}))
+
+    assert binding._tracked == dispatched
+
+
+def test_third_party_change_during_a_scroll_rebases_immediately(monkeypatch) -> None:
+    """A value we never sent is a real external change, even mid-gesture."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    now[0] = 0.4
+    external = SimpleNamespace(state="on", attributes={"brightness": 12})
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
 
     assert binding._tracked is None
 
