@@ -90,6 +90,95 @@ Single best next action for this item: a controlled Hardware A/B on
 judging first-notch onset and the smoothness of fast rotation separately, then
 record the chosen value and whether it becomes the default.
 
+## rc.10 on hardware: the integration is clean, the dimmer drops off (2026-07-29)
+
+Status: **Hardware-confirmed for the rotation logic. The remaining fault is
+outside the integration.**
+
+A 166-second session on deployed rc.10, tracing armed, scrolling
+`Kolečko Obývák` channel 1 against `light.linka`:
+
+| measure | result |
+|---|---|
+| rotation steps continuing our own calculation | **78 of 80** |
+| targets discarded by mistaken recognition | **0** |
+| commands coalesced | 12 |
+| notches decoded | 217 |
+
+Both fixes are confirmed on hardware. The trajectory test recognizes the
+target's own movement, and coalescing thins bursts without losing the final
+value.
+
+### The real cause of the freezing
+
+The capture contains two `unavailable` reports for the target entity, at
+t=109.2 s (returning at 119.5 s) and t=165.9 s. Home Assistant's own log
+carries the matching failure:
+
+```text
+ERROR [homeassistant.components.shelly] Error fetching
+shellyplus010v-10061ccbdb04 data: An error occurred while reconnecting
+```
+
+**The device is dropping off the network.** The binding handles it correctly —
+both `forget` rows in the capture are `target_unavailable`, which is the right
+response — but nothing in this integration can keep commands flowing to a
+device Home Assistant cannot reach.
+
+This supersedes the earlier suspicion that command volume caused the freeze.
+Coalescing remains worthwhile and is confirmed working, but it was treating a
+symptom of something else.
+
+Device facts read directly over its RPC, for the record: firmware 1.7.5,
+`transition_duration` 0.00, `range_map` [10, 100] — so the bottom tenth of the
+range is unreachable regardless of the binding's minimum-brightness setting —
+`min_brightness_on_toggle` 10, Wi-Fi RSSI -61 dBm, uptime 139 days. The owner
+authorized a reboot on 2026-07-29; afterwards RSSI read -55 dBm and the entity
+returned to `on` at 255. Whether the dropouts stop is not yet known.
+
+Note the `transition_duration` of 0.00 contradicts the earlier explanation that
+the intermediate reported values were a device-side fade. The values are real
+and the trajectory fix handles them, but **why the device emits them is not
+established** — internal hardware ramping, `range_map` conversion and reporting
+by the Shelly integration are all still candidates.
+
+`TRACE_LIMIT` was raised from 400 to 2000: this session overflowed the ring
+buffer and lost its own beginning.
+
+### After the reboot: the dropouts are independent of this integration
+
+A second session was captured after the device reboot. Two scrolling windows,
+one down and one up:
+
+```text
+227.7 - 246.4 s    37 steps,  63 notches -> 31 service calls
+431.7 - 444.6 s    37 steps,  74 notches -> 32 service calls
+```
+
+- **73 of 74 steps continued the calculated target**; the single `state` row is
+  the first step of the session, which legitimately reads the entity;
+- **one discarded target in the whole session**, `outside_scroll_authority`
+  with reported 255 against a tracked 255 — correct behaviour, not a defect;
+- coalescing roughly halved the outgoing calls.
+
+The entity still went `unavailable` twice, at t=313.9 and t=392.2. **Both fall
+between the two scrolling windows, while nothing was being sent.** A device
+that drops off while idle is not dropping off because of command volume, so
+this closes the question: the fault is not caused by anything the integration
+does.
+
+The reboot did not fix it — both dropouts are after it — and
+`Shelly.CheckForUpdate` reports no newer firmware than the installed 1.7.5,
+with Wi-Fi at -55 dBm. Remaining candidates are the network, the device itself,
+or Home Assistant's Shelly integration. None of them is actionable here, and
+the binding already responds correctly by discarding its target when the entity
+becomes unavailable.
+
+Single best next action for the integration is therefore no longer this defect.
+The rotation work is hardware-confirmed; `docs/V0.6.0_CHECKLIST.md` items #2 and
+#6 can be closed, and #1's A/B is now unblocked because scrolling itself is
+reliable.
+
 ## rc.9 on hardware: the trajectory fix works, and the real loss is elsewhere (2026-07-29)
 
 Status: **Hardware capture on rc.9 + coalescing Implemented + Static + Unit

@@ -31,9 +31,13 @@ from collections import deque
 import time
 from typing import Any
 
-# Roughly twenty seconds of the fastest scrolling observed on the E2490, which
-# covers any single gesture plus the gaps around it.
-TRACE_LIMIT = 400
+# A capture is read after the fact, so the window has to be long enough to
+# still contain the beginning. A 166-second session on the physical wheel
+# produced 400 rows and lost its own start; at roughly 2.5 rows per second of
+# active scrolling this holds several minutes, which is what a "scroll for a
+# while and see what happens" session actually needs. Each row is a small dict,
+# so the cost of the larger window is on the order of a few hundred kilobytes.
+TRACE_LIMIT = 2000
 
 CAPTURE_VERSION = 1
 
