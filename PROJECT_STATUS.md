@@ -90,6 +90,168 @@ Single best next action for this item: a controlled Hardware A/B on
 judging first-notch onset and the smoothness of fast rotation separately, then
 record the chosen value and whether it becomes the default.
 
+## Hardware session on rc.7: #6 is NOT fixed, and a rotation trace was built (2026-07-29)
+
+Status: **Hardware evidence that the defect persists. Cause not yet identified.
+Trace instrument Implemented + Static + Unit (342 tests). Not committed, not
+released, not deployed.**
+
+### What the physical wheel showed
+
+Owner scrolled `Kolečko Obývák` channel 1 against `light.linka` (Shelly Plus
+0-10V), step 3 %, smoothing 0, from brightness 255.
+
+Round 1, the only round with a complete decode log: **21 dispatched actions
+totalling 37 notches** over 5.8 seconds, all `dir=down`. Expected end value
+`255 − 37 × 7.65` is below the floor, so the light should have clamped at 3.
+**It reported 79**, which is exactly 23 notches' worth. Later rounds ended at
+97 and 133 without a usable decode log.
+
+The owner independently reported, twice and unprompted, that **the brightness
+appeared to jump back up** during scrolling. That is the signature of a step
+recomputed from a stale higher value.
+
+### The dimmer is not at fault
+
+This mattered because absolute commands mean the last one wins, so a dimmer
+that merely lags would still land correctly. Two checks:
+
+- the panel's Live test reported the binding calculating `Jas 18 → 12 %`, and
+  the entity then read **31**, which is exactly `0.12 × 255`. The dimmer
+  honoured the last command to the unit;
+- a direct 255 → 31 jump applied immediately with **no intermediate values**,
+  disproving a device-side fade that would emit values we never sent.
+
+So the wrong number is one the integration itself calculated and sent. **The
+rc.7 fix did not close item #6.** Whether rc.7 made it worse than rc.6 is not
+established.
+
+### Why no cause is claimed
+
+Three attempts to read the truth from logs failed, and the reason is worth
+recording: the `ikea_bilresa` DEBUG logger yields clean rows but only shows
+*decoded actions*, never the value sent. Widening to `homeassistant.core`
+DEBUG, then to the Shelly loggers, flooded the log — the Shelly devices act as
+BLE proxies and emit scan results continuously — and pushed the relevant lines
+out of the readable tail in both cases. A text log is the wrong instrument for
+this defect.
+
+### The instrument built instead
+
+`trace.py` adds `RotationTrace`: an opt-in, bounded ring buffer of structured
+rows, exposed in `telemetry` (so it rides the existing redacted diagnostics
+download) and through a new admin-only `ikea_bilresa/trace` WebSocket command
+that reads, arms and clears it. Disabled by default; `record()` is a no-op
+while off, and arming clears the buffer so a capture starts from a known point.
+
+Rows, per applied step: `notches`, `direction`, **`from_source`** (`tracked` /
+`state` / `fallback`), `from_value`, `state_value`, `target`, `dispatched`.
+`from_source` is the field that answers the open question directly — `state`
+mid-gesture means the calculated target was thrown away. Every discard writes
+its own row with `reason`, `had_tracked`, `reported` and the recent command
+history, and recognized echoes are recorded too, so accepted and rejected
+reports can be compared.
+
+`_rotate_by` was split into a traced wrapper plus `_rotate_mode`, so one code
+path covers all eight rotation modes. `_forget_target` now requires a reason at
+every call site. `_observed_value` gained a defensive `getattr` for states
+without attributes, found by an existing test.
+
+Three existing tests changed meaning: the panel API's command count and its
+write-surface allow-list (`ws_trace` writes only to an in-memory diagnostic
+buffer and is documented as such in that test), and a coordinator fake binding
+that now accepts the `trace` keyword.
+
+Files: `custom_components/ikea_bilresa/trace.py` (new), `binding.py`,
+`coordinator.py`, `panel_api.py`, `tests/test_trace.py` (new),
+`tests/test_panel_api.py`, `tests/test_coordinator.py`, `CHANGELOG.md`, this
+handoff.
+
+```text
+ruff format --check / ruff check                     passed (41 files)
+mypy custom_components/ikea_bilresa                  passed (21 files)
+node --test panel + icon frontend tests              passed (20 tests)
+pytest                                               342 passed
+```
+
+Single best next action: release rc.8, capture one scroll with the trace armed,
+and read `from_source` on each row. That names the cause instead of inferring
+it.
+
+Known limits: the trace records what the binding calculated and whether a
+dispatch happened, not what Home Assistant's service layer finally delivered.
+If a future capture shows every row with `from_source: tracked` and a correct
+final `target`, the remaining gap is between the binding and the entity, and
+needs a different probe.
+
+## First real-HA look at deployed rc.7, and one contradiction it exposed (2026-07-29)
+
+Status: **Real Home Assistant visual evidence (light theme) from owner
+screenshots + one follow-up fix that is Implemented + Static + Unit +
+harness-measured, uncommitted. No Hardware gesture yet.**
+
+The owner opened the deployed rc.7 panel and sent four screenshots of the real
+frontend. They confirm, **in Home Assistant rather than in a harness**:
+
+- the regrouped editor renders as designed — `Otáčení` with mode/target and
+  step/smoothing, `Tlačítko` with short press beside its target, then scenes,
+  then full-width `Dvojitý stisk přepne` and `Trojitý stisk přepne`, then hold
+  beside its target;
+- `Pokročilé možnosti` is collapsed, and when opened holds button response
+  full-width with **minimum and maximum brightness on one row** and
+  acceleration below — the defect from the owner's original screenshot;
+- the gesture ledger reads `Otočení doleva / doprava → Jas · Svetylka Světýlka`,
+  so the quantity fix is live;
+- the overview shows `Tlačítko Obývák` with a glyph distinct from both wheels,
+  which closes checklist **#7**.
+
+Checklist **#4** is therefore partly done: light theme only, on a wheel
+channel. Dark theme, a custom theme, the keyboard/screen-reader pass and the
+dual-button view remain owed.
+
+**The contradiction.** The same screenshot shows the ledger saying
+`Krátký stisk → Přepnout · Svetylka Světýlka` while the editor's
+`Cíl krátkého stisku` says `Není nastaven žádný cíl`. Both were truthful:
+`BindingRuntime` falls back to the rotation target when the short-press target
+is empty, so the ledger reported the effective behavior and the editor reported
+the stored value. This predates the regrouping, but putting the ledger and the
+field on one screen is what made it visible — and a placeholder that claims
+"no target" for a control that demonstrably acts is worse than a long label.
+
+Fixed by giving that one field its own empty-option label,
+`Stejný jako cíl otáčení` / `Same as the rotation target`. `_selectField` and
+`_entityField` gained an optional `emptyLabel`; every other optional target
+keeps `target_none`, because hold and multi-press targets genuinely do nothing
+when empty. A dual button passes `undefined` — it has no rotation to fall back
+to and its click target stays required.
+
+Verified in the harness against the production element: `click_target` offers
+`Stejný jako cíl otáčení` while `hold_target` and `double_press_target` still
+offer `Není nastaven žádný cíl`.
+
+Files: `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
+`panel_strings.py`, `tests/test_panel.py`, `docs/V0.6.0_CHECKLIST.md`, this
+handoff.
+
+```text
+ruff format --check / ruff check                     passed
+mypy custom_components/ikea_bilresa                  passed (20 files)
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (20 tests)
+EN/CS panel string alignment                         passed (265 keys each)
+pytest                                               335 passed
+```
+
+**Not deployed.** rc.7 is what is running on the owner's instance and this fix
+is deliberately left in the working tree, so the hardware session is not
+disturbed by a mid-session reinstall.
+
+Known related item, deliberately not changed: with `hold_action = ramp` the
+ramp drives the **rotation** target regardless of `Cíl podržení`, so that field
+can mislead in the same way. It was left alone because the ledger currently
+reports hold correctly and changing it needs a decision about whether ramp
+should honour a separate hold target at all.
+
 ## `v0.6.0-rc.7` published and deployed (2026-07-29)
 
 Status: **Implemented + Static + Unit + CI + Released + non-hardware Home

@@ -67,6 +67,7 @@ TYPE_ACTIVITY_SUBSCRIBE = f"{DOMAIN}/activity/subscribe"
 TYPE_BINDING_SAVE = f"{DOMAIN}/binding/save"
 TYPE_BINDING_DELETE = f"{DOMAIN}/binding/delete"
 TYPE_BINDING_TEST = f"{DOMAIN}/binding/test"
+TYPE_TRACE = f"{DOMAIN}/trace"
 
 _COMMANDS_REGISTERED = f"{DOMAIN}_ws_registered"
 
@@ -234,6 +235,38 @@ def ws_overview(
 ) -> None:
     """Return the current overview snapshot."""
     connection.send_result(msg["id"], _snapshot_or_empty(hass))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): TYPE_TRACE,
+        vol.Optional("enabled"): bool,
+        vol.Optional("clear"): bool,
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_trace(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Read, arm or clear the rotation trace.
+
+    Without arguments this only reads, so a capture can be fetched without
+    disturbing it. Rows carry no household identifiers beyond the node id and
+    channel already present throughout diagnostics.
+    """
+    entry = _loaded_entry(hass)
+    if entry is None:
+        connection.send_error(msg["id"], "not_loaded", "Integration is not loaded")
+        return
+    trace = entry.runtime_data.rotation_trace
+    if "enabled" in msg:
+        trace.set_enabled(msg["enabled"])
+    if msg.get("clear"):
+        trace.clear()
+    connection.send_result(msg["id"], {"enabled": trace.enabled, "rows": trace.dump()})
 
 
 @websocket_api.websocket_command({vol.Required("type"): TYPE_OVERVIEW_SUBSCRIBE})
@@ -580,4 +613,5 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_binding_save)
     websocket_api.async_register_command(hass, ws_binding_delete)
     websocket_api.async_register_command(hass, ws_binding_test)
+    websocket_api.async_register_command(hass, ws_trace)
     hass.data[_COMMANDS_REGISTERED] = True

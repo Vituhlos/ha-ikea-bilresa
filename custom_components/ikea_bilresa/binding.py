@@ -103,6 +103,7 @@ from .const import (
     signal_raw_button,
 )
 from .engine import WheelAction
+from .trace import RotationTrace
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -187,8 +188,18 @@ def _as_float(value: Any) -> float | None:
 class LightBinding:
     """Runtime for one GUI-configured wheel channel or button endpoint."""
 
-    def __init__(self, hass: HomeAssistant, data: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        data: dict[str, Any],
+        trace: RotationTrace | None = None,
+    ) -> None:
         self.hass = hass
+        # Optional so a binding constructed without a coordinator - in tests,
+        # and in any future caller - still works, with tracing simply absent.
+        self._trace = trace or RotationTrace()
+        self._trace_from: float | None = None
+        self._trace_source: str | None = None
         self._node_id = int(data[CONF_NODE_ID])
         raw_channel = data.get(CONF_CHANNEL)
         raw_endpoint = data.get(CONF_ENDPOINT)
@@ -424,7 +435,7 @@ class LightBinding:
         """Stop safety-critical timers whenever Matter connectivity changes."""
         self._fast_press_started = None
         self._reset_latency_trace()
-        self._forget_target()
+        self._forget_target("matter_connection_change")
         self._command_authoritative_until = 0.0
         self._last_direction = None
         self._active_scrolls.clear()
@@ -442,7 +453,7 @@ class LightBinding:
             self._handle_latency_target_state_change(event)
         new_state = event.data.get("new_state")
         if new_state is None or new_state.state in _UNAVAILABLE:
-            self._forget_target()
+            self._forget_target("target_unavailable")
             self._command_authoritative_until = 0.0
             self._stop_ramp(change_direction=False)
             return
@@ -458,15 +469,25 @@ class LightBinding:
             for endpoint_id, last_seen in self._active_scrolls.items()
             if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
         }
+        observed = self._observed_value(new_state)
         if self._scroll_authoritative(now):
             if not self._is_own_echo(new_state):
-                self._forget_target()
+                self._forget_target("unrecognized_value_during_scroll", observed)
+            else:
+                self._trace.record(
+                    "echo_ignored",
+                    node_id=self._node_id,
+                    channel=self._channel,
+                    endpoint=self._endpoint_id,
+                    reported=observed,
+                    tracked=None if self._tracked is None else round(self._tracked, 2),
+                )
             return
         # Outside a scroll, ignore only state echoes covered by the configured
         # service transition. A later external update invalidates the desired
         # value so the next gesture reads reality again.
         if now >= self._command_authoritative_until:
-            self._forget_target()
+            self._forget_target("outside_scroll_authority", observed)
 
     def _scroll_authoritative(self, now: float) -> bool:
         """Report whether one continuous scroll still owns the target value."""
@@ -496,7 +517,9 @@ class LightBinding:
 
     def _observed_value(self, state: State) -> float | None:
         """Return the state value this binding's mode actually rotates."""
-        attributes = state.attributes
+        # A state without attributes carries no value to compare against, and
+        # this runs on the hot path for every report, so it must not raise.
+        attributes = getattr(state, "attributes", None) or {}
         if self._mode == MODE_COLOR_TEMP:
             return _as_float(attributes.get(ATTR_COLOR_TEMP_KELVIN))
         if self._mode == MODE_COLOR:
@@ -523,8 +546,24 @@ class LightBinding:
         self._commanded.append((value, max(span, 1e-9)))
 
     @callback
-    def _forget_target(self) -> None:
-        """Drop the calculated target so the next rotation reads reality."""
+    def _forget_target(self, reason: str = "unspecified", reported: Any = None) -> None:
+        """Drop the calculated target so the next rotation reads reality.
+
+        Every caller names why. A scroll that loses steps almost always lost
+        them here, and the reason plus the value that triggered it is what
+        turns "steps went missing" into a specific defect.
+        """
+        if self._tracked is not None:
+            self._trace.record(
+                "forget",
+                node_id=self._node_id,
+                channel=self._channel,
+                endpoint=self._endpoint_id,
+                reason=reason,
+                had_tracked=round(self._tracked, 2),
+                reported=reported,
+                recent_commands=[round(value, 2) for value, _span in self._commanded],
+            )
         self._tracked = None
         self._commanded.clear()
 
@@ -777,14 +816,42 @@ class LightBinding:
     def _rotate_by(self, notches: int, up: bool) -> bool:
         if not self._mode_target_valid:
             self._report_activity("skipped", reason="mode_target_mismatch")
-            self._forget_target()
+            self._forget_target("mode_target_mismatch")
             self._stop_ramp(change_direction=False)
             return False
         if self._available_state(self._target) is None:
             self._report_activity("skipped", reason="target_unavailable")
-            self._forget_target()
+            self._forget_target("target_unavailable")
             self._stop_ramp(change_direction=False)
             return False
+        if not self._trace.enabled:
+            return self._rotate_mode(notches, up)
+        # One row per applied step, covering every mode through the same path.
+        # `from_source` is the field worth reading first: "tracked" means the
+        # step continued our own calculation, "state" means it restarted from
+        # whatever the entity was reporting at that instant.
+        self._trace_source = None
+        self._trace_from = None
+        state = self._available_state(self._target)
+        observed = self._observed_value(state) if state is not None else None
+        changed = self._rotate_mode(notches, up)
+        self._trace.record(
+            "rotate",
+            node_id=self._node_id,
+            channel=self._channel,
+            endpoint=self._endpoint_id,
+            notches=notches,
+            direction=DIRECTION_UP if up else "down",
+            from_source=self._trace_source,
+            from_value=None if self._trace_from is None else round(self._trace_from, 2),
+            state_value=None if observed is None else round(observed, 2),
+            target=None if self._tracked is None else round(self._tracked, 2),
+            dispatched=changed,
+        )
+        return changed
+
+    @callback
+    def _rotate_mode(self, notches: int, up: bool) -> bool:
         if self._mode == MODE_COLOR_TEMP:
             return self._rotate_color_temp(notches, up)
         if self._mode == MODE_COLOR:
@@ -922,8 +989,14 @@ class LightBinding:
         recent = self._tracked is not None and (now - self._last) < _RESYNC_AFTER
         self._last = now
         if recent and self._tracked is not None:
+            # Recorded for the trace: which of these two branches ran is the
+            # single most useful fact when a scroll loses steps.
+            self._trace_source = "tracked"
+            self._trace_from = self._tracked
             return self._tracked
         value = current if current is not None else fallback
+        self._trace_source = "state" if current is not None else "fallback"
+        self._trace_from = value
         self._tracked = value
         return value
 
@@ -1201,7 +1274,7 @@ class LightBinding:
         if entity_id in self._unavailable_targets:
             self._unavailable_targets.remove(entity_id)
             if entity_id == self._target:
-                self._forget_target()
+                self._forget_target("target_became_available")
             _LOGGER.info("BILRESA target %s is available again", entity_id)
         return state
 

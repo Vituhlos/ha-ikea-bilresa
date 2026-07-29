@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **Rotation trace** — an opt-in, bounded record of how each rotation step
+  reached its value, served through the existing diagnostics download and
+  through the `ikea_bilresa/trace` WebSocket command. Each row states whether
+  the step continued the binding's own calculated target or restarted from
+  whatever the entity was reporting, and every discarded target is recorded
+  with the reason and the value that triggered it. Nothing is recorded until
+  it is switched on. It exists because absolute-value scrolling defects are
+  invisible in a text log: the interesting lines rotate out of a busy log
+  before they can be read, and they do not say why a step started where it did.
+
+### Fixed
+- A wheel's `Short-press target` no longer offers "No target configured" as its
+  empty option. Leaving it empty makes the short press act on the rotation
+  target, which the gesture list already reported, so the placeholder now says
+  `Same as the rotation target`. Hold and multi-press targets keep the plain
+  wording, because those genuinely do nothing when left empty.
+
 ## [0.6.0-rc.7] - 2026-07-29
 
 ### Changed

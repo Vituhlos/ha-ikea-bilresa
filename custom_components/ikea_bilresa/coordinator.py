@@ -39,6 +39,7 @@ from .engine import GestureEngine, WheelAction
 from .matter_core import CoreMatterEventSource, CoreMatterUnavailable
 from .matter_ws import MatterWSClient
 from .model import BilresaWheel, decode_event, parse_node
+from .trace import RotationTrace
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ class BilresaCoordinator:
         self.connected = False
         self.wheels: dict[int, BilresaWheel] = {}
         self._engine = GestureEngine()
+        # Shared by every binding so one capture covers all of them at once.
+        self.rotation_trace = RotationTrace()
         self._client: CoreMatterEventSource | MatterWSClient = CoreMatterEventSource(
             hass, url, self._on_event, self._core_matter_unavailable
         )
@@ -108,6 +111,8 @@ class BilresaCoordinator:
                 self._last_event_at.isoformat() if self._last_event_at else None
             ),
             "recent_events": list(self._recent_events),
+            "rotation_trace_enabled": self.rotation_trace.enabled,
+            "rotation_trace": self.rotation_trace.dump(),
         }
 
     async def async_start(self) -> None:
@@ -172,7 +177,9 @@ class BilresaCoordinator:
         for subentry in entry.subentries.values():
             if subentry.subentry_type != SUBENTRY_BINDING:
                 continue
-            binding = LightBinding(self.hass, dict(subentry.data))
+            binding = LightBinding(
+                self.hass, dict(subentry.data), trace=self.rotation_trace
+            )
             self._binding_unsubs.append(binding.async_attach())
             key = binding.binding_key
             self._binding_keys.add(key)

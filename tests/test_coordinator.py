@@ -233,7 +233,7 @@ def test_button_binding_keys_separate_endpoints_and_multiple_devices(
     created = []
 
     class FakeBinding:
-        def __init__(self, _hass, data) -> None:
+        def __init__(self, _hass, data, trace=None) -> None:
             self.node_id = int(data[CONF_NODE_ID])
             self.channel = int(data[CONF_CHANNEL]) if CONF_CHANNEL in data else None
             self.endpoint_id = (

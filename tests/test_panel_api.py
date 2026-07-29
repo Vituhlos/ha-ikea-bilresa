@@ -356,11 +356,17 @@ def test_commands_register_once(monkeypatch) -> None:
     async_register_commands(hass)
     async_register_commands(hass)
 
-    assert register.call_count == 6
+    assert register.call_count == 7
 
 
 def test_write_surface_is_limited_to_binding_mutations_and_tests() -> None:
-    """The panel must not gain arbitrary config-entry or Matter mutation."""
+    """The panel must not gain arbitrary config-entry or Matter mutation.
+
+    `ws_trace` is on this list deliberately. It writes, but only to an
+    in-memory diagnostic buffer: it cannot change a binding, a config entry, a
+    Matter device or any entity, and its rows carry nothing that diagnostics
+    does not already redact.
+    """
     import custom_components.ikea_bilresa.panel_api as api
 
     exported = {name for name in dir(api) if name.startswith("ws_")}
@@ -371,6 +377,7 @@ def test_write_surface_is_limited_to_binding_mutations_and_tests() -> None:
         "ws_binding_test",
         "ws_overview",
         "ws_overview_subscribe",
+        "ws_trace",
     }
 
 
