@@ -142,6 +142,14 @@ _ECHO_MATCH_FRACTION = 0.01
 # unbounded history.
 _COMMAND_HISTORY = 8
 
+# The largest single rotary batch recorded on the physical E2490 during the
+# uncontrolled fast-scroll stress run (batches of 14, 9, 6 and 14 notches). A
+# batch that size receives the whole configured transition; smaller batches
+# receive proportionally less, so the smoothing tracks how far the light has
+# to travel. No duration is claimed here: the ceiling is the owner's own
+# setting and remains subject to a controlled Hardware A/B.
+_SMOOTHING_FULL_BATCH = 14
+
 # Acceleration is derived from recent decoded velocity, never a single Matter
 # batch size. Defaults remain disabled until physical tuning is complete.
 _VELOCITY_WINDOW = 2.0
@@ -924,6 +932,25 @@ class LightBinding:
         magnitude = step_pct / 100 * span * notches
         return magnitude if up else -magnitude
 
+    def _smoothing_transition(self, notches: int) -> float:
+        """Return the service transition for one batch of decoded notches.
+
+        A single notch is never smoothed. The eager first notch of a gesture
+        is the whole point of the RC.5 optimization, and hold-to-ramp steps
+        one notch at a time, so both stay immediate however this is
+        configured. Larger batches are the firmware bundling a fast rotation
+        into one jump; they are spread proportionally to their size, up to
+        the configured transition. Zero disables smoothing entirely.
+
+        The configured value is used as given. A transition longer than the
+        roughly 0.5-second spacing between batches will be interrupted by the
+        next batch, which is a real effect the owner can hear out during the
+        Hardware A/B rather than something to clamp away silently.
+        """
+        if notches <= 1 or self._transition <= 0:
+            return 0.0
+        return self._transition * min(1.0, notches / _SMOOTHING_FULL_BATCH)
+
     @callback
     def _rotate_brightness(self, notches: int, up: bool) -> bool:
         state = self._available_state(self._target)
@@ -950,7 +977,7 @@ class LightBinding:
                 self._call(
                     "light",
                     "turn_off",
-                    {ATTR_TRANSITION: self._transition},
+                    {ATTR_TRANSITION: self._smoothing_transition(notches)},
                     result=self._value_result(
                         "brightness",
                         round(tracked / 255 * 100),
@@ -970,7 +997,10 @@ class LightBinding:
         return self._call_value_if_changed(
             "light",
             "turn_on",
-            {ATTR_BRIGHTNESS: round(target), ATTR_TRANSITION: self._transition},
+            {
+                ATTR_BRIGHTNESS: round(target),
+                ATTR_TRANSITION: self._smoothing_transition(notches),
+            },
             before=round(tracked),
             after=round(target),
             result=result,
@@ -995,7 +1025,10 @@ class LightBinding:
         return self._call_value_if_changed(
             "light",
             "turn_on",
-            {ATTR_COLOR_TEMP_KELVIN: round(target), ATTR_TRANSITION: self._transition},
+            {
+                ATTR_COLOR_TEMP_KELVIN: round(target),
+                ATTR_TRANSITION: self._smoothing_transition(notches),
+            },
             before=round(tracked),
             after=round(target),
             result=result,
@@ -1017,7 +1050,7 @@ class LightBinding:
             "turn_on",
             {
                 ATTR_HS_COLOR: [round(hue, 1), self._saturation],
-                ATTR_TRANSITION: self._transition,
+                ATTR_TRANSITION: self._smoothing_transition(notches),
             },
             result=self._value_result("hue", round(tracked, 1), round(hue, 1), "°"),
         )

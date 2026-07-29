@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **The `Transition` binding field is now `Smoothing of large jumps` and only
+  applies to batched rotation.** Fast rotation reaches Home Assistant as
+  batches of notches; a single notch — including the eager first notch of a
+  gesture and every hold-to-ramp step — is now always applied immediately, so
+  the wheel stays responsive whatever this is set to. A larger batch is spread
+  over up to the configured duration, in proportion to its size. Setting it to
+  0 keeps the previous instant behavior. Anyone who relied on the old field
+  slowing down single notches will notice the difference; the value itself is
+  unchanged and needs no migration.
+
 ### Fixed
 - A long physical rotation reaches Home Assistant as several Matter gestures,
   and a target-state report arriving in the gap between two of them could

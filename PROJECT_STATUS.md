@@ -2,6 +2,94 @@
 
 Last updated: **2026-07-29 by Claude Code**
 
+## Checklist item #1 — batch smoothing mechanism (durations still unmeasured)
+
+Status: **Implemented + Static + local Unit (328 tests) + frontend Unit. mypy
+and hassfest not run locally. CI has not run. Not committed, not released, not
+deployed. No Hardware, and none is claimed — the whole point of this item is a
+duration that only a controlled A/B can supply.**
+
+`docs/V0.6.0_CHECKLIST.md` item #1 covered two symptoms. Only one of them is a
+defect:
+
+- **Large batches appear as jumps** (real). The firmware bundles a fast
+  rotation into batches of up to 14 notches, and at transition 0.0 s each batch
+  is one service call, so the light jumps.
+- **The light looks stationary at min/max** (not a defect, deliberately not
+  addressed). RC.5 suppresses identical service payloads at a limit, and that
+  is correct: the target really is at its limit and there is nothing to smooth.
+  If this needs anything it is UI feedback, not a different service call.
+
+The transition is no longer flat. `_smoothing_transition(notches)` returns 0
+for a single notch and otherwise scales linearly with batch size up to the
+binding's configured value, capped at `_SMOOTHING_FULL_BATCH = 14` — the
+largest single batch in the recorded stress run. It is applied by the three
+modes that accept a service transition (brightness, including the turn-off at
+minimum; color temperature; hue). Volume, cover, climate, fan and number
+services take no transition and are untouched.
+
+A single notch is never smoothed on purpose: the eager first notch is the
+entire RC.5 latency gain, and hold-to-ramp steps one notch per 200 ms tick, so
+both keep their cadence at any setting.
+
+**Owner decision (2026-07-29): policy A — reuse the existing field.** The
+binding's `Transition` field becomes the smoothing ceiling and was relabelled
+`Smoothing of large jumps` / `Vyhlazení velkých skoků`, with a new
+`data_description` in `strings.json`, `en.json` and `cs.json` explaining the
+batch behavior. No new option, no migration: stored values keep working and 0
+reproduces the previous instant behavior exactly. C (a second field) was
+rejected because the two numbers would not be independent in practice; B
+(hard-coded constants) was rejected because the integration reloads itself on
+save, so A allows the A/B to be run from the UI without a release per attempt.
+
+The configured value is **not** clamped. A duration longer than the roughly
+0.5-second batch spacing will be interrupted by the next batch; that is a real
+effect for the owner to hear out during the A/B, not something to hide.
+
+Files: `custom_components/ikea_bilresa/binding.py`, `strings.json`,
+`translations/en.json`, `translations/cs.json`, `panel_strings.py`,
+`tests/test_binding.py`, `CHANGELOG.md`, `docs/RUNTIME_POLISH_ROADMAP.md`
+(R4 reopened as "mechanism done, durations deferred"),
+`docs/V0.6.0_CHECKLIST.md`, this handoff.
+
+Eight new tests in `tests/test_binding.py` cover: single notch never smoothed,
+full-size batch receiving the whole ceiling, proportional scaling at half a
+batch, the cap holding beyond the observed maximum, 0 disabling smoothing,
+hold-to-ramp ticks staying immediate, color temperature batches smoothing too,
+and the turn-off at minimum carrying its batch's transition. Four of them were
+confirmed to **fail** when the transition is reverted to a flat configured
+value or the cap is removed.
+
+Local validation on Windows / Python 3.14:
+
+```text
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+strings/en/cs recursive key alignment                passed (169 paths each)
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (20 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                        328 passed
+mypy / hassfest                                      not run (CI only)
+```
+
+Known risks and assumptions:
+
+- `_SMOOTHING_FULL_BATCH = 14` comes from the uncontrolled stress run recorded
+  in the RC.5/RC.6 section below, not from a controlled measurement. If real
+  batches routinely exceed it, those batches all receive the same ceiling and
+  the largest ones are under-smoothed.
+- Linear scaling by batch size is a design choice (owner selected it over a
+  threshold), not a measured curve. It assumes perceived smoothness tracks
+  distance travelled.
+- The relabelled field changes behavior for anyone who used the old transition
+  to slow down single notches. That is the owner here, deliberately.
+
+Single best next action for this item: a controlled Hardware A/B on
+`Kolečko Obývák` at step 3 % — compare 0 (today's behavior), 0.2, 0.3 and 0.5,
+judging first-notch onset and the smoothness of fast rotation separately, then
+record the chosen value and whether it becomes the default.
+
 ## Checklist item #6 — the RC.5 brightness accounting anomaly is explained and fixed
 
 Status: **Diagnosed + Implemented + Static + local Unit (320 tests). mypy and

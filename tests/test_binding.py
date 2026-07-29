@@ -8,7 +8,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from custom_components.ikea_bilresa.binding import LightBinding
+from custom_components.ikea_bilresa.binding import (
+    _RAMP_NOTCHES,
+    _SMOOTHING_FULL_BATCH,
+    LightBinding,
+)
 from custom_components.ikea_bilresa.const import (
     ACTION_HOLD,
     ACTION_PRESS,
@@ -25,6 +29,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_RAMP_DIRECTION,
@@ -35,6 +40,7 @@ from custom_components.ikea_bilresa.const import (
     DIRECTION_UP,
     HOLD_NONE,
     HOLD_RAMP,
+    MODE_COLOR_TEMP,
     MODE_VOLUME,
     RAMP_DIRECTION_DOWN,
     RAMP_DIRECTION_UP,
@@ -999,6 +1005,95 @@ def test_scroll_tracking_survives_overlapping_direction_boundaries(monkeypatch) 
     )
 
     assert binding._tracked is None
+
+
+def _smoothing_binding(monkeypatch, **overrides):
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TRANSITION: 0.4, CONF_STEP: 3, CONF_ACCELERATION: 0, **overrides},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 128}
+    )
+    return binding
+
+
+def _dispatched_transition(binding) -> float:
+    return binding.hass.services.async_call.call_args.args[2]["transition"]
+
+
+def test_a_single_notch_is_never_smoothed(monkeypatch) -> None:
+    """The eager first notch must stay immediate at any configured value."""
+    binding = _smoothing_binding(monkeypatch)
+
+    binding._rotate_brightness(1, up=True)
+
+    assert _dispatched_transition(binding) == 0.0
+
+
+def test_a_full_size_batch_receives_the_configured_transition(monkeypatch) -> None:
+    binding = _smoothing_binding(monkeypatch)
+
+    binding._rotate_brightness(_SMOOTHING_FULL_BATCH, up=True)
+
+    assert _dispatched_transition(binding) == 0.4
+
+
+def test_batch_smoothing_scales_with_batch_size(monkeypatch) -> None:
+    """Half a full batch travels half as far, so it is spread half as long."""
+    binding = _smoothing_binding(monkeypatch)
+
+    binding._rotate_brightness(_SMOOTHING_FULL_BATCH // 2, up=True)
+
+    assert _dispatched_transition(binding) == pytest.approx(0.2)
+
+
+def test_a_batch_beyond_the_observed_maximum_stays_at_the_ceiling(monkeypatch) -> None:
+    binding = _smoothing_binding(monkeypatch)
+
+    binding._rotate_brightness(_SMOOTHING_FULL_BATCH * 3, up=True)
+
+    assert _dispatched_transition(binding) == 0.4
+
+
+def test_zero_configured_transition_disables_smoothing(monkeypatch) -> None:
+    """The historic instant behavior stays reachable from the existing field."""
+    binding = _smoothing_binding(monkeypatch, **{CONF_TRANSITION: 0.0})
+
+    binding._rotate_brightness(_SMOOTHING_FULL_BATCH, up=True)
+
+    assert _dispatched_transition(binding) == 0.0
+
+
+def test_hold_to_ramp_steps_are_never_smoothed(monkeypatch) -> None:
+    """Ramp ticks are one notch each, so the ramp keeps its own cadence."""
+    binding = _smoothing_binding(monkeypatch)
+    del binding._rotate_by  # the shared helper mocks it; this test needs the real one
+
+    binding._start_ramp()
+
+    assert _RAMP_NOTCHES == 1
+    assert _dispatched_transition(binding) == 0.0
+
+
+def test_color_temperature_batches_are_smoothed_too(monkeypatch) -> None:
+    binding = _smoothing_binding(monkeypatch, **{CONF_MODE: MODE_COLOR_TEMP})
+
+    binding._rotate_color_temp(_SMOOTHING_FULL_BATCH, up=True)
+
+    assert _dispatched_transition(binding) == 0.4
+
+
+def test_turning_off_at_the_minimum_is_smoothed_like_its_batch(monkeypatch) -> None:
+    binding = _smoothing_binding(monkeypatch, **{CONF_MIN_BRIGHTNESS: 0})
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 10}
+    )
+
+    binding._rotate_brightness(_SMOOTHING_FULL_BATCH, up=False)
+
+    assert binding.hass.services.async_call.call_args.args[1] == "turn_off"
+    assert _dispatched_transition(binding) == 0.4
 
 
 def _replay_recorded_fast_scroll(binding, now, *, step_seconds: float = 0.05):

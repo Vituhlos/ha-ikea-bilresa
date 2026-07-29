@@ -118,10 +118,20 @@ and Hardware remain pending.
 
 ## R4 - Measured transition presets
 
-**Deferred by owner on 2026-07-15.** Keep this as future physical tuning. No
-default or profile transition changes may be inferred from static checks or HA
-history; resume only when the owner wants to compare visible behavior at the
-wheel and light.
+**Mechanism implemented on 2026-07-29; the durations are still deferred.** The
+transition is no longer flat: a single notch is never smoothed and a batch is
+spread in proportion to its size, up to the binding's configured value. That
+changes *how* the number is applied, not *which* number is right — the rule
+below still stands, and no default or profile value may be changed without
+physical A/B evidence.
+
+Because the configured field is the ceiling, the A/B can now be run by editing
+the binding in the UI: the integration reloads itself on save, so no new
+release is needed per attempt.
+
+**Original deferral (owner, 2026-07-15).** No default or profile transition
+changes may be inferred from static checks or HA history; resume only when the
+owner wants to compare visible behavior at the wheel and light.
 
 Use physical A/B evidence to tune perceived brightness response without making
 device-side batching more visible. The 2026-07-15 baseline used transition

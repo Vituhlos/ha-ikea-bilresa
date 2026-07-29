@@ -47,7 +47,7 @@
             "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "max_brightness": "Maximální jas (%)",
-            "transition": "Přechod (s)",
+            "transition": "Vyhlazení velkých skoků (s)",
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
@@ -59,7 +59,8 @@
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           },
           "data_description": {
-            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané."
+            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
+            "transition": "Rychlé otáčení dorazí do Home Assistantu po dávkách cvaknutí. Jedno cvaknutí se použije vždy okamžitě, aby kolečko zůstalo svižné; větší dávka se rozloží nanejvýš na tuto dobu, úměrně své velikosti. 0 vyhlazení vypne."
           }
         },
         "profile": {
@@ -82,7 +83,7 @@
             "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "max_brightness": "Maximální jas (%)",
-            "transition": "Přechod (s)",
+            "transition": "Vyhlazení velkých skoků (s)",
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
@@ -94,7 +95,8 @@
             "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)"
           },
           "data_description": {
-            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané."
+            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
+            "transition": "Rychlé otáčení dorazí do Home Assistantu po dávkách cvaknutí. Jedno cvaknutí se použije vždy okamžitě, aby kolečko zůstalo svižné; větší dávka se rozloží nanejvýš na tuto dobu, úměrně své velikosti. 0 vyhlazení vypne."
           }
         }
       },
