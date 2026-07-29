@@ -90,6 +90,73 @@ Single best next action for this item: a controlled Hardware A/B on
 judging first-notch onset and the smoothness of fast rotation separately, then
 record the chosen value and whether it becomes the default.
 
+## rc.9 on hardware: the trajectory fix works, and the real loss is elsewhere (2026-07-29)
+
+Status: **Hardware capture on rc.9 + coalescing Implemented + Static + Unit
+(353 tests). Coalescing is not committed, not released, not deployed.**
+
+### The trajectory fix is confirmed on hardware
+
+The owner scrolled down on deployed rc.9 with tracing armed. First 4.3 seconds:
+
+- **zero discarded targets** during the whole gesture;
+- six mid-fade reports (247, 230, 224, 186, 181, 125) — **all recognized** as
+  our own travel;
+- every step continued from the previous one (`from_source: tracked`).
+
+The defect diagnosed from the rc.8 capture is closed. Item #6's rebase
+mechanism is fixed and confirmed on the physical wheel.
+
+### But the capture exposed a larger problem
+
+| capture time | event |
+|---|---|
+| 2.27 s | last report from the dimmer: **125** |
+| 2.3–4.3 s | we send 117 → 109 → 102 → 71 → 63 → 25 → 17 → **3** |
+| 4.3–19.7 s | **no report at all for seventeen seconds** |
+| 19.7 s | reports **71** |
+
+The entity then read **71**, against a last commanded value of **3**. The
+commands did not land. This is not our arithmetic: 14 service calls went out in
+4.3 seconds — over three per second at a Wi-Fi device — and it stopped
+responding.
+
+This also explains the owner's account precisely: the light froze; further
+scrolling showed `dispatched: false` because our target was already at the
+floor while the device sat at 71; and when the 3-second resync window expired
+at 11.3 s we re-read the stale 125 and started down again — the delayed jump.
+
+**An earlier conclusion needs correcting:** the rebase mechanism was named as
+the cause of the lost notches. It was real and is fixed, but it was probably
+the smaller of two problems. Most of round 1's 14 lost notches are now better
+explained by commands never reaching the device.
+
+### Coalescing
+
+Absolute values make intermediate commands redundant, so `_call` now sends the
+first command of a burst immediately — the eager response is the whole point of
+this integration — and replaces a queued send for anything within
+`_MIN_COMMAND_INTERVAL` (0.18 s, just under the ramp's own 200 ms cadence). A
+queued send always fires, so a gesture's final target cannot be the dropped
+one. Queued sends are cancelled on reconnect, on an unavailable target and on
+unload.
+
+Replayed against the recorded hardware sequence: **13 service calls instead of
+21, ending on the identical value.**
+
+`tests/replay.py` now models `async_call_later`, since a replay that ignored
+deferred sends would drop exactly the calls the real runtime makes.
+
+**This is a mitigation, not a proven fix.** Seventeen seconds of silence is a
+lot for simple congestion; a stalled WebSocket or a firmware fault would look
+the same from here. Lower command volume is worth having regardless, and it
+cannot make the situation worse, but the next capture has to show whether the
+freeze actually stops.
+
+Single best next action: release, then repeat the same scroll and check whether
+reports keep arriving throughout and the entity ends where the last command
+said.
+
 ## Capture & replay, and what it already ruled out (2026-07-29)
 
 Status: **Implemented + Static + Unit (348 tests). Not committed, not released,

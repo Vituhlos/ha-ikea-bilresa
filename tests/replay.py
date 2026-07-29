@@ -196,10 +196,34 @@ def replay(
 
     clock = _Clock()
     monkeypatch.setattr("custom_components.ikea_bilresa.binding.time.monotonic", clock)
-    for name in ("async_track_time_interval", "async_call_later"):
-        monkeypatch.setattr(
-            f"custom_components.ikea_bilresa.binding.{name}", lambda *_a: Mock()
-        )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_track_time_interval",
+        lambda *_a: Mock(),
+    )
+
+    # The binding defers coalesced commands with async_call_later, so a replay
+    # that ignored it would drop exactly the sends the real runtime makes.
+    timers: list[list[Any]] = []
+
+    def _later(_hass, delay, callback_fn):
+        entry = [clock.now + delay, callback_fn, False]
+        timers.append(entry)
+
+        def cancel() -> None:
+            entry[2] = True
+
+        return cancel
+
+    def _run_due_timers() -> None:
+        for entry in list(timers):
+            due, callback_fn, cancelled = entry
+            if not cancelled and due <= clock.now:
+                entry[2] = True
+                callback_fn(clock.now)
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later", _later
+    )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.binding.async_track_state_change_event",
         lambda *_a: Mock(),
@@ -246,6 +270,7 @@ def replay(
         if row.get("binding") not in (None, key):
             continue
         clock.now = row["t"]
+        _run_due_timers()
         kind = row["kind"]
         if kind == "raw":
             binding._handle_raw_input(row["role"], row["event_type"], row["endpoint"])
@@ -261,6 +286,11 @@ def replay(
             )
         elif kind == "rotate":
             binding._rotate_by(row["notches"], row["direction"] == DIRECTION_UP)
+
+    # A gesture's last value is usually still queued when the rows run out;
+    # the real runtime would fire it a fraction of a second later.
+    clock.now += 1.0
+    _run_due_timers()
 
     result.rows = trace.dump()
     result.final_value = target.applied

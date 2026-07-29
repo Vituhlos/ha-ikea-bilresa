@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **Bursts of rotation commands are now coalesced.** A fast scroll could
+  calculate a new absolute value every ~110 ms. Captured on hardware, fourteen
+  service calls in 4.3 seconds left a Shelly Plus 0-10V silent for seventeen
+  seconds and stopped 68 brightness units short of the value it was last sent —
+  the commands never landed. Because these values are absolute, intermediate
+  ones are redundant: the first command of a burst is still sent immediately,
+  and further ones within a short interval replace a queued send instead of
+  adding to it. A queued send always fires, so the final target of a gesture is
+  never the one dropped. On the recorded hardware sequence this is 13 calls
+  instead of 21, ending on the identical value.
+  This is a mitigation, not a proven fix: seventeen seconds of silence may have
+  a cause beyond command volume.
+
 ## [0.6.0-rc.9] - 2026-07-29
 
 ### Fixed

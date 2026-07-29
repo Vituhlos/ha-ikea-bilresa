@@ -167,6 +167,13 @@ _INITIAL_PRESS = SWITCH_EVENT_NAMES[EVT_INITIAL_PRESS]
 _COMPLETE = SWITCH_EVENT_NAMES[EVT_MULTI_PRESS_COMPLETE]
 _SHORT_RELEASE = SWITCH_EVENT_NAMES[EVT_SHORT_RELEASE]
 
+# Absolute values make intermediate commands redundant, so a burst is thinned
+# to protect the target. Chosen just under the ramp's own 200 ms cadence so a
+# held ramp still sends every tick, while a fast scroll - which can calculate a
+# target every ~110 ms - is halved. Not derived from a device datasheet: it is
+# a conservative default, and the honest limit of any one device is unknown.
+_MIN_COMMAND_INTERVAL = 0.18
+
 # Hold-to-ramp: how often and by how much to step while the button is held.
 _RAMP_INTERVAL = timedelta(seconds=0.2)
 _RAMP_NOTCHES = 1
@@ -261,6 +268,17 @@ class LightBinding:
         self._last_scroll_seen: float | None = None
         # Where the target last said it was. One end of the path it is on.
         self._last_reported: float | None = None
+        # Outgoing-command rate limiting. An instance attribute so a test can
+        # disable it without patching the module.
+        self._min_command_interval = _MIN_COMMAND_INTERVAL
+        # None rather than 0.0: a monotonic clock starting at zero would make
+        # the very first command look like it followed one, and delaying that
+        # one is the opposite of what this is for.
+        self._last_command_at: float | None = None
+        self._pending_command: (
+            tuple[str, str, dict[str, Any], dict[str, Any]] | None
+        ) = None
+        self._pending_unsub: Callable[[], None] | None = None
         # Recently calculated targets with the range they were derived from,
         # so a later absolute state report can be recognized as our own echo.
         self._commanded: deque[tuple[float, float]] = deque(maxlen=_COMMAND_HISTORY)
@@ -379,6 +397,7 @@ class LightBinding:
         @callback
         def unsubscribe() -> None:
             self._stop_ramp(change_direction=False)
+            self._cancel_pending_command()
             self._fast_press_started = None
             self._reset_latency_trace()
             if trace_state_unsub is not None:
@@ -464,6 +483,7 @@ class LightBinding:
         # Across a reconnect nothing is known about where the target got to.
         self._commanded.clear()
         self._last_reported = None
+        self._cancel_pending_command()
         self._command_authoritative_until = 0.0
         self._last_direction = None
         self._active_scrolls.clear()
@@ -491,9 +511,11 @@ class LightBinding:
             )
         if new_state is None or new_state.state in _UNAVAILABLE:
             self._forget_target("target_unavailable")
-            # An unavailable target is not travelling anywhere we can describe.
+            # An unavailable target is not travelling anywhere we can describe,
+            # and a queued command for it would fail on arrival.
             self._commanded.clear()
             self._last_reported = None
+            self._cancel_pending_command()
             self._command_authoritative_until = 0.0
             self._stop_ramp(change_direction=False)
             return
@@ -1443,9 +1465,76 @@ class LightBinding:
         *,
         result: dict[str, Any],
     ) -> None:
+        """Send an absolute value, coalescing bursts into one call.
+
+        A fast scroll can calculate a new target every hundred milliseconds.
+        Captured on a Shelly Plus 0-10V: fourteen calls in 4.3 seconds and the
+        device stopped acknowledging for seventeen, ending 68 units away from
+        the value it was last sent — the commands never landed.
+
+        Because every value here is absolute, intermediate ones are redundant:
+        sending only the newest reaches the same place. So the first command of
+        a burst goes immediately — the eager response is the point of this
+        integration — and further ones inside the interval replace a pending
+        send rather than adding to it. A pending send always fires, so the last
+        target of a gesture can never be the one that gets dropped.
+        """
         if self._available_state(self._target) is None:
             self._report_activity("skipped", result=result, reason="target_unavailable")
             return
+        now = time.monotonic()
+        elapsed = (
+            float("inf")
+            if self._last_command_at is None
+            else now - self._last_command_at
+        )
+        if self._min_command_interval > 0 and elapsed < self._min_command_interval:
+            # Replace whatever was queued: an older absolute value has no
+            # value of its own once a newer one exists.
+            self._pending_command = (domain, service, data, result)
+            self._trace.record(
+                "coalesced",
+                binding=self.trace_key,
+                domain=domain,
+                service=service,
+                waited=round(self._min_command_interval - elapsed, 3),
+            )
+            if self._pending_unsub is None:
+                self._pending_unsub = async_call_later(
+                    self.hass,
+                    self._min_command_interval - elapsed,
+                    self._flush_pending_command,
+                )
+            return
+        self._last_command_at = now
+        self._dispatch_call(domain, service, data, result)
+
+    @callback
+    def _flush_pending_command(self, _now=None) -> None:
+        """Send the newest queued value once the interval has passed."""
+        self._pending_unsub = None
+        pending = self._pending_command
+        self._pending_command = None
+        if pending is None:
+            return
+        self._last_command_at = time.monotonic()
+        self._dispatch_call(*pending)
+
+    @callback
+    def _cancel_pending_command(self) -> None:
+        if self._pending_unsub is not None:
+            self._pending_unsub()
+            self._pending_unsub = None
+        self._pending_command = None
+
+    @callback
+    def _dispatch_call(
+        self,
+        domain: str,
+        service: str,
+        data: dict[str, Any],
+        result: dict[str, Any],
+    ) -> None:
         transition = _as_float(data.get(ATTR_TRANSITION)) or 0.0
         self._command_authoritative_until = (
             time.monotonic() + transition + _STATE_ECHO_MARGIN

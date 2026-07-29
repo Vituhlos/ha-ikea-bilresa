@@ -1295,3 +1295,93 @@ def test_unavailable_state_event_stops_ramp_and_clears_tracking(monkeypatch) -> 
 
     interval_unsub.assert_called_once()
     assert binding._tracked is None
+
+
+def test_a_burst_of_targets_reaches_the_device_as_one_command(monkeypatch) -> None:
+    """Absolute values make intermediate commands redundant.
+
+    Captured on hardware: fourteen calls in 4.3 seconds left the dimmer 68
+    units from the value it was last sent. Only the newest value matters, so a
+    burst inside the interval must collapse to a single send.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    scheduled = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later",
+        lambda _hass, delay, cb: scheduled.append((delay, cb)) or Mock(),
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    binding._rotate_brightness(1, up=False)  # leading edge: sent at once
+    now[0] = 0.05
+    binding._rotate_brightness(1, up=False)
+    now[0] = 0.10
+    binding._rotate_brightness(1, up=False)
+
+    assert binding.hass.services.async_call.call_count == 1
+    assert len(scheduled) == 1
+
+    now[0] = 0.18
+    scheduled[0][1](None)
+
+    # One deferred call carrying the newest target, not the ones in between.
+    assert binding.hass.services.async_call.call_count == 2
+    assert binding.hass.services.async_call.call_args.args[2]["brightness"] == round(
+        255 - 3 * 7.65
+    )
+
+
+def test_the_first_command_of_a_gesture_is_never_delayed(monkeypatch) -> None:
+    """The eager response is the point of this integration; it must not queue."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    binding._rotate_brightness(1, up=False)
+
+    assert binding.hass.services.async_call.call_count == 1
+
+
+def test_a_queued_command_is_dropped_when_the_target_goes_away(monkeypatch) -> None:
+    """A deferred send must not arrive after the target became unavailable."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    cancel = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later",
+        lambda *_a: cancel,
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+    binding._rotate_brightness(1, up=False)
+    now[0] = 0.05
+    binding._rotate_brightness(1, up=False)
+
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={"new_state": SimpleNamespace(state="unavailable", attributes={})}
+        )
+    )
+
+    cancel.assert_called_once()
+    assert binding._pending_command is None
