@@ -51,6 +51,7 @@ from .const import (
     CONF_TRIPLE_TARGET,
     DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
+    DEFAULT_MODE,
     DOMAIN,
     HOLD_NONE,
     HOLD_RAMP,
@@ -349,12 +350,16 @@ def _wheel_gesture_summaries(
     # channel subtitle directly above already names the mode, so repeating it
     # here would say the same thing twice, and an infinitive ("Adjust target")
     # reads as a button rather than a description of what the gesture does.
+    # A stored binding may predate the mode field, and BindingRuntime falls back
+    # to the same default, so the ledger must not claim a different quantity
+    # from the one the binding would actually move.
+    mode = str(data.get(CONF_MODE) or DEFAULT_MODE)
     summaries = [
         _gesture_summary(
             hass,
             language,
             "rotation",
-            _QUANTITY_KEYS.get(data.get(CONF_MODE), "quantity_brightness"),
+            _QUANTITY_KEYS.get(mode, "quantity_brightness"),
             target,
         )
     ]

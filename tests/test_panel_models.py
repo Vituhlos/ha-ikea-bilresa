@@ -409,6 +409,30 @@ def test_a_dead_click_target_flags_the_channel(monkeypatch) -> None:
     assert channels[0]["target_missing"] is True
 
 
+def test_a_binding_without_a_stored_mode_names_the_default_quantity(
+    monkeypatch,
+) -> None:
+    """A subentry may predate the mode field, and the runtime defaults it too.
+
+    The ledger must name the quantity the binding would actually move, not a
+    blank or a different one, or the panel would describe behaviour the device
+    does not have.
+    """
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [_subentry(NODE_A, 1, **{CONF_TARGET: "light.main"})],
+    )
+
+    snapshot = async_overview_snapshot(
+        _hass({"light.main": _state("on", "Main light")}), entry
+    )
+
+    actions = snapshot["wheels"][0]["channels"][0]["actions"]
+    assert actions[0]["gesture"] == "rotation"
+    assert actions[0]["action_label"] == "Brightness"
+
+
 def test_detail_actions_mirror_the_stored_binding(monkeypatch) -> None:
     """The detail describes runtime inputs without importing or executing it."""
     _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
