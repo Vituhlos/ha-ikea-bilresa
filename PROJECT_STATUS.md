@@ -90,6 +90,73 @@ Single best next action for this item: a controlled Hardware A/B on
 judging first-notch onset and the smoothness of fast rotation separately, then
 record the chosen value and whether it becomes the default.
 
+## `v0.6.0-rc.7` published and deployed (2026-07-29)
+
+Status: **Implemented + Static + Unit + CI + Released + non-hardware Home
+Assistant deployment smoke. No Hardware.** This candidate exists so the owner
+can run the checklist #1 A/B and the #2/#6 confirmation on the physical wheel.
+
+Owner authorized the release and deployment on 2026-07-29.
+
+Commits on `agent/dual-button-0.6`:
+
+- `ed2c478` fix: keep the scroll target authoritative between Matter gestures;
+- `b6ea801` feat: smooth large scroll batches without delaying the first notch;
+- `be28d9f` refactor(panel): group binding fields by what they belong to;
+- `f49927e` chore: prepare v0.6.0-rc.7;
+- `cdeb5ab` fix(panel): default the rotation quantity when no mode is stored.
+
+**The first attempt failed CI and was not tagged.** Run `30447028431` on
+`f49927e` failed the mypy job: `panel_models.py:357` looked a quantity key up
+from `data.get(CONF_MODE)`, which is `Any | None`, unsound for a subentry
+predating the mode field. Fixed in `cdeb5ab` by defaulting to `DEFAULT_MODE` —
+the same fallback `BindingRuntime` uses, so the ledger cannot name a quantity
+the binding would not move — with a regression test for a mode-less subentry.
+mypy is now installed locally, so this class of failure should not need another
+CI round trip.
+
+Exact-revision CI run `30447368039` passed all six jobs for full commit
+`cdeb5ab361bfd1f73418180c60db26fa6589c102`: Validate HACS, Unit tests, Lint
+(ruff), Frontend checks, Type check (mypy) and Validate manifest (hassfest).
+
+Annotated tag `v0.6.0-rc.7` resolves to that exact commit and the GitHub
+release is marked prerelease:
+https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.7
+
+Deployment results:
+
+- pre-restart Home Assistant configuration check `valid`;
+- HACS installed exactly `v0.6.0-rc.7` and reports it as the installed version;
+- Home Assistant (Core 2026.7.4, HA OS 18.1, Python 3.14.6) restarted normally
+  and the post-restart configuration check is `valid`;
+- the `ikea_bilresa` config entry returned to `loaded`, and the **running**
+  integration manifest reports version `0.6.0-rc.7`;
+- System Health: Matter Server add-on 9.1.0 / matter-server 1.2.6 connected on
+  server schema 12 through compatibility schema 11, active source
+  `core_matter_client`, fallback reason `none`, two wheels, one dual button and
+  **all six bindings preserved**;
+- Matter traffic resumed after the restart (a fresh `last_matter_event`);
+- exact-domain system-log search returned zero entries. The error log contains
+  only Home Assistant's standard warning for an unreviewed custom integration.
+
+This is publication plus install/startup smoke. **No physical gesture has been
+performed on this candidate**, so nothing in it is Hardware-verified.
+
+Owed next, on the physical `Kolečko Obývák`, in this order:
+
+1. **#2 + #6 together** — one controlled 18-notch rotation down from brightness
+   255 at step 3 % with smoothing 0. The light must land on **117**. Any higher
+   value means target authority is still being lost.
+2. **#1 A/B** — compare smoothing 0, 0.2, 0.3 and 0.5 by editing the binding
+   (the integration reloads on save, so no redeploy per attempt), judging
+   first-notch onset separately from fast-rotation smoothness. Expect
+   degradation above roughly 0.5 s, where a transition outlives the gap to the
+   next batch.
+3. **#7** — confirm the dual-button glyph renders, visible on opening the panel.
+4. **#4** — the regrouped editor in a **fresh** browser tab (an open tab keeps
+   the old custom element), light/dark/one custom theme plus a keyboard and
+   screen-reader pass.
+
 ## Binding editor regrouped after the owner's deployed screenshots (2026-07-29)
 
 Status: **Implemented + Static + local Unit (333 Python, 20 frontend) +
