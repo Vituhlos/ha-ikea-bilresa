@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.9] - 2026-07-29
+
+### Fixed
+- **Scrolling no longer loses steps against a target that dims gradually.**
+  A dimmer with its own fade — and a Zigbee bulb with a default transition, and
+  a cover motor mid-travel — reports values *between* the ones we sent. Those
+  were read as somebody else changing the target, so the calculated value was
+  thrown away and the next notch restarted from wherever the device had got to.
+  Captured on the owner's hardware, one such rebase discarded nine notches at
+  once, and because the device lags, scrolling down made the brightness jump
+  back up.
+  A report is now recognized by the path the target is travelling — from where
+  it last reported towards the newest value we sent — instead of by matching a
+  value we sent. A report off that path is still treated as an outside change
+  and still takes effect immediately.
+  Known limitation: a light *group* reports the average brightness of its
+  members, which no such path describes; a group target can still rebase
+  unexpectedly.
+
+### Added
+- The rotation trace records arriving actions before any filter, so a notch
+  dropped on the way in is visible in a capture rather than simply absent, and
+  a capture now carries the binding settings and relative timing needed to
+  replay it offline.
+
 ## [0.6.0-rc.8] - 2026-07-29
 
 ### Added
