@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.8] - 2026-07-29
+
 ### Added
 - **Rotation trace** — an opt-in, bounded record of how each rotation step
   reached its value, served through the existing diagnostics download and
