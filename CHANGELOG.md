@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.10] - 2026-07-29
+
 ### Changed
 - **Bursts of rotation commands are now coalesced.** A fast scroll could
   calculate a new absolute value every ~110 ms. Captured on hardware, fourteen
