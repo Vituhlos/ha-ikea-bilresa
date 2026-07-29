@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.7] - 2026-07-29
+
 ### Changed
 - **The binding editor is grouped by what fields belong to, not by how advanced
   they are.** Double press and triple press were filed under "advanced options"
