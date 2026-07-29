@@ -269,6 +269,20 @@ _MODE_KEYS = {
     MODE_NUMBER: "mode_number",
 }
 
+# The same modes, named as the quantity a rotation moves rather than as the
+# behavior of the binding. Kept beside `_MODE_KEYS` so a new mode cannot be
+# added to one map and forgotten in the other.
+_QUANTITY_KEYS = {
+    MODE_BRIGHTNESS: "quantity_brightness",
+    MODE_COLOR_TEMP: "quantity_color_temp",
+    MODE_COLOR: "quantity_color",
+    MODE_VOLUME: "quantity_volume",
+    MODE_COVER: "quantity_cover_position",
+    MODE_TEMPERATURE: "quantity_temperature",
+    MODE_FAN: "quantity_fan_speed",
+    MODE_NUMBER: "quantity_number",
+}
+
 
 def _behaviour_label(data: dict[str, Any], language: str | None) -> str | None:
     """A short, human phrase for what this binding does, in the user's language.
@@ -331,12 +345,16 @@ def _wheel_gesture_summaries(
     hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
     scenes = list(data.get(CONF_SCENES) or [])
 
+    # Name the quantity the rotation changes, not the act of changing it. The
+    # channel subtitle directly above already names the mode, so repeating it
+    # here would say the same thing twice, and an infinitive ("Adjust target")
+    # reads as a button rather than a description of what the gesture does.
     summaries = [
         _gesture_summary(
             hass,
             language,
             "rotation",
-            "action_adjust",
+            _QUANTITY_KEYS.get(data.get(CONF_MODE), "quantity_brightness"),
             target,
         )
     ]

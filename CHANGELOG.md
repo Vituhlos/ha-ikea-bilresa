@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Changed
+- **The binding editor is grouped by what fields belong to, not by how advanced
+  they are.** Double press and triple press were filed under "advanced options"
+  while short press and hold sat in the main body, contradicting the gesture
+  list shown directly above them. All five gestures are now edited together, in
+  the order that list uses, and one row carries one gesture — its action beside
+  its target. Double and triple press take a full row and say what they do
+  (`Double press toggles`), because they choose a target but never an action.
+  What is left under the disclosure is set-once: the recognition policy and the
+  rotation limits, with minimum and maximum brightness finally on one row
+  instead of split across two by an unrelated field.
+- The rotation row in a channel's gesture list now names what the rotation
+  changes — `Brightness · Kitchen` — instead of the infinitive `Adjust target`,
+  which read as a button and repeated nothing useful. The line above it already
+  names the mode, so the two no longer say the same thing twice.
 - **The `Transition` binding field is now `Smoothing of large jumps` and only
   applies to batched rotation.** Fast rotation reaches Home Assistant as
   batches of notches; a single notch — including the eager first notch of a

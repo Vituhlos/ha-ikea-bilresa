@@ -452,7 +452,7 @@ def test_detail_actions_mirror_the_stored_binding(monkeypatch) -> None:
         "hold",
         "release",
     ]
-    assert by_gesture["rotation"]["action_label"] == "Adjust target"
+    assert by_gesture["rotation"]["action_label"] == "Brightness"
     assert by_gesture["rotation"]["target_label"] == "Main light"
     assert by_gesture["short_press"]["action_label"] == "Turn off"
     assert by_gesture["short_press"]["target_label"] == "Bedside switch"
@@ -754,11 +754,11 @@ def test_behaviour_labels_follow_the_instance_language(monkeypatch) -> None:
     assert english["wheels"][0]["channels"][0]["behaviour"] == "Smooth dimming"
     # the entity's own name is the user's and is never translated
     assert czech["wheels"][0]["channels"][0]["target_label"] == "Lampa"
-    assert czech["wheels"][0]["channels"][0]["actions"][0]["action_label"] == (
-        "Upravit cíl"
-    )
+    # The subtitle names the mode, so the rotation row names the quantity it
+    # moves; repeating "Plynulé stmívání" on both lines says nothing twice.
+    assert czech["wheels"][0]["channels"][0]["actions"][0]["action_label"] == "Jas"
     assert english["wheels"][0]["channels"][0]["actions"][0]["action_label"] == (
-        "Adjust target"
+        "Brightness"
     )
 
 

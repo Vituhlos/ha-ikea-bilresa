@@ -593,7 +593,7 @@ def test_dual_button_reuses_the_panel_shell_with_two_button_controls() -> None:
     assert '"button-list"' not in asset
     assert '"button-surface"' not in asset
     assert '["buttons", "live", "diagnostics"]' in views
-    assert "if (!isButton) primary.appendChild(this._scenesField())" in form
+    assert "if (!isButton) button.appendChild(this._scenesField())" in form
     assert "if (!isButton) {" in form
     assert '"triple_press_target"' in form
     assert '"ramp_direction"' in form
@@ -606,6 +606,82 @@ def test_binding_editor_offers_three_truthful_response_points() -> None:
     )[0]
 
     assert '["multi_press", "fast", "instant"]' in form
+
+
+def _binding_form_source() -> str:
+    return (
+        _asset()
+        .split("  _bindingForm(wheel, control) {", 1)[1]
+        .split("  _channelDetail(wheel, channel) {", 1)[0]
+    )
+
+
+def test_every_press_gesture_is_edited_beside_the_others() -> None:
+    """Double and triple press belong with short press, not behind a disclosure.
+
+    The gesture ledger presents five equal gestures. Filing two of them under
+    "advanced options" contradicted that on the very next screen, and there is
+    no sense in which a double press is more advanced than a short one.
+    """
+    form = _binding_form_source()
+    gestures, advanced = form.split('el("details", "advanced")', 1)
+
+    for field in (
+        '"click_action"',
+        '"click_target"',
+        '"double_press_target"',
+        '"triple_press_target"',
+        '"hold_action"',
+        '"hold_target"',
+    ):
+        assert field in gestures, field
+        assert field not in advanced, field
+
+
+def test_the_editor_follows_the_gesture_ledger_order() -> None:
+    form = _binding_form_source()
+    order = [
+        '"mode"',
+        '"target"',
+        '"click_action"',
+        '"double_press_target"',
+        '"triple_press_target"',
+        '"hold_action"',
+    ]
+    positions = [form.index(field) for field in order]
+
+    assert positions == sorted(positions)
+
+
+def test_advanced_keeps_only_set_once_options_and_pairs_the_limits() -> None:
+    """What remains is a recognition policy and the range limits, in one pair."""
+    form = _binding_form_source()
+    advanced = form.split('el("details", "advanced")', 1)[1]
+
+    assert '"button_response"' in advanced
+    # Adjacent in source order, so the two-column grid cannot split the pair
+    # across separate rows the way the old flat ordering did.
+    minimum = advanced.index('"min_brightness"')
+    maximum = advanced.index('"max_brightness"')
+    acceleration = advanced.index('"acceleration"')
+    assert minimum < maximum < acceleration
+
+
+def test_a_gesture_without_an_action_takes_a_whole_row() -> None:
+    """Double and triple press choose a target only, so no half row is left."""
+    form = _binding_form_source()
+
+    for field in ('"double_press_target"', '"triple_press_target"'):
+        # the rest of that one _entityField call, whatever the formatter does
+        declaration = form.split(field, 1)[1].split("      ),", 1)[0]
+        assert "wide: true" in declaration, field
+
+
+def test_a_button_editor_has_no_section_title_to_repeat_itself() -> None:
+    """One group needs no heading; the editor's own title already says it."""
+    form = _binding_form_source()
+
+    assert 'isButton ? null : this._t("section_button")' in form
 
 
 def test_panel_detail_tabs_follow_the_aria_keyboard_contract() -> None:

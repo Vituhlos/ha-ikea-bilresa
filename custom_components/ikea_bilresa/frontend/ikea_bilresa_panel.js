@@ -972,6 +972,23 @@ const STYLES = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--_space-4);
   }
+  .form-sections {
+    display: grid;
+    gap: var(--_space-4);
+  }
+  /* A hairline between groups, never a box around each one: the editor already
+     sits on a card, and nesting cards is what made this panel read as a form
+     builder rather than a control surface. */
+  .form-section + .form-section {
+    border-block-start: 1px solid var(--_divider);
+    padding-block-start: var(--_space-4);
+  }
+  .form-section-title {
+    margin: 0 0 var(--_space-3);
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    color: var(--_ink);
+  }
   .field {
     min-inline-size: 0;
     display: grid;
@@ -2180,6 +2197,17 @@ class IkeaBilresaPanel extends HTMLElement {
     return wrap;
   }
 
+  _formSection(parent, title) {
+    // A title exists to tell two groups apart. A button binding has only one
+    // group, so titling it would repeat the editor's own heading.
+    const section = el("section", "form-section");
+    if (title) section.appendChild(el("h4", "form-section-title", title));
+    const grid = el("div", "form-grid");
+    section.appendChild(grid);
+    parent.appendChild(section);
+    return grid;
+  }
+
   _scenesField() {
     const wrap = this._fieldShell(
       "scenes",
@@ -2330,9 +2358,16 @@ class IkeaBilresaPanel extends HTMLElement {
       form.appendChild(message);
     }
 
-    const primary = el("div", "form-grid");
+    // The gesture ledger above lists rotation, short, double, triple and hold
+    // as one sequence. The editor follows that same order, and one grid row
+    // carries one gesture: its action beside its target. Fields are grouped by
+    // what they belong to, never by how advanced they are — a double press is
+    // no more advanced than a short press.
+    const sections = el("div", "form-sections");
+
     if (!isButton) {
-      primary.appendChild(
+      const rotation = this._formSection(sections, this._t("section_rotation"));
+      rotation.appendChild(
         this._selectField(
           "mode",
           this._t("field_mode"),
@@ -2342,18 +2377,17 @@ class IkeaBilresaPanel extends HTMLElement {
           })),
         ),
       );
-      primary.appendChild(
+      rotation.appendChild(
         this._entityField(
           "target",
           this._t("field_target"),
           MODE_DOMAINS[this._editorData.mode] || [],
-          { wide: true },
         ),
       );
-      primary.appendChild(
+      rotation.appendChild(
         this._numberField("step", this._t("field_step"), 1, 25, 1, "%"),
       );
-      primary.appendChild(
+      rotation.appendChild(
         this._numberField(
           "transition",
           this._t("field_transition"),
@@ -2364,7 +2398,12 @@ class IkeaBilresaPanel extends HTMLElement {
         ),
       );
     }
-    primary.appendChild(
+
+    const button = this._formSection(
+      sections,
+      isButton ? null : this._t("section_button"),
+    );
+    button.appendChild(
       this._selectField(
         "click_action",
         this._t("field_click_action"),
@@ -2375,7 +2414,7 @@ class IkeaBilresaPanel extends HTMLElement {
       ),
     );
     if (!isButton || this._editorData.click_action !== "none") {
-      primary.appendChild(
+      button.appendChild(
         this._entityField(
           "click_target",
           this._t("field_click_target"),
@@ -2384,7 +2423,28 @@ class IkeaBilresaPanel extends HTMLElement {
         ),
       );
     }
-    primary.appendChild(
+    if (!isButton) button.appendChild(this._scenesField());
+    // Double and triple press take a target but never an action, so each owns
+    // a full row instead of leaving a hole where an action select would be.
+    button.appendChild(
+      this._entityField(
+        "double_press_target",
+        this._t("field_double_target"),
+        ["light", "switch"],
+        { optional: true, wide: true },
+      ),
+    );
+    if (!isButton) {
+      button.appendChild(
+        this._entityField(
+          "triple_press_target",
+          this._t("field_triple_target"),
+          ["light", "switch"],
+          { optional: true, wide: true },
+        ),
+      );
+    }
+    button.appendChild(
       this._selectField(
         "hold_action",
         this._t("field_hold_action"),
@@ -2395,7 +2455,7 @@ class IkeaBilresaPanel extends HTMLElement {
       ),
     );
     if (this._editorData.hold_action !== "none") {
-      primary.appendChild(
+      button.appendChild(
         this._entityField(
           "hold_target",
           this._t("field_hold_target"),
@@ -2407,7 +2467,7 @@ class IkeaBilresaPanel extends HTMLElement {
       );
     }
     if (isButton && this._editorData.hold_action === "ramp") {
-      primary.appendChild(
+      button.appendChild(
         this._selectField(
           "ramp_direction",
           this._t("field_ramp_direction"),
@@ -2415,12 +2475,15 @@ class IkeaBilresaPanel extends HTMLElement {
             value: direction,
             label: this._t(`ramp_direction_${direction}`),
           })),
+          { wide: true },
         ),
       );
     }
-    if (!isButton) primary.appendChild(this._scenesField());
-    form.appendChild(primary);
+    form.appendChild(sections);
 
+    // What is left is genuinely set-once: a recognition policy and the limits
+    // of the rotation range. Minimum and maximum stay adjacent because they
+    // are one pair, which the old flat ordering split across two rows.
     const advanced = el("details", "advanced");
     const summary = el("summary", null, this._t("advanced_options"));
     advanced.appendChild(summary);
@@ -2435,27 +2498,10 @@ class IkeaBilresaPanel extends HTMLElement {
             `${isButton ? "dual_button_response" : "button_response"}_${response}`,
           ),
         })),
-      ),
-    );
-    advancedGrid.appendChild(
-      this._entityField(
-        "double_press_target",
-        this._t("field_double_target"),
-        ["light", "switch"],
-        { optional: true },
+        { wide: true },
       ),
     );
     if (!isButton) {
-      advancedGrid.appendChild(
-        this._numberField(
-          "acceleration",
-          this._t("field_acceleration"),
-          0,
-          100,
-          5,
-          "%",
-        ),
-      );
       advancedGrid.appendChild(
         this._numberField(
           "min_brightness",
@@ -2477,11 +2523,13 @@ class IkeaBilresaPanel extends HTMLElement {
         ),
       );
       advancedGrid.appendChild(
-        this._entityField(
-          "triple_press_target",
-          this._t("field_triple_target"),
-          ["light", "switch"],
-          { optional: true },
+        this._numberField(
+          "acceleration",
+          this._t("field_acceleration"),
+          0,
+          100,
+          5,
+          "%",
         ),
       );
     }

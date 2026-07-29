@@ -389,6 +389,38 @@ Relevant controls may include:
 The editor must validate targets before saving, warn about removed or
 unavailable targets and present a review summary before a material change.
 
+#### Field grouping, revised 2026-07-29
+
+**Fields are grouped by what they belong to, never by how advanced they are.**
+The deployed editor filed double press and triple press under "advanced
+options" while short press and hold stayed in the main body, so the gesture
+ledger directly above — which presents five equal gestures — was contradicted
+on the very next screen. A double press is not more advanced than a short one;
+it was simply added later.
+
+Two rules follow, and both are held by tests:
+
+1. **One grid row carries one gesture**: its action beside its target. A
+   gesture that takes a target but no action (double and triple press always
+   toggle) spans the full row instead of leaving a hole where an action select
+   would be, and its label says what it does — `Double press toggles`.
+2. **The editor follows the ledger's order**: rotation, short press, double,
+   triple, hold. A reader who just read the ledger finds the same sequence.
+
+What remains under the disclosure is genuinely set-once: the recognition
+policy and the limits of the rotation range. Minimum and maximum brightness
+stay adjacent in source order, because the two-column grid otherwise split that
+one pair across two rows with an unrelated field wedged between them — which is
+what the flat ordering actually shipped.
+
+A section is titled only when there is another section to tell it apart from. A
+dual-button editor has one group, so titling it would repeat the editor's own
+heading — the same duplicate-heading storey this document already rejects
+elsewhere.
+
+Groups are separated by a hairline, never boxed. The editor already sits on a
+card, and nesting cards is what made the panel read as a form builder.
+
 ### Live test
 
 Live test is a core feature, not hidden developer tooling. It should provide a
