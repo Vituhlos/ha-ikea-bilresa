@@ -2886,14 +2886,20 @@ class IkeaBilresaPanel extends HTMLElement {
     this._render();
     try {
       const draft = this._settingsStateFor(wheel);
-      const response = await this._hass.callWS({
+      const payload = {
         type: SETTINGS_SAVE,
         wheel: wheel.key,
         channel_enabled: draft.channel_enabled,
         step: Number(draft.step),
         acceleration: Number(draft.acceleration),
-        expected_revision: wheel.settings?.revision,
-      });
+      };
+      // Omitted, never null: a wheel saving for the first time has no stored
+      // revision, and the command's schema takes a string or nothing. The
+      // server still treats a missing token as "I expect no stored settings",
+      // so a subentry created meanwhile is reported as a conflict.
+      const revision = wheel.settings?.revision;
+      if (revision) payload.expected_revision = revision;
+      const response = await this._hass.callWS(payload);
       if (!response.ok) {
         this._settingsMessage = this._t(
           response.error === "conflict"

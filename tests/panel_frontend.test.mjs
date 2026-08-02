@@ -513,3 +513,26 @@ test("one wheel's unsaved draft never leaks onto another", () => {
 
   assert.deepEqual(panel._settingsStateFor(second).channel_enabled, { 1: true });
 });
+
+test("a wheel saving for the first time omits the revision instead of sending null", async () => {
+  // The deployed rc.12 sent expected_revision: null here, and the command's
+  // schema rejected it — so the very first save of any wheel always failed.
+  let message;
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [{ channel: 1, enabled: true }],
+    settings: { subentry_id: null, revision: null, step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  await panel._saveSettings(wheel);
+
+  assert.ok(!("expected_revision" in message));
+});

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.13] - 2026-08-02
+
+### Fixed
+- **Saving a wheel's channel settings failed on the first attempt for every
+  wheel.** A wheel with nothing stored yet has no revision token, and the panel
+  sent it as `null` rather than leaving it out, which the command's schema
+  rejected. The panel now omits the token when there is none; a missing token
+  still means "I expect no stored settings", so a settings entry created from
+  another panel meanwhile is reported as a conflict rather than overwritten.
+
 ## [0.6.0-rc.12] - 2026-08-02
 
 ### Fixed
