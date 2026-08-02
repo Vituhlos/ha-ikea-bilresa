@@ -13,7 +13,7 @@ from pathlib import Path
 
 from custom_components.ikea_bilresa.trace import CAPTURE_VERSION
 
-from .replay import replay, simulate_target
+from .replay import ReplayResult, perceptual, replay, simulate_target
 
 CAPTURES = Path(__file__).parent / "fixtures" / "captures"
 
@@ -341,3 +341,49 @@ def test_a_genuine_outside_change_is_still_honoured(monkeypatch) -> None:
         "unrecognized_value_during_scroll"
     ]
     assert result.rotations[-1]["from_source"] == "state"
+
+
+# -- smoothness scoring ----------------------------------------------------
+
+
+def test_perceptual_scale_grows_the_same_notch_towards_the_bottom() -> None:
+    """The reason a raw-unit metric would lie about how a ramp looks."""
+    top = perceptual(255) - perceptual(255 - NOTCH_UNITS)
+    bottom = perceptual(30) - perceptual(30 - NOTCH_UNITS)
+
+    assert top < 1.5
+    assert bottom > top * 1.5
+
+
+def test_even_motion_scores_near_zero() -> None:
+    result = ReplayResult(initial_value=255)
+    # Equal perceptual steps, so the values themselves are not equally spaced.
+    result.sent = [
+        round(255 * ((perceptual(255) - drop + 16) / 116) ** 3, 4)
+        for drop in (10, 20, 30, 40)
+    ]
+
+    score = result.smoothness()
+
+    assert score.cv < 0.01
+    assert score.ratio < 1.05
+
+
+def test_an_eager_notch_followed_by_a_batch_scores_as_uneven() -> None:
+    """The shape rc.5 produces: one notch, then the rest of the batch.
+
+    Recorded on hardware 2026-08-02 — a run alternating a single notch with a
+    7-to-14 notch batch measured a ratio of 27-50x. Anything that claims to
+    make scrolling feel even has to move this number.
+    """
+    result = ReplayResult(initial_value=255)
+    result.sent = [247.35, 239.7, 178.5, 170.85, 117.3, 109.65, 102.0, 3.0]
+
+    score = result.smoothness()
+
+    assert score.ratio > 20
+    assert score.cv > 1.0
+
+
+def test_smoothness_of_an_empty_run_does_not_divide_by_zero() -> None:
+    assert ReplayResult().smoothness().cv == 0.0

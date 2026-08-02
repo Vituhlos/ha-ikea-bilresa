@@ -2,6 +2,92 @@
 
 Last updated: **2026-08-02 by Claude Code**
 
+## Checklist item #1 is aimed at the wrong thing, and now there is a metric (2026-08-02)
+
+Status: **Hardware A/B run on `v0.6.0-rc.13` + metric Implemented + Static +
+Unit (382 tests). The A/B decided nothing, which is itself the result.**
+
+### The A/B
+
+Three controlled runs on `Kolečko Obývák` channel 3 against
+`light.kajplats_e27_ws_globe_1055lm`, each from brightness 255, fast downward
+rotation, step 3 %, only the smoothing changed between them:
+
+| run | smoothing | first report from the bulb | report lag | largest batch |
+|---|---|---|---|---|
+| A | 0 | 0.17 s | ~0.15 s | 13 notches |
+| B | 0.5 | **2.15 s** | **1-2 s** | 12 notches |
+| C | 0.2 | 0.23 s | ~0.3 s | 14 notches |
+
+Every run: zero discarded targets, every echo recognized, accounting exact.
+
+B confirms this file's own warning that a duration longer than the batch
+spacing is interrupted by the next batch — its `state_value` column sits at 255
+across six consecutive steps while the binding has already calculated 102.
+
+**The owner's verdict was that A, B and C all felt the same kind of steppy:
+"first the brightness dips slightly, then straight away a jump, then again and
+again."** That description is exactly right, and the trace shows why.
+
+### What is actually wrong, stated properly
+
+Item #1 says the defect is that *large batches appear as jumps*, and its fix
+spreads a large batch over time. That framing is incomplete. The real shape is
+an **alternation**, and it comes from rc.5's own eager notch: every
+`InitialPress` dispatches one notch immediately, and the rest of the batch
+arrives together a moment later. One run therefore goes
+
+```text
+1 notch (-7.65)   1 notch (-7.65)   8 notches (-61)   1 notch (-7.65)   ...
+```
+
+and `_smoothing_transition()` deliberately returns 0 for a single notch, so the
+two are not merely different sizes — they are a snap and a ramp, alternating.
+No value of the smoothing field changes that ratio.
+
+**Reducing `step` does not fix it either.** It scales both sides equally; 1:8
+stays 1:8.
+
+### The metric
+
+`tests/replay.py` gained `perceptual()` and `ReplayResult.smoothness()`. Steps
+are scored in CIE L* rather than raw units, because the same 7.65-unit notch is
+1.2 L* at the top of the range and 2.1 L* near the bottom — a raw-unit metric
+scores a visibly uneven ramp as even.
+
+Scored on the three runs above:
+
+| run | smallest step | largest step | ratio | CV |
+|---|---|---|---|---|
+| A | 1.2 L* | 45.8 L* | 39x | 1.38 |
+| B | 1.2 L* | 31.6 L* | 27x | 1.09 |
+| C | 1.2 L* | 59.1 L* | 50x | **1.66** |
+
+All three are the same order. **The metric would have rejected this A/B before
+the wheel was turned three times.** Use it as the gate: a change to smoothing
+or step size is an improvement only if it lowers `cv`.
+
+It also puts a number on a second, separate unevenness this file already
+predicted in prose — *"a linear 3 % step can never feel even"*. The eager notch
+alone grows from 1.2 to 2.1 L* on the way down, and the final batch is always
+the worst because the eye is most sensitive near the bottom.
+
+Limits, so nobody over-reads it: it scores **what was dispatched**, not what the
+lamp emitted, and L* assumes brightness is proportional to luminance, which an
+LED driver's own curve may break. It is a consistent yardstick for comparing
+two runs, not a photometric measurement. Validated against one observer on
+three runs.
+
+### The idea worth testing next, not a conclusion
+
+Spread a batch over the *observed interval until the next batch* rather than
+over a fraction of a fixed ceiling. Batches arrive every ~0.3-0.5 s; a 14-notch
+batch at smoothing 0.2 travels for 0.2 s and then the light sits still until the
+next one. Filling the gap would give constant velocity. **Unverified** — replay
+it against the three captures and check `cv` before touching `binding.py`.
+
+Channel 3 is left at smoothing **0.2** by the owner's decision.
+
 ## Hardware: brightness accounting is exact on a second, different device (2026-08-02)
 
 Status: **Hardware-confirmed on `v0.6.0-rc.13`.** The accounting result stands

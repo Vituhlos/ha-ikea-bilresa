@@ -40,6 +40,43 @@ from custom_components.ikea_bilresa.const import (
 _VALUE_KEYS = ("brightness", "color_temp_kelvin", "volume_level", "position")
 
 
+def perceptual(units: float, *, full_scale: float = 255) -> float:
+    """Convert a brightness to CIE L*, a roughly perceptually uniform scale.
+
+    Raw units lie about how a step looks. A 7.65-unit notch is 1.2 L* at the
+    top of the range and 2.1 L* near the bottom, so a metric in raw units
+    scores a visibly uneven ramp as perfectly even.
+
+    This assumes the entity's brightness is proportional to luminance. Many LED
+    drivers apply their own curve, so treat the result as a consistent yardstick
+    for comparing two runs, not as a photometric measurement.
+    """
+    y = max(0.0, min(1.0, units / full_scale))
+    return 116 * y ** (1 / 3) - 16 if y > 0.008856 else 903.3 * y
+
+
+@dataclass
+class Smoothness:
+    """How evenly a run's dispatched values were spaced, perceptually.
+
+    `ratio` is the owner's actual complaint made numeric: rc.5 emits one eager
+    notch per gesture and the rest of the batch arrives together, so a run
+    alternates between a tiny step and a large one. `cv` is the same property
+    across the whole run; 0 would be perfectly even motion.
+    """
+
+    steps: list[float] = field(default_factory=list)
+    smallest: float = 0.0
+    largest: float = 0.0
+    ratio: float = 0.0
+    cv: float = 0.0
+
+    @property
+    def total(self) -> float:
+        """Perceptual distance travelled, for comparing runs of equal length."""
+        return sum(self.steps)
+
+
 @dataclass
 class ReplayResult:
     """What a replayed capture produced, ready to assert on or to score."""
@@ -47,6 +84,38 @@ class ReplayResult:
     sent: list[float] = field(default_factory=list)
     rows: list[dict[str, Any]] = field(default_factory=list)
     final_value: float | None = None
+    initial_value: float = 255
+
+    def smoothness(self, *, full_scale: float = 255) -> Smoothness:
+        """Score how evenly this run moved, in perceptual steps.
+
+        Use it as a gate: a change to smoothing or step size is only an
+        improvement if it lowers `cv`. Measured on 2026-08-02, transition 0,
+        0.2 and 0.5 scored 1.38, 1.66 and 1.09 on the same wheel and target —
+        the same order of magnitude, which is why that A/B decided nothing.
+        """
+        if not self.sent:
+            return Smoothness()
+        steps: list[float] = []
+        previous = self.initial_value
+        for value in self.sent:
+            steps.append(
+                abs(
+                    perceptual(previous, full_scale=full_scale)
+                    - perceptual(value, full_scale=full_scale)
+                )
+            )
+            previous = value
+        smallest, largest = min(steps), max(steps)
+        mean = sum(steps) / len(steps)
+        deviation = (sum((step - mean) ** 2 for step in steps) / len(steps)) ** 0.5
+        return Smoothness(
+            steps=steps,
+            smallest=smallest,
+            largest=largest,
+            ratio=largest / smallest if smallest else float("inf"),
+            cv=deviation / mean if mean else 0.0,
+        )
 
     @property
     def rotations(self) -> list[dict[str, Any]]:
@@ -233,7 +302,7 @@ def replay(
     )
 
     target = _Target(initial_value)
-    result = ReplayResult()
+    result = ReplayResult(initial_value=initial_value)
 
     def _service_call(domain, service, payload, **_kw):
         if service == "turn_off":
