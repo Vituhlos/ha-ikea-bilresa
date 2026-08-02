@@ -2,6 +2,71 @@
 
 Last updated: **2026-08-02 by Claude Code**
 
+## Hardware: brightness accounting is exact on a second, different device (2026-08-02)
+
+Status: **Hardware-confirmed on `v0.6.0-rc.13`.** The accounting result stands
+on its own; the device-side finding below is about the bulb, not the code.
+
+Every earlier accounting result came from `light.linka`, a Shelly Plus 0-10V.
+This run used `Kolečko Obývák` **channel 2** against `light.zarovka_lustr`, a
+Matter bulb with effects — different vendor, different transport, and the
+channel carries smoothing 1.0 s rather than the 0 used on the Shelly.
+
+Tracing armed, one continuous downward scroll from brightness 255, step 3 %:
+
+| measure | result |
+|---|---|
+| notches decoded | **31** |
+| last calculated target | **17.85** |
+| `255 − 31 × 7.65` | **17.85** — exact |
+| targets discarded during the scroll | **0** |
+| own echoes recognized | every one |
+| commands coalesced | 6 |
+
+Every rotation row after the first reads `from_source: tracked`; the first
+reads `state`, which is correct at the start of a session. So the batching,
+the echo recognition and the authority window all hold on hardware that is not
+the Shelly.
+
+**The owner could not count the notches** — he asked for 18 and the device
+decoded 31. That is not a defect and not a miscount worth chasing: a perceived
+detent is not a raw event counter, as the RC.5 section below already recorded.
+The instrument counts; do not design a hardware test that depends on a human
+counting detents. This run's arithmetic was checked against the decoded 31,
+not against the intended 18, and that is the right way round.
+
+### The bulb floors at 26, and that is the bulb
+
+The binding dispatched 17.85 and the entity stayed at 26. Proven to be
+device-side by two probes that bypass the integration completely:
+
+```text
+light.turn_on brightness=18  -> entity reports 26
+light.turn_on brightness=40  -> entity reports 41
+```
+
+So it tracks correctly above the floor and clamps below it. 26/255 is 10.2 % —
+the same shape as the Shelly's `range_map [10, 100]` recorded further down.
+
+The trace also caught its own correctness here: both probes appear as
+`kind: state` rows followed by `forget` with `reason: outside_scroll_authority`
+and `had_tracked: 17.85`. An external change is supposed to discard the tracked
+target, and it did.
+
+**Consequence for this installation, not for the code:** channel 2's binding
+has `min_brightness` 1 %, i.e. `min_units` 3, which the bulb cannot reach. The
+bottom tenth of the scroll travel is invisible. Setting that channel's minimum
+to roughly 11 % would map the full rotation onto what the bulb can actually do.
+Not changed here — it is the owner's configuration.
+
+### Also confirmed incidentally
+
+The new entities move on real gestures. Before this run, `dial_1` read 100.0
+and `dial_2` 73.0 against a 50.0 default, and `button_1` read `on` — all from
+the owner's own physical scrolling and pressing, with nothing set by hand. The
+disabled-channel gate is **still unverified on hardware**: the settings
+subentry currently has all three channels enabled.
+
 ## Channel dials, button switches and per-wheel settings — backend only (2026-08-02)
 
 Status: **Implemented + Static + Unit (378 Python, 24 frontend) + CI + Released
