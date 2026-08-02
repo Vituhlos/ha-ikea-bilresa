@@ -144,6 +144,20 @@ def button_event_types(multi_press_max: int | None) -> list[str]:
 # --- config subentries (GUI light bindings) -----------------------------
 SUBENTRY_BINDING = "binding"
 
+# --- config subentries (per-wheel channel settings) ---------------------
+# Storage only. Unlike bindings there is no config-flow handler: these are
+# edited from the panel, so the subentry exists purely to persist them.
+SUBENTRY_WHEEL = "wheel_settings"
+
+CONF_CHANNEL_ENABLED = "channel_enabled"
+
+# Per-channel 1-100 dials moved by scrolling. `CONF_STEP` and
+# `CONF_ACCELERATION` are reused, so a dial reads the same as a binding.
+DIAL_MIN = 1.0
+DIAL_MAX = 100.0
+DIAL_DEFAULT = 50.0
+DEFAULT_DIAL_STEP = 2
+
 CONF_NODE_ID = "node_id"
 CONF_CHANNEL = "channel"
 CONF_ENDPOINT = "endpoint"
@@ -285,6 +299,7 @@ SIGNAL_WHEELS_UPDATED = f"{DOMAIN}_wheels_updated"
 SIGNAL_CONNECTION = f"{DOMAIN}_connection"
 SIGNAL_BINDINGS_UPDATED = f"{DOMAIN}_bindings_updated"
 SIGNAL_BINDING_ACTIVITY = f"{DOMAIN}_binding_activity"
+SIGNAL_SETTINGS_UPDATED = f"{DOMAIN}_settings_updated"
 
 # --- repair issues ------------------------------------------------------
 ISSUE_CANNOT_CONNECT = "cannot_connect"

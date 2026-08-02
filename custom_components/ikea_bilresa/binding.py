@@ -35,6 +35,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
+from .channel_controls import ScrollAccelerator
 from .const import (
     ACTION_HOLD,
     ACTION_PRESS,
@@ -152,12 +153,9 @@ _COMMAND_HISTORY = 8
 _SMOOTHING_FULL_BATCH = 14
 
 # Acceleration is derived from recent decoded velocity, never a single Matter
-# batch size. Defaults remain disabled until physical tuning is complete.
-_VELOCITY_WINDOW = 2.0
-_VELOCITY_IDLE_RESET = 1.5
-_VELOCITY_FLOOR = 2.0
-_VELOCITY_FULL_SCALE = 10.0
-_MAX_ACCELERATION_MULTIPLIER = 3.0
+# batch size. The model itself lives in `channel_controls.ScrollAccelerator`,
+# shared with the channel dials so one setting means one thing. Defaults remain
+# disabled until physical tuning is complete.
 
 # If a MultiPressComplete is lost, allow a clearly later gesture to recover
 # instead of leaving fast single-press handling blocked indefinitely.
@@ -239,7 +237,9 @@ class LightBinding:
                 self._target,
             )
         self._step = float(data.get(CONF_STEP, DEFAULT_STEP))
-        self._accel = float(data.get(CONF_ACCELERATION, DEFAULT_ACCELERATION)) / 100
+        self._accelerator = ScrollAccelerator(
+            float(data.get(CONF_ACCELERATION, DEFAULT_ACCELERATION))
+        )
         self._min_units = _pct_to_units(
             float(data.get(CONF_MIN_BRIGHTNESS, DEFAULT_MIN_BRIGHTNESS))
         )
@@ -285,8 +285,6 @@ class LightBinding:
         self._button_scroll_boundary: int | None = None
         self._suppress_scroll_through = -1
         self._suppress_scroll_until = 0.0
-        self._velocity_samples: deque[tuple[float, int]] = deque()
-        self._velocity_direction: str | None = None
         self._reset_velocity_after_rotate = False
         self._unavailable_targets: set[str] = set()
         button_response = data.get(CONF_BUTTON_RESPONSE, DEFAULT_BUTTON_RESPONSE)
@@ -350,7 +348,7 @@ class LightBinding:
             "mode": self._mode,
             "target": self._target,
             "step": self._step,
-            "acceleration": self._accel * 100,
+            "acceleration": self._accelerator.percent,
             "min_units": self._min_units,
             "max_units": self._max_units,
             "transition": self._transition,
@@ -1057,46 +1055,10 @@ class LightBinding:
         self._ramp_action = None
 
     def _accelerate(self, notches: int, direction: str | None = None) -> int:
-        if self._accel <= 0:
-            return notches
-        now = time.monotonic()
-        if (
-            self._velocity_direction != direction
-            or not self._velocity_samples
-            or now - self._velocity_samples[-1][0] > _VELOCITY_IDLE_RESET
-        ):
-            self._velocity_samples.clear()
-        self._velocity_direction = direction
-        self._velocity_samples.append((now, notches))
-        while (
-            len(self._velocity_samples) > 1
-            and now - self._velocity_samples[0][0] > _VELOCITY_WINDOW
-        ):
-            self._velocity_samples.popleft()
-        if len(self._velocity_samples) < 2:
-            return notches
-
-        elapsed = now - self._velocity_samples[0][0]
-        if elapsed <= 0:
-            return notches
-        # The first sample establishes the time boundary; later deltas belong
-        # to the measured interval and are independent of its initial batch.
-        velocity = (
-            sum(sample[1] for sample in list(self._velocity_samples)[1:]) / elapsed
-        )
-        intensity = min(
-            1.0,
-            max(
-                0.0,
-                (velocity - _VELOCITY_FLOOR) / (_VELOCITY_FULL_SCALE - _VELOCITY_FLOOR),
-            ),
-        )
-        multiplier = 1 + self._accel * intensity * (_MAX_ACCELERATION_MULTIPLIER - 1)
-        return max(notches, round(notches * multiplier))
+        return self._accelerator.accelerate(notches, direction)
 
     def _reset_velocity(self) -> None:
-        self._velocity_samples.clear()
-        self._velocity_direction = None
+        self._accelerator.reset()
         self._reset_velocity_after_rotate = False
 
     def _resync(self, current: float | None, fallback: float) -> float:

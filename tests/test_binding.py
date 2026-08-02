@@ -819,15 +819,16 @@ def test_velocity_resets_on_gesture_completion_and_reconnect(monkeypatch) -> Non
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_ACCELERATION: 100}
     )
-    binding._velocity_samples.extend([(1.0, 2), (2.0, 4)])
-    binding._velocity_direction = DIRECTION_UP
+    accelerator = binding._accelerator
+    accelerator._samples.extend([(1.0, 2), (2.0, 4)])
+    accelerator._direction = DIRECTION_UP
 
     binding._handle_raw_input("scroll_up", "multi_press_complete")
     assert binding._reset_velocity_after_rotate is True
     binding._handle_connection_change()
 
-    assert not binding._velocity_samples
-    assert binding._velocity_direction is None
+    assert not accelerator._samples
+    assert accelerator._direction is None
 
 
 def test_rotate_up_from_off_uses_predictable_configured_floor(monkeypatch) -> None:
