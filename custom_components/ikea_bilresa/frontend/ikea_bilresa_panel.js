@@ -752,49 +752,65 @@ const STYLES = `
     text-decoration: line-through;
   }
 
+  /* A sibling card to the workbench, not a form floating on the page
+     background. Same tokens as .channel-workbench so the two read as one
+     surface; PANEL_DESIGN.md forbids nesting one inside the other. */
   .settings-section {
-    margin-block-start: 24px;
-    padding-block-start: 20px;
-    border-block-start: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
-  }
-  .settings-title {
-    margin: 0 0 4px;
-    font-size: 14px;
-    font-weight: 500;
+    margin-block-start: var(--_space-6);
+    padding: var(--_space-8);
+    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_card);
+    box-shadow: var(--ha-card-box-shadow, none);
   }
   .settings-intro {
-    margin: 0 0 16px;
-    color: var(--secondary-text-color);
-    font-size: 13px;
+    margin: var(--_space-2) 0 var(--_space-6);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 13px);
     line-height: 1.5;
   }
   .settings-toggles {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 24px;
-    margin-block-end: 16px;
+    gap: 0 var(--_space-8);
+    margin-block-end: var(--_space-6);
+    padding-block-end: var(--_space-6);
+    border-block-end: 1px solid var(--_border);
   }
   .settings-toggle {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--_space-2);
     min-block-size: 44px;
+    color: var(--_ink);
+    font-size: var(--ha-font-size-m, 14px);
     cursor: pointer;
+  }
+  .settings-toggle input {
+    inline-size: 18px;
+    block-size: 18px;
+    margin: 0;
+    accent-color: var(--_accent);
+    cursor: pointer;
+  }
+  .settings-toggle input:focus-visible {
+    outline: 2px solid var(--_accent);
+    outline-offset: 2px;
   }
   .settings-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
+    gap: var(--_space-6);
   }
   .settings-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-block-start: 16px;
+    gap: var(--_space-6);
+    margin-block-start: var(--_space-8);
   }
   .settings-message {
-    color: var(--secondary-text-color);
-    font-size: 13px;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 13px);
   }
   .channel-surface {
     min-inline-size: 0;
@@ -2908,7 +2924,7 @@ class IkeaBilresaPanel extends HTMLElement {
   _settingsSection(wheel) {
     const draft = this._settingsStateFor(wheel);
     const section = el("section", "settings-section");
-    section.appendChild(el("h3", "settings-title", this._t("settings_title")));
+    section.appendChild(el("h4", "form-section-title", this._t("settings_title")));
     section.appendChild(el("p", "settings-intro", this._t("settings_intro")));
 
     const toggles = el("div", "settings-toggles");
@@ -2965,8 +2981,9 @@ class IkeaBilresaPanel extends HTMLElement {
     section.appendChild(grid);
 
     const actions = el("div", "settings-actions");
-    const save = el("button", "primary", this._t("settings_save"));
+    const save = el("button", "action-button", this._t("settings_save"));
     save.type = "button";
+    save.dataset.primary = "true";
     save.disabled = this._settingsBusy;
     save.addEventListener("click", () => this._saveSettings(wheel));
     actions.appendChild(save);
@@ -2979,8 +2996,12 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _settingsNumber(wheel, name, label, value, min, max, step, help) {
     const shell = el("div", "field");
-    shell.appendChild(el("label", "field-label", label));
+    const labelNode = el("label", null, label);
+    labelNode.htmlFor = `settings-${wheel.key}-${name}`;
+    shell.appendChild(labelNode);
     const input = el("input");
+    input.id = `settings-${wheel.key}-${name}`;
+    input.name = name;
     input.type = "number";
     input.min = String(min);
     input.max = String(max);
@@ -2990,7 +3011,7 @@ class IkeaBilresaPanel extends HTMLElement {
       this._updateSettingsDraft(wheel, { [name]: Number(input.value) }),
     );
     shell.appendChild(input);
-    if (help) shell.appendChild(el("p", "field-help", help));
+    if (help) shell.appendChild(el("span", "field-help", help));
     return shell;
   }
 

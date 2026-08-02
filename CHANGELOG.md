@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.12] - 2026-08-02
+
+### Fixed
+- The panel's channel-behaviour settings rendered as a bare form on the page
+  background with default browser controls. It is now a card beside the channel
+  workbench, using the panel's own field shell, action button and theme tokens,
+  as `docs/PANEL_DESIGN.md` requires.
+
 ## [0.6.0-rc.11] - 2026-08-02
 
 ### Added
