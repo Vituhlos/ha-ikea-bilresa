@@ -4,9 +4,9 @@ Last updated: **2026-08-02 by Claude Code**
 
 ## Channel dials, button switches and per-wheel settings — backend only (2026-08-02)
 
-Status: **Implemented + Static + local Unit (378 Python, 24 frontend). Feature
-complete end to end. Not committed, not released, not deployed. No Hardware,
-and none is claimed — no physical gesture has touched any of this.**
+Status: **Implemented + Static + Unit (378 Python, 24 frontend) + CI + Released
++ deployed as `v0.6.0-rc.12`. No Hardware, and none is claimed — no physical
+gesture has touched any of this.**
 
 Built on **`agent/channel-controls-0.7`** off `agent/dual-button-0.6` at
 `c79da3e`, then fast-forwarded onto the publication branch and released as
@@ -129,12 +129,52 @@ internals that moved, and `test_only_physical_device_platform_is_forwarded`,
 whose intent (no integration *service* device) is preserved — every new
 platform attaches to a wheel's own reconciled identifiers.
 
+### Publication and deployment (2026-08-02)
+
+Two candidates, because the first one looked wrong in the owner's browser.
+
+| | rc.11 | rc.12 |
+|---|---|---|
+| commit | `2f9531c` | `7a1032e` |
+| CI (all six jobs) | run `30750409636` | passed on the exact revision |
+| HACS install | confirmed | confirmed |
+| restart | clean, entry `loaded` | clean |
+
+Post-restart on rc.11: running manifest `0.6.0-rc.11`, config entry `loaded`,
+Matter connected on `core_matter_client`, two wheels + one dual button, six
+bindings preserved, **twelve new entities created** — `number.*_dial_1..3` and
+`switch.*_button_1..3` on both wheels, correctly area-prefixed, and none on the
+dual button. Nothing in the system log for the domain; the error log holds only
+Home Assistant's standard custom-integration warning.
+
+**rc.11's panel section was wrong and the owner's screenshot caught it.** It
+rendered on the page background below the workbench with default browser
+checkboxes, number inputs and a grey square button — a third-party form pasted
+under the panel. Root cause: `docs/PANEL_DESIGN.md` was not read before writing
+the frontend. Three concrete faults, fixed in rc.12:
+
+- appended outside the card, where that document requires a hairline-separated
+  group and forbids a form floating on the background;
+- `class="primary"` on the save button, when this panel marks a primary action
+  with `class="action-button"` plus `data-primary="true"` — so it picked up no
+  styling at all;
+- a `.settings-title` class that does not exist, and fields that bypassed the
+  `.field` label/help shell the binding editor uses.
+
+rc.12 rebuilds it as a sibling card from `--_card` / `--_border` / `--_radius`
+and the `--_space-*` scale, with `--_accent` checkboxes and a focus ring.
+
+**A note for whoever writes panel code next:** `node --test` and mypy passed on
+the broken version, and so did 378 Python tests. Nothing in this repository can
+catch "it looks wrong". Read `PANEL_DESIGN.md` first and get a screenshot from
+the owner before calling frontend work done.
+
 ### Known gaps — read before continuing
 
-- **Nothing has been seen in a real browser.** The panel section is held by
-  unit tests against the production custom element, not by a screenshot, a
-  harness render or a deployed instance. Checklist item #4's light/dark/custom
-  theme and keyboard/screen-reader pass do not cover it.
+- **rc.12's appearance is not confirmed.** rc.11 was seen and rejected; the
+  owner is checking rc.12 himself. Until that screenshot arrives the fix is
+  reasoned, not observed. Checklist item #4's light/dark/custom theme and
+  keyboard/screen-reader pass are untouched either way.
 - **No Hardware at all.** No physical gesture has moved a dial or flipped a
   switch. In particular the claim that a disabled channel is *completely*
   silent is held by a unit test over `_dispatch`, not observed on a wheel.
@@ -149,12 +189,12 @@ platform attaches to a wheel's own reconciled identifiers.
 - `CONTRACT_VERSION` moved to 5. A browser holding an old panel module open
   across the upgrade will not render the settings section until it reloads.
 
-Single best next action: deploy to a real Home Assistant and open the panel —
-the section has never been rendered by a browser. Then a Hardware pass: disable
-channel 2 on `Kolečko Obývák`, confirm the wheel's own `event` entity does not
-fire and no automation triggers, then re-enable and confirm the dial moves.
-Afterwards `README.md` / `README.cs.md`, and CI for the exact revision
-(mypy/hassfest are the gates local Python 3.14 cannot supply).
+Single best next action: the owner's rc.12 screenshot. If the card now sits
+right, the Hardware pass is next — disable channel 2 on `Kolečko Obývák` from
+the panel, confirm the wheel's own `event` entity does **not** fire and no
+automation triggers, then re-enable and confirm the dial moves. That is the
+only check that proves the disabled-channel gate on real hardware. Afterwards
+`README.md` / `README.cs.md`.
 
 ## Checklist item #1 — batch smoothing mechanism (durations still unmeasured)
 
