@@ -35,7 +35,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
-from .channel_controls import ScrollAccelerator
+from .channel_controls import ScrollAccelerator, perceptual_target
 from .const import (
     ACTION_HOLD,
     ACTION_PRESS,
@@ -62,6 +62,7 @@ from .const import (
     CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_STEP,
+    CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
     CONF_TRIPLE_TARGET,
@@ -74,6 +75,7 @@ from .const import (
     DEFAULT_MODE,
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
+    DEFAULT_STEP_CURVE,
     DEFAULT_TRANSITION,
     DIRECTION_UP,
     EVT_INITIAL_PRESS,
@@ -98,6 +100,7 @@ from .const import (
     ROLE_SCROLL_UP,
     SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
+    STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
     mode_supports_target,
     signal_channel,
@@ -237,6 +240,7 @@ class LightBinding:
                 self._target,
             )
         self._step = float(data.get(CONF_STEP, DEFAULT_STEP))
+        self._step_curve = data.get(CONF_STEP_CURVE, DEFAULT_STEP_CURVE)
         self._accelerator = ScrollAccelerator(
             float(data.get(CONF_ACCELERATION, DEFAULT_ACCELERATION))
         )
@@ -348,6 +352,7 @@ class LightBinding:
             "mode": self._mode,
             "target": self._target,
             "step": self._step,
+            "step_curve": self._step_curve,
             "acceleration": self._accelerator.percent,
             "min_units": self._min_units,
             "max_units": self._max_units,
@@ -1089,6 +1094,17 @@ class LightBinding:
         magnitude = step_pct / 100 * span * notches
         return magnitude if up else -magnitude
 
+    def _brightness_step(self, value: float, notches: int, up: bool) -> float:
+        """Where `notches` of rotation land on the brightness range.
+
+        `linear` reproduces the historic arithmetic exactly, including the
+        `notches == 0` case that leaves the value alone; a test pins that so the
+        default can never drift.
+        """
+        if self._step_curve != STEP_CURVE_PERCEPTUAL:
+            return value + self._delta(self._step, 255, notches, up)
+        return perceptual_target(value, self._step, notches, up)
+
     def _smoothing_transition(self, notches: int) -> float:
         """Return the service transition for one batch of decoded notches.
 
@@ -1121,11 +1137,11 @@ class LightBinding:
             return False  # don't switch a light on by scrolling down
 
         if not state_on and up:
-            first_step = self._delta(self._step, 255, 1, True)
+            first_step = self._brightness_step(0, 1, True)
             start = max(self._min_units, first_step)
-            target = start + self._delta(self._step, 255, max(0, notches - 1), True)
+            target = self._brightness_step(start, max(0, notches - 1), True)
         else:
-            target = tracked + self._delta(self._step, 255, notches, up)
+            target = self._brightness_step(tracked, notches, up)
         if target >= self._max_units:
             target = self._max_units
         elif target <= self._min_units:

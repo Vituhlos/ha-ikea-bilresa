@@ -215,6 +215,17 @@ RAMP_DIRECTIONS = [
 ]
 DEFAULT_RAMP_DIRECTION = RAMP_DIRECTION_ALTERNATE
 
+# Where a notch lands on the brightness range. `linear` is the historic
+# behaviour and stays the default: turning it on by default would break every
+# lamp that already applies its own dimming curve, and nothing here can tell
+# which ones those are without a light meter. Brightness only — no measurement
+# exists for volume, covers, fans or numbers, so they keep the linear step.
+CONF_STEP_CURVE = "step_curve"
+STEP_CURVE_LINEAR = "linear"
+STEP_CURVE_PERCEPTUAL = "perceptual"
+STEP_CURVES = [STEP_CURVE_LINEAR, STEP_CURVE_PERCEPTUAL]
+DEFAULT_STEP_CURVE = STEP_CURVE_LINEAR
+
 DEFAULT_STEP = 3
 DEFAULT_ACCELERATION = 0
 DEFAULT_MIN_BRIGHTNESS = 1

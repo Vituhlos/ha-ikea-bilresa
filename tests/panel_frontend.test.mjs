@@ -536,3 +536,30 @@ test("a wheel saving for the first time omits the revision instead of sending nu
 
   assert.ok(!("expected_revision" in message));
 });
+
+test("a new binding defaults to the linear step curve", () => {
+  // Turning the perceptual curve on by default would break every lamp that
+  // already corrects its own dimming curve, and nothing can tell which.
+  const panel = newPanel();
+  panel._startEditor({ variant: "wheel", key: "w" }, { channel: 1 });
+
+  assert.equal(panel._editorData.step_curve, "linear");
+});
+
+test("the step curve is a set-once option, not a rotation field", async () => {
+  // PANEL_DESIGN.md: the disclosure keeps genuinely set-once options only.
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const rotation = source.indexOf("const rotation = this._formSection");
+  const split = source.indexOf("const advancedGrid");
+
+  assert.ok(source.slice(split).includes('"step_curve"'));
+  // Not among the rotation fields, where it would read as a per-use setting.
+  assert.ok(!source.slice(rotation, split).includes("step_curve"));
+});

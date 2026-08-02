@@ -35,6 +35,7 @@ from .const import (
     CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_STEP,
+    CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
     CONF_TRIPLE_TARGET,
@@ -47,12 +48,14 @@ from .const import (
     DEFAULT_MODE,
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
+    DEFAULT_STEP_CURVE,
     DEFAULT_TRANSITION,
     HOLD_ACTIONS,
     HOLD_NONE,
     HOLD_RAMP,
     MODES,
     RAMP_DIRECTIONS,
+    STEP_CURVES,
     mode_supports_target,
 )
 
@@ -68,6 +71,7 @@ BINDING_EDIT_FIELDS = (
     CONF_TARGET,
     CONF_MODE,
     CONF_STEP,
+    CONF_STEP_CURVE,
     CONF_ACCELERATION,
     CONF_MIN_BRIGHTNESS,
     CONF_MAX_BRIGHTNESS,
@@ -103,6 +107,7 @@ _WHEEL_SCHEMA = vol.Schema(
         vol.Required(CONF_STEP, default=DEFAULT_STEP): vol.All(
             vol.Coerce(float), vol.Range(min=1, max=25)
         ),
+        vol.Required(CONF_STEP_CURVE, default=DEFAULT_STEP_CURVE): vol.In(STEP_CURVES),
         vol.Required(CONF_ACCELERATION, default=DEFAULT_ACCELERATION): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=100)
         ),

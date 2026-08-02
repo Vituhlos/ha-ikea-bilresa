@@ -52,6 +52,7 @@ from .const import (
     CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_STEP,
+    CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
     CONF_TRIPLE_TARGET,
@@ -66,6 +67,7 @@ from .const import (
     DEFAULT_MODE,
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
+    DEFAULT_STEP_CURVE,
     DEFAULT_TRANSITION,
     DOMAIN,
     HOLD_ACTIONS,
@@ -76,6 +78,7 @@ from .const import (
     MODES,
     RAMP_DIRECTIONS,
     ROLE_BUTTON,
+    STEP_CURVES,
     SUBENTRY_BINDING,
     TARGET_DOMAINS,
 )
@@ -489,6 +492,16 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                         step=1,
                         mode=selector.NumberSelectorMode.SLIDER,
                         unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_STEP_CURVE,
+                    default=defaults.get(CONF_STEP_CURVE, DEFAULT_STEP_CURVE),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=STEP_CURVES,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="step_curve",
                     )
                 ),
                 vol.Required(

@@ -170,6 +170,48 @@ class WheelSettings:
 DEFAULT_SETTINGS = WheelSettings.from_data({})
 
 
+# --- perceptual step placement -----------------------------------------
+#
+# A notch that is a fixed percentage of Home Assistant's 0-255 brightness range
+# is not a fixed size to the eye: measured on hardware 2026-08-02, one 3 % notch
+# is 1.2 L* near the top of the range and 2.1 L* near the bottom, and a batch of
+# 14 covers 59 L* — more than half the perceptual range in one command.
+#
+# This converts to CIE L*, which is roughly perceptually uniform, so a notch can
+# be placed at a constant *apparent* size instead. It corrects nothing about the
+# lamp: the meaning of any absolute brightness is untouched, only where this
+# integration puts its own steps. That is what keeps it from stacking with a
+# calibrated proxy light, where correcting twice would flatten the curve again.
+
+PERCEPTUAL_MAX = 100.0
+
+
+def to_perceptual(units: float, span: float = 255) -> float:
+    """Brightness units -> CIE L*."""
+    y = max(0.0, min(1.0, units / span))
+    return 116 * y ** (1 / 3) - 16 if y > 0.008856 else 903.3 * y
+
+
+def from_perceptual(lightness: float, span: float = 255) -> float:
+    """CIE L* -> brightness units, the inverse of :func:`to_perceptual`."""
+    y = ((lightness + 16) / 116) ** 3 if lightness > 8 else lightness / 903.3
+    return max(0.0, min(1.0, y)) * span
+
+
+def perceptual_target(
+    value: float, step_pct: float, notches: int, up: bool, span: float = 255
+) -> float:
+    """Move `notches` steps of `step_pct` along the perceptual scale.
+
+    The percentage keeps its meaning — it is simply a share of the perceptual
+    range rather than of the raw one, so "3 %" stays roughly a thirty-third of
+    a full sweep either way.
+    """
+    delta = step_pct / 100 * PERCEPTUAL_MAX * notches
+    lightness = to_perceptual(value, span) + (delta if up else -delta)
+    return from_perceptual(max(0.0, min(PERCEPTUAL_MAX, lightness)), span)
+
+
 def apply_rotation(value: float, notches: int, up: bool, step: float) -> float:
     """Move a dial value by an already-accelerated rotation, clamped to range."""
     delta = step * notches

@@ -13,6 +13,7 @@ from custom_components.ikea_bilresa.binding import (
     _SMOOTHING_FULL_BATCH,
     LightBinding,
 )
+from custom_components.ikea_bilresa.channel_controls import to_perceptual
 from custom_components.ikea_bilresa.const import (
     ACTION_HOLD,
     ACTION_PRESS,
@@ -34,6 +35,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_NODE_ID,
     CONF_RAMP_DIRECTION,
     CONF_STEP,
+    CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
     DIRECTION_DOWN,
@@ -1386,3 +1388,58 @@ def test_a_queued_command_is_dropped_when_the_target_goes_away(monkeypatch) -> N
 
     cancel.assert_called_once()
     assert binding._pending_command is None
+
+
+# -- step curve ------------------------------------------------------------
+
+
+def test_a_binding_without_a_step_curve_keeps_the_historic_arithmetic(
+    monkeypatch,
+) -> None:
+    """The default must not move. Every stored binding predates this field.
+
+    3 % of the 0-255 range is 7.65 units a notch, applied linearly. These are
+    the numbers the integration has produced since the step setting existed.
+    """
+    binding, _i, _w = _binding(monkeypatch)
+
+    assert binding._brightness_step(255, 1, False) == 255 - 7.65
+    assert binding._brightness_step(255, 12, False) == 255 - 12 * 7.65
+    assert binding._brightness_step(128, 4, True) == 128 + 4 * 7.65
+    # Zero notches is a real case (a batch fully consumed by eager credits).
+    assert binding._brightness_step(128, 0, True) == 128
+
+
+def test_an_explicit_linear_curve_matches_the_absent_one(monkeypatch) -> None:
+    absent, _i, _w = _binding(monkeypatch)
+    explicit, _i2, _w2 = _binding(monkeypatch, **{CONF_STEP_CURVE: "linear"})
+
+    for notches in (1, 3, 12):
+        assert absent._brightness_step(
+            200, notches, False
+        ) == explicit._brightness_step(200, notches, False)
+
+
+def test_the_perceptual_curve_makes_a_notch_a_constant_apparent_size(
+    monkeypatch,
+) -> None:
+    """The point of the setting, stated as the property it must have.
+
+    Measured on hardware 2026-08-02, a linear 3 % notch covers 1.2 L* at the top
+    of the range and 2.1 L* near the bottom. On the perceptual curve both are
+    the configured share of the perceptual range, wherever the lamp happens to
+    be.
+    """
+    binding, _i, _w = _binding(monkeypatch, **{CONF_STEP_CURVE: "perceptual"})
+
+    high = to_perceptual(255) - to_perceptual(binding._brightness_step(255, 1, False))
+    low = to_perceptual(60) - to_perceptual(binding._brightness_step(60, 1, False))
+
+    assert round(high, 2) == round(low, 2) == 3.0
+
+
+def test_the_perceptual_curve_cannot_leave_the_brightness_range(monkeypatch) -> None:
+    binding, _i, _w = _binding(monkeypatch, **{CONF_STEP_CURVE: "perceptual"})
+
+    assert binding._brightness_step(255, 80, True) <= 255
+    assert binding._brightness_step(4, 80, False) >= 0

@@ -39,6 +39,7 @@ const MODE_DOMAINS = {
 const DEFAULT_BINDING = {
   mode: "brightness",
   step: 3,
+  step_curve: "linear",
   acceleration: 0,
   min_brightness: 1,
   max_brightness: 100,
@@ -2599,6 +2600,20 @@ class IkeaBilresaPanel extends HTMLElement {
       ),
     );
     if (!isButton) {
+      // Set-once, so it belongs under the disclosure rather than beside the
+      // rotation fields - PANEL_DESIGN.md. Full width because its help text
+      // carries the one thing a reader has to know: do not correct twice.
+      advancedGrid.appendChild(
+        this._selectField(
+          "step_curve",
+          this._t("field_step_curve"),
+          ["linear", "perceptual"].map((curve) => ({
+            value: curve,
+            label: this._t(`step_curve_${curve}`),
+          })),
+          { wide: true, help: this._t("field_step_curve_help") },
+        ),
+      );
       advancedGrid.appendChild(
         this._numberField(
           "min_brightness",

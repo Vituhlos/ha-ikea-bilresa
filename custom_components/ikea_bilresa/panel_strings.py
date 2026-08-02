@@ -102,6 +102,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "back": "Back to all BILRESA devices",
         "wheel_switcher": "BILRESA devices",
         "detail_views": "Device detail views",
+        "field_step_curve": "Step placement",
+        "field_step_curve_help": (
+            "Perceptual makes every notch look the same size. Leave it linear "
+            "if the lamp already corrects its own dimming curve, or the two "
+            "corrections stack."
+        ),
+        "step_curve_linear": "Linear (default)",
+        "step_curve_perceptual": "Perceptual (even to the eye)",
         "settings_title": "Channel behaviour",
         "settings_intro": (
             "Switch a selector position off and it is ignored entirely — no "
@@ -486,6 +494,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "back": "Zpět na všechna zařízení BILRESA",
         "wheel_switcher": "Zařízení BILRESA",
         "detail_views": "Pohledy detailu zařízení",
+        "field_step_curve": "Rozložení kroků",
+        "field_step_curve_help": (
+            "Percepční zajistí, že každý zub vypadá stejně velký. Nech "
+            "lineární, pokud si lampa stmívací křivku koriguje sama — jinak "
+            "se korekce sečtou."
+        ),
+        "step_curve_linear": "Lineární (výchozí)",
+        "step_curve_perceptual": "Percepční (rovnoměrné pro oko)",
         "settings_title": "Chování kanálů",
         "settings_intro": (
             "Vypnutý kanál je zcela ignorován — žádný číselník, žádné "
