@@ -7,6 +7,261 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.13] - 2026-08-02
+
+### Fixed
+- **Saving a wheel's channel settings failed on the first attempt for every
+  wheel.** A wheel with nothing stored yet has no revision token, and the panel
+  sent it as `null` rather than leaving it out, which the command's schema
+  rejected. The panel now omits the token when there is none; a missing token
+  still means "I expect no stored settings", so a settings entry created from
+  another panel meanwhile is reported as a conflict rather than overwritten.
+
+## [0.6.0-rc.12] - 2026-08-02
+
+### Fixed
+- The panel's channel-behaviour settings rendered as a bare form on the page
+  background with default browser controls. It is now a card beside the channel
+  workbench, using the panel's own field shell, action button and theme tokens,
+  as `docs/PANEL_DESIGN.md` requires.
+
+## [0.6.0-rc.11] - 2026-08-02
+
+### Added
+
+- **Per-channel dials** — every selector channel gets a `number` entity with a
+  **1–100 range** that scrolling moves in real time. It survives restarts and
+  can also be set from the UI or `number.set_value`, so a channel is useful on
+  its own without configuring a binding.
+- **Per-channel button switches** — each channel's centre button flips its own
+  `switch` entity on a single press. Double press, triple press and hold keep
+  firing their own events.
+- **Per-wheel channel settings** — a channel can be switched off entirely. A
+  disabled channel is ignored completely: no bus event, no automation trigger,
+  no binding and no entity movement, so an accidental flip of the selector does
+  nothing at all. Each wheel also carries its own dial step and acceleration.
+
+### Changed
+
+- The scroll accelerator moved out of `binding.py` into
+  `channel_controls.ScrollAccelerator`, shared with the new dials so one
+  `Acceleration` setting means one thing across a wheel. Behaviour is
+  unchanged.
+
+## [0.6.0-rc.10] - 2026-07-29
+
+### Changed
+- **Bursts of rotation commands are now coalesced.** A fast scroll could
+  calculate a new absolute value every ~110 ms. Captured on hardware, fourteen
+  service calls in 4.3 seconds left a Shelly Plus 0-10V silent for seventeen
+  seconds and stopped 68 brightness units short of the value it was last sent —
+  the commands never landed. Because these values are absolute, intermediate
+  ones are redundant: the first command of a burst is still sent immediately,
+  and further ones within a short interval replace a queued send instead of
+  adding to it. A queued send always fires, so the final target of a gesture is
+  never the one dropped. On the recorded hardware sequence this is 13 calls
+  instead of 21, ending on the identical value.
+  This is a mitigation, not a proven fix: seventeen seconds of silence may have
+  a cause beyond command volume.
+
+## [0.6.0-rc.9] - 2026-07-29
+
+### Fixed
+- **Scrolling no longer loses steps against a target that dims gradually.**
+  A dimmer with its own fade — and a Zigbee bulb with a default transition, and
+  a cover motor mid-travel — reports values *between* the ones we sent. Those
+  were read as somebody else changing the target, so the calculated value was
+  thrown away and the next notch restarted from wherever the device had got to.
+  Captured on the owner's hardware, one such rebase discarded nine notches at
+  once, and because the device lags, scrolling down made the brightness jump
+  back up.
+  A report is now recognized by the path the target is travelling — from where
+  it last reported towards the newest value we sent — instead of by matching a
+  value we sent. A report off that path is still treated as an outside change
+  and still takes effect immediately.
+  Known limitation: a light *group* reports the average brightness of its
+  members, which no such path describes; a group target can still rebase
+  unexpectedly.
+
+### Added
+- The rotation trace records arriving actions before any filter, so a notch
+  dropped on the way in is visible in a capture rather than simply absent, and
+  a capture now carries the binding settings and relative timing needed to
+  replay it offline.
+
+## [0.6.0-rc.8] - 2026-07-29
+
+### Added
+- **Rotation trace** — an opt-in, bounded record of how each rotation step
+  reached its value, served through the existing diagnostics download and
+  through the `ikea_bilresa/trace` WebSocket command. Each row states whether
+  the step continued the binding's own calculated target or restarted from
+  whatever the entity was reporting, and every discarded target is recorded
+  with the reason and the value that triggered it. Nothing is recorded until
+  it is switched on. It exists because absolute-value scrolling defects are
+  invisible in a text log: the interesting lines rotate out of a busy log
+  before they can be read, and they do not say why a step started where it did.
+
+### Fixed
+- A wheel's `Short-press target` no longer offers "No target configured" as its
+  empty option. Leaving it empty makes the short press act on the rotation
+  target, which the gesture list already reported, so the placeholder now says
+  `Same as the rotation target`. Hold and multi-press targets keep the plain
+  wording, because those genuinely do nothing when left empty.
+
+## [0.6.0-rc.7] - 2026-07-29
+
+### Changed
+- **The binding editor is grouped by what fields belong to, not by how advanced
+  they are.** Double press and triple press were filed under "advanced options"
+  while short press and hold sat in the main body, contradicting the gesture
+  list shown directly above them. All five gestures are now edited together, in
+  the order that list uses, and one row carries one gesture — its action beside
+  its target. Double and triple press take a full row and say what they do
+  (`Double press toggles`), because they choose a target but never an action.
+  What is left under the disclosure is set-once: the recognition policy and the
+  rotation limits, with minimum and maximum brightness finally on one row
+  instead of split across two by an unrelated field.
+- The rotation row in a channel's gesture list now names what the rotation
+  changes — `Brightness · Kitchen` — instead of the infinitive `Adjust target`,
+  which read as a button and repeated nothing useful. The line above it already
+  names the mode, so the two no longer say the same thing twice.
+- **The `Transition` binding field is now `Smoothing of large jumps` and only
+  applies to batched rotation.** Fast rotation reaches Home Assistant as
+  batches of notches; a single notch — including the eager first notch of a
+  gesture and every hold-to-ramp step — is now always applied immediately, so
+  the wheel stays responsive whatever this is set to. A larger batch is spread
+  over up to the configured duration, in proportion to its size. Setting it to
+  0 keeps the previous instant behavior. Anyone who relied on the old field
+  slowing down single notches will notice the difference; the value itself is
+  unchanged and needs no migration.
+
+### Fixed
+- A long physical rotation reaches Home Assistant as several Matter gestures,
+  and a target-state report arriving in the gap between two of them could
+  rebase the next notch from a value the target had not finished applying —
+  losing steps from an otherwise exactly decoded scroll. The calculated target
+  now stays authoritative across that gap.
+- A state report is only treated as this binding's own echo when its value
+  matches one of the recently dispatched targets, allowing for the target's own
+  quantization. A genuine change made from elsewhere is now honored
+  immediately, including in the middle of a scroll.
+
+## [0.6.0-rc.6] - 2026-07-18
+
+### Fixed
+- A delayed target-state report can no longer rebase an absolute wheel target
+  while the same raw Matter scroll is still active. Active scrolls are tracked
+  independently by endpoint, so a quick direction reversal cannot let the old
+  direction's completion erase confirmed steps from the new direction. Lost
+  completion events expire after a bounded safety window.
+
+## [0.6.0-rc.5] - 2026-07-18
+
+### Changed
+- Scroll-wheel bindings now react to every confirmed Matter `InitialPress`
+  immediately, then subtract those eager notches from later cumulative counts.
+  This removes the firmware's batching wait without applying a step twice.
+- Switch `CurrentPosition = 0` no longer clears an active rotary cumulative
+  sequence; it remains a release/stuck-state hint for physical buttons.
+- Missing, malformed, zero-overflow and above-`MultiPressMax` rotary completion
+  counts now end local accounting safely instead of leaking stale state into the
+  next gesture.
+- Bounded rotation modes no longer repeat an identical Home Assistant service
+  call after brightness, color temperature, volume, cover position, climate
+  temperature, fan speed or number value reaches its effective limit. The live
+  test records the gesture as completed with an unchanged value; cyclic hue
+  rotation continues to wrap normally.
+- Hold-to-ramp pauses its recurring interval at a target limit while retaining
+  release-direction handling and the lost-release watchdog.
+
+## [0.6.0-rc.4] - 2026-07-18
+
+### Fixed
+- A controlled Matter Server restart no longer makes the integration abandon
+  Home Assistant's supported core Matter client during the temporary
+  config-entry unload. Runtime monitoring now allows a one-minute restart
+  grace period and reattaches to the replacement core client when it returns.
+  Initial incompatibility still falls back immediately, while a persistent
+  runtime incompatibility still falls back after the grace period.
+
+## [0.6.0-rc.3] - 2026-07-18
+
+### Changed
+- Live test now treats an unconfigured physical gesture as a successful
+  hardware-recognition state instead of showing the internal fallback
+  "calculated result not reported". It explains that the control does not
+  operate a target yet and offers a direct action to configure that exact
+  channel or button.
+- The live-test introduction and status text now distinguish gesture
+  recognition from a configured target action. The side summary is titled
+  simply "Channels" or "Buttons" because it includes configured and
+  unconfigured controls.
+- Recent live events use a bounded, keyboard-focusable scroll region, so an
+  event burst no longer keeps extending the page.
+- Matter Server add-on 9.1.0 / matterjs-server 1.2.6 is accepted through its
+  supported schema-11 compatibility profile while System Health distinguishes
+  the server's schema 12 from the client compatibility schema.
+- `node_updated`, `attribute_updated` and `server_shutdown` now have explicit
+  passive handling. Switch `CurrentPosition` is used only to clear stale
+  gesture state, never to manufacture a click.
+- Button response now has three truthful policies: Instant initial press, Fast
+  release and Multi-press aware. Instant is accepted only for an unambiguous
+  single action with hold disabled, and completion is suppressed from executing
+  that direct binding twice while public gesture events remain unchanged.
+- Hold/release actions carry `observed_duration_ms` when one uninterrupted
+  monotonic press observation exists. Live test labels it as integration-
+  observed duration; reconnect or a release safety hint clears it rather than
+  inventing a value.
+
+### Fixed
+- A Matter 1.6 multi-press completion with count `0` (overflow past
+  `MultiPressMax`) is no longer misread as a single press. Positive counts
+  above the endpoint's advertised maximum are ignored as invalid as well.
+
+## [0.6.0-rc.2] - 2026-07-18
+
+### Fixed
+- The real E2489's two physical buttons carry Matter semantic `up` / `down`
+  tags even though neither endpoint has a numeric wheel channel. RC.1 treated
+  those tags as rotary evidence, so the already discovered device still showed
+  the wheel icon, an empty three-channel view and no button-binding controls.
+- Variant discovery now uses the stable live endpoint shape: exactly two Switch
+  endpoints without numeric channel labels identify the dual button. Their
+  semantic roles are normalized to buttons before the gesture engine, event
+  entities, device triggers, config flow and panel consume them.
+- Downloadable diagnostics now expose the sanitized device variant and each
+  endpoint's `MultiPressMax`, making future hardware-shape regressions visible
+  without leaking household identifiers.
+
+## [0.6.0-rc.1] - 2026-07-17
+
+### Added
+- BILRESA devices are now classified from their Matter endpoint shape as either
+  a scroll wheel or an E2489 dual button, so a button-only device is no longer
+  presented as an empty wheel.
+- Each physical dual-button control gets its own event entity and device
+  triggers for single press, double press, hold and release. Rotation and
+  triple press are never advertised for `MultiPressMax = 2`.
+- Dual-button bindings are stored and dispatched by Matter endpoint, so both
+  buttons on each device — and any number of dual-button devices — can keep
+  independent single-press, double-press and hold targets without colliding on
+  their shared `channel = None` signal.
+- Dual-button hold-to-ramp supports fixed brighten/dim roles for a
+  two-button "software DIRIGERA" pair, or the existing alternating direction,
+  with the same release, reconnect, new-gesture and watchdog safety stops.
+- The native config flow now builds a hardware-specific form after the device
+  is selected. Dual buttons never show rotary, scene or triple-press options;
+  wheel profiles and their existing rotary options are unchanged.
+- A bundled `bilresa:dual-button` two-path glyph now identifies dual-button
+  event entities through both supported Home Assistant custom-icon contracts.
+- The existing BILRESA panel now includes every dual-button device alongside
+  the wheels. Its unchanged detail workbench adapts the numbered channel spine
+  from `1 / 2 / 3` to independently configurable buttons `1 / 2`, while
+  omitting only rotation, triple-press and detent controls the hardware does
+  not have. The existing Live test reports which button was pressed and the
+  resulting action outcome. Matter endpoint ids remain server-side.
+
 ## [0.5.9-rc.12] - 2026-07-17
 
 ### Changed
@@ -465,7 +720,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.8...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.6...HEAD
+[0.6.0-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.5...v0.6.0-rc.6
+[0.6.0-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.4...v0.6.0-rc.5
+[0.6.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.3...v0.6.0-rc.4
+[0.6.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.2...v0.6.0-rc.3
+[0.6.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.1...v0.6.0-rc.2
+[0.6.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.9-rc.12...v0.6.0-rc.1
 [0.5.7-rc.8]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.7...v0.5.7-rc.8
 [0.5.7-rc.7]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.6...v0.5.7-rc.7
 [0.5.7-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.7-rc.5...v0.5.7-rc.6

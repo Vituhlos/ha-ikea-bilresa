@@ -1,6 +1,1114 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-17 by Claude Code**
+Last updated: **2026-08-02 by Claude Code**
+
+## Checklist item #1 is aimed at the wrong thing, and now there is a metric (2026-08-02)
+
+Status: **Hardware A/B run on `v0.6.0-rc.13` + metric Implemented + Static +
+Unit (382 tests). The A/B decided nothing, which is itself the result.**
+
+### The A/B
+
+Three controlled runs on `Kolečko Obývák` channel 3 against
+`light.kajplats_e27_ws_globe_1055lm`, each from brightness 255, fast downward
+rotation, step 3 %, only the smoothing changed between them:
+
+| run | smoothing | first report from the bulb | report lag | largest batch |
+|---|---|---|---|---|
+| A | 0 | 0.17 s | ~0.15 s | 13 notches |
+| B | 0.5 | **2.15 s** | **1-2 s** | 12 notches |
+| C | 0.2 | 0.23 s | ~0.3 s | 14 notches |
+
+Every run: zero discarded targets, every echo recognized, accounting exact.
+
+B confirms this file's own warning that a duration longer than the batch
+spacing is interrupted by the next batch — its `state_value` column sits at 255
+across six consecutive steps while the binding has already calculated 102.
+
+**The owner's verdict was that A, B and C all felt the same kind of steppy:
+"first the brightness dips slightly, then straight away a jump, then again and
+again."** That description is exactly right, and the trace shows why.
+
+### What is actually wrong, stated properly
+
+Item #1 says the defect is that *large batches appear as jumps*, and its fix
+spreads a large batch over time. That framing is incomplete. The real shape is
+an **alternation**, and it comes from rc.5's own eager notch: every
+`InitialPress` dispatches one notch immediately, and the rest of the batch
+arrives together a moment later. One run therefore goes
+
+```text
+1 notch (-7.65)   1 notch (-7.65)   8 notches (-61)   1 notch (-7.65)   ...
+```
+
+and `_smoothing_transition()` deliberately returns 0 for a single notch, so the
+two are not merely different sizes — they are a snap and a ramp, alternating.
+No value of the smoothing field changes that ratio.
+
+**Reducing `step` does not fix it either.** It scales both sides equally; 1:8
+stays 1:8.
+
+### The metric
+
+`tests/replay.py` gained `perceptual()` and `ReplayResult.smoothness()`. Steps
+are scored in CIE L* rather than raw units, because the same 7.65-unit notch is
+1.2 L* at the top of the range and 2.1 L* near the bottom — a raw-unit metric
+scores a visibly uneven ramp as even.
+
+Scored on the three runs above:
+
+| run | smallest step | largest step | ratio | CV |
+|---|---|---|---|---|
+| A | 1.2 L* | 45.8 L* | 39x | 1.38 |
+| B | 1.2 L* | 31.6 L* | 27x | 1.09 |
+| C | 1.2 L* | 59.1 L* | 50x | **1.66** |
+
+All three are the same order. **The metric would have rejected this A/B before
+the wheel was turned three times.** Use it as the gate: a change to smoothing
+or step size is an improvement only if it lowers `cv`.
+
+It also puts a number on a second, separate unevenness this file already
+predicted in prose — *"a linear 3 % step can never feel even"*. The eager notch
+alone grows from 1.2 to 2.1 L* on the way down, and the final batch is always
+the worst because the eye is most sensitive near the bottom.
+
+Limits, so nobody over-reads it: it scores **what was dispatched**, not what the
+lamp emitted, and L* assumes brightness is proportional to luminance, which an
+LED driver's own curve may break. It is a consistent yardstick for comparing
+two runs, not a photometric measurement. Validated against one observer on
+three runs.
+
+### The idea worth testing next, not a conclusion
+
+Spread a batch over the *observed interval until the next batch* rather than
+over a fraction of a fixed ceiling. Batches arrive every ~0.3-0.5 s; a 14-notch
+batch at smoothing 0.2 travels for 0.2 s and then the light sits still until the
+next one. Filling the gap would give constant velocity. **Unverified** — replay
+it against the three captures and check `cv` before touching `binding.py`.
+
+Channel 3 is left at smoothing **0.2** by the owner's decision.
+
+## Hardware: brightness accounting is exact on a second, different device (2026-08-02)
+
+Status: **Hardware-confirmed on `v0.6.0-rc.13`.** The accounting result stands
+on its own; the device-side finding below is about the bulb, not the code.
+
+Every earlier accounting result came from `light.linka`, a Shelly Plus 0-10V.
+This run used `Kolečko Obývák` **channel 2** against `light.zarovka_lustr`, a
+Matter bulb with effects — different vendor, different transport, and the
+channel carries smoothing 1.0 s rather than the 0 used on the Shelly.
+
+Tracing armed, one continuous downward scroll from brightness 255, step 3 %:
+
+| measure | result |
+|---|---|
+| notches decoded | **31** |
+| last calculated target | **17.85** |
+| `255 − 31 × 7.65` | **17.85** — exact |
+| targets discarded during the scroll | **0** |
+| own echoes recognized | every one |
+| commands coalesced | 6 |
+
+Every rotation row after the first reads `from_source: tracked`; the first
+reads `state`, which is correct at the start of a session. So the batching,
+the echo recognition and the authority window all hold on hardware that is not
+the Shelly.
+
+**The owner could not count the notches** — he asked for 18 and the device
+decoded 31. That is not a defect and not a miscount worth chasing: a perceived
+detent is not a raw event counter, as the RC.5 section below already recorded.
+The instrument counts; do not design a hardware test that depends on a human
+counting detents. This run's arithmetic was checked against the decoded 31,
+not against the intended 18, and that is the right way round.
+
+### The bulb floors at 26, and that is the bulb
+
+The binding dispatched 17.85 and the entity stayed at 26. Proven to be
+device-side by two probes that bypass the integration completely:
+
+```text
+light.turn_on brightness=18  -> entity reports 26
+light.turn_on brightness=40  -> entity reports 41
+```
+
+So it tracks correctly above the floor and clamps below it. 26/255 is 10.2 % —
+the same shape as the Shelly's `range_map [10, 100]` recorded further down.
+
+The trace also caught its own correctness here: both probes appear as
+`kind: state` rows followed by `forget` with `reason: outside_scroll_authority`
+and `had_tracked: 17.85`. An external change is supposed to discard the tracked
+target, and it did.
+
+**Consequence for this installation, not for the code:** channel 2's binding
+has `min_brightness` 1 %, i.e. `min_units` 3, which the bulb cannot reach. The
+bottom tenth of the scroll travel is invisible. Setting that channel's minimum
+to roughly 11 % would map the full rotation onto what the bulb can actually do.
+Not changed here — it is the owner's configuration.
+
+### Also confirmed incidentally
+
+The new entities move on real gestures. Before this run, `dial_1` read 100.0
+and `dial_2` 73.0 against a 50.0 default, and `button_1` read `on` — all from
+the owner's own physical scrolling and pressing, with nothing set by hand. The
+disabled-channel gate is **still unverified on hardware**: the settings
+subentry currently has all three channels enabled.
+
+## Channel dials, button switches and per-wheel settings — backend only (2026-08-02)
+
+Status: **Implemented + Static + Unit (378 Python, 24 frontend) + CI + Released
++ deployed as `v0.6.0-rc.12`. No Hardware, and none is claimed — no physical
+gesture has touched any of this.**
+
+Built on **`agent/channel-controls-0.7`** off `agent/dual-button-0.6` at
+`c79da3e`, then fast-forwarded onto the publication branch and released as
+`v0.6.0-rc.11`.
+
+**Owner decision (2026-08-02): ship it inside 0.6.0, not as 0.7.0.** The
+recommendation here was the opposite — keep the RC train's scope frozen,
+because the hardware validation recorded in the sections below was earned
+against rc.10 and two new entity platforms widen what 0.6.0 has to prove. The
+owner chose rc.11 anyway, so **0.6.0's hardware checklist now also owes the
+dials, the button switches and the disabled-channel gate.** Do not read the
+rc.10 hardware results as covering them.
+
+### Where this came from
+
+`64bitjoe/ha-ikea-bilresa` forked `main` (v0.5.0) on 2026-07-29 and added three
+features in 10 commits, then tagged its own "0.6.0". The owner asked for all of
+it, with the settings surfaced in the panel rather than a config-flow handler.
+The fork's own `WheelSettingsSubentryFlowHandler` and its `entity.py` are
+therefore **not** ported: the first is replaced by the panel, and the second is
+a flattened copy of device-info logic that this branch has since deepened
+(`linked_to_matter`, `update_wheel`).
+
+### The acceleration decision, and what was actually measured
+
+The fork's `accelerate()` claims in a comment to be "the same formula as light
+bindings". It is not: it is `n * (1 + a/100 * (n-1))`, driven by batch size
+alone. Both laws were replayed over the committed capture
+`hardware-2026-07-29-round1-decode-only.json` (21 rotations, 37 notches,
+5.81 s):
+
+```text
+acceleration   raw   fork (batch)   ours (velocity)
+   0 %          37      37 (x1.00)      37 (x1.00)
+  50 %          37      63 (x1.70)      57 (x1.54)
+ 100 %          37      89 (x2.41)      80 (x2.16)
+```
+
+Totals are close; the distribution is not. The fork returns 1 for every
+single-notch row even mid-scroll, because rc.5 emits an eager notch per
+`InitialPress` — so batch size measures our own dispatch shape, not how fast
+the wheel turns. And the formula is quadratic in batch size: the 14-notch batch
+recorded in the RC.5 stress run becomes **196 notches** at 100 %, which on a
+1–100 dial is an instant slam to the limit. `_MAX_ACCELERATION_MULTIPLIER = 3.0`
+bounds ours.
+
+This is replay evidence — **Unit, not Hardware**. Which one feels better in the
+hand is unmeasured for both, and this branch's own constants remain the
+unmeasured design choices recorded in the item #1 section below.
+
+### What changed
+
+A pure refactor first, verified separately: `ScrollAccelerator` lifted out of
+`LightBinding` into `channel_controls.py`, with `_accelerate` / `_reset_velocity`
+kept as thin delegating methods so existing tests hold it unchanged. One real
+bug was introduced and caught by those tests — `clock=time.monotonic` as a
+default argument binds at import and defeats `monkeypatch`; the clock is now
+resolved per call.
+
+Then the feature:
+
+- `channel_controls.py` — `ScrollAccelerator`, `WheelSettings`, dial math.
+- `entity.py` — `BilresaChannelEntity` base plus `async_setup_channel_platform`,
+  shared by the two new platforms only. `event.py` keeps its own copy on
+  purpose; rewriting it would mix a refactor into a feature.
+- `number.py` / `switch.py` — one dial and one toggle per wheel channel. Dual
+  buttons are skipped: they have endpoints, not channels.
+- `coordinator.py` — `async_setup_settings` / `settings_for` / `channel_enabled`,
+  and the suppression gate at the very top of `_dispatch`, plus an
+  `actions_suppressed` telemetry counter.
+- `__init__.py` — `NUMBER` and `SWITCH` platforms; settings loaded *before* the
+  platforms so a dial never appears available and then corrects itself.
+
+Storage is a `wheel_settings` config subentry keyed by node id, absent meaning
+"all channels enabled" so a wheel whose channel set grows later cannot silently
+gain dead channels.
+
+Then the panel, per the owner's decision that the settings live there rather
+than in a config-flow handler:
+
+- `panel_models.py` — `ChannelSummary.enabled`, a `WheelSettingsEditor` on each
+  wheel, and `settings_subentry()`. **`CONTRACT_VERSION` 4 → 5.** A dual button
+  gets no editor: it has no channels and no dials.
+- `panel_api.py` — `ikea_bilresa/settings/save`, admin-only, with the same
+  revision-token conflict handling as `ws_binding_save`. It rejects a channel
+  the device does not report, and refuses a dual button outright.
+- `panel_strings.py` — 11 new keys in EN and CS.
+- `ikea_bilresa_panel.js` — a settings section under the channel workbench, and
+  a disabled position struck through on the spine so it reads as off before
+  anything is clicked. Deliberately not merely dimmed: dimming already means
+  "unconfigured" in this panel, which is a different state.
+
+The draft is keyed by wheel, so switching wheels in the rail cannot carry one
+wheel's unsaved edits onto another, and a save conflict drops the draft rather
+than letting the next save clobber whatever the other panel stored.
+
+Local validation on Windows / Python 3.14:
+
+```text
+JSON parse strings + en/cs                           passed
+python -m compileall -q custom_components tests      passed
+ruff format --check / ruff check                     passed (48 files)
+mypy custom_components/ikea_bilresa                  passed (25 files)
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (24 tests)
+EN/CS panel string alignment                         passed (276 keys each)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest  378 passed
+git diff --check                                     passed (CRLF warnings only)
+hassfest / HACS validation                           not run (CI only)
+```
+
+Two existing panel guards were widened deliberately, and both are the kind that
+should never move silently: `test_commands_register_once` (7 → 8) and
+`test_write_surface_is_limited_to_binding_mutations_and_tests`, whose docstring
+now records *why* `ws_settings_save` is allowed on the list — one subentry type,
+four validated fields, a wheel that currently exists.
+
+Three existing tests changed meaning, deliberately: two coupled to velocity
+internals that moved, and `test_only_physical_device_platform_is_forwarded`,
+whose intent (no integration *service* device) is preserved — every new
+platform attaches to a wheel's own reconciled identifiers.
+
+### Publication and deployment (2026-08-02)
+
+Two candidates, because the first one looked wrong in the owner's browser.
+
+| | rc.11 | rc.12 |
+|---|---|---|
+| commit | `2f9531c` | `7a1032e` |
+| CI (all six jobs) | run `30750409636` | passed on the exact revision |
+| HACS install | confirmed | confirmed |
+| restart | clean, entry `loaded` | clean |
+
+Post-restart on rc.11: running manifest `0.6.0-rc.11`, config entry `loaded`,
+Matter connected on `core_matter_client`, two wheels + one dual button, six
+bindings preserved, **twelve new entities created** — `number.*_dial_1..3` and
+`switch.*_button_1..3` on both wheels, correctly area-prefixed, and none on the
+dual button. Nothing in the system log for the domain; the error log holds only
+Home Assistant's standard custom-integration warning.
+
+**rc.11's panel section was wrong and the owner's screenshot caught it.** It
+rendered on the page background below the workbench with default browser
+checkboxes, number inputs and a grey square button — a third-party form pasted
+under the panel. Root cause: `docs/PANEL_DESIGN.md` was not read before writing
+the frontend. Three concrete faults, fixed in rc.12:
+
+- appended outside the card, where that document requires a hairline-separated
+  group and forbids a form floating on the background;
+- `class="primary"` on the save button, when this panel marks a primary action
+  with `class="action-button"` plus `data-primary="true"` — so it picked up no
+  styling at all;
+- a `.settings-title` class that does not exist, and fields that bypassed the
+  `.field` label/help shell the binding editor uses.
+
+rc.12 rebuilds it as a sibling card from `--_card` / `--_border` / `--_radius`
+and the `--_space-*` scale, with `--_accent` checkboxes and a focus ring.
+
+**A note for whoever writes panel code next:** `node --test` and mypy passed on
+the broken version, and so did 378 Python tests. Nothing in this repository can
+catch "it looks wrong". Read `PANEL_DESIGN.md` first and get a screenshot from
+the owner before calling frontend work done.
+
+### Known gaps — read before continuing
+
+- **rc.12's appearance is not confirmed.** rc.11 was seen and rejected; the
+  owner is checking rc.12 himself. Until that screenshot arrives the fix is
+  reasoned, not observed. Checklist item #4's light/dark/custom theme and
+  keyboard/screen-reader pass are untouched either way.
+- **No Hardware at all.** No physical gesture has moved a dial or flipped a
+  switch. In particular the claim that a disabled channel is *completely*
+  silent is held by a unit test over `_dispatch`, not observed on a wheel.
+- **The new tests were not confirmed to fail against a reverted gate.** The
+  repo standard is to check that; it was reasoned, not measured.
+- `README.md` and `README.cs.md` are not updated. `strings.json` / `en.json` /
+  `cs.json` are untouched on purpose — these settings have no config-flow
+  handler, so they need no HA translation keys; everything user-facing is in
+  `panel_strings.py`.
+- `DEFAULT_DIAL_STEP = 2` (about 50 notches for a full sweep) is a guess, not a
+  measurement. So is the 1–25 range on the step field.
+- `CONTRACT_VERSION` moved to 5. A browser holding an old panel module open
+  across the upgrade will not render the settings section until it reloads.
+
+Single best next action: the owner's rc.12 screenshot. If the card now sits
+right, the Hardware pass is next — disable channel 2 on `Kolečko Obývák` from
+the panel, confirm the wheel's own `event` entity does **not** fire and no
+automation triggers, then re-enable and confirm the dial moves. That is the
+only check that proves the disabled-channel gate on real hardware. Afterwards
+`README.md` / `README.cs.md`.
+
+## Checklist item #1 — batch smoothing mechanism (durations still unmeasured)
+
+Status: **Implemented + Static + local Unit (328 tests) + frontend Unit. mypy
+and hassfest not run locally. CI has not run. Not committed, not released, not
+deployed. No Hardware, and none is claimed — the whole point of this item is a
+duration that only a controlled A/B can supply.**
+
+`docs/V0.6.0_CHECKLIST.md` item #1 covered two symptoms. Only one of them is a
+defect:
+
+- **Large batches appear as jumps** (real). The firmware bundles a fast
+  rotation into batches of up to 14 notches, and at transition 0.0 s each batch
+  is one service call, so the light jumps.
+- **The light looks stationary at min/max** (not a defect, deliberately not
+  addressed). RC.5 suppresses identical service payloads at a limit, and that
+  is correct: the target really is at its limit and there is nothing to smooth.
+  If this needs anything it is UI feedback, not a different service call.
+
+The transition is no longer flat. `_smoothing_transition(notches)` returns 0
+for a single notch and otherwise scales linearly with batch size up to the
+binding's configured value, capped at `_SMOOTHING_FULL_BATCH = 14` — the
+largest single batch in the recorded stress run. It is applied by the three
+modes that accept a service transition (brightness, including the turn-off at
+minimum; color temperature; hue). Volume, cover, climate, fan and number
+services take no transition and are untouched.
+
+A single notch is never smoothed on purpose: the eager first notch is the
+entire RC.5 latency gain, and hold-to-ramp steps one notch per 200 ms tick, so
+both keep their cadence at any setting.
+
+**Owner decision (2026-07-29): policy A — reuse the existing field.** The
+binding's `Transition` field becomes the smoothing ceiling and was relabelled
+`Smoothing of large jumps` / `Vyhlazení velkých skoků`, with a new
+`data_description` in `strings.json`, `en.json` and `cs.json` explaining the
+batch behavior. No new option, no migration: stored values keep working and 0
+reproduces the previous instant behavior exactly. C (a second field) was
+rejected because the two numbers would not be independent in practice; B
+(hard-coded constants) was rejected because the integration reloads itself on
+save, so A allows the A/B to be run from the UI without a release per attempt.
+
+The configured value is **not** clamped. A duration longer than the roughly
+0.5-second batch spacing will be interrupted by the next batch; that is a real
+effect for the owner to hear out during the A/B, not something to hide.
+
+Files: `custom_components/ikea_bilresa/binding.py`, `strings.json`,
+`translations/en.json`, `translations/cs.json`, `panel_strings.py`,
+`tests/test_binding.py`, `CHANGELOG.md`, `docs/RUNTIME_POLISH_ROADMAP.md`
+(R4 reopened as "mechanism done, durations deferred"),
+`docs/V0.6.0_CHECKLIST.md`, this handoff.
+
+Eight new tests in `tests/test_binding.py` cover: single notch never smoothed,
+full-size batch receiving the whole ceiling, proportional scaling at half a
+batch, the cap holding beyond the observed maximum, 0 disabling smoothing,
+hold-to-ramp ticks staying immediate, color temperature batches smoothing too,
+and the turn-off at minimum carrying its batch's transition. Four of them were
+confirmed to **fail** when the transition is reverted to a flat configured
+value or the cap is removed.
+
+Local validation on Windows / Python 3.14:
+
+```text
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+strings/en/cs recursive key alignment                passed (169 paths each)
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (20 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                        328 passed
+mypy / hassfest                                      not run (CI only)
+```
+
+Known risks and assumptions:
+
+- `_SMOOTHING_FULL_BATCH = 14` comes from the uncontrolled stress run recorded
+  in the RC.5/RC.6 section below, not from a controlled measurement. If real
+  batches routinely exceed it, those batches all receive the same ceiling and
+  the largest ones are under-smoothed.
+- Linear scaling by batch size is a design choice (owner selected it over a
+  threshold), not a measured curve. It assumes perceived smoothness tracks
+  distance travelled.
+- The relabelled field changes behavior for anyone who used the old transition
+  to slow down single notches. That is the owner here, deliberately.
+
+Single best next action for this item: a controlled Hardware A/B on
+`Kolečko Obývák` at step 3 % — compare 0 (today's behavior), 0.2, 0.3 and 0.5,
+judging first-notch onset and the smoothness of fast rotation separately, then
+record the chosen value and whether it becomes the default.
+
+## rc.10 on hardware: the integration is clean, the dimmer drops off (2026-07-29)
+
+Status: **Hardware-confirmed for the rotation logic. The remaining fault is
+outside the integration.**
+
+A 166-second session on deployed rc.10, tracing armed, scrolling
+`Kolečko Obývák` channel 1 against `light.linka`:
+
+| measure | result |
+|---|---|
+| rotation steps continuing our own calculation | **78 of 80** |
+| targets discarded by mistaken recognition | **0** |
+| commands coalesced | 12 |
+| notches decoded | 217 |
+
+Both fixes are confirmed on hardware. The trajectory test recognizes the
+target's own movement, and coalescing thins bursts without losing the final
+value.
+
+### The real cause of the freezing
+
+The capture contains two `unavailable` reports for the target entity, at
+t=109.2 s (returning at 119.5 s) and t=165.9 s. Home Assistant's own log
+carries the matching failure:
+
+```text
+ERROR [homeassistant.components.shelly] Error fetching
+shellyplus010v-10061ccbdb04 data: An error occurred while reconnecting
+```
+
+**The device is dropping off the network.** The binding handles it correctly —
+both `forget` rows in the capture are `target_unavailable`, which is the right
+response — but nothing in this integration can keep commands flowing to a
+device Home Assistant cannot reach.
+
+This supersedes the earlier suspicion that command volume caused the freeze.
+Coalescing remains worthwhile and is confirmed working, but it was treating a
+symptom of something else.
+
+Device facts read directly over its RPC, for the record: firmware 1.7.5,
+`transition_duration` 0.00, `range_map` [10, 100] — so the bottom tenth of the
+range is unreachable regardless of the binding's minimum-brightness setting —
+`min_brightness_on_toggle` 10, Wi-Fi RSSI -61 dBm, uptime 139 days. The owner
+authorized a reboot on 2026-07-29; afterwards RSSI read -55 dBm and the entity
+returned to `on` at 255. Whether the dropouts stop is not yet known.
+
+Note the `transition_duration` of 0.00 contradicts the earlier explanation that
+the intermediate reported values were a device-side fade. The values are real
+and the trajectory fix handles them, but **why the device emits them is not
+established** — internal hardware ramping, `range_map` conversion and reporting
+by the Shelly integration are all still candidates.
+
+`TRACE_LIMIT` was raised from 400 to 2000: this session overflowed the ring
+buffer and lost its own beginning.
+
+### After the reboot: the dropouts are independent of this integration
+
+A second session was captured after the device reboot. Two scrolling windows,
+one down and one up:
+
+```text
+227.7 - 246.4 s    37 steps,  63 notches -> 31 service calls
+431.7 - 444.6 s    37 steps,  74 notches -> 32 service calls
+```
+
+- **73 of 74 steps continued the calculated target**; the single `state` row is
+  the first step of the session, which legitimately reads the entity;
+- **one discarded target in the whole session**, `outside_scroll_authority`
+  with reported 255 against a tracked 255 — correct behaviour, not a defect;
+- coalescing roughly halved the outgoing calls.
+
+The entity still went `unavailable` twice, at t=313.9 and t=392.2. **Both fall
+between the two scrolling windows, while nothing was being sent.** A device
+that drops off while idle is not dropping off because of command volume, so
+this closes the question: the fault is not caused by anything the integration
+does.
+
+The reboot did not fix it — both dropouts are after it — and
+`Shelly.CheckForUpdate` reports no newer firmware than the installed 1.7.5,
+with Wi-Fi at -55 dBm. Remaining candidates are the network, the device itself,
+or Home Assistant's Shelly integration. None of them is actionable here, and
+the binding already responds correctly by discarding its target when the entity
+becomes unavailable.
+
+Single best next action for the integration is therefore no longer this defect.
+The rotation work is hardware-confirmed; `docs/V0.6.0_CHECKLIST.md` items #2 and
+#6 can be closed, and #1's A/B is now unblocked because scrolling itself is
+reliable.
+
+## rc.9 on hardware: the trajectory fix works, and the real loss is elsewhere (2026-07-29)
+
+Status: **Hardware capture on rc.9 + coalescing Implemented + Static + Unit
+(353 tests). Coalescing is not committed, not released, not deployed.**
+
+### The trajectory fix is confirmed on hardware
+
+The owner scrolled down on deployed rc.9 with tracing armed. First 4.3 seconds:
+
+- **zero discarded targets** during the whole gesture;
+- six mid-fade reports (247, 230, 224, 186, 181, 125) — **all recognized** as
+  our own travel;
+- every step continued from the previous one (`from_source: tracked`).
+
+The defect diagnosed from the rc.8 capture is closed. Item #6's rebase
+mechanism is fixed and confirmed on the physical wheel.
+
+### But the capture exposed a larger problem
+
+| capture time | event |
+|---|---|
+| 2.27 s | last report from the dimmer: **125** |
+| 2.3–4.3 s | we send 117 → 109 → 102 → 71 → 63 → 25 → 17 → **3** |
+| 4.3–19.7 s | **no report at all for seventeen seconds** |
+| 19.7 s | reports **71** |
+
+The entity then read **71**, against a last commanded value of **3**. The
+commands did not land. This is not our arithmetic: 14 service calls went out in
+4.3 seconds — over three per second at a Wi-Fi device — and it stopped
+responding.
+
+This also explains the owner's account precisely: the light froze; further
+scrolling showed `dispatched: false` because our target was already at the
+floor while the device sat at 71; and when the 3-second resync window expired
+at 11.3 s we re-read the stale 125 and started down again — the delayed jump.
+
+**An earlier conclusion needs correcting:** the rebase mechanism was named as
+the cause of the lost notches. It was real and is fixed, but it was probably
+the smaller of two problems. Most of round 1's 14 lost notches are now better
+explained by commands never reaching the device.
+
+### Coalescing
+
+Absolute values make intermediate commands redundant, so `_call` now sends the
+first command of a burst immediately — the eager response is the whole point of
+this integration — and replaces a queued send for anything within
+`_MIN_COMMAND_INTERVAL` (0.18 s, just under the ramp's own 200 ms cadence). A
+queued send always fires, so a gesture's final target cannot be the dropped
+one. Queued sends are cancelled on reconnect, on an unavailable target and on
+unload.
+
+Replayed against the recorded hardware sequence: **13 service calls instead of
+21, ending on the identical value.**
+
+`tests/replay.py` now models `async_call_later`, since a replay that ignored
+deferred sends would drop exactly the calls the real runtime makes.
+
+**This is a mitigation, not a proven fix.** Seventeen seconds of silence is a
+lot for simple congestion; a stalled WebSocket or a firmware fault would look
+the same from here. Lower command volume is worth having regardless, and it
+cannot make the situation worse, but the next capture has to show whether the
+freeze actually stops.
+
+Single best next action: release, then repeat the same scroll and check whether
+reports keep arriving throughout and the entity ends where the last command
+said.
+
+## Capture & replay, and what it already ruled out (2026-07-29)
+
+Status: **Implemented + Static + Unit (348 tests). Not committed, not released,
+not deployed. One real hardware decode sequence replays as a committed
+regression fixture.**
+
+The owner asked for a proper diagnostic instrument after a session where the
+cause could not be found from logs. Web research first settled one open
+question and raised one long-term one:
+
+- **Relative stepping would not have helped.** Home Assistant's own
+  `brightness_step_pct` reads the current brightness, adds the step and writes
+  the result, so it carries the same dependency on a fresh state read;
+  core issue #118009 documents the same mechanic breaking grouped lights. Our
+  absolute-target design stays.
+- **A linear 3 % step can never feel even.** Perceived brightness is
+  non-linear, so a fixed step is a large visible jump at the bottom and almost
+  nothing at the top. Not today's defect, but the ceiling any "make it feel
+  great" work eventually meets.
+- No established capture/replay pattern exists for HA integrations; snapshot
+  testing is the nearest thing and does not cover timed event streams.
+
+### The instrument
+
+`tests/replay.py` drives a real `LightBinding` through a capture offline — no
+Home Assistant, no Matter, no wheel. The capture (from `ikea_bilresa/trace`)
+now carries raw Matter gesture boundaries, the target's own state reports,
+arriving actions **before** any filter, and applied steps, each with a relative
+timestamp. `RotationTrace` gained `capture()`, an injectable clock, per-row
+relative time and a `describe_binding` record of the settings a replay needs.
+
+The simulated target models the real one: it applies any absolute value it is
+sent, but only *reports* a value when the capture says a report arrived. That
+gap is where the defect lives.
+
+Captures in `tests/fixtures/captures/*.json` with an `expect` block become
+regression tests automatically, with no new code.
+
+### What it ruled out on day one
+
+The real round-1 decode sequence from the physical wheel (21 actions,
+37 notches, exact timings) is committed as
+`hardware-2026-07-29-round1-decode-only.json`. Replayed with no state reports
+it lands exactly on the floor, as the arithmetic requires.
+
+A sweep then injected the report pattern a Shelly actually produces — echoing
+back the value we sent — across delays 0.05 s to 1.2 s and lags of zero to two
+batches. **Not one combination lost a step, and no target was ever discarded.**
+
+So the echo-recognition logic is not the cause, and the earlier suspicion that
+rc.7's value matching regressed against rc.6 is not supported.
+
+Two important caveats, both found by using the tool:
+
+- an early version of the sweep *did* show losses, purely because the capture
+  held only the first `initial_press`. The real device emits one per notch, so
+  the authority window is refreshed continuously; a capture without those
+  refreshes manufactures failures the hardware never had. Faithful raw rows are
+  mandatory, and rc.8 records them;
+- the trace recorded steps only in `_rotate_by`, i.e. after filtering, so an
+  action dropped on the way in was invisible. `_rotate` now records every
+  arriving action with its `suppressed` flag, held by a test.
+
+### What this leaves open
+
+The physical wheel applied 23 notches out of 37 decoded, and no simulated
+report pattern reproduces that. The remaining candidates are therefore: an
+input shape not yet simulated, actions dropped before reaching `_rotate_by`
+(now visible), or something between the binding and the entity that the trace
+does not cover.
+
+Single best next action: capture one real scroll on rc.8+ with tracing armed
+and replay it. If the capture reproduces the loss, the cause is in the rows.
+If it replays clean while the real light did not, the defect is downstream of
+the binding and needs a probe at the service-call layer.
+
+## Hardware session on rc.7: #6 is NOT fixed, and a rotation trace was built (2026-07-29)
+
+Status: **Hardware evidence that the defect persists. Cause not yet identified.
+Trace instrument Implemented + Static + Unit (342 tests). Not committed, not
+released, not deployed.**
+
+### What the physical wheel showed
+
+Owner scrolled `Kolečko Obývák` channel 1 against `light.linka` (Shelly Plus
+0-10V), step 3 %, smoothing 0, from brightness 255.
+
+Round 1, the only round with a complete decode log: **21 dispatched actions
+totalling 37 notches** over 5.8 seconds, all `dir=down`. Expected end value
+`255 − 37 × 7.65` is below the floor, so the light should have clamped at 3.
+**It reported 79**, which is exactly 23 notches' worth. Later rounds ended at
+97 and 133 without a usable decode log.
+
+The owner independently reported, twice and unprompted, that **the brightness
+appeared to jump back up** during scrolling. That is the signature of a step
+recomputed from a stale higher value.
+
+### The dimmer is not at fault
+
+This mattered because absolute commands mean the last one wins, so a dimmer
+that merely lags would still land correctly. Two checks:
+
+- the panel's Live test reported the binding calculating `Jas 18 → 12 %`, and
+  the entity then read **31**, which is exactly `0.12 × 255`. The dimmer
+  honoured the last command to the unit;
+- a direct 255 → 31 jump applied immediately with **no intermediate values**,
+  disproving a device-side fade that would emit values we never sent.
+
+So the wrong number is one the integration itself calculated and sent. **The
+rc.7 fix did not close item #6.** Whether rc.7 made it worse than rc.6 is not
+established.
+
+### Why no cause is claimed
+
+Three attempts to read the truth from logs failed, and the reason is worth
+recording: the `ikea_bilresa` DEBUG logger yields clean rows but only shows
+*decoded actions*, never the value sent. Widening to `homeassistant.core`
+DEBUG, then to the Shelly loggers, flooded the log — the Shelly devices act as
+BLE proxies and emit scan results continuously — and pushed the relevant lines
+out of the readable tail in both cases. A text log is the wrong instrument for
+this defect.
+
+### The instrument built instead
+
+`trace.py` adds `RotationTrace`: an opt-in, bounded ring buffer of structured
+rows, exposed in `telemetry` (so it rides the existing redacted diagnostics
+download) and through a new admin-only `ikea_bilresa/trace` WebSocket command
+that reads, arms and clears it. Disabled by default; `record()` is a no-op
+while off, and arming clears the buffer so a capture starts from a known point.
+
+Rows, per applied step: `notches`, `direction`, **`from_source`** (`tracked` /
+`state` / `fallback`), `from_value`, `state_value`, `target`, `dispatched`.
+`from_source` is the field that answers the open question directly — `state`
+mid-gesture means the calculated target was thrown away. Every discard writes
+its own row with `reason`, `had_tracked`, `reported` and the recent command
+history, and recognized echoes are recorded too, so accepted and rejected
+reports can be compared.
+
+`_rotate_by` was split into a traced wrapper plus `_rotate_mode`, so one code
+path covers all eight rotation modes. `_forget_target` now requires a reason at
+every call site. `_observed_value` gained a defensive `getattr` for states
+without attributes, found by an existing test.
+
+Three existing tests changed meaning: the panel API's command count and its
+write-surface allow-list (`ws_trace` writes only to an in-memory diagnostic
+buffer and is documented as such in that test), and a coordinator fake binding
+that now accepts the `trace` keyword.
+
+Files: `custom_components/ikea_bilresa/trace.py` (new), `binding.py`,
+`coordinator.py`, `panel_api.py`, `tests/test_trace.py` (new),
+`tests/test_panel_api.py`, `tests/test_coordinator.py`, `CHANGELOG.md`, this
+handoff.
+
+```text
+ruff format --check / ruff check                     passed (41 files)
+mypy custom_components/ikea_bilresa                  passed (21 files)
+node --test panel + icon frontend tests              passed (20 tests)
+pytest                                               342 passed
+```
+
+Single best next action: release rc.8, capture one scroll with the trace armed,
+and read `from_source` on each row. That names the cause instead of inferring
+it.
+
+Known limits: the trace records what the binding calculated and whether a
+dispatch happened, not what Home Assistant's service layer finally delivered.
+If a future capture shows every row with `from_source: tracked` and a correct
+final `target`, the remaining gap is between the binding and the entity, and
+needs a different probe.
+
+## First real-HA look at deployed rc.7, and one contradiction it exposed (2026-07-29)
+
+Status: **Real Home Assistant visual evidence (light theme) from owner
+screenshots + one follow-up fix that is Implemented + Static + Unit +
+harness-measured, uncommitted. No Hardware gesture yet.**
+
+The owner opened the deployed rc.7 panel and sent four screenshots of the real
+frontend. They confirm, **in Home Assistant rather than in a harness**:
+
+- the regrouped editor renders as designed — `Otáčení` with mode/target and
+  step/smoothing, `Tlačítko` with short press beside its target, then scenes,
+  then full-width `Dvojitý stisk přepne` and `Trojitý stisk přepne`, then hold
+  beside its target;
+- `Pokročilé možnosti` is collapsed, and when opened holds button response
+  full-width with **minimum and maximum brightness on one row** and
+  acceleration below — the defect from the owner's original screenshot;
+- the gesture ledger reads `Otočení doleva / doprava → Jas · Svetylka Světýlka`,
+  so the quantity fix is live;
+- the overview shows `Tlačítko Obývák` with a glyph distinct from both wheels,
+  which closes checklist **#7**.
+
+Checklist **#4** is therefore partly done: light theme only, on a wheel
+channel. Dark theme, a custom theme, the keyboard/screen-reader pass and the
+dual-button view remain owed.
+
+**The contradiction.** The same screenshot shows the ledger saying
+`Krátký stisk → Přepnout · Svetylka Světýlka` while the editor's
+`Cíl krátkého stisku` says `Není nastaven žádný cíl`. Both were truthful:
+`BindingRuntime` falls back to the rotation target when the short-press target
+is empty, so the ledger reported the effective behavior and the editor reported
+the stored value. This predates the regrouping, but putting the ledger and the
+field on one screen is what made it visible — and a placeholder that claims
+"no target" for a control that demonstrably acts is worse than a long label.
+
+Fixed by giving that one field its own empty-option label,
+`Stejný jako cíl otáčení` / `Same as the rotation target`. `_selectField` and
+`_entityField` gained an optional `emptyLabel`; every other optional target
+keeps `target_none`, because hold and multi-press targets genuinely do nothing
+when empty. A dual button passes `undefined` — it has no rotation to fall back
+to and its click target stays required.
+
+Verified in the harness against the production element: `click_target` offers
+`Stejný jako cíl otáčení` while `hold_target` and `double_press_target` still
+offer `Není nastaven žádný cíl`.
+
+Files: `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
+`panel_strings.py`, `tests/test_panel.py`, `docs/V0.6.0_CHECKLIST.md`, this
+handoff.
+
+```text
+ruff format --check / ruff check                     passed
+mypy custom_components/ikea_bilresa                  passed (20 files)
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (20 tests)
+EN/CS panel string alignment                         passed (265 keys each)
+pytest                                               335 passed
+```
+
+**Not deployed.** rc.7 is what is running on the owner's instance and this fix
+is deliberately left in the working tree, so the hardware session is not
+disturbed by a mid-session reinstall.
+
+Known related item, deliberately not changed: with `hold_action = ramp` the
+ramp drives the **rotation** target regardless of `Cíl podržení`, so that field
+can mislead in the same way. It was left alone because the ledger currently
+reports hold correctly and changing it needs a decision about whether ramp
+should honour a separate hold target at all.
+
+## `v0.6.0-rc.7` published and deployed (2026-07-29)
+
+Status: **Implemented + Static + Unit + CI + Released + non-hardware Home
+Assistant deployment smoke. No Hardware.** This candidate exists so the owner
+can run the checklist #1 A/B and the #2/#6 confirmation on the physical wheel.
+
+Owner authorized the release and deployment on 2026-07-29.
+
+Commits on `agent/dual-button-0.6`:
+
+- `ed2c478` fix: keep the scroll target authoritative between Matter gestures;
+- `b6ea801` feat: smooth large scroll batches without delaying the first notch;
+- `be28d9f` refactor(panel): group binding fields by what they belong to;
+- `f49927e` chore: prepare v0.6.0-rc.7;
+- `cdeb5ab` fix(panel): default the rotation quantity when no mode is stored.
+
+**The first attempt failed CI and was not tagged.** Run `30447028431` on
+`f49927e` failed the mypy job: `panel_models.py:357` looked a quantity key up
+from `data.get(CONF_MODE)`, which is `Any | None`, unsound for a subentry
+predating the mode field. Fixed in `cdeb5ab` by defaulting to `DEFAULT_MODE` —
+the same fallback `BindingRuntime` uses, so the ledger cannot name a quantity
+the binding would not move — with a regression test for a mode-less subentry.
+mypy is now installed locally, so this class of failure should not need another
+CI round trip.
+
+Exact-revision CI run `30447368039` passed all six jobs for full commit
+`cdeb5ab361bfd1f73418180c60db26fa6589c102`: Validate HACS, Unit tests, Lint
+(ruff), Frontend checks, Type check (mypy) and Validate manifest (hassfest).
+
+Annotated tag `v0.6.0-rc.7` resolves to that exact commit and the GitHub
+release is marked prerelease:
+https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.7
+
+Deployment results:
+
+- pre-restart Home Assistant configuration check `valid`;
+- HACS installed exactly `v0.6.0-rc.7` and reports it as the installed version;
+- Home Assistant (Core 2026.7.4, HA OS 18.1, Python 3.14.6) restarted normally
+  and the post-restart configuration check is `valid`;
+- the `ikea_bilresa` config entry returned to `loaded`, and the **running**
+  integration manifest reports version `0.6.0-rc.7`;
+- System Health: Matter Server add-on 9.1.0 / matter-server 1.2.6 connected on
+  server schema 12 through compatibility schema 11, active source
+  `core_matter_client`, fallback reason `none`, two wheels, one dual button and
+  **all six bindings preserved**;
+- Matter traffic resumed after the restart (a fresh `last_matter_event`);
+- exact-domain system-log search returned zero entries. The error log contains
+  only Home Assistant's standard warning for an unreviewed custom integration.
+
+This is publication plus install/startup smoke. **No physical gesture has been
+performed on this candidate**, so nothing in it is Hardware-verified.
+
+Owed next, on the physical `Kolečko Obývák`, in this order:
+
+1. **#2 + #6 together** — one controlled 18-notch rotation down from brightness
+   255 at step 3 % with smoothing 0. The light must land on **117**. Any higher
+   value means target authority is still being lost.
+2. **#1 A/B** — compare smoothing 0, 0.2, 0.3 and 0.5 by editing the binding
+   (the integration reloads on save, so no redeploy per attempt), judging
+   first-notch onset separately from fast-rotation smoothness. Expect
+   degradation above roughly 0.5 s, where a transition outlives the gap to the
+   next batch.
+3. **#7** — confirm the dual-button glyph renders, visible on opening the panel.
+4. **#4** — the regrouped editor in a **fresh** browser tab (an open tab keeps
+   the old custom element), light/dark/one custom theme plus a keyboard and
+   screen-reader pass.
+
+## Binding editor regrouped after the owner's deployed screenshots (2026-07-29)
+
+Status: **Implemented + Static + local Unit (333 Python, 20 frontend) +
+measured in a throwaway browser harness. mypy and hassfest not run locally. CI
+has not run. Not committed, not deployed, no Hardware.**
+
+The owner sent two screenshots of the deployed RC.6 panel and asked why the
+double-press, triple-press and hold settings felt scattered. They were right,
+and the cause was structural rather than cosmetic.
+
+**What was wrong.** The editor built two flat grids, `primary` and `advanced`,
+and the two-column CSS grid broke them into rows by source order alone. So:
+
+- **Gestures were split across the disclosure.** Short press and hold were in
+  the main body; double press and triple press were under "advanced options".
+  The gesture ledger immediately above presents five equal gestures, so the
+  editor contradicted it one screen later. Nothing made a double press
+  advanced — it was added later.
+- **Unrelated fields were paired.** `Button response | Double-press target`
+  shared a row, and worse, **minimum and maximum brightness were split across
+  two different rows** with `Acceleration` wedged between them. One pair, two
+  rows — visible in the owner's screenshot.
+- **The rotation row said `Adjust target`** — an infinitive that reads as a
+  button and does not say what rotation changes. An earlier entry in this file
+  claims this was already fixed to `Jas · …`; it was not. `panel_models.py` was
+  still passing a fixed `action_adjust` key regardless of mode. Recorded
+  because the handoff promised more than the tree contained.
+
+**What changed.** Fields are grouped by what they belong to. Sections
+`Rotation` and `Button`, one grid row per gesture (action beside target), in
+the ledger's own order. Double and triple press span a full row and their
+labels state the behavior (`Double press toggles`), because they take a target
+but never an action. The disclosure keeps only set-once options — recognition
+policy and rotation limits — with minimum and maximum adjacent. A section is
+titled only when a second section exists, so a dual-button editor gains no
+heading that would repeat its own title. Groups are separated by a hairline,
+not boxed.
+
+The rotation row now names the quantity (`quantity_*` strings, mapped beside
+the existing `_MODE_KEYS`), so the row says `Jas · Linka` while the subtitle
+above still says `Plynulé stmívání · Linka`. The dead `action_adjust` strings
+were removed from both languages.
+
+The rule is written into `docs/PANEL_DESIGN.md` rather than left in the code,
+because it is the kind of thing the next contributor will otherwise undo by
+appending one more field to whichever grid is nearest.
+
+Files: `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
+`panel_models.py`, `panel_strings.py`, `tests/test_panel.py`,
+`tests/test_panel_models.py`, `docs/PANEL_DESIGN.md`, `CHANGELOG.md`, this
+handoff.
+
+Three existing tests changed meaning deliberately (the scenes-field assertion,
+and two that asserted the old `Adjust target` / `Upravit cíl` wording). Five
+new tests hold the new structure: every press gesture edited beside the others,
+editor order matching the ledger, the disclosure keeping only set-once options
+with the limits adjacent, an actionless gesture taking a whole row, and a
+button editor carrying no repeated section title. All five were confirmed to
+**fail** against the panel asset at HEAD.
+
+**Measured, not asserted.** A throwaway harness rendered the production custom
+element with a snapshot generated by the real `async_overview_snapshot` and the
+real Czech strings, at a 666 px pane in a dark theme:
+
+```text
+Rotation   Režim otáčení | Cíl otáčení            one row
+           Krok na jeden zub | Vyhlazení…         one row
+Button     Krátký stisk | Cíl krátkého stisku     one row
+           Scény / Dvojitý stisk / Trojitý stisk  full-width rows
+           Podržení | Cíl podržení                one row
+Advanced   Minimální jas | Maximální jas          one row (was two)
+section title 14px / weight 500 / contrast 12.65:1 on the card
+hairline above the second section only, none above the first
+horizontal page overflow 0, fields escaping the viewport 0
+smallest control 44px; pane at 666px collapses to a single column
+```
+
+Local validation on Windows / Python 3.14:
+
+```text
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (20 tests)
+EN/CS panel string alignment                         passed (264 keys each)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                        333 passed
+mypy / hassfest                                      not run (CI only)
+```
+
+Known limits and risks:
+
+- **This is harness evidence, not a real Home Assistant pass.** The harness
+  supplies its own theme tokens and its own `hass` stub. Checklist item #4 —
+  light/dark/custom theme and a screen-reader pass in the real frontend — is
+  untouched by this work and still owed.
+- The dual-button variant of the form is covered by unit tests only; the
+  harness rendered the wheel variant.
+- `quantity_color_temp` duplicates the wording of `mode_color_temp` because for
+  that mode the quantity and the behavior genuinely are the same phrase.
+
+## Checklist item #6 — the RC.5 brightness accounting anomaly is explained and fixed
+
+Status: **Diagnosed + Implemented + Static + local Unit (320 tests). mypy and
+hassfest not run locally. CI has not run. Not committed, not released, not
+deployed, no Hardware.**
+
+`docs/V0.6.0_CHECKLIST.md` item #6 asked whether the RC.5 anomaly (18 decoded
+notches moved `light.linka` from 255 to 140, worth about 15 configured 3 %
+steps) was expected clamping or a real bug. It is a real bug, it is **not**
+closed by RC.6, and it now has a failing-then-passing regression.
+
+**The arithmetic identifies the mechanism exactly.** At step 3 % a notch is
+7.65 units, so the recorded deltas produce targets `247 → 217 → 179 → 156 →
+133 → 117`. One rebase from a state echo reporting `156` — the value from two
+batches earlier — before the final two-notch batch yields
+`156 − 2 × 7.65 = 140.7`. That is the observed 140/141, and exactly three lost
+notches. 140 sits mid-range, so it is neither a clamp nor rounding.
+
+**The loss has a single vector.** `_resync` returns the tracked target whenever
+it exists and is younger than `_RESYNC_AFTER` (3.0 s), and `_tracked` is a
+float that accumulates without intermediate rounding, so batching alone cannot
+lose steps. The only place the target is discarded is
+`_handle_target_state_change`.
+
+**Why RC.6 does not close it.** RC.6 protects the target while
+`_active_scrolls` is non-empty, but `multi_press_complete` pops the endpoint,
+after which only `_command_authoritative_until` (last dispatch + transition +
+0.25 s) remains. At transition 0.0 s that window is shorter than the observed
+0.5-second batch spacing. One continuous physical rotation is delivered as
+**several Matter gestures** — the sanitized capture already in
+`tests/test_engine.py` shows `…→ 18`, `multi_press_complete 18`, then a second
+gesture `3 → 7 → 11 → 14`. A delayed echo landing in that inter-gesture gap
+cleared the target and the next gesture rebased from state that was still
+catching up. This also explains why the anomaly appeared in the very run where
+the transition was lowered from 1.0 s to 0.0 s: at 1.0 s the margin was 1.25 s
+and swallowed the same echoes.
+
+Decoding was verified innocent: the real `GestureEngine` returns exactly 18 and
+14 notches for that capture, matching `PROJECT_STATUS.md`'s "not a decoder
+loss".
+
+**The fix (owner selected policy A+B on 2026-07-29).** A state report is
+ignored only when *both* hold:
+
+- the scroll still owns the value — an active raw scroll, or the new
+  `_SCROLL_AUTHORITY_GRACE` (1.0 s, two observed batch intervals) since the
+  last raw scroll event, still bounded by `_ACTIVE_SCROLL_TIMEOUT`; and
+- the reported value matches one of the last `_COMMAND_HISTORY` (8) calculated
+  targets within `_ECHO_MATCH_FRACTION` (1 %) of that mode's range, which
+  absorbs the target's own quantization (a Shelly Plus 0-10V stores whole
+  percent, so a dispatched 156 returns as 155).
+
+A report that fails the value match is a genuine third-party change and rebases
+immediately, **including mid-scroll** — that is stricter than RC.6, which
+ignored every report during an active gesture. `_set_target` / `_forget_target`
+keep the tracked value and its command history in step; `_observed_value` reads
+the attribute each mode actually rotates, and an unreadable value is treated as
+an echo because it carries no evidence of an external change.
+
+Files: `custom_components/ikea_bilresa/binding.py`, `tests/test_binding.py`,
+`CHANGELOG.md`, `docs/V0.6.0_CHECKLIST.md`, this handoff.
+
+One existing test changed meaning, deliberately:
+`test_scroll_tracking_survives_overlapping_direction_boundaries` asserted that
+authority ends at `multi_press_complete`. It now asserts the grace window keeps
+it, and that authority expires afterwards. That is the behavior change, not an
+accommodation of the test.
+
+New regressions in `tests/test_binding.py`:
+`test_recorded_fast_scroll_applies_every_notch_exactly` (the full recorded
+capture through the real decoder and binding lands on the single-shot
+arithmetic), `test_stale_echo_between_two_gestures_of_one_scroll_keeps_
+accounting` (the anomaly itself), `test_quantized_echo_of_our_own_value_is_
+recognized`, and `test_third_party_change_during_a_scroll_rebases_immediately`.
+The anomaly regression was confirmed to **fail** when both new behaviors are
+reverted to their RC.6 values, so it genuinely holds the fix.
+
+Local validation on Windows / Python 3.14:
+
+```text
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                        320 passed
+git diff --check                                     passed (CRLF warnings only)
+mypy                                                 not run (not installed locally)
+hassfest / HACS validation                           not run (CI only)
+```
+
+Known risks and assumptions:
+
+- `_SCROLL_AUTHORITY_GRACE = 1.0` is derived from the roughly 0.5-second batch
+  spacing recorded on the physical E2490, not from a controlled measurement of
+  the inter-gesture gap. If a real rotation ever pauses longer than that
+  between gestures, the next gesture rebases from reality — audible as the same
+  class of step loss, just rarer.
+- `_ECHO_MATCH_FRACTION = 1 %` of the mode's range was chosen to clear a whole-
+  percent dimmer (0.5 % of range) with margin while staying well under one
+  3 % notch. An external change smaller than that fraction is read as an echo.
+- Mid-scroll third-party changes now win. That is the safer default, but it is
+  new behavior and no device has been observed doing it.
+- Two adjacent constants still disagree in spirit: `_RESYNC_AFTER` (3.0 s) lets
+  `_resync` trust a target far longer than the echo path protects it. Not
+  touched here — it is a separate decision.
+
+Single best next action: exact-revision CI for this tree (mypy/hassfest are the
+gates local Python 3.14 cannot supply), then a controlled Hardware A/B on the
+owner's `Kolečko Obývák` — one slow 18-notch rotation and one fast one from
+brightness 255 at step 3 %, checking the final value equals the single-shot
+arithmetic. That same gesture also discharges checklist item #2.
+
+Last updated before this entry: **2026-07-18 by Codex**
 
 This is the canonical live state for the owner, Codex and Claude Code. Read it
 with `AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, and the device-facing
@@ -20,10 +1128,196 @@ references before making changes.
 Never collapse these states or infer Hardware from Static, Unit, CI, MCP, or
 earlier device-reference observations.
 
+## RC.5 zero-transition finding and `v0.6.0-rc.6` corrective candidate
+
+Status: **RC.5 Hardware diagnosis + Implemented + Static + local Unit + CI +
+Released + deployed. Not corrective Hardware.**
+
+Annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit
+`dd14521d03786ea63a6bbe6cc365a8dbf0088f1c`. GitHub Actions run `29647018640`
+passed hassfest, HACS validation, Ruff, mypy, frontend checks and the full
+Python suite for that exact revision.
+
+HACS installed exact `v0.6.0-rc.6`. The pre-restart Home Assistant
+configuration check was valid, Home Assistant restarted normally, and the
+post-restart check remained valid. Loaded diagnostics now report manifest
+`0.6.0-rc.6`, config entry state `loaded`, Matter Server add-on `9.1.0` /
+matterjs-server `1.2.6`, server schema 12 through compatibility schema 11,
+`core_matter_client`, no fallback, two wheels, one dual button and all six
+bindings. `Kolečko Obývák` channel 1 retained transition 0.0 seconds. Diagnostics
+list no integration issue; the post-restart log contains only Home Assistant's
+standard custom-component warning. No corrective Hardware result is claimed
+before a new controlled gesture.
+
+All controlled RC.5 tuning below used only the owner's selected
+`Kolečko Obývák`, channel 1, with acceleration disabled, step 3%, and
+`light.linka` as its target. No RC.5 Hardware claim is made for
+`Kolečko Nelča`.
+
+With the configured transition reduced from 1.0 seconds to 0.0 seconds, the
+first Home Assistant target acknowledgement improved from approximately 906 ms
+to 548 ms, and the owner described the perceived delay as the smallest so far.
+Exact accounting still failed: Matter and the public BILRESA event stream both
+reported 18 notches, but the light moved from brightness 255 to 140, equivalent
+to only 15 configured 3% steps. This is not a decoder loss.
+
+The cause was reproduced in a failing unit regression. A Shelly Plus 0-10V
+Dimmer can report an older absolute brightness after the fixed 250 ms
+zero-transition echo margin while the Matter scroll is still delivering later
+cumulative deltas. That report cleared the binding's newest calculated target,
+so the next delta rebased from stale physical state. The old code produced
+brightness 239 where the confirmed four-notch sequence required 224.
+
+The released RC.6 candidate now keeps its calculated target authoritative for the
+duration of each raw scroll endpoint. Opposite directions are tracked
+independently, completion clears only its own endpoint, unavailable targets
+still fail closed, reconnect clears all activity, and a missing completion
+expires after two seconds. This timeout is four times the roughly 0.5-second
+batch spacing observed on the physical E2490; it prevents indefinite authority
+without truncating an ordinarily active sequence. The new regression and full
+Python suite pass locally (316 tests); compileall, Ruff format/lint, mypy,
+frontend syntax and diff checks also pass.
+
+A later uncontrolled rapid back-and-forth stress run confirmed a separate
+presentation issue. The E2490/Matter stream emits the eager first notch and
+then irregular cumulative batches such as 14, 9, 6 and 14 notches. At transition
+0.0 seconds those valid batches appear as visible jumps; when the configured
+minimum or maximum is reached, unchanged service calls are intentionally
+suppressed and the light can appear stationary while raw events continue. This
+cannot be corrected by the target-tracking fix alone. Smoothing must retain the
+immediate first notch and apply only a short, measured transition to later
+large batches; no duration is accepted without a controlled Hardware A/B.
+
+## Scroll first-response optimization (`v0.6.0-rc.5` candidate, 2026-07-18)
+
+Status: **Implemented + Static + local Unit + CI + Released + deployed.
+Physical section G is in progress; no G Hardware item is claimed yet.**
+
+Before publication, a read-only Home Assistant registry recheck confirmed both
+physical E2490 scroll wheels and the E2489 dual button now run firmware
+`1.9.15`. Both wheel nodes were therefore available on the same current
+firmware, but the owner selected only `Kolečko Obývák` for controlled RC.5
+tuning. The earlier `1.8.7` observations remain historical evidence, not an
+available RC.5 comparison target.
+
+Annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
+`e17797ac9be1f6183c6867738aed597824843487`. GitHub Actions run `29645572829`
+passed all six jobs for that exact revision. HACS then installed the explicit
+prerelease tag, the pre-restart configuration check was valid, and Home
+Assistant restarted normally.
+
+Post-restart evidence confirms:
+
+- HACS installed version `v0.6.0-rc.5` and the loaded integration manifest
+  reports `0.6.0-rc.5`;
+- the config entry is loaded at logger level `WARNING`, with no integration
+  issues and no integration error in the post-restart system log;
+- Matter Server add-on `9.1.0` / matterjs-server `1.2.6` is connected on
+  WebSocket schema 12 through compatibility schema 11;
+- the active source is `core_matter_client`, fallback reason is `none`, and the
+  inventory remains two wheels, one dual button and six bindings;
+- the post-restart configuration check remains valid.
+
+Matter Server and integration telemetry also received scroll traffic after the
+restart, including cumulative count 18. Because those movements were not
+performed under a single controlled instruction, they are reconnaissance only
+and do not check any section G box.
+
+A controlled baseline on the installed `v0.6.0-rc.4` used Matter Server add-on
+9.1.0 / matterjs-server 1.2.6 native sanitized Switch-event logging. The
+integration preserved every observed cumulative rotary count and dispatched
+approximately 4-10 ms after the corresponding raw completion. Slow deliberate
+movement also showed that a perceived physical detent is not a reliable raw
+event counter; the integration neither invented nor dropped events.
+
+Fast rotation exposed the actual perceived-latency source. Matter delivered
+`InitialPress`, but the engine waited roughly 0.5-0.6 seconds for the first
+cumulative count before producing any rotary action. Transition A/B testing
+showed that 0.5 seconds improved target acknowledgement over 1.0 second, while
+0.3 seconds produced no repeatable additional gain. Transition tuning did not
+remove the initial wait. The temporary binding change and scoped DEBUG logger
+were returned to their exact original values after measurement.
+
+The working-tree candidate now emits one eager notch from every rotary
+`InitialPress`. It retains those notches as credits and subtracts them from
+cumulative ongoing/completion reports, so the final total stays exact. This is
+grounded in both the public Matter Switch sequence (InitialPress for every
+detected press; coincident MultiPressOngoing directly afterward) and the
+sanitized BILRESA stream. The exact recorded fast sequence
+`5 → 10 → 13 → 16 → 18`, then `3 → 7 → 11 → 14`, is replayed as a unit test.
+An equal duplicate count emits nothing; a decreased count starts a new
+baseline. Missing, malformed, negative, zero-overflow and above-max completion
+counts end local accounting safely. State remains keyed by node and endpoint,
+preserving isolation across any number of wheels, channels and directions.
+
+`CurrentPosition = 0` no longer clears rotary counts. The attribute represents
+an individual release and may occur while the cumulative multi-press sequence
+is still active; using it as the sequence boundary could duplicate a later
+batch. It still invalidates button hold-duration observation, while reconnect
+`reset()` clears rotary counts and eager credits.
+
+The real fast stream continued after its brightness target had already reached
+the configured maximum. Because eager dispatch increases the number of useful
+early actions, the binding now suppresses an identical value service payload at
+the effective minimum or maximum. This is applied to every bounded value mode:
+brightness, color temperature, volume, cover position, climate temperature,
+fan speed and number. It is deliberately not applied to hue, whose supported
+behavior is cyclic wraparound. A no-change gesture is reported to Live test as
+completed with equal before/after values, rather than as a failed dispatch.
+Hold-to-ramp also pauses its 200 ms recurring interval at a limit, while
+retaining the release needed for alternating direction and the 30-second
+lost-release watchdog.
+
+Files:
+
+- `custom_components/ikea_bilresa/binding.py`;
+- `custom_components/ikea_bilresa/engine.py`;
+- `tests/test_binding.py`;
+- `tests/test_engine.py`;
+- `custom_components/ikea_bilresa/manifest.json`;
+- `CHANGELOG.md`;
+- `README.md`;
+- `README.cs.md`;
+- `docs/DEVICE_REFERENCE.md`;
+- `docs/MATTERJS_COMPATIBILITY.md`;
+- `docs/SCROLL_PERFORMANCE.md`;
+- `docs/HARDWARE_TEST.md`;
+- this handoff.
+
+Local validation:
+
+```text
+pytest ... test_engine/test_binding                              113 passed
+pytest -q -p pytest_asyncio.plugin                               313 passed
+python -m compileall -q custom_components tests                  passed
+JSON parse for strings + EN/CS translations                      passed
+ruff format --check custom_components tests                      passed (39 files)
+ruff check custom_components tests                               passed
+mypy custom_components/ikea_bilresa                              passed (20 files)
+node --check panel asset                                         passed
+node panel + icon frontend tests                                 passed (20 tests)
+git diff --check                                                 passed
+```
+
+The five local warnings are dependency deprecations from Home Assistant,
+`aiohttp` and `backoff`, not test failures. Controlled physical single-notch
+onset, exact fast-scroll total, direction reversal, count-18/wrap and both
+physical firmware-1.9.15 wheels remain unverified for this candidate.
+Suppression of redundant service calls is locally unit-tested at both limits
+for all seven bounded modes; the exact live service-call count during
+saturation is still a Hardware item. The active gate is
+`docs/HARDWARE_TEST.md` section G on both physical wheels.
+
+GitHub Actions run `29645493522` passed all six jobs for exact implementation
+commit `d12707c769239e14ff9f4e709efbeba0c3891fb2`: hassfest, HACS validation,
+Ruff, mypy, frontend checks and the full Python unit suite. The subsequent
+documentation-only release record must pass CI on its own exact revision before
+that revision is tagged.
+
 ## Repository state
 
-- Active publication branch: `agent/stabilize-0.5-x`, created from `main` at
-  `f1e7583`.
+- Active publication branch: `agent/dual-button-0.6`, branched from the
+  deployed `agent/stabilize-0.5-x` line after local B0/B1 commit `7446194`.
 - `origin/main`: `f1e7583 docs: add DEVICE_REFERENCE — Matter/HA facts for the
   BILRESA wheel` before this stabilization snapshot is merged.
 - Before Claude's reference commit, `main`/`origin/main` were at `662762a`.
@@ -34,8 +1328,14 @@ earlier device-reference observations.
 - The owner authorized commit, push, a GitHub CI/PR workflow, an RC release and
   controlled Home Assistant deployment on 2026-07-15. Record their concrete
   results here after each gate; authorization is not proof that a gate passed.
-- Latest stable release remains `v0.5.0`. The latest prerelease is
-  `v0.5.9-rc.11`. Panel Phases 0-3 were published as
+- Latest stable release remains `v0.5.0`. The latest published and deployed
+  prerelease is corrective `v0.6.0-rc.4`; its controlled Matter Server restart
+  recovery and first physical post-restart single passed on the exact installed
+  candidate. RC.3 fixed the count-zero overflow reproduced on RC.2 but failed
+  the restart lifecycle gate. RC.1 exposed
+  a separate real-device discovery defect and is explicitly marked known-bad
+  for the E2489. Panel Phases 0-3
+  were published as
   `v0.5.7-rc.11`; the functional editor/detail candidate was published as
   `v0.5.9-rc.1`, the first real-screenshot visual polish was published and
   deployed as `v0.5.9-rc.2`, the duplicate-back/channel-detail follow-up as
@@ -266,6 +1566,488 @@ not implemented:
 
 Read-only MCP was used only to read the device; no Home Assistant state changed.
 Dual-button facts marked *(confirm)* in the roadmap still need a raw capture.
+
+### B0 — device-variant discovery (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit. mypy not run locally (not
+installed). CI has not run. Not deployed, no Hardware.**
+
+The first `ROADMAP_BUTTON.md` package: stop mis-presenting the dual button as a
+wheel with zero channels, before adding any feature. No entities, triggers or
+bindings for the dual button yet — that is B1.
+
+- `model.py`: `BilresaWheel` gains derived `variant` / `is_dual_button`
+  **properties** (not stored fields), computed from endpoint shape — a device
+  with rotary (up/down) endpoints is `wheel`, one with only button endpoints is
+  `dual_button` (`VARIANT_*` in `const.py`). Derived, so it can never disagree
+  with the endpoints, and no constructor/fixture anywhere needed changing.
+  Discovery still matches on the `"bilresa"` product substring; the variant is
+  the shape distinction, not a new product-code match.
+- `system_health.py`: `discovered_wheels` now counts wheel-variant devices only,
+  and a new `discovered_buttons` counts dual buttons — so the button no longer
+  inflates the wheel count.
+- `event.py`: `_sync` skips dual buttons, so no channelless wheel device is
+  reconciled/built for them (they already produced zero entities; this also stops
+  asserting a wheel link).
+- `panel_models.py`: `async_overview_snapshot` skips dual buttons, so the grid
+  no longer renders a zero-channel wheel card.
+- `coordinator.py`: the discovery log says the variant instead of always "wheel".
+- Tests: `test_model.py` (dual-button node fixture with the real shape — two
+  button endpoints, no channel label — variant assertions), `test_system_health.py`
+  (separate wheel/button counts) and `test_panel_models.py` (overview excludes the
+  dual button).
+
+Not done on purpose (deferred): a pre-existing merged `ikea_bilresa` identifier
+on an already-discovered dual button is not un-merged here; registry migration
+belongs with B1 when the device gets its real entities.
+
+Local validation on Windows / Python 3.14:
+
+```text
+python -m compileall (changed files)                 passed
+ruff format --check custom_components tests           passed (38 files)
+ruff check custom_components tests                    passed
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -p pytest_asyncio.plugin                            216 passed
+mypy                                                  not run (not installed locally)
+```
+
+Files: `custom_components/ikea_bilresa/const.py`, `model.py`, `system_health.py`,
+`event.py`, `panel_models.py`, `coordinator.py`, `tests/test_model.py`,
+`tests/test_system_health.py`, `tests/test_panel_models.py`, and this handoff.
+Owed before B0 closes: exact-revision CI (mypy/hassfest/HACS) and a deployed check
+that the dual button no longer shows as a wheel in System Health or the panel.
+
+### B1 (event entities) — dual button gestures in HA (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit (222 pytest pass on py3.14, ruff
+clean). mypy not run locally. CI has not run. Not deployed, no Hardware.**
+
+This is the event-surface slice of B1: the dual button now produces real Home
+Assistant event entities. Device triggers and button bindings are **not** in this
+slice (see "deferred" below).
+
+- `event.py`: `_sync` handles both variants — it reconciles the device for both,
+  then builds channel entities for a wheel and **button** entities for a dual
+  button. New `BilresaButtonEvent`: one entity per physical button, `unique_id`
+  `{node}_ep{endpoint}`, name `Button N` (1-based in endpoint order), device
+  model `BILRESA dual button` when unlinked.
+- **Addressing:** both button endpoints report `channel = None`, so they share the
+  one `signal_channel(node, None)` dispatcher signal. Each entity filters
+  `action.endpoint_id` to keep only its own button's gestures — no coordinator
+  hot-path change was needed (the actions were already being decoded and
+  dispatched; only the entity to receive them was missing).
+- **Advertised event types are capped by MultiPressMax:** `const.button_event_types`
+  returns `press`, `double_press`, `hold`, `release` for the dual button (max 2)
+  and adds `triple_press` only at max ≥ 3. No rotation. `model.py` now parses
+  `Switch.MultiPressMax` (attribute `ep/59/2`) into `SwitchEndpoint.multi_press_max`.
+  `_handle_action` also drops any press count not in the advertised list rather
+  than raising.
+- **The "past-max goes silent" quirk needs no new timeout here:** the engine's
+  button path is stateless (it acts only on `MultiPressComplete`/`LongPress`/
+  `LongRelease`, never accumulates), so an unclassified >max press simply produces
+  no event — correct, and it cannot get stuck. The timeout concern remains
+  relevant only to hold bindings (B2), which already have the ramp watchdog.
+- Tests: `test_model.py` (MultiPressMax parsing), `test_event.py`
+  (`button_event_types` cap, entity identity/types, endpoint filtering, dropped
+  over-max press, hold/release mapping).
+
+Local validation (Windows / Python 3.14): `compileall` passed, `ruff format
+--check` passed (38 files), `ruff check` passed, full `pytest` **222 passed**.
+mypy not run locally (not installed); CI is authoritative.
+
+Deferred to later B1/B2 slices, on purpose:
+- **Device triggers** for the buttons (the automation-UI dropdown). The event
+  entities are usable in automations now; the device-trigger sugar is next.
+- **Button binding profile** (click/double/hold targets, paired hold-to-ramp) —
+  that is B2.
+- **Un-merging the pre-existing `ikea_bilresa` identifier** off an already-linked
+  dual button: reconcile is now called for it and is idempotent, so no migration
+  is forced, but a dedicated registry migration for legacy state is still owed if
+  one is found in the field.
+
+Owed before this closes: exact-revision CI, and a deployed check that pressing the
+physical dual button drives its new `Button 1/2` event entities (single/double/
+hold/release), with no triple-press trigger advertised.
+
+### B1b — device triggers for the dual button (Claude Code, 2026-07-17)
+
+Status: **Implemented + Static + local Unit (226 pytest pass on py3.14, ruff
+clean, JSON valid). mypy not run locally. CI has not run. Not deployed, no
+Hardware.**
+
+Device-page automation triggers now match the device variant.
+
+- `device_trigger.py` is variant-aware. `async_get_triggers` looks up the
+  discovered device from the loaded coordinator (duck-typed, no import cycle):
+  a **dual button** offers `button_N` subtypes (one per physical button) with
+  only the gestures `button_event_types(MultiPressMax)` allows — press,
+  double_press, hold, release; **no rotation, no triple** at max 2. A wheel (or an
+  unknown device) keeps the existing `channel_1..3` triggers unchanged.
+- `async_attach_trigger` filters a button trigger on `endpoint_id` (buttons carry
+  `channel = None` and are told apart by endpoint), and keeps the channel filter
+  for wheels. `EVENT_BILRESA` already carries `endpoint_id`, so no coordinator
+  change was needed.
+- Strings: `button_1..4` subtypes added to `strings.json`, `translations/en.json`
+  and `translations/cs.json` (Tlačítko N); the existing `{subtype} pressed` /
+  `double-pressed` / `held` / `released` trigger-type strings already read
+  correctly for buttons.
+- **New `tests/test_device_trigger.py`** (there was none): dual button offers
+  button subtypes without rotate/triple, wheel still offers channels, the
+  `button_N → endpoint` mapping, and attach filters by endpoint not channel.
+
+Local validation (Windows / Python 3.14): `compileall` passed, JSON parse of the
+three string files passed, `ruff format --check` passed (39 files), `ruff check`
+passed, full `pytest` **226 passed**. mypy/hassfest not run locally; CI is
+authoritative (hassfest validates strings.json ↔ en.json alignment).
+
+Still deferred to B2: the button binding profile (click/double/hold targets,
+paired hold-to-ramp). The legacy-identifier registry migration is still owed if
+found in the field.
+
+Owed before B1b closes: exact-revision CI, and a deployed check that the dual
+button's device page lists Button 1/Button 2 triggers (press/double/hold/release,
+no triple, no rotation) and that one fires a test automation.
+
+### B2 — dual-button binding profile and config flow (Codex, 2026-07-17)
+
+Status: **Implemented + Static + local Unit. CI has not run. Not committed,
+deployed, HA-UI-verified or Hardware-verified.**
+
+B2 now treats each physical button as its own fully independent control binding,
+including when several dual buttons expose the same endpoint numbers:
+
+- **Stored/runtime address:** a wheel binding remains `node_id + channel`; a
+  dual-button binding stores `node_id + endpoint`. Runtime keys are explicitly
+  tagged `(node_id, "channel", channel)` or
+  `(node_id, "endpoint", endpoint_id)`, so the two buttons on one device cannot
+  collide and endpoint 1 on one physical dual button cannot collide with
+  endpoint 1 on another. Both button bindings still subscribe to the existing
+  shared `channel=None` action/raw signals and filter the action's `endpoint_id`
+  before running.
+- **Independent actions:** each endpoint has its own single-press action
+  (`toggle` / `on` / `off` / `none`) and target, optional double-press toggle
+  target, and hold action/target. Button 1 may therefore toggle one light while
+  button 2 toggles another; every other dual button has its own independent pair.
+- **No impossible UI:** creation selects the physical BILRESA first, then builds
+  the schema from its parsed variant. A dual button never receives mode, step,
+  acceleration, min/max brightness, transition, scene or triple-press fields.
+  Its multi-press selector says single/double only. Wheel profiles retain their
+  rotary and triple-press fields. Reconfigure may move a binding only between
+  devices of the same variant, preventing a channel-shaped entry from being
+  saved onto a button-shaped device.
+- **Copy flow:** copy-from-existing still pre-fills actions, but the selected
+  destination node is authoritative and unsupported source fields are omitted
+  before storage. Copying a wheel profile to a button cannot smuggle mode,
+  rotation, scene or triple-press fields into the button subentry.
+- **Hold-to-ramp / software DIRIGERA:** button bindings reuse the existing
+  brightness ramp, release/reconnect/new-gesture stops and 30-second watchdog.
+  A new button-only direction can be `up`, `down` or `alternate`, so two endpoint
+  bindings may share a light while button 1 always brightens and button 2 always
+  dims. The historic wheel behavior remains `alternate`.
+- **Icon:** `bilresa_icons.js` now contains the owner-supplied dual-button
+  primary and 0.32 secondary paths as the self-contained
+  `bilresa:dual-button` glyph. Both current and legacy Home Assistant icon
+  contracts resolve it, and `BilresaButtonEvent` uses it. The wheel glyph is
+  unchanged.
+- **Documentation:** the endpoint address decision and fixed-direction paired
+  ramp are recorded in `docs/ROADMAP_BUTTON.md` and
+  `docs/DEVICE_REFERENCE_BUTTON.md`; `CHANGELOG.md` records the user-visible
+  behavior.
+
+Tests use the real device shape (two `ROLE_BUTTON` endpoints, `channel=None`,
+`MultiPressMax=2`) and cover two endpoints on one device, the same endpoint ids
+on a second device, independent click targets, endpoint-filtered fast response,
+copy sanitization, hidden rotary/triple fields, wheel-schema preservation,
+fixed up/down shared-target ramps, release/watchdog safety, titles and both icon
+provider contracts.
+
+Exact local validation on Windows / Python 3.14:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+EN/CS/string recursive key alignment                 passed (163 paths each)
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel + icon provider                    passed
+node --test panel + icon frontend tests               passed (10 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                         passed (238 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Not run: hassfest, HACS validation and exact-revision GitHub CI. No Home
+Assistant config-flow screen was opened and no physical press changed a target,
+so neither HA UI nor Hardware is claimed. The existing identifier-registry
+migration was not needed and remains a separate owed item. B3 panel rendering
+was intentionally not touched by the B2 slice; its later implementation is
+recorded directly below.
+
+Known assumption: the config flow validates the selected endpoint against the
+currently discovered device, and stores the Matter endpoint rather than a
+derived button index. This is stable across multiple physical devices and does
+not assume endpoints are globally unique.
+
+Single best next action: after owner review of the combined B2+B3 tree, commit
+it and run exact-revision CI; only then deploy a candidate for the real-HA panel
+pass and execute `HARDWARE_TEST.md` F3 for independent button targets and the
+fixed up/down shared-light ramp.
+
+### B3 — existing panel adapted for the dual button (Codex, 2026-07-17)
+
+Status: **Implemented + Static + local Unit + browser-harness visual checks.
+Not committed, not run in exact-revision CI, not deployed to Home Assistant and
+not Hardware-verified.**
+
+B3 is an adaptation of the existing wheel panel, not a second panel or a new
+visual direction:
+
+- **Shared overview and rail:** every wheel and every dual-button device stays
+  in the same landing grid and the same 256 px detail switcher. Multiple
+  dual-button devices retain separate opaque device keys and each shows its own
+  button 1/2 summaries.
+- **The same workbench:** the dual-button detail literally reuses
+  `.channel-workbench`, `.channel-spine`, `.channel-position` and
+  `.channel-surface`. The wheel's vertical `1 / 2 / 3` selector becomes
+  `1 / 2`; selecting a number opens one button in the same right-hand gesture
+  ledger. An earlier two-stacked-card draft was rejected after owner review and
+  removed; no button-only card system or parallel panel remains.
+- **Independent binding editor:** button 1 and button 2 open the existing inline
+  editor with only their supported short press, double press and hold/release
+  fields. Saving sends the safe display button number; the server resolves and
+  stores the Matter endpoint. Endpoint ids never enter the frontend snapshot or
+  mutation response.
+- **Adapted Live test:** the existing `Live test` tab remains. The WebSocket
+  activity API maps a private endpoint to safe `button: 1|2` server-side, so the
+  UI reports the physical button, short/double/hold/release gesture, dispatch
+  state and structured binding result. Panel-triggered tests offer only single,
+  double, hold and release. Rotation, triple press and the detent strip remain
+  wheel-only.
+- **Variant-aware diagnostics and copy:** last activity names a button for the
+  dual device; device-level diagnostic wording no longer calls every BILRESA a
+  wheel. EN and CS panel dictionaries remain exactly aligned.
+
+The privacy/multi-device tests cover two dual-button devices with the same
+endpoint numbers, independent targets, safe endpoint-to-button activity
+mapping, binding mutations without leaked endpoint ids, and rejection of
+channel-shaped or unsupported rotary/triple requests.
+
+Browser harness checks used the production custom element and its production
+CSS, first at the owner's 1521 px reference width and then at 320 px. The
+desktop workbench matched the existing wheel composition with a vertical grey
+spine and one right-hand action surface. Light and custom dark themes had no
+document, host or main-pane horizontal overflow; both button positions were
+present; every visible control measured at least 44 px; and real Tab traversal
+showed a 2 px focus outline at every in-panel stop. The adapted Live test showed
+`Tlačítko 2 · dvojitý stisk`, its structured target result, no detent strip and
+only the four supported synthetic controls. This is harness evidence, **not** a
+real-HA visual pass.
+
+Exact local validation on Windows / Python 3.14 after B3:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+EN/CS/string recursive key alignment                 passed
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel + icon provider                    passed
+node --test panel + icon frontend tests               passed (16 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest
+  -q -p pytest_asyncio.plugin                         passed (246 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Still owed: exact-revision hassfest/HACS/Ruff/mypy/unit CI, a real Home
+Assistant light/dark/custom-theme visual and screen-reader pass, and B4 physical
+verification. No release, deployment or device control has been performed.
+
+### `v0.6.0-rc.1` publication and controlled deployment
+
+The owner explicitly authorized publication of B0-B3 as an RC and installation
+through the existing custom HACS repository on 2026-07-17, specifically to make
+the real-HA and physical checks in B4 possible.
+
+Candidate preparation:
+
+- branch: `agent/dual-button-0.6`, based on the currently deployed 0.5.x line;
+- version/tag: `0.6.0-rc.1` / `v0.6.0-rc.1`;
+- scope: B0 variant discovery, B1 event entities/device triggers, B2 independent
+  bindings/config flow, and B3 adaptation of the existing panel and Live test;
+- B4 remains open and this tag must be a **prerelease**, never stable;
+- local Static, Python Unit, frontend Unit and browser-harness results are
+  recorded in the B2/B3 sections above.
+
+The historical repository warning about installation-specific identifiers in
+an older, already-public commit remains recorded above. The owner has now
+explicitly requested another repository release from this same public history;
+the release must not copy any such identifiers into notes, logs or chat.
+
+Concrete publication and deployment results:
+
+- B0/B1 commit `7446194` and B2/B3/release commit `b0c139a` were pushed on
+  `agent/dual-button-0.6`;
+- draft PR `#2` targets `agent/stabilize-0.5-x`, keeping the `0.6.x` train
+  separate from the wheel stabilization line;
+- exact-revision CI run `29612854755` passed on full commit
+  `b0c139ae45d60f925f18041758f60853830f81c3`: Ruff, frontend checks, mypy,
+  246 Python tests, HACS validation and hassfest all succeeded;
+- GitHub prerelease `v0.6.0-rc.1` was published, and its lightweight tag points
+  directly to that exact CI-verified commit;
+- the pre-deployment Home Assistant configuration check was valid; HACS
+  installed the exact tag and reported `v0.6.0-rc.1` pending restart;
+- Home Assistant restarted normally. The post-restart configuration check is
+  valid, the BILRESA config entry is `loaded`, Matter is connected through
+  `core_matter_client`, and HACS reports `v0.6.0-rc.1` installed;
+- post-restart integration health reports three existing wheels, four existing
+  bindings and the new `discovered_buttons` field. It currently reports zero
+  discovered dual buttons, so discovery and all gesture/binding outcomes remain
+  B4 Hardware work rather than a release claim;
+- no BILRESA error was present after startup. The only matching log lines are
+  Home Assistant's standard warning for an unreviewed custom integration.
+
+This establishes publication plus install/startup smoke for the RC.1 package,
+not functional Hardware evidence for B0-B3.
+
+The owner's first real-panel check then disproved the RC.1 discovery fixture:
+
+- the already commissioned E2489 remained visible with the wheel glyph;
+- its detail still showed wheel copy and an empty three-channel surface;
+- no button-binding controls were offered;
+- sanitized live diagnostics showed exactly two endpoints with
+  `channel = null`, but semantic roles `scroll_up` and `scroll_down`;
+- System Health therefore reported three wheels and zero dual buttons.
+
+This is not a browser-cache defect. The server sent `variant = wheel`.
+The real E2489 uses Matter up/down semantic tags for its two physical buttons;
+the invented RC.1 fixture incorrectly omitted those tags. Corrective
+`v0.6.0-rc.2` classifies the exact pair of channel-less switch endpoints as a
+dual button and normalizes both downstream roles to `button`. Until RC.2 passes
+CI and the same real panel reports two buttons, B0 and B3 are not Hardware and
+RC.1 is not a valid B4 test baseline.
+
+Corrective RC.2 candidate preparation:
+
+- `tests/fixtures/bilresa_dual_button_node.json` contains only the minimal,
+  sanitized raw endpoint facts captured from core Matter diagnostics, with a
+  synthetic node id and no serial, network, entity or household identifiers;
+- the fixture includes the complete observed TagLists, FeatureMap `30` and
+  `MultiPressMax = 2` for both endpoints;
+- the same fixture now drives parser/decoder, panel-read-model and config-flow
+  regression tests, so those layers cannot silently substitute an invented
+  button shape again;
+- the official connectedhomeip Switches namespace confirms tags `0x0003` /
+  `0x0004` as semantic Up/Down functions, not physical rotation evidence;
+- local validation on 2026-07-18: JSON parsing and compileall passed; Ruff
+  format/check passed; mypy passed 20 source files; 251 Python tests and 16
+  frontend tests passed; `git diff --check` passed with CRLF warnings only.
+
+Corrective RC.2 publication and controlled deployment completed on 2026-07-18:
+
+- corrective commit `fb290d3` (`fix: classify the real BILRESA dual button
+  shape`) was pushed to `agent/dual-button-0.6`; draft PR #2 was updated;
+- exact-revision GitHub Actions run `29633850027` passed all six jobs for full
+  commit `fb290d3e2d0d38faa1a5a5222412ab5bd0cfc528`: Ruff, mypy, frontend,
+  251 Python tests, HACS validation and hassfest;
+- prerelease `v0.6.0-rc.2` was published from that exact commit:
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.2;
+  the RC.1 release notes were amended to identify its known E2489 defect, and
+  the RC.1 tag was not moved;
+- the pre-restart Home Assistant config check was valid; HACS installed exactly
+  `v0.6.0-rc.2`; Home Assistant restarted and the config entry returned to
+  `loaded` with the post-restart config check valid;
+- System Health changed from **3 wheels / 0 buttons** on RC.1 to **2 wheels /
+  1 dual button** on RC.2. Matter is connected through `core_matter_client`,
+  no fallback is active, and all four existing wheel bindings were preserved;
+- sanitized integration diagnostics report version `0.6.0-rc.2` and the real
+  dual-button shape as `variant = dual_button`: two channel-less endpoints,
+  both normalized to role `button`, each with `MultiPressMax = 2`;
+- the Home Assistant device registry now contains two enabled
+  `ikea_bilresa` event entities for that device, Button 1 and Button 2, with the
+  HA button event device class;
+- the live server-side `ikea_bilresa/overview` snapshot returns the existing
+  panel contract (`contract_version = 4`) with the same device shell,
+  `variant = dual_button`, `channels = []` and independent unconfigured button
+  controls `1 / 2`. The frontend maps that variant to the dedicated dual-button
+  glyph, the `Tlačítka / Živý test / Diagnostika` tabs, and `Přidat propojení`
+  for each control;
+- the config-subentry create schema lists the dual-button device alongside both
+  wheels, so the native add-binding path can select it. No real binding was
+  created and no target-changing panel test was run;
+- the only matching startup log line is Home Assistant's standard warning for
+  an unreviewed custom integration; no BILRESA runtime error was recorded.
+
+This is **Implemented + Static + Unit + CI + Released + real-HA server-side
+deployment smoke** for RC.2. It corrects the precise server-side failure shown
+by the owner's RC.1 screenshots. It is deliberately not labelled Hardware:
+the owner still needs to open a completely fresh panel tab and physically press
+both buttons to verify gesture delivery and real target outcomes in B4.
+
+### Post-RC.2 Live-test empty-state and history pass (2026-07-18)
+
+Status: **Implemented + Static + local Python Unit + frontend Unit. Not
+committed, not published, not deployed, no new Hardware claim.**
+
+The owner's first correct dual-button screenshot proved physical single presses
+were reaching the adapted Live test, but also exposed two product defects:
+
+- an unconfigured press was presented as the internal fallback
+  `Vypočtený výsledek se nehlásí`, making successful hardware recognition read
+  like a runtime error;
+- the recent-event card had no bounded visual height, so its event rows would
+  keep extending the detail page instead of becoming a secondary history.
+
+The live-result model now separates **recognized gesture** from **configured
+target outcome**. A press with no binding leads with `Stisk rozpoznán`, explains
+that it reached Home Assistant but the button does not control a target yet,
+and offers `Nastavit tlačítko 1/2`, which opens the existing inline editor for
+that exact physical button. Wheel channels use the same state model. A
+not-configured control is neutral, not a failed dispatch.
+
+The Live-test copy was reviewed as one state system rather than as isolated
+phrases. The intro now promises gesture recognition first and target action
+second; result/event labels are contextual; runtime jargon was removed from
+ordinary empty states; and the side heading is `Tlačítka` / `Kanály`, because
+the list includes configured and unconfigured controls.
+
+The recent-event list remains bounded to eight records in memory and is now
+also capped at 320 px on screen with vertical overflow, contained overscroll,
+stable scrollbar space and a labelled keyboard-focusable ordered list. It keeps
+native list semantics and a visible inset focus ring.
+
+Files:
+
+- `custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`
+- `custom_components/ikea_bilresa/panel_strings.py`
+- `tests/panel_frontend.test.mjs`
+- `tests/test_panel.py`
+- `tests/test_panel_strings.py`
+- `docs/PANEL_DESIGN.md`
+- `CHANGELOG.md`
+- `PROJECT_STATUS.md`
+
+Validation:
+
+```text
+manifest/strings/en/cs JSON parsing                  passed
+python -m compileall -q custom_components tests      passed
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+node --check panel                                   passed
+node --test panel + icon frontend tests               passed (19 tests)
+isolated Windows Python 3.14 pytest                   passed (254 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+The user-provided real-HA screenshot was inspected at its original resolution.
+No post-change real-HA screenshot was captured: the available authenticated
+screenshot service supports Lovelace dashboards, not this custom panel, and the
+Product Design browser workflow was not requested. Visual HA verification
+therefore remains pending and must not be inferred from code/tests.
 
 ## `0.5.9-rc.11` BILRESA icon identity (current working tree)
 
@@ -1888,24 +3670,282 @@ mixed into their real-phone verification.
   accumulator unless `docs/SCROLL_PERFORMANCE.md` revisit criteria are met.
 - Brand icon, brands PR and default HACS publication remain the final phase.
 
+### Matter Server 9.1.0 compatibility audit and G0 safeguards (2026-07-18)
+
+Status: **Implemented + Static + Python Unit + frontend regression +
+exact-revision CI + Released + real-HA deployment smoke. G0 overflow fix is not
+yet Hardware-verified.**
+
+The official Home Assistant add-on 9.1.0 changelog, matterjs-server 1.2.6 tag,
+WebSocket API/schema changelog, Python client and Matter 1.6 Switch definition
+were reviewed. Matter Server 9.1.0 uses server schema 12 with minimum supported
+schema 11; its own Python client still advertises schema 11. The integration
+therefore correctly remains a schema-11 compatibility client and accepts the
+new server instead of claiming schema 12 and breaking older schema-11 servers.
+System Health now reports both values separately.
+
+The dedicated WebSocket path now handles `node_updated`,
+`attribute_updated` and `server_shutdown` explicitly. The core-client adapter
+restores node/path context for Switch `CurrentPosition` by comparing the
+already-updated Matter node cache. CurrentPosition is deliberately only a
+release/stuck-state hint because matterjs-server may coalesce attribute updates
+under backpressure. Every user-visible gesture remains derived from ordered
+`node_event` messages.
+
+The Matter 1.6 overflow contract exposed a real bug:
+`decoded.get("count") or 1` converted a valid zero completion count into a
+single press. Zero, non-integer and positive counts above the endpoint's
+advertised `MultiPressMax` are now ignored instead of executing a target.
+
+The post-B3 feature ideas are specified in `docs/ADVANCED_GESTURES.md` as G1–G4:
+Instant response and observed hold duration; opt-in dual-button chords and
+wheel-button rotation modifiers; HA scripts/scenes/sequences and named
+profiles; saturation and cover tilt. The contract keeps all state isolated by
+node/endpoint, preserves the existing panel workbench and leaves complex logic
+to Home Assistant rather than embedding a second automation engine.
+
+The first bounded G1 slice is also implemented locally. Bindings and the
+existing panel editor now distinguish three real response points:
+`Instant initial press`, `Fast release` and `Multi-press aware`. Instant reacts
+once on `InitialPress`; semantic validation rejects it when double/triple or
+hold behavior would make that early action ambiguous. The later public
+completion still reaches event entities, device triggers and the public event
+bus, but the direct binding cannot execute twice. Existing stored bindings keep
+their prior default.
+
+G1 also records `observed_duration_ms` for hold/release actions when
+`InitialPress` and the later boundary belong to one uninterrupted host-
+monotonic observation. The public event entity, event bus, binding activity and
+Live test carry the bounded value. The panel labels it as integration-observed
+time (for example `zachyceno 2,25 s`), not physical contact duration. A
+reconnect, reset or CurrentPosition release hint invalidates the measurement
+instead of manufacturing a number.
+
+Files added or materially changed by this package:
+
+- `custom_components/ikea_bilresa/matter_ws.py`
+- `custom_components/ikea_bilresa/matter_core.py`
+- `custom_components/ikea_bilresa/coordinator.py`
+- `custom_components/ikea_bilresa/engine.py`
+- `custom_components/ikea_bilresa/const.py`
+- `custom_components/ikea_bilresa/system_health.py`
+- `custom_components/ikea_bilresa/binding.py`
+- `custom_components/ikea_bilresa/binding_config.py`
+- `custom_components/ikea_bilresa/event.py`
+- `custom_components/ikea_bilresa/panel_api.py`
+- config-flow, panel and EN/CS response copy
+- `tests/fixtures/matterjs_1_2_6.json`
+- protocol/core/coordinator/engine/System Health tests
+- `docs/MATTERJS_COMPATIBILITY.md`
+- `docs/ADVANCED_GESTURES.md`
+- `docs/ROADMAP_BUTTON.md`
+- `CHANGELOG.md`
+
+Validation:
+
+```text
+isolated Windows Python 3.14 pytest                   passed (275 tests)
+ruff format --check custom_components tests          passed (39 files)
+ruff check custom_components tests                   passed
+mypy custom_components/ikea_bilresa                  passed (20 source files)
+python -m compileall -q custom_components tests      passed
+node --check panel                                   passed
+node --test panel + icon frontend tests              passed (20 tests)
+git diff --check                                     passed (CRLF warnings only)
+```
+
+Publication and controlled deployment completed on 2026-07-18:
+
+- candidate commit `e6e67eb` was pushed on `agent/dual-button-0.6`;
+- GitHub Actions run `29636673855` passed hassfest, HACS validation, Ruff,
+  mypy, frontend tests and Python unit tests;
+- annotated tag and prerelease `v0.6.0-rc.3` resolve to exact candidate
+  `e6e67eb`;
+- the pre-restart Home Assistant configuration check was valid, HACS installed
+  exactly `v0.6.0-rc.3`, and Home Assistant restarted normally;
+- post-restart diagnostics reported integration manifest `0.6.0-rc.3`, config
+  entry `loaded`, Matter Server add-on `9.1.0` started, server schema `12`,
+  client compatibility schema `11`, event source `core_matter_client`, no
+  fallback, two wheels, one dual button and all six stored bindings;
+- no `ikea_bilresa` system-log entry appeared after startup.
+
+No binding, automation, target or device configuration was changed during
+deployment. This establishes a successful server-side deployment smoke on
+Matter Server 9.1.0/schema 12.
+
+The owner then repeated the exact three-rapid-tap overflow gesture on the
+installed RC.3. Matter Server reported `MultiPressComplete(0)` on the E2489
+endpoint. RC.3 dispatched zero actions, neither the public custom event entity
+nor the core Matter event entity advanced, the configured target stayed
+unchanged, and no `ikea_bilresa` error appeared. The G0 zero-count safeguard is
+therefore **Hardware PASS** on the exact released candidate. Above-max rejection
+remains Unit evidence because the real device represents this overflow as zero.
+An immediate deliberate normal single then produced
+`MultiPressComplete(1)`, advanced both event surfaces once, dispatched exactly
+one binding action and changed only the configured target once. Recovery after
+the ignored overflow is also **Hardware PASS**.
+
+The next single arrived after approximately 2 hours 11 minutes without a valid
+Switch gesture on that endpoint. Matter Server emitted exactly one completion
+with count one; both event surfaces advanced once and the binding action count
+increased by one. There was no queued Switch burst, reconnect, fallback or
+matching integration error. The B4 idle-resume gate is therefore
+**Hardware PASS**.
+
+The owner then pressed the other E2489 side and immediately operated the living
+room wheel. Only the second dual-button endpoint advanced and it toggled only
+its configured target once; the first endpoint stayed unchanged. The wheel
+then emitted eight real-time rotate-up batches on channel 3 and the integration
+dispatched exactly eight corresponding wheel actions. Wheel channels 1/2 and
+the observed dual-button targets did not change from the wheel activity. No
+reconnect, fallback or matching error appeared. Cross-endpoint and cross-node
+no-leak are therefore **Hardware PASS** for this bounded adjacent-use test. The
+integration config entry was then reloaded without restarting Home Assistant.
+It returned `loaded` through `core_matter_client` with two wheels, one dual
+button and all six stored bindings. Its first post-reload physical single
+produced exactly one completion, one public event, one binding action and one
+intended target change; no old event replayed and no fallback or error
+appeared. Config-entry restore is therefore **Hardware PASS**.
+
+The subsequent controlled restart of only the Matter Server add-on exposed a
+real RC.3 lifecycle defect. While Home Assistant temporarily had no loaded core
+Matter config entry, `_get_loaded_client()` indexed an empty list and the
+ten-second runtime-unavailable threshold caused a permanent switch to
+`dedicated_websocket` for that integration load. Diagnostics recorded one
+fallback with reason `list index out of range`, and the dual button was
+temporarily unavailable. Reloading only the IKEA BILRESA config entry restored
+`loaded`, `core_matter_client`, two wheels, one dual button and all six
+bindings. RC.3 therefore **FAILS** the controlled Matter Server restart gate;
+the successful config-entry reload does not turn that result into a pass.
+
+The local `v0.6.0-rc.4` candidate explicitly represents the missing loaded
+Matter entry as a temporary runtime condition, extends the runtime grace from
+10 to 60 seconds, and reattaches to the replacement core client. Initial
+unsupported-client fallback remains immediate and persistent runtime
+incompatibility still falls back after the grace period. The exact regression
+test keeps the Matter entry absent for five monitor checks, restores a new
+client, and proves reattachment without fallback. Local validation passed 276
+Python tests, 20 frontend tests, Ruff format/lint, mypy, compileall, panel
+syntax and diff checks. Candidate commit `5a39f90` is pushed on
+`agent/dual-button-0.6`; GitHub Actions run `29641407216` passed hassfest, HACS
+validation, Ruff, mypy, frontend checks and Python unit tests on that exact
+revision.
+
+The release/deployment follow-up completed on 2026-07-18:
+
+- release commit `90076cf` passed exact-revision GitHub Actions run
+  `29641472813`;
+- annotated tag and prerelease `v0.6.0-rc.4` resolve to `90076cf`;
+- HACS installed exactly `v0.6.0-rc.4`; configuration validation passed and
+  Home Assistant restarted normally;
+- the loaded manifest reported `0.6.0-rc.4`, with Matter Server 9.1.0/schema 12,
+  client compatibility schema 11, `core_matter_client`, two wheels, one dual
+  button, six bindings and no fallback;
+- a controlled restart of only the Matter Server app produced one disconnect
+  and one successful core-client reattach. Connection count advanced to two,
+  fallback count stayed zero through the full grace window, all devices and
+  bindings returned, and no matching integration error appeared;
+- the first physical Button 1 single afterward advanced the custom and core
+  Matter event surfaces once, dispatched exactly one action and changed only
+  its intended light from off to on. Button 2 and the other observed targets
+  stayed unchanged.
+
+RC.4 therefore has Static, Unit, exact-revision CI, Released, deployed and
+Hardware evidence for the Matter Server restart recovery and first post-restart
+single.
+
+The owner then authorized the two remaining targeted B4 failure-injection
+checks with a reversible safe dimmable target. Button 2 was temporarily changed
+from hold-none to hold-ramp-up while its existing single/double targets were
+preserved. A qualifying real hold produced `long_press` at `13:32:44.658`; the
+30-second watchdog fired at `13:33:14.664`, and the later
+`long_release` at `13:34:03.490` neither restarted the ramp nor emitted a stale
+command. There was no cross-target change, reconnect or fallback. The exact
+original Button 2 payload was restored, including its original
+`73c03e349fe721d3` revision, and the safe target returned to its original off
+state.
+
+The already configured wheel channel-2 target was then naturally unavailable
+while its power relay was off. Two physical detent batches were decoded and
+skipped with one transition-deduplicated availability warning, no target
+change, no recurring command, no integration error and no fallback. After
+power recovery, a clean physical clockwise detent decoded as up and moved the
+target from brightness 128 to 135, proving normal-path recovery and the
+expected clockwise-to-brighten mapping. The target was restored to its original
+100% brightness.
+
+RC.4 therefore has **B4 Hardware PASS**. The run covers the real E2489 grammar,
+both endpoints, independent binding outcomes, overflow safeguard, idle resume,
+cross-endpoint/node isolation, config-entry reload, Matter Server restart,
+lost-release watchdog, unavailable-target suppression and recovery. The
+optional paired two-button hold-ramp profile was not configured and is not
+claimed.
+
+This follow-up changes documentation only. `git diff --check` passed and the 20
+Node frontend tests passed. A fresh `python -m pytest -q` attempt did not reach
+test execution because the current system Python lacks the `homeassistant`
+package; all 18 collection modules reported that same missing dependency. This
+is a local-environment limitation, not a Python-test pass. The installed code
+remains the exact `v0.6.0-rc.4` release whose Python suite and six CI jobs
+already passed; no runtime source or test file changed in this follow-up.
+
+### B4 E2489 partial hardware run on Matter Server 9.1.0 (2026-07-18)
+
+The owner authorized and performed a controlled physical gesture run against
+the currently installed `v0.6.0-rc.2`; Codex observed Home Assistant state,
+recorder history, redacted integration diagnostics and sanitized Matter Server
+logs. No binding, integration option, logger level, automation or device
+configuration was changed.
+
+Both physical buttons passed single, double, long-press and long-release
+delivery. Slow pairs remained separate singles and fast pairs completed as
+doubles. Configured single, double, hold-toggle and hold-none outcomes affected
+only their intended targets. Both CurrentPosition values returned to zero and
+no matching integration error appeared.
+
+The real E2489 then reproduced the exact G0 overflow case: three rapid physical
+taps ended with `MultiPressComplete(0)`. Installed RC.2 converted zero to one,
+published a false single press and toggled its configured target. A subsequent
+normal single completed correctly, so the input was not left stuck. This is
+direct Hardware evidence that the local `count <= 0` safeguard is necessary;
+it is not Hardware evidence that the safeguard works until an exact candidate
+is installed and the same test passes without a target action.
+
+The raw grammar and sanitized environment were added to
+`docs/DEVICE_REFERENCE_BUTTON.md`; the partial verdict and remaining gates are
+recorded in `docs/HARDWARE_TEST.md`. Overall B4 remains **IN PROGRESS**.
+
 ## Single best next action
 
-`v0.5.9-rc.12` is deployed and loaded (deployment smoke clean). Open the panel
-in a **completely fresh** browser tab — an existing tab keeps the old custom
-element and the web platform does not allow redefining it. Then visually check
-the channel spine, the corrected rail (accent icon + weight on the open wheel,
-no stray tick row), the lighter unconfigured channels, the result-led Live test
-with its detent strip, and the tab strip with no scrollbar. Capture screenshots
-against a non-default theme, which the harness could not exercise.
+Review the remaining unchecked all-features hardware matrix independently from
+the now-complete B4 package, then decide whether `v0.6.0-rc.4` needs a final
+soak-only RC follow-up or is ready for the explicitly authorized stable-release
+gate.
 
 ## Next-agent handoff
 
 1. Read the required instruction/reference files; do not rely on chat history.
-2. Start from implementation commit `f676bb7` plus the deployment-record
-   follow-up on `agent/stabilize-0.5-x`; then re-check HEAD, branch and status.
-3. Do not move the `v0.5.9-rc.1` tag away from runtime commit `c3c5c2f`.
-4. For the icon package, Static, Python Unit, frontend Unit, exact-revision CI,
-   release and backend deployment smoke are established. Real HA visual review
-   and Hardware remain pending.
-5. Do not mutate real bindings or run target-changing panel tests unless the
-   owner identifies a safe binding/target for that check.
+2. Start from RC.3 release commit `e6e67eb` plus its deployment-record
+   follow-up on `agent/dual-button-0.6`; then re-check HEAD, branch and status.
+3. Do not move the `v0.6.0-rc.1` tag away from runtime commit `b0c139a`.
+4. RC.1 failed real E2489 discovery. RC.2 fixed discovery and supplied partial
+   B4 Hardware evidence but failed three-tap overflow handling. RC.3 has Static,
+   Python Unit, frontend Unit, exact-revision CI, Released and successful
+   Matter Server 9.1.0/schema-12 deployment-smoke evidence; its zero-count
+   overflow fix and immediate normal-single recovery passed the exact physical
+   retest, and a later single passed after approximately 2 hours 11 minutes
+   idle with no queued burst or reconnect. Adjacent use of the other dual-button
+   endpoint and wheel channel 3 also passed cross-endpoint/node no-leak. A
+   config-entry reload restored all devices/bindings and its first single
+   exactly once. Its controlled Matter Server restart then failed because the
+   temporary core-entry unload triggered a permanent dedicated-WebSocket
+   fallback. RC.4 release commit `90076cf` fixes that lifecycle path and is
+   locally validated, exact-revision CI-green, Released, deployed and Hardware
+   PASS for the controlled restart plus first physical post-restart single.
+5. The owner selected a safe dimmable target for the bounded watchdog check.
+   The temporary binding and target state were restored exactly; do not repeat
+   target-changing tests without fresh authorization.
+6. The Live-test polish and G0 compatibility safeguards are included in RC.3.
+   Do not promote RC.3 to stable. RC.4 is the current prerelease and now has
+   complete B4 Hardware evidence, including restart recovery, watchdog,
+   unavailable-target suppression and normal-path recovery.

@@ -15,6 +15,7 @@ from .const import (
     ATTR_BASIC_PRODUCT_NAME,
     ATTR_DESCRIPTOR_PARTS_LIST,
     ATTR_DESCRIPTOR_TAGLIST,
+    ATTR_SWITCH_MULTI_PRESS_MAX,
     BILRESA_PRODUCT_MATCH,
     CLUSTER_BASIC_INFO,
     CLUSTER_DESCRIPTOR,
@@ -31,6 +32,8 @@ from .const import (
     TAG_KEY_LABEL,
     TAG_KEY_NAMESPACE,
     TAG_KEY_TAG,
+    VARIANT_DUAL_BUTTON,
+    VARIANT_WHEEL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,17 +46,51 @@ class SwitchEndpoint:
     endpoint_id: int
     channel: int | None
     role: str  # ROLE_SCROLL_UP / ROLE_SCROLL_DOWN / ROLE_BUTTON
+    multi_press_max: int | None = None  # Switch.MultiPressMax, if the node reports it
+
+
+def _is_dual_button_shape(endpoints: dict[int, SwitchEndpoint]) -> bool:
+    """Return whether endpoint structure matches the two-button E2489.
+
+    The real E2489 labels its two physical buttons with the Matter semantic
+    tags ``up`` and ``down``. Those tags describe the face of the remote; they
+    do not make the device a rotary wheel. The stable structural distinction is
+    that both endpoints lack the wheel's numeric channel label.
+
+    Requiring exactly two endpoints keeps a partial or malformed wheel dump
+    from being promoted to a supported dual button.
+    """
+    return len(endpoints) == 2 and all(
+        endpoint.channel is None for endpoint in endpoints.values()
+    )
 
 
 @dataclass(slots=True)
 class BilresaWheel:
-    """A discovered BILRESA scroll wheel."""
+    """A discovered BILRESA device (a scroll wheel or the dual button).
+
+    The class name is historical: it also carries the button-only variant. The
+    device kind is derived from endpoint shape via `variant`, never stored, so it
+    can never disagree with the endpoints it is computed from.
+    """
 
     node_id: int
     name: str
     product_name: str
     serial: str | None
     endpoints: dict[int, SwitchEndpoint]  # endpoint_id -> SwitchEndpoint
+
+    @property
+    def variant(self) -> str:
+        """Return the device variant from endpoint shape (wheel vs dual button)."""
+        if _is_dual_button_shape(self.endpoints):
+            return VARIANT_DUAL_BUTTON
+        return VARIANT_WHEEL
+
+    @property
+    def is_dual_button(self) -> bool:
+        """Whether this is the button-only BILRESA (E2489), not a scroll wheel."""
+        return self.variant == VARIANT_DUAL_BUTTON
 
 
 def _attr(attrs: dict[str, Any], ep: int, cluster: int, attr: int) -> Any:
@@ -114,10 +151,29 @@ def parse_node(node: dict[str, Any]) -> BilresaWheel | None:
             continue
         taglist = _attr(attrs, ep, CLUSTER_DESCRIPTOR, ATTR_DESCRIPTOR_TAGLIST)
         channel, role = parse_taglist(taglist)
-        endpoints[ep] = SwitchEndpoint(endpoint_id=ep, channel=channel, role=role)
+        raw_max = _attr(attrs, ep, CLUSTER_SWITCH, ATTR_SWITCH_MULTI_PRESS_MAX)
+        multi_press_max = (
+            raw_max
+            if isinstance(raw_max, int) and not isinstance(raw_max, bool)
+            else None
+        )
+        endpoints[ep] = SwitchEndpoint(
+            endpoint_id=ep,
+            channel=channel,
+            role=role,
+            multi_press_max=multi_press_max,
+        )
 
     if not endpoints:
         return None
+
+    if _is_dual_button_shape(endpoints):
+        # E2489 uses the semantic up/down tags for its two physical buttons.
+        # Normalize both endpoints here so every downstream consumer (gesture
+        # engine, event entities, device triggers, bindings and panel) sees the
+        # button semantics that the hardware actually exposes.
+        for endpoint in endpoints.values():
+            endpoint.role = ROLE_BUTTON
 
     serial = node.get("attributes", {}).get(f"0/{CLUSTER_BASIC_INFO}/15")
     return BilresaWheel(

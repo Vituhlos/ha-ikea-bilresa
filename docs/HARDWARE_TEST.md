@@ -21,6 +21,43 @@ Record before testing:
 Enable debug logging for `custom_components.ikea_bilresa` and retain relevant,
 redacted logs for failures.
 
+## Raw event capture (independent oracle)
+
+For any item below that asserts what the device *actually sent* — notch counts,
+press classification, timing, or the dual button's past-max behaviour — capture
+the raw Switch-cluster stream at the Matter Server, one layer below Home
+Assistant's filtering. This is the layer the integration itself consumes, so it
+is a ground-truth oracle: it proves whether a decode mismatch is ours or the
+device's, and it removes the recurring "the device's physical count was not
+independently instrumented" limitation from earlier runs.
+
+Method (adapted from StephanMeijer's public gist,
+`https://gist.github.com/StephanMeijer/75a26615f9b692cf7ce7cf8d6716ade4`):
+
+- Inside the **Matter Server add-on** container, patch
+  `matter_server/server/device_controller.py` to log each Switch (cluster 59)
+  node event as it arrives — `received_at` (ms), `endpoint_id`, `event_id`,
+  `event_number`, device timestamp and raw `data`.
+- Read it live with the add-on logs, filtered to the marker, e.g.
+  `grep SWITCH_EVENT`.
+- Cross-check the captured `event_id`/`data` sequence against the integration's
+  decoded `ikea_bilresa_event`, event entity and (where applicable) device
+  trigger for the same physical gesture.
+
+Constraints — this is instrumentation, not a test, and does **not** replace the
+checklists:
+
+- It is a manual, host-side edit performed by the owner; it is **not** something
+  the assistant can do remotely.
+- The patch lives in the add-on's `site-packages` and is **wiped on any add-on
+  update**. Treat it as temporary and remove it after the run; never rely on it
+  as a permanent fixture.
+- Raw lines contain node IDs and other household identifiers. **Redact** before
+  pasting into this file, `PROJECT_STATUS.md`, issues or chat, per the repo's
+  privacy rules.
+- It captures what the device emits only. Binding outcomes, entity/trigger/event
+  agreement, lifecycle, fallback and soak still require the checklist items.
+
 ## A. Discovery and lifecycle
 
 - [ ] Integration connects to the configured Matter Server.
@@ -94,13 +131,13 @@ Repeat on all three channels:
 - [ ] Scene cycling follows the configured order and wraps to the first scene.
 - [ ] Scene cycling overrides the normal single-press action only when scenes
       are configured.
-- [ ] Hold-to-ramp begins on `hold` and stops immediately on `release`.
-- [ ] A deliberately missing `release` is stopped by the 30-second watchdog.
+- [x] Hold-to-ramp begins on `hold` and stops immediately on `release`.
+- [x] A deliberately missing `release` is stopped by the 30-second watchdog.
 - [ ] Disconnecting Matter or starting another gesture stops an active ramp.
 - [ ] The first ramp goes upward; the next completed hold goes downward.
 - [ ] Reconfiguring/unloading during a hold cancels the timer cleanly.
-- [ ] Hold action `toggle` preserves the legacy behavior.
-- [ ] Hold action `none` performs no service call.
+- [x] Hold action `toggle` preserves the legacy behavior.
+- [x] Hold action `none` performs no service call.
 - [ ] Each binding profile preselects the expected mode without saving the
       flow-only profile field into the subentry.
 - [ ] Copying a binding prepopulates its options, can be edited independently,
@@ -114,9 +151,419 @@ Repeat on all three channels:
 - [ ] Two wheels used concurrently do not leak actions across Matter nodes.
 - [ ] Logs contain no recurring exceptions, task warnings, or reconnect spam.
 
+## F. BILRESA dual button (E2489)
+
+Separate device class from the scroll wheel: two buttons, no rotary channels.
+See `docs/ROADMAP_BUTTON.md`. Sections A–E above are wheel-shaped; use this
+section for the dual button and capture the raw stream (above) for every
+"device actually sent" claim.
+
+Record before testing: dual button firmware version (owner's unit was `1.8.5`),
+hardware version, and the endpoint `MultiPressMax` read from diagnostics.
+
+### F1. Discovery and presentation
+
+- [x] The dual button is discovered from its node shape (two button endpoints,
+      no channel label), not from the product string.
+- [x] It is presented as a **buttons** device, not as a wheel with zero channels,
+      and is excluded from any "wheel" count in System Health.
+- [x] Each of the two buttons appears once as its own event entity.
+- [x] Restarting Home Assistant restores the device and any button bindings.
+- [x] Diagnostics redact node IDs, serials, names and target entity IDs.
+
+### F2. Raw button gestures (capture the raw stream)
+
+- [x] Single press on button 1 and button 2 each classify as one press.
+- [x] Double press on each button classifies as a double press.
+- [x] Long press emits `hold`; release emits `release` exactly once, per button.
+- [x] Advertised event types match the endpoint's `MultiPressMax`: **no triple
+      press** is offered for a `MultiPressMax = 2` device.
+- [x] Pressing **more than max** (≥3 fast presses): capture the actual firmware
+      completion contract and confirm the integration neither gets stuck nor
+      emits a false action. **Real E2489 emits `MultiPressComplete(0)`; RC.3
+      ignores it and accepts the next valid single exactly once.**
+- [ ] Event entity, device trigger and `ikea_bilresa_event` agree for each
+      gesture on each button.
+
+### F3. Button binding behaviour
+
+- [x] Single/double/hold targets affect only their configured entities.
+- [x] Hold action `toggle`/`none` behave as configured; a missing `release` is
+      stopped by the watchdog.
+- [ ] Paired hold-to-ramp (button 1 up / button 2 down on a shared target), if
+      configured, begins on `hold` and stops on `release`.
+- [ ] At a configured ramp limit, no recurring service calls continue; release
+      still arms the correct next alternating direction, and a lost release is
+      still cleared by the watchdog.
+- [x] Unavailable/unknown targets cause no errors or runaway commands.
+
+### F4. Reliability and no-leak
+
+- [x] After ~15 min idle (matterjs-server #526), the next press is still
+      delivered; note whether queued presses burst on resubscribe. **PASS on
+      RC.3 after ~2 h 11 min: one completion, one action, no queued Switch
+      burst, reconnect or fallback.**
+- [x] The two buttons do not leak actions into each other. **PASS on RC.3:
+      pressing endpoint 2 advanced only Button 2 and left Button 1 unchanged.**
+- [x] A dual button and a scroll wheel used concurrently do not leak actions
+      across Matter nodes. **PASS bounded adjacent-use check on RC.3: endpoint
+      2 single followed by eight channel-3 rotate batches; only those two
+      surfaces and their expected binding actions advanced.**
+- [x] Logs contain no recurring integration exceptions, task warnings, or
+      reconnect spam during the recorded B4 run.
+
+## G. Eager first-notch scroll response
+
+Use this section for any candidate that emits a rotary action on
+`InitialPress`. Keep acceleration at zero for the exact-accounting checks first;
+test an accelerated profile separately so multiplication cannot hide a missing
+or duplicated raw notch.
+
+Current hardware note (2026-07-18): Home Assistant's device registry confirms
+that both commissioned physical scroll wheels, as well as the dual button, now
+run firmware `1.9.15`. The owner selected only `Kolečko Obývák` for controlled
+RC.5 wheel tuning. Results below therefore apply only to that wheel; they must
+not be generalized to `Kolečko Nelča`. Earlier `1.8.7` observations remain
+valid historical evidence, but that firmware is no longer available for this
+candidate and must not be claimed as RC.5 hardware coverage.
+
+- [ ] On each of the two firmware-1.9.15 wheels, rotate one deliberate notch in
+      each direction. Confirm one immediate action follows InitialPress and the
+      later completion adds no second notch.
+- [ ] On each wheel, perform one continuous faster rotation. Sum the eager
+      notch and every later delta; it must equal the final cumulative Matter
+      count, including a sequence reaching 18.
+- [ ] Confirm a duplicate/equal cumulative report produces no additional
+      action, and a decreased/wrapped count starts a new baseline.
+- [ ] Reverse direction during ordinary use. Up/down endpoint accounting must
+      stay independent and the target must not jump in the old direction.
+- [ ] Stop after a fast rotation and wait through completion. No trailing
+      brightness change may appear after the exact final delta.
+- [ ] Continue turning briefly after the configured brightness maximum and
+      minimum is reached. The raw/action count may continue, but the binding
+      must not repeat an identical light service call or create delayed target
+      movement. Record the sanitized service-call count.
+- [ ] Change the physical channel selector and verify no eager notch leaks to
+      the preceding or adjacent channel.
+- [ ] Reload the BILRESA config entry and repeat one notch. Reconnect must clear
+      every eager credit and cumulative baseline.
+- [ ] Compare the selected target transition only after exact accounting passes.
+      Record subjective onset separately from the Home Assistant target-state
+      acknowledgement; neither is proof of physical photon timing.
+
 ## Recorded runs
 
-No complete hardware run has been recorded yet.
+A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
+below. Unchecked items belong to the broader all-features matrix and are not
+claims made by B4.
+
+### 2026-07-18 — `v0.6.0-rc.6` deployment baseline
+
+- annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit
+  `dd14521d03786ea63a6bbe6cc365a8dbf0088f1c`;
+- exact-revision GitHub Actions run `29647018640` passed hassfest, HACS
+  validation, Ruff, mypy, frontend checks and the full Python suite;
+- HACS installed exact `v0.6.0-rc.6`; configuration validation passed before
+  restart and again after Home Assistant returned;
+- loaded diagnostics report manifest `0.6.0-rc.6`, Matter Server add-on `9.1.0`
+  / matterjs-server `1.2.6`, server schema 12, compatibility schema 11,
+  `core_matter_client`, no fallback, two wheels, one dual button and six
+  bindings;
+- `Kolečko Obývák` channel 1 retained the controlled-test settings: brightness
+  mode, step 3%, acceleration 0%, bounds 1–100% and transition 0.0 seconds;
+- the integration config entry is loaded at logger level `WARNING`, diagnostics
+  list no integration issue, and post-restart logs contain no integration
+  exception (only Home Assistant's standard custom-component warning).
+
+This is deployment evidence only. No wheel gesture was requested after restart,
+so RC.6 has no corrective Hardware result yet and no section G item is checked.
+
+### 2026-07-18 — `v0.6.0-rc.5` deployment baseline
+
+- annotated tag and GitHub prerelease `v0.6.0-rc.5` resolve to exact commit
+  `e17797ac9be1f6183c6867738aed597824843487`;
+- exact-revision GitHub Actions run `29645572829` passed hassfest, HACS
+  validation, Ruff, mypy, frontend checks and the full Python suite;
+- HACS installed exact `v0.6.0-rc.5`; configuration validation passed before
+  restart and again after Home Assistant returned;
+- loaded diagnostics report manifest `0.6.0-rc.5`, Matter Server add-on `9.1.0`
+  / matterjs-server `1.2.6`, server schema 12, compatibility schema 11,
+  `core_matter_client`, no fallback, two wheels, one dual button and six
+  bindings;
+- the integration config entry is loaded at logger level `WARNING`, diagnostics
+  list no integration issues, and post-restart logs contain no integration
+  error (only Home Assistant's standard custom-component warning);
+- all three physical BILRESA devices are currently on firmware `1.9.15`.
+
+Post-restart telemetry received scroll traffic, including cumulative count 18,
+but those movements were not performed under one controlled instruction.
+They are not credited to section G. No G checklist item is checked by this
+deployment baseline.
+
+### 2026-07-18 — E2490 RC.5 controlled response and accounting runs
+
+Tester: owner operating only `Kolečko Obývák`; Codex observing Home Assistant,
+the integration diagnostics, recorder and sanitized Matter Server events
+through MCP. Channel 1 targeted `light.linka` (Shelly Plus 0-10V Dimmer), with
+step 3%, acceleration 0%, minimum 1% and maximum 100%.
+
+- One deliberate slow upward notch produced its public action approximately
+  18 ms after the raw InitialPress, with exactly one notch and no trailing
+  duplicate. The owner noted that a single 3% change was too subtle for a
+  useful subjective brightness judgement.
+- One deliberate slow downward notch produced its public action approximately
+  20 ms after InitialPress, with exactly one notch and no trailing duplicate.
+  The target changed from brightness 201 to 194; this was also too subtle for a
+  useful subjective latency judgement.
+- In a controlled fast downward run at transition 1.0 seconds, Matter
+  cumulative accounting decoded into deltas `1 + 1 + 2 + 2 + 5 = 11`.
+  The public event sum matched exactly, the target changed from brightness 194
+  to 110, and no trailing duplicate appeared. The owner perceived a delay.
+- Channel 1 was then reconfigured through the normal Home Assistant config
+  subentry flow to transition 0.0 seconds; target, mode, step, acceleration and
+  bounds remained unchanged. No restart was required.
+- In the controlled transition-0 run, Matter reported 18 notches and the public
+  BILRESA event sum was also exactly 18. First target-state acknowledgement
+  improved from approximately 906 ms in the transition-1 run to 548 ms, and the
+  owner described the perceived delay as the smallest so far.
+- **FAIL exact target outcome on installed RC.5:** brightness changed from 255
+  to 140, equivalent to only 15 configured steps rather than all 18. A failing
+  regression proved that a delayed Shelly state echo could clear the binding's
+  calculated absolute target after the 250 ms zero-transition margin while the
+  same Matter scroll was still active.
+- The released, not-deployed RC.6 candidate tracks active rotary endpoints independently
+  until their raw completion, with a two-second lost-completion safety expiry.
+  The regression that previously produced brightness 239 instead of the
+  required 224 now passes, including reversal and timeout coverage. Binding and
+  engine tests pass locally (116 tests), and the full Python suite passes
+  locally (316 tests). Static checks also pass. This is Static/Unit evidence
+  only, not corrective Hardware evidence.
+- A later rapid back-and-forth stress run was not performed under one bounded
+  instruction and is diagnostic only. It showed irregular valid public batches
+  including 14, 9, 6 and 14 notches. Transition 0.0 renders those batches as
+  visible jumps, while the configured min/max legitimately suppress identical
+  service calls and can create stationary periods during continuing input.
+
+The exact-target failure keeps section G open. The target-tracking correction
+must be validated and deployed before another controlled run. Perceived
+smoothing is a separate A/B after exact accounting passes: retain the eager
+first notch, then compare short measured transitions for later large batches.
+
+### 2026-07-18 — E2489 B4 partial run on `v0.6.0-rc.2`
+
+Tester: owner performing physical gestures, Codex observing Home Assistant,
+recorder, integration diagnostics and sanitized Matter Server logs read-only.
+
+Environment:
+
+- Home Assistant Core `2026.7.2`, Home Assistant OS `18.1`, Python `3.14.6`;
+- Matter Server add-on `9.1.0`, matterjs-server `1.2.6`,
+  matter.js `0.17.6-alpha.0-20260715-3585d95fe`;
+- WebSocket server schema `12`, minimum supported client schema `11`;
+- installed custom integration `v0.6.0-rc.2`, event source
+  `core_matter_client`, no fallback;
+- one E2489 on firmware `1.9.15`, hardware `P2.0`, two Switch endpoints,
+  `MultiPressMax = 2` on each;
+- two wheels, one dual button and six configured bindings in the integration;
+  household names, entity IDs, node IDs, serials and network identifiers omitted.
+
+Observed results:
+
+- **PASS F1:** System Health reported two wheels and one dual button; the E2489
+  appeared as a buttons device with one custom event entity per physical
+  button. Both bindings were restored and the diagnostic dump redacted node,
+  serial and target identifiers.
+- **PASS F2:** button 1 and button 2 each produced a single press, a double
+  press, one hold and exactly one release. Core Matter and custom event
+  entities agreed on endpoint and gesture. Both endpoints advertised only
+  single/double/hold/release, never triple.
+- **PASS F2 timing boundary:** deliberately slow pairs completed as two
+  separate singles; fast pairs completed as doubles.
+- **PASS F3:** separate single-press targets toggled only their configured
+  lights. A configured button-1 hold target toggled exactly once. Button 2,
+  configured with hold action `none`, still emitted hold/release and changed
+  neither its single nor double target. A configured double target changed
+  only on a completed double. A button-1 double with no double target changed
+  nothing.
+- **FAIL F2 overflow on the installed RC.2:** three rapid physical taps ended
+  with the real device's Matter 1.6 `MultiPressComplete(0)`. RC.2's
+  `decoded.get("count") or 1` converted zero to one, published a false single
+  press and toggled the single-press target.
+- **PASS recovery after the failure:** the endpoint position returned to zero;
+  the next physical single press completed as count one and toggled its target
+  normally. No recurring exception, task warning or reconnect spam appeared.
+- **OPEN:** public `ikea_bilresa_event` and device-trigger agreement were not
+  independently subscribed during this capture; only the two event-entity
+  surfaces were compared.
+- **OPEN:** installed-candidate overflow retest, approximately 15-minute
+  idle-resume, dual-button/wheel concurrent no-leak, unavailable-target,
+  watchdog/lost-release, integration/HA restore and controlled Matter Server
+  reconnect remain.
+
+The working tree already contains the G0 fix that rejects zero and counts above
+the endpoint's advertised maximum, plus a deterministic regression test. That
+implementation does not change this RC.2 result into a pass. It must be
+published, installed and physically retested on the exact candidate.
+
+Verdict: **FAIL on RC.2 overflow handling; otherwise the captured B4 gesture
+and configured-binding subset passes. Overall B4 remains IN PROGRESS.**
+
+### 2026-07-18 — `v0.6.0-rc.3` deployment and overflow retest
+
+The owner authorized publication and deployment of the G0 compatibility
+candidate. No physical button, wheel or controlled target was exercised during
+the deployment baseline.
+
+- exact release tag `v0.6.0-rc.3` resolves to candidate commit `e6e67eb`;
+- all six GitHub Actions jobs passed for that revision;
+- Home Assistant configuration validation passed before restart;
+- HACS installed exactly `v0.6.0-rc.3` and Home Assistant restarted normally;
+- post-restart diagnostics reported integration manifest `0.6.0-rc.3`, config
+  entry `loaded`, Matter Server add-on `9.1.0` started, server schema `12`,
+  minimum/client compatibility schema `11`, `core_matter_client`, no fallback,
+  two wheels, one dual button and six restored bindings;
+- the integration rediscovered both E2489 endpoints with
+  `MultiPressMax = 2`;
+- the post-start system log contained no matching `ikea_bilresa` entry.
+
+Physical overflow follow-up:
+
+- the owner made three rapid taps on the same E2489 side used for the RC.2
+  failure;
+- Matter Server logged the expected `MultiPressComplete(0)`;
+- RC.3 received the ordered Switch sequence but diagnostics remained at
+  `actions_dispatched = 0`;
+- the public custom event entity and matching core Matter event entity did not
+  advance or publish a false single;
+- the configured target state did not change during the gesture;
+- both integration and Home Assistant logs remained free of a matching error.
+- an immediate normal single on the same endpoint completed as count one,
+  advanced the custom and core event entities once, increased
+  `actions_dispatched` from zero to one and changed only its configured target
+  once; the other observed light remained unchanged.
+- after approximately 2 hours 11 minutes without another valid Switch gesture
+  on that endpoint, the next normal single completed as count one, advanced
+  both event surfaces once and increased `actions_dispatched` from one to two;
+  no queued Switch burst, reconnect, fallback or matching integration error
+  appeared.
+- the other E2489 endpoint then completed one single and only its Button 2
+  surfaces advanced; its configured target toggled once while Button 1 stayed
+  unchanged;
+- the living-room wheel immediately followed on channel 3 with eight decoded
+  rotate-up batches and exactly eight corresponding binding actions; wheel
+  channels 1/2 and the observed dual-button targets stayed unchanged during
+  the wheel activity;
+- connection count remained one, fallback count remained zero and no matching
+  integration error appeared.
+- a controlled reload of only the IKEA BILRESA config entry returned `loaded`
+  through `core_matter_client`, rediscovered two wheels and one dual button and
+  restored all six bindings;
+- the first physical single after that reload produced the expected
+  InitialPress/ShortRelease/complete-one sequence, advanced both event surfaces
+  once, dispatched one action and changed its intended target once; no old
+  event replayed and no fallback or matching error appeared.
+
+Verdict: **PASS deployment smoke and PASS real zero-count overflow safeguard.**
+This confirms that RC.3 loads on Matter Server 9.1.0/schema 12 and correctly
+ignores the real E2489 `MultiPressComplete(0)`. **PASS immediate recovery:** the
+next valid single was neither lost nor duplicated. **PASS idle-resume:** a
+single after ~2 hours 11 minutes was delivered once without a queued burst.
+**PASS bounded no-leak:** the two dual-button endpoints and wheel channel 3
+remained isolated during adjacent use. **PASS config-entry restore:** all
+devices/bindings returned and the first post-reload single executed once.
+Overall B4 remains **IN PROGRESS** for the Matter Server reconnect and targeted
+failure-injection gates.
+
+Controlled Matter Server restart follow-up:
+
+- only the Matter Server add-on was restarted; no binding, target, integration
+  option or automation was changed;
+- the add-on returned to `started`, but RC.3 observed the temporarily unloaded
+  core Matter config entry as `list index out of range`;
+- after two five-second checks RC.3 selected `dedicated_websocket`, recorded one
+  fallback and temporarily exposed the dual button as unavailable;
+- all six stored bindings remained present, but this is a **FAIL** because the
+  supported core Matter source did not recover in place;
+- reloading only the IKEA BILRESA config entry restored `loaded`,
+  `core_matter_client`, two wheels, one dual button, all six bindings and no
+  active fallback.
+
+Verdict amendment: **RC.3 FAILS the controlled Matter Server restart gate.**
+RC.4 adds a one-minute runtime restart grace and has deterministic Unit
+coverage for reattachment without fallback.
+
+### 2026-07-18 — `v0.6.0-rc.4` restart recovery retest
+
+- annotated tag and prerelease `v0.6.0-rc.4` resolve to exact release commit
+  `90076cf`;
+- exact-revision GitHub Actions run `29641472813` passed all six jobs;
+- HACS installed exactly `v0.6.0-rc.4`, the pre-restart configuration check was
+  valid and Home Assistant restarted normally;
+- diagnostics confirmed manifest `0.6.0-rc.4`, Matter Server `9.1.0`, server
+  schema 12, client compatibility schema 11, `core_matter_client`, two wheels,
+  one dual button, six bindings and zero fallback;
+- only the Matter Server app was then restarted. RC.4 recorded one disconnect,
+  attached to the replacement core client, refreshed its node snapshot and
+  stayed on `core_matter_client` for the full one-minute grace window;
+- connection count advanced from one to two while fallback count remained zero;
+  all three devices stayed represented and all six bindings remained present;
+- no matching `ikea_bilresa` system-log entry appeared;
+- the first physical Button 1 single afterward advanced both the custom and
+  core Matter event entities once and dispatched exactly one binding action;
+- its intended light changed from off to on once. Button 2 and the three other
+  observed light targets remained unchanged.
+
+Verdict: **PASS RC.4 controlled Matter Server restart recovery and PASS first
+post-restart physical single without loss, duplication or cross-button leak.**
+The targeted failure-injection follow-up below closes the two remaining B4
+gates.
+
+### 2026-07-18 — `v0.6.0-rc.4` targeted B4 failure injection
+
+- Home Assistant Core `2026.7.2`, Home Assistant OS `18.1`, Matter Server app
+  `9.1.0`, server schema 12 / client compatibility schema 11 and installed
+  integration `v0.6.0-rc.4` were unchanged.
+- The owner explicitly selected a safe dimmable target. Button 2 was
+  temporarily changed from hold-none to hold-ramp-up while its single and
+  double targets stayed unchanged. Its exact original payload and revision
+  were captured before the change.
+- The first bounded hold produced `long_press` at `13:30:55.975` and
+  `long_release` 21.825 seconds later. It correctly stopped on release but did
+  not qualify as a watchdog test. Two later physical singles affected only
+  Button 2's configured single target and left the other observed targets
+  unchanged.
+- The deliberate lost-release run produced `long_press` at `13:32:44.658`.
+  The integration logged
+  `Stopping hold-to-ramp after 30 seconds without a release event` at
+  `13:33:14.664`, 30.006 seconds later. The physical `long_release` arrived
+  afterward at `13:34:03.490`; it did not restart the ramp or dispatch a stale
+  command.
+- The source stayed `core_matter_client`, connection count stayed one and
+  fallback count stayed zero. The safe dimmable target remained at the prepared
+  100% ceiling; the other observed targets did not change during the qualifying
+  watchdog run.
+- Button 2 was then restored through the revision-checked panel API. The
+  original revision `73c03e349fe721d3` returned exactly, its hold action was
+  again `none`, and the safe target returned to its original `off` state.
+- With the existing channel-2 wheel target naturally `unavailable` while its
+  power relay was off, two physical detent batches were decoded. The binding
+  emitted one transition-deduplicated
+  `Skipping BILRESA action while target ... is unavailable` warning, made no
+  target change and produced no recurring command, integration error or
+  fallback.
+- Power was restored and the target recovered from `unavailable` to `on`.
+  A clean clockwise detent decoded through the channel's up endpoint and moved
+  brightness from 128 to 135 (the configured 3% step). This confirms normal
+  operation and physical clockwise-to-brighten direction after recovery. The
+  target was finally restored to its original 100% brightness.
+
+Verdict: **B4 HARDWARE PASS on `v0.6.0-rc.4`.** The complete recorded run now
+covers real E2489 discovery and grammar, both endpoints, normal and overflow
+multi-press behavior, independent binding outcomes, hold toggle/none,
+lost-release watchdog, idle resume, cross-endpoint/node isolation, config-entry
+reload, Matter Server restart recovery, unavailable-target suppression and
+normal-path recovery. The optional paired two-button hold-ramp profile was not
+configured and is not claimed.
 
 ### 2026-07-15 - `v0.5.7-rc.2` run in progress
 

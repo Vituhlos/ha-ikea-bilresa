@@ -1,0 +1,48 @@
+{
+  "server_info": {
+    "fabric_id": 2,
+    "compressed_fabric_id": 0,
+    "schema_version": 12,
+    "min_supported_schema_version": 11,
+    "sdk_version": "matter-server/1.2.6 (matter.js/0.17.6-alpha.0-20260715-3585d95fe)",
+    "wifi_credentials_set": false,
+    "thread_credentials_set": true,
+    "bluetooth_enabled": false,
+    "ble_proxy_enabled": true
+  },
+  "node_updated": {
+    "event": "node_updated",
+    "data": {
+      "node_id": 202,
+      "attributes": {
+        "0/40/3": "BILRESA dual button",
+        "0/29/3": [1, 2],
+        "1/59/0": 0,
+        "1/59/2": 2,
+        "2/59/0": 0,
+        "2/59/2": 2
+      }
+    }
+  },
+  "attribute_updated": {
+    "event": "attribute_updated",
+    "data": [202, "1/59/0", 1]
+  },
+  "overflow_complete_event": {
+    "event": "node_event",
+    "data": {
+      "node_id": 202,
+      "endpoint_id": 1,
+      "cluster_id": 59,
+      "event_id": 6,
+      "event_number": 2001,
+      "priority": 1,
+      "timestamp": 234567,
+      "timestamp_type": 0,
+      "data": {
+        "previousPosition": 1,
+        "totalNumberOfPressesCounted": 0
+      }
+    }
+  }
+}

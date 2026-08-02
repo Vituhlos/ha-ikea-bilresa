@@ -10,6 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from custom_components.ikea_bilresa.matter_core import (
+    _UNAVAILABLE_CHECKS_BEFORE_FALLBACK,
     CoreMatterEventSource,
     CoreMatterUnavailable,
 )
@@ -38,7 +39,7 @@ class FakeEventType:
 class FakeMatterClient:
     def __init__(self, node_id: int = 12) -> None:
         self.server_info = SimpleNamespace(sdk_version="test-sdk")
-        self._nodes = [SimpleNamespace(node_data=FakeNodeData(node_id, {}))]
+        self._nodes = [SimpleNamespace(node_data=FakeNodeData(node_id, {"1/59/0": 0}))]
         self.callback = None
         self.unsubscribe = Mock()
 
@@ -48,6 +49,9 @@ class FakeMatterClient:
 
     def get_nodes(self):
         return self._nodes
+
+    def set_position(self, endpoint_id: int, value: int) -> None:
+        self._nodes[0].node_data.attributes[f"{endpoint_id}/59/0"] = value
 
 
 class FakeConfigEntries:
@@ -109,6 +113,28 @@ async def test_reuses_nodes_and_node_events(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_restores_attribute_path_context_from_core_node_cache(
+    monkeypatch,
+) -> None:
+    client = FakeMatterClient()
+    hass = SimpleNamespace(config_entries=FakeConfigEntries(client))
+    events: list[tuple[str, Any]] = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.matter_core.async_track_time_interval",
+        lambda *_args: Mock(),
+    )
+    source = CoreMatterEventSource(
+        hass, "ws://matter/ws", lambda event, data: events.append((event, data))
+    )
+    await source.start()
+
+    client.set_position(1, 1)
+    client.callback(FakeEventType("attribute_updated"), 1)
+
+    assert events[-1] == ("attribute_updated", [12, "1/59/0", 1])
+
+
+@pytest.mark.asyncio
 async def test_reattaches_after_core_matter_reload(monkeypatch) -> None:
     first = FakeMatterClient(12)
     second = FakeMatterClient(13)
@@ -130,6 +156,45 @@ async def test_reattaches_after_core_matter_reload(monkeypatch) -> None:
     source._check_client(None)
 
     first.unsubscribe.assert_called_once()
+    assert events[-2] == ("__connected__", None)
+    assert events[-1][0] == "__nodes__"
+    assert events[-1][1][0]["node_id"] == 13
+
+
+@pytest.mark.asyncio
+async def test_transient_core_matter_restart_reattaches_without_fallback(
+    monkeypatch,
+) -> None:
+    first = FakeMatterClient(12)
+    second = FakeMatterClient(13)
+    config_entries = FakeConfigEntries(first)
+    hass = SimpleNamespace(config_entries=config_entries)
+    events: list[tuple[str, Any]] = []
+    unavailable = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.matter_core.async_track_time_interval",
+        lambda *_args: Mock(),
+    )
+    source = CoreMatterEventSource(
+        hass,
+        "ws://matter/ws",
+        lambda event, data: events.append((event, data)),
+        on_unavailable=unavailable,
+    )
+    await source.start()
+
+    config_entries.client = None
+    for _ in range(5):
+        source._check_client(None)
+
+    unavailable.assert_not_called()
+    first.unsubscribe.assert_called_once()
+    assert events[-1] == ("__disconnected__", None)
+
+    config_entries.client = second
+    source._check_client(None)
+
+    unavailable.assert_not_called()
     assert events[-2] == ("__connected__", None)
     assert events[-1][0] == "__nodes__"
     assert events[-1][1][0]["node_id"] == 13
@@ -181,7 +246,8 @@ async def test_runtime_incompatibility_requests_fallback(monkeypatch) -> None:
     await source.start()
 
     config_entries.url = "ws://different-matter/ws"
-    source._check_client(None)
-    unavailable.assert_not_called()
+    for _ in range(_UNAVAILABLE_CHECKS_BEFORE_FALLBACK - 1):
+        source._check_client(None)
+        unavailable.assert_not_called()
     source._check_client(None)
     unavailable.assert_called_once()

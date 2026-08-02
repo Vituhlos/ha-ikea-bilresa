@@ -202,3 +202,364 @@ test("structured results lead with the human-readable outcome", () => {
     "Jas 42 → 58 %",
   );
 });
+
+test("an unconfigured button leads with recognized hardware, not a missing result", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        live_event_label: "Poslední gesto",
+        result_gesture_press: "Stisk rozpoznán",
+        result_not_configured_button_detail:
+          "Gesto dorazilo do Home Assistantu.",
+      },
+    },
+  };
+  const activity = {
+    button: 1,
+    gesture: "press",
+    presses: 1,
+    dispatch_status: "not_configured",
+    result: null,
+  };
+
+  assert.equal(panel._liveResultLabel(activity), "Poslední gesto");
+  assert.equal(panel._liveResult(activity), "Stisk rozpoznán");
+  assert.equal(
+    panel._liveExplanation(activity),
+    "Gesto dorazilo do Home Assistantu.",
+  );
+  assert.deepEqual(panel._dispatchLabel(activity), [
+    "unknown",
+    "dispatch_not_configured_button",
+  ]);
+});
+
+test("recognized multi-press copy keeps the physical gesture specific", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        result_gesture_double_press: "Dvojitý stisk rozpoznán",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._recognizedResult({ gesture: "press", presses: 2 }),
+    "Dvojitý stisk rozpoznán",
+  );
+});
+
+test("live setup opens the matching dual-button editor", () => {
+  const panel = newPanel();
+  const wheel = {
+    variant: "dual_button",
+    buttons: [
+      { button: 1, configured: false, binding: null },
+      { button: 2, configured: false, binding: null },
+    ],
+  };
+
+  panel._configureFromLive(wheel, {
+    button: 2,
+    gesture: "press",
+    dispatch_status: "not_configured",
+  });
+
+  assert.equal(panel._view, "buttons");
+  assert.equal(panel._openButton, 2);
+  assert.equal(panel._editingChannel, 2);
+  assert.equal(panel._editingKind, "button");
+});
+
+test("dual button keeps the existing detail shell and adapted live test", () => {
+  const panel = newPanel();
+
+  assert.deepEqual(
+    panel._viewsFor({ variant: "dual_button" }),
+    ["buttons", "live", "diagnostics"],
+  );
+  assert.deepEqual(
+    panel._viewsFor({ variant: "wheel" }),
+    ["channels", "live", "diagnostics"],
+  );
+});
+
+test("dual-button live activity names its safe button number", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        gesture_button_press_double: "Tlačítko {button} · dvojitý stisk",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._gestureLabel({
+      button: 2,
+      channel: null,
+      gesture: "press",
+      presses: 2,
+    }),
+    "Tlačítko 2 · dvojitý stisk",
+  );
+});
+
+test("hold activity labels integration-observed duration honestly", () => {
+  const panel = newPanel();
+  panel._language = "cs";
+  panel._panel = {
+    config: {
+      labels: {
+        gesture_button_release: "Tlačítko {button} · uvolnění",
+        gesture_observed_duration: "zachyceno {duration} s",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._gestureLabel({
+      button: 1,
+      gesture: "release",
+      observed_duration_ms: 2250,
+    }),
+    "Tlačítko 1 · uvolnění · zachyceno 2,25 s",
+  );
+});
+
+test("dual-button panel test sends button and no rotary address", async () => {
+  const panel = newPanel();
+  let message;
+  panel._hass = {
+    callWS: async (payload) => {
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  await panel._testBinding(
+    { key: "button-device", variant: "dual_button" },
+    1,
+    "press",
+    { presses: 1 },
+  );
+
+  assert.deepEqual(message, {
+    type: "ikea_bilresa/binding/test",
+    wheel: "button-device",
+    button: 1,
+    gesture: "press",
+    presses: 1,
+  });
+  assert.equal("channel" in message, false);
+});
+
+test("dual button selection changes only the open physical button", () => {
+  const panel = newPanel();
+  panel._openButton = 1;
+  panel._editingChannel = 1;
+  panel._editingKind = "button";
+  panel._editorData = {};
+
+  panel._openButtonAt(2);
+
+  assert.equal(panel._openButton, 2);
+  assert.equal(panel._editingChannel, null);
+  assert.equal(panel._editingKind, null);
+  assert.equal(panel._editorData, null);
+});
+
+test("dual-button editor starts without rotary or triple-press fields", () => {
+  const panel = newPanel();
+  const device = { variant: "dual_button" };
+  const button = { button: 1, binding: null };
+
+  panel._startEditor(device, button);
+
+  assert.equal(panel._editingKind, "button");
+  assert.equal(panel._editingChannel, 1);
+  assert.deepEqual(panel._editorData, {
+    click_action: "toggle",
+    button_response: "multi_press",
+    hold_action: "toggle",
+    ramp_direction: "alternate",
+  });
+  assert.equal("mode" in panel._editorData, false);
+  assert.equal("triple_press_target" in panel._editorData, false);
+});
+
+test("dual-button save sends only its safe display number", async () => {
+  const panel = newPanel();
+  const messages = [];
+  const binding = {
+    id: "binding-button-2",
+    revision: "rev-2",
+    data: {
+      click_action: "toggle",
+      click_target: "light.second",
+      hold_action: "none",
+      button_response: "multi_press",
+      ramp_direction: "alternate",
+    },
+  };
+  const device = {
+    key: "button-device-a",
+    variant: "dual_button",
+    buttons: [{ button: 1 }, { button: 2, binding }],
+    channels: [],
+  };
+  panel._snapshot = { wheels: [device] };
+  panel._editorData = { ...binding.data };
+  panel._editorBinding = binding;
+  panel._editingChannel = 2;
+  panel._editingKind = "button";
+  panel._hass = {
+    callWS: async (payload) => {
+      messages.push(payload);
+      if (payload.type === "ikea_bilresa/overview") {
+        return panel._snapshot;
+      }
+      return { ok: true, binding };
+    },
+  };
+
+  await panel._saveBinding(device, device.buttons[1]);
+
+  assert.deepEqual(messages[0], {
+    type: "ikea_bilresa/binding/save",
+    wheel: "button-device-a",
+    button: 2,
+    data: binding.data,
+    binding_id: "binding-button-2",
+    expected_revision: "rev-2",
+  });
+  assert.equal("channel" in messages[0], false);
+  assert.equal("endpoint" in messages[0], false);
+});
+
+test("saving wheel settings sends the disabled channel and its revision", async () => {
+  let message;
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [
+      { channel: 1, enabled: true },
+      { channel: 2, enabled: true },
+    ],
+    settings: { subentry_id: "s1", revision: "rev-1", step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  panel._updateSettingsDraft(wheel, {
+    channel_enabled: { 1: true, 2: false },
+  });
+  await panel._saveSettings(wheel);
+
+  assert.equal(message.type, "ikea_bilresa/settings/save");
+  assert.equal(message.wheel, "wheel-a");
+  assert.deepEqual(message.channel_enabled, { 1: true, 2: false });
+  assert.equal(message.expected_revision, "rev-1");
+});
+
+test("a settings conflict drops the draft instead of resending it", async () => {
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [{ channel: 1, enabled: true }],
+    settings: { subentry_id: "s1", revision: "stale", step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      return { ok: false, error: "conflict" };
+    },
+  };
+
+  panel._updateSettingsDraft(wheel, { channel_enabled: { 1: false } });
+  await panel._saveSettings(wheel);
+
+  // Losing the draft is the point: the stored value is the truth now, and
+  // silently keeping the rejected edit would let the next save clobber it.
+  assert.equal(panel._settingsDraft, null);
+  assert.equal(panel._settingsDraftKey, null);
+});
+
+test("a wheel without stored settings still offers the defaults", () => {
+  const panel = newPanel();
+  const state = panel._settingsStateFor({
+    key: "wheel-b",
+    channels: [{ channel: 1, enabled: true }, { channel: 2, enabled: false }],
+  });
+
+  assert.deepEqual(state.channel_enabled, { 1: true, 2: false });
+  assert.equal(state.step, 2);
+  assert.equal(state.acceleration, 0);
+});
+
+test("one wheel's unsaved draft never leaks onto another", () => {
+  const panel = newPanel();
+  const first = { key: "wheel-a", channels: [{ channel: 1, enabled: true }] };
+  const second = { key: "wheel-b", channels: [{ channel: 1, enabled: true }] };
+
+  panel._updateSettingsDraft(first, { channel_enabled: { 1: false } });
+
+  assert.deepEqual(panel._settingsStateFor(second).channel_enabled, { 1: true });
+});
+
+test("a wheel saving for the first time omits the revision instead of sending null", async () => {
+  // The deployed rc.12 sent expected_revision: null here, and the command's
+  // schema rejected it — so the very first save of any wheel always failed.
+  let message;
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [{ channel: 1, enabled: true }],
+    settings: { subentry_id: null, revision: null, step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  await panel._saveSettings(wheel);
+
+  assert.ok(!("expected_revision" in message));
+});
+
+test("a new binding defaults to the linear step curve", () => {
+  // Turning the perceptual curve on by default would break every lamp that
+  // already corrects its own dimming curve, and nothing can tell which.
+  const panel = newPanel();
+  panel._startEditor({ variant: "wheel", key: "w" }, { channel: 1 });
+
+  assert.equal(panel._editorData.step_curve, "linear");
+});
+
+test("the step curve is a set-once option, not a rotation field", async () => {
+  // PANEL_DESIGN.md: the disclosure keeps genuinely set-once options only.
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const rotation = source.indexOf("const rotation = this._formSection");
+  const split = source.indexOf("const advancedGrid");
+
+  assert.ok(source.slice(split).includes('"step_curve"'));
+  // Not among the rotation fields, where it would read as a per-use setting.
+  assert.ok(!source.slice(rotation, split).includes("step_curve"));
+});

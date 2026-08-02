@@ -19,16 +19,22 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
 
 from .binding import LightBinding
+from .channel_controls import DEFAULT_SETTINGS, WheelSettings
 from .const import (
+    ATTR_SWITCH_CURRENT_POSITION,
     CLUSTER_SWITCH,
+    CONF_CHANNEL,
+    CONF_ENDPOINT,
     DISCONNECT_GRACE_SECONDS,
     DOMAIN,
     EVENT_BILRESA,
     ISSUE_CANNOT_CONNECT,
     SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
+    SIGNAL_SETTINGS_UPDATED,
     SIGNAL_WHEELS_UPDATED,
     SUBENTRY_BINDING,
+    SUBENTRY_WHEEL,
     signal_channel,
     signal_raw_button,
 )
@@ -36,8 +42,18 @@ from .engine import GestureEngine, WheelAction
 from .matter_core import CoreMatterEventSource, CoreMatterUnavailable
 from .matter_ws import MatterWSClient
 from .model import BilresaWheel, decode_event, parse_node
+from .trace import RotationTrace
 
 _LOGGER = logging.getLogger(__name__)
+
+BindingKey = tuple[int, str, int]
+
+
+def _action_binding_key(action: WheelAction) -> BindingKey:
+    """Address wheel channels and button endpoints without sharing a keyspace."""
+    if action.channel is not None:
+        return (action.node_id, CONF_CHANNEL, action.channel)
+    return (action.node_id, CONF_ENDPOINT, action.endpoint_id)
 
 
 class BilresaCoordinator:
@@ -53,20 +69,24 @@ class BilresaCoordinator:
         self.url = url
         self.connected = False
         self.wheels: dict[int, BilresaWheel] = {}
+        self.wheel_settings: dict[int, WheelSettings] = {}
         self._engine = GestureEngine()
+        # Shared by every binding so one capture covers all of them at once.
+        self.rotation_trace = RotationTrace()
         self._client: CoreMatterEventSource | MatterWSClient = CoreMatterEventSource(
             hass, url, self._on_event, self._core_matter_unavailable
         )
         self._source_switch_lock = asyncio.Lock()
         self._stopping = False
         self._binding_unsubs: list[Callable[[], None]] = []
-        self._binding_keys: set[tuple[int, int]] = set()
-        self._bindings: dict[tuple[int, int], LightBinding] = {}
+        self._binding_keys: set[BindingKey] = set()
+        self._bindings: dict[BindingKey, LightBinding] = {}
         self._disconnect_timer: Callable[[], None] | None = None
         self._event_counts: Counter[str] = Counter()
         self._ignored_counts: Counter[str] = Counter()
         self._recent_events: deque[dict[str, Any]] = deque(maxlen=20)
         self._actions_dispatched = 0
+        self._actions_suppressed = 0
         self._connection_count = 0
         self._fallback_count = 0
         self._last_event_at: datetime | None = None
@@ -89,6 +109,7 @@ class BilresaCoordinator:
             "event_counts": dict(self._event_counts),
             "ignored_counts": dict(self._ignored_counts),
             "actions_dispatched": self._actions_dispatched,
+            "actions_suppressed": self._actions_suppressed,
             "connection_count": self._connection_count,
             "fallback_count": self._fallback_count,
             "last_fallback_reason": self._last_fallback_reason,
@@ -96,6 +117,8 @@ class BilresaCoordinator:
                 self._last_event_at.isoformat() if self._last_event_at else None
             ),
             "recent_events": list(self._recent_events),
+            "rotation_trace_enabled": self.rotation_trace.enabled,
+            "rotation_trace": self.rotation_trace.dump(),
         }
 
     async def async_start(self) -> None:
@@ -147,6 +170,35 @@ class BilresaCoordinator:
             )
             await self._client.start()
 
+    # -- per-wheel channel settings ---------------------------------------
+
+    @callback
+    def async_setup_settings(self, entry: ConfigEntry) -> None:
+        """(Re)load per-wheel settings from the entry's subentries, in place.
+
+        Called on setup and whenever a `wheel_settings` subentry changes, so
+        disabling a channel never needs a reload / reconnect.
+        """
+        settings: dict[int, WheelSettings] = {}
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type != SUBENTRY_WHEEL:
+                continue
+            parsed = WheelSettings.from_data(dict(subentry.data))
+            if parsed.node_id is not None:
+                settings[parsed.node_id] = parsed
+        self.wheel_settings = settings
+        async_dispatcher_send(self.hass, SIGNAL_SETTINGS_UPDATED)
+
+    @callback
+    def settings_for(self, node_id: int) -> WheelSettings:
+        """Settings for one wheel, falling back to the defaults."""
+        return self.wheel_settings.get(node_id, DEFAULT_SETTINGS)
+
+    @callback
+    def channel_enabled(self, node_id: int, channel: int | None) -> bool:
+        """Whether a wheel channel acts at all, or is ignored entirely."""
+        return self.settings_for(node_id).channel_enabled(channel)
+
     # -- bindings ---------------------------------------------------------
 
     @callback
@@ -160,13 +212,15 @@ class BilresaCoordinator:
         for subentry in entry.subentries.values():
             if subentry.subentry_type != SUBENTRY_BINDING:
                 continue
-            binding = LightBinding(self.hass, dict(subentry.data))
+            binding = LightBinding(
+                self.hass, dict(subentry.data), trace=self.rotation_trace
+            )
             self._binding_unsubs.append(binding.async_attach())
-            key = (binding.node_id, binding.channel)
+            key = binding.binding_key
             self._binding_keys.add(key)
             self._bindings[key] = binding
         if self._binding_unsubs:
-            _LOGGER.debug("Attached %s light binding(s)", len(self._binding_unsubs))
+            _LOGGER.debug("Attached %s control binding(s)", len(self._binding_unsubs))
 
     @callback
     def _detach_bindings(self) -> None:
@@ -179,7 +233,7 @@ class BilresaCoordinator:
     @callback
     def test_binding_action(self, action: WheelAction) -> bool:
         """Execute a synthetic panel test through one configured binding."""
-        binding = self._bindings.get((action.node_id, action.channel or 0))
+        binding = self._bindings.get(_action_binding_key(action))
         if binding is None:
             return False
         binding.test_action(action)
@@ -196,10 +250,14 @@ class BilresaCoordinator:
             self._set_connected(False)
         elif event_type == "__nodes__":
             self._handle_nodes(data)
-        elif event_type == "node_added":
+        elif event_type in ("node_added", "node_updated"):
             self._add_node(data)
         elif event_type == "node_removed":
             self._remove_node(data)
+        elif event_type == "attribute_updated":
+            self._handle_attribute_updated(data)
+        elif event_type == "server_shutdown":
+            self._set_connected(False)
         elif event_type == "node_event" and isinstance(data, dict):
             self._last_event_at = datetime.now(UTC)
             self._recent_events.append(
@@ -213,6 +271,41 @@ class BilresaCoordinator:
             self._handle_node_event(data)
         else:
             self._ignored_counts["unsupported_event"] += 1
+
+    @callback
+    def _handle_attribute_updated(self, data: Any) -> None:
+        """Consume Switch.CurrentPosition as a release/stuck-state safety hint."""
+        if not isinstance(data, (list, tuple)) or len(data) != 3:
+            self._ignored_counts["malformed_attribute_update"] += 1
+            return
+        node_id, path, value = data
+        if not isinstance(node_id, int) or not isinstance(path, str):
+            self._ignored_counts["malformed_attribute_update"] += 1
+            return
+        wheel = self.wheels.get(node_id)
+        if wheel is None:
+            self._ignored_counts["unknown_attribute_node"] += 1
+            return
+        parts = path.split("/")
+        if len(parts) != 3:
+            self._ignored_counts["malformed_attribute_path"] += 1
+            return
+        try:
+            endpoint_id, cluster_id, attribute_id = (int(part) for part in parts)
+        except ValueError:
+            self._ignored_counts["malformed_attribute_path"] += 1
+            return
+        if (
+            cluster_id != CLUSTER_SWITCH
+            or attribute_id != ATTR_SWITCH_CURRENT_POSITION
+            or endpoint_id not in wheel.endpoints
+        ):
+            self._ignored_counts["irrelevant_attribute_update"] += 1
+            return
+        if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
+            self._ignored_counts["invalid_switch_position"] += 1
+            return
+        self._engine.observe_position(node_id, endpoint_id, value)
 
     @callback
     def _handle_node_event(self, data: dict) -> None:
@@ -236,6 +329,7 @@ class BilresaCoordinator:
             signal_raw_button(wheel.node_id, decoded["channel"]),
             decoded["role"],
             decoded["event_type"],
+            decoded["endpoint_id"],
         )
         action = self._engine.process(wheel, decoded)
         if action is not None:
@@ -245,6 +339,19 @@ class BilresaCoordinator:
 
     @callback
     def _dispatch(self, action: WheelAction) -> None:
+        # A disabled channel is silent all the way down: no bus event, no
+        # channel signal, no binding, no entity movement. The owner's intent is
+        # "this selector position does not exist", so anything that leaked past
+        # here would still let an accidental flip act.
+        if not self.channel_enabled(action.node_id, action.channel):
+            self._actions_suppressed += 1
+            _LOGGER.debug(
+                "suppressed (channel disabled): node=%s ch=%s %s",
+                action.node_id,
+                action.channel,
+                action.type,
+            )
+            return
         self._actions_dispatched += 1
         _LOGGER.debug(
             "action: node=%s ch=%s %s dir=%s notches=%s presses=%s",
@@ -265,7 +372,7 @@ class BilresaCoordinator:
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )
-        if (action.node_id, action.channel) not in self._binding_keys:
+        if _action_binding_key(action) not in self._binding_keys:
             async_dispatcher_send(
                 self.hass,
                 SIGNAL_BINDING_ACTIVITY,
@@ -310,7 +417,8 @@ class BilresaCoordinator:
             _LOGGER.info("Updated BILRESA wheel metadata for node %s", wheel.node_id)
             return True
         _LOGGER.info(
-            "Discovered BILRESA wheel: node %s '%s' -> %s",
+            "Discovered BILRESA %s: node %s '%s' -> %s",
+            wheel.variant,
             wheel.node_id,
             wheel.name,
             {ep: (e.channel, e.role) for ep, e in wheel.endpoints.items()},

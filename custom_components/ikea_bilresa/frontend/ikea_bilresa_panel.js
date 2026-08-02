@@ -1,5 +1,5 @@
 /**
- * BILRESA panel — wheel overview, live activity and binding editor.
+ * BILRESA panel — device overview, live activity and binding editor.
  *
  * The layout follows PANEL_DESIGN.md's two-layer model: the landing view is a
  * grid of every wheel, while an opened wheel gets a measured 256px switcher rail
@@ -22,6 +22,7 @@ const ACTIVITY_SUBSCRIBE = "ikea_bilresa/activity/subscribe";
 const BINDING_SAVE = "ikea_bilresa/binding/save";
 const BINDING_DELETE = "ikea_bilresa/binding/delete";
 const BINDING_TEST = "ikea_bilresa/binding/test";
+const SETTINGS_SAVE = "ikea_bilresa/settings/save";
 const ACTIVITY_LIMIT = 8;
 
 const MODE_DOMAINS = {
@@ -38,6 +39,7 @@ const MODE_DOMAINS = {
 const DEFAULT_BINDING = {
   mode: "brightness",
   step: 3,
+  step_curve: "linear",
   acceleration: 0,
   min_brightness: 1,
   max_brightness: 100,
@@ -46,6 +48,13 @@ const DEFAULT_BINDING = {
   button_response: "multi_press",
   hold_action: "toggle",
   scenes: [],
+};
+
+const DEFAULT_BUTTON_BINDING = {
+  click_action: "toggle",
+  button_response: "multi_press",
+  hold_action: "toggle",
+  ramp_direction: "alternate",
 };
 
 // Material Design Icons remain the standard chrome. Product identity and
@@ -100,6 +109,26 @@ const BILRESA_ICON = Object.freeze({
     C14.95 20.75 16.42 18.62 16.42 15.36
     V8
     C16.42 5.1 15.2 2.75 13.05 1.35Z`,
+});
+
+const BILRESA_DUAL_BUTTON_ICON = Object.freeze({
+  viewBox: "0 0 24 24",
+  path: `M11.3 1.4 C15.05 1.4 17.65 4.18 17.65 7.9 V15.5
+    C17.65 19.72 15.02 22.35 11.3 22.35 C7.58 22.35 4.95 19.72
+    4.95 15.5 V7.9 C4.95 4.18 7.55 1.4 11.3 1.4Z M11.3 2.65
+    C8.27 2.65 6.2 4.95 6.2 7.98 V15.38 C6.2 18.85 8.38 21.1
+    11.3 21.1 C14.22 21.1 16.4 18.85 16.4 15.38 V7.98 C16.4
+    4.95 14.33 2.65 11.3 2.65Z M11.3 4.35 A1.8 1.9 0 1 1
+    11.3 8.15 A1.8 1.9 0 1 1 11.3 4.35Z M11.3 5.05 A1.13 1.2
+    0 1 0 11.3 7.45 A1.13 1.2 0 1 0 11.3 5.05Z M11.3 12.23
+    A0.42 0.42 0 1 1 11.3 13.07 A0.42 0.42 0 1 1 11.3 12.23Z
+    M11.3 17.05 A1.23 1.37 0 1 1 11.3 19.79 A1.23 1.37 0 1 1
+    11.3 17.05Z M11.3 17.69 A0.64 0.73 0 1 0 11.3 19.15 A0.64
+    0.73 0 1 0 11.3 17.69Z`,
+  secondaryPath: `M13.05 1.35 C16.45 1.85 18.65 4.55 18.65 8.15
+    V15.48 C18.65 19.28 16.3 21.9 12.95 22.55 L12.68 21.22
+    C14.95 20.75 16.42 18.62 16.42 15.36 V8 C16.42 5.1 15.2
+    2.75 13.05 1.35Z`,
 });
 
 const MATERIAL_VIEWBOX = "0 -960 960 960";
@@ -658,10 +687,9 @@ const STYLES = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--_space-4);
   }
-  /* The wheel has three physical selector positions, so the panel navigates by
-     them: a spine of three detents, one open at a time. The overview is where
-     every channel of every wheel is compared; the detail is a workbench for one.
-     PANEL_DESIGN.md's "separate card for each channel" is superseded by this. */
+  /* Physical controls navigate the workbench: three positions for a wheel or
+     two buttons for a dual button, one open at a time. The overview compares
+     devices; the detail keeps the established spine-and-surface composition. */
   .channel-workbench {
     min-inline-size: 0;
     display: grid;
@@ -718,6 +746,73 @@ const STYLES = `
     color: var(--text-primary-color, #fff);
   }
   .channel-position:active { transform: translateY(1px); }
+  /* Struck through rather than merely dimmed: dimming reads as "unconfigured",
+     which this is not — it is a position that has been switched off. */
+  .channel-position-off {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+
+  /* A sibling card to the workbench, not a form floating on the page
+     background. Same tokens as .channel-workbench so the two read as one
+     surface; PANEL_DESIGN.md forbids nesting one inside the other. */
+  .settings-section {
+    margin-block-start: var(--_space-6);
+    padding: var(--_space-8);
+    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_card);
+    box-shadow: var(--ha-card-box-shadow, none);
+  }
+  .settings-intro {
+    margin: var(--_space-2) 0 var(--_space-6);
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 13px);
+    line-height: 1.5;
+  }
+  .settings-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--_space-8);
+    margin-block-end: var(--_space-6);
+    padding-block-end: var(--_space-6);
+    border-block-end: 1px solid var(--_border);
+  }
+  .settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--_space-2);
+    min-block-size: 44px;
+    color: var(--_ink);
+    font-size: var(--ha-font-size-m, 14px);
+    cursor: pointer;
+  }
+  .settings-toggle input {
+    inline-size: 18px;
+    block-size: 18px;
+    margin: 0;
+    accent-color: var(--_accent);
+    cursor: pointer;
+  }
+  .settings-toggle input:focus-visible {
+    outline: 2px solid var(--_accent);
+    outline-offset: 2px;
+  }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--_space-6);
+  }
+  .settings-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--_space-6);
+    margin-block-start: var(--_space-8);
+  }
+  .settings-message {
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-s, 13px);
+  }
   .channel-surface {
     min-inline-size: 0;
     padding: var(--_space-8);
@@ -946,6 +1041,23 @@ const STYLES = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--_space-4);
   }
+  .form-sections {
+    display: grid;
+    gap: var(--_space-4);
+  }
+  /* A hairline between groups, never a box around each one: the editor already
+     sits on a card, and nesting cards is what made this panel read as a form
+     builder rather than a control surface. */
+  .form-section + .form-section {
+    border-block-start: 1px solid var(--_divider);
+    padding-block-start: var(--_space-4);
+  }
+  .form-section-title {
+    margin: 0 0 var(--_space-3);
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    color: var(--_ink);
+  }
   .field {
     min-inline-size: 0;
     display: grid;
@@ -1076,6 +1188,7 @@ const STYLES = `
     margin-block-start: var(--_space-5);
     font-size: var(--ha-font-size-l, 16px);
   }
+  .live-setup-action { margin-block-start: var(--_space-5); }
   .gesture-caption {
     display: flex;
     flex-wrap: wrap;
@@ -1144,7 +1257,19 @@ const STYLES = `
     font-size: var(--ha-font-size-s, 12px);
   }
   .recent h4 { padding-block-end: var(--_space-3); }
-  .recent ol { margin: 0; padding: 0; list-style: none; }
+  .recent ol {
+    max-block-size: 320px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    list-style: none;
+  }
+  .recent ol:focus-visible {
+    outline: 2px solid var(--_ink);
+    outline-offset: -2px;
+  }
   .recent li {
     padding: var(--_space-3) var(--_space-4);
     font-size: var(--ha-font-size-m, 14px);
@@ -1341,6 +1466,13 @@ const svg = (icon, cls) => {
 // global provider. Inline SVG remains intentional: it renders reliably inside
 // this dependency-free custom panel's shadow root.
 const bilresaIcon = (cls) => svg(BILRESA_ICON, cls);
+const deviceIcon = (device, cls) =>
+  svg(
+    device?.variant === "dual_button"
+      ? BILRESA_DUAL_BUTTON_ICON
+      : BILRESA_ICON,
+    cls,
+  );
 
 const gestureGlyph = (gesture) => {
   if (gesture === "rotation") {
@@ -1376,6 +1508,7 @@ class IkeaBilresaPanel extends HTMLElement {
     this._started = false;
     this._open = null;
     this._openChannel = 1;
+    this._openButton = 1;
     this._view = "channels";
     this._activities = [];
     this._activityUnsub = null;
@@ -1383,10 +1516,17 @@ class IkeaBilresaPanel extends HTMLElement {
     this._activityError = false;
     this._activityEpoch = 0;
     this._editingChannel = null;
+    this._editingKind = null;
     this._editorData = null;
     this._editorBinding = null;
     this._editorErrors = {};
     this._editorBusy = false;
+    // Per-wheel settings draft, keyed by wheel so switching wheels in the rail
+    // cannot carry one wheel's unsaved edits onto another.
+    this._settingsDraft = null;
+    this._settingsDraftKey = null;
+    this._settingsBusy = false;
+    this._settingsMessage = null;
     this._editorMessage = null;
     this._deleteConfirm = false;
     this._testBusy = false;
@@ -1579,7 +1719,14 @@ class IkeaBilresaPanel extends HTMLElement {
     if (key !== this._open) {
       this._activities = [];
       this._openChannel = 1;
+      this._openButton = 1;
       this._closeEditor();
+    }
+    const device = this._snapshot?.wheels.find((item) => item.key === key);
+    const views = this._viewsFor(device);
+    if (!views.includes(this._view)) {
+      if (this._view === "live") this._stopActivity();
+      this._view = views[0];
     }
     this._open = key;
     this._render();
@@ -1595,14 +1742,46 @@ class IkeaBilresaPanel extends HTMLElement {
       ?.focus({ preventScroll: true });
   }
 
+  _openButtonAt(button) {
+    if (button === this._openButton) return;
+    this._openButton = button;
+    this._closeEditor();
+    this._render();
+    this.shadowRoot
+      ?.getElementById(`button-${this._open}-${button}`)
+      ?.focus({ preventScroll: true });
+  }
+
   _backToOverview() {
     this._stopActivity();
     this._view = "channels";
     this._open = null;
     this._openChannel = 1;
+    this._openButton = 1;
     this._activities = [];
     this._closeEditor();
     this._render();
+  }
+
+  _viewsFor(device) {
+    return device?.variant === "dual_button"
+      ? ["buttons", "live", "diagnostics"]
+      : ["channels", "live", "diagnostics"];
+  }
+
+  _controlsFor(device) {
+    return device?.variant === "dual_button"
+      ? device.buttons || []
+      : device.channels || [];
+  }
+
+  _controlNumber(device, control) {
+    return device?.variant === "dual_button" ? control.button : control.channel;
+  }
+
+  _isConfigured(control) {
+    return control.configured ??
+      (control.profile !== null && control.profile !== undefined);
   }
 
   _showMenuButton() {
@@ -1697,34 +1876,35 @@ class IkeaBilresaPanel extends HTMLElement {
     return status;
   }
 
-  _overviewChannel(channel) {
-    const configured = channel.profile !== null && channel.profile !== undefined;
+  _overviewControl(device, control) {
+    const configured = this._isConfigured(control);
+    const number = this._controlNumber(device, control);
     const row = el("span", "channel");
     row.dataset.state = configured ? "ok" : "empty";
-    row.appendChild(el("span", "channel-n", String(channel.channel)));
+    row.appendChild(el("span", "channel-n", String(number)));
 
     const text = el("span", "channel-text");
     text.appendChild(
       el(
         "span",
         "channel-behaviour",
-        channel.behaviour ||
-          (configured ? channel.profile : this._t("not_configured")),
+        control.behaviour ||
+          (configured ? control.profile : this._t("not_configured")),
       ),
     );
     text.appendChild(
       el(
         "span",
         "channel-target",
-        channel.target_missing
+        control.target_missing
           ? this._t("target_unavailable", {
-              target: channel.target_label || this._t("target_none"),
+              target: control.target_label || this._t("target_none"),
             })
-          : channel.target_label || this._t("add_binding"),
+          : control.target_label || this._t("add_binding"),
       ),
     );
     row.appendChild(text);
-    if (channel.target_missing) row.appendChild(svg(ICON.alert, "channel-warn"));
+    if (control.target_missing) row.appendChild(svg(ICON.alert, "channel-warn"));
     return row;
   }
 
@@ -1738,7 +1918,7 @@ class IkeaBilresaPanel extends HTMLElement {
     card.addEventListener("click", () => this._openWheel(wheel.key));
 
     const head = el("span", "wheel-head");
-    head.appendChild(bilresaIcon("device-glyph"));
+    head.appendChild(deviceIcon(wheel, "device-glyph"));
     const names = el("span", "wheel-names");
     names.appendChild(el("span", "wheel-name", wheel.name));
     const meta = [wheel.area, this._activityLabel(wheel)].filter(Boolean);
@@ -1752,8 +1932,8 @@ class IkeaBilresaPanel extends HTMLElement {
     card.appendChild(head);
 
     const channels = el("span", "channels");
-    for (const channel of wheel.channels) {
-      channels.appendChild(this._overviewChannel(channel));
+    for (const control of this._controlsFor(wheel)) {
+      channels.appendChild(this._overviewControl(wheel, control));
     }
     card.appendChild(channels);
     return card;
@@ -1763,13 +1943,23 @@ class IkeaBilresaPanel extends HTMLElement {
     if (!wheel.last_activity) return this._t("no_activity");
     const when = new Date(wheel.last_activity);
     if (Number.isNaN(when.getTime())) return null;
-    const suffix =
+    let suffix = "";
+    if (
+      wheel.variant === "dual_button" &&
+      wheel.last_active_button !== null &&
+      wheel.last_active_button !== undefined
+    ) {
+      suffix = ` · ${this._t("last_on_button", {
+        button: wheel.last_active_button,
+      })}`;
+    } else if (
       wheel.last_active_channel !== null &&
       wheel.last_active_channel !== undefined
-        ? ` · ${this._t("last_on_channel", {
-            channel: wheel.last_active_channel,
-          })}`
-        : "";
+    ) {
+      suffix = ` · ${this._t("last_on_channel", {
+        channel: wheel.last_active_channel,
+      })}`;
+    }
     return `${this._formatRelative(when)}${suffix}`;
   }
 
@@ -1844,7 +2034,7 @@ class IkeaBilresaPanel extends HTMLElement {
       // Exactly three children for the rail's three columns. The tick that used
       // to trail the open wheel was a fourth, so it wrapped to its own row — and
       // it was redundant anyway: the tinted surface already says "open".
-      button.appendChild(bilresaIcon("rail-glyph"));
+      button.appendChild(deviceIcon(wheel, "rail-glyph"));
       const copy = el("span", "rail-copy");
       copy.appendChild(el("span", "rail-name", wheel.name));
       copy.appendChild(
@@ -1870,7 +2060,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _detailTop(wheel) {
     const top = el("div", "detail-top");
-    top.appendChild(bilresaIcon("detail-glyph"));
+    top.appendChild(deviceIcon(wheel, "detail-glyph"));
 
     const heading = el("div", "detail-heading");
     heading.appendChild(el("h2", null, wheel.name));
@@ -1897,7 +2087,7 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _tabs(wheel) {
-    const views = ["channels", "live", "diagnostics"];
+    const views = this._viewsFor(wheel);
     const tabs = el("div", "tabs");
     tabs.setAttribute("role", "tablist");
     tabs.setAttribute("aria-label", this._t("detail_views"));
@@ -1947,6 +2137,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _closeEditor() {
     this._editingChannel = null;
+    this._editingKind = null;
     this._editorData = null;
     this._editorBinding = null;
     this._editorErrors = {};
@@ -1955,13 +2146,23 @@ class IkeaBilresaPanel extends HTMLElement {
     this._deleteConfirm = false;
   }
 
-  _startEditor(channel) {
-    this._editingChannel = channel.channel;
-    this._editorBinding = channel.binding || null;
+  _defaultBindingFor(device) {
+    return device.variant === "dual_button"
+      ? DEFAULT_BUTTON_BINDING
+      : DEFAULT_BINDING;
+  }
+
+  _startEditor(device, control) {
+    this._editingChannel = this._controlNumber(device, control);
+    this._editingKind =
+      device.variant === "dual_button" ? "button" : "channel";
+    this._editorBinding = control.binding || null;
     this._editorData = {
-      ...DEFAULT_BINDING,
-      ...(channel.binding?.data || {}),
-      scenes: [...(channel.binding?.data?.scenes || [])],
+      ...this._defaultBindingFor(device),
+      ...(control.binding?.data || {}),
+      ...(device.variant === "dual_button"
+        ? {}
+        : { scenes: [...(control.binding?.data?.scenes || [])] }),
     };
     this._editorErrors = {};
     this._editorMessage = null;
@@ -1997,13 +2198,20 @@ class IkeaBilresaPanel extends HTMLElement {
     return wrap;
   }
 
-  _selectField(name, label, options, { optional = false, help, wide = false } = {}) {
+  _selectField(
+    name,
+    label,
+    options,
+    { optional = false, help, wide = false, emptyLabel } = {},
+  ) {
     const wrap = this._fieldShell(name, label, help, wide);
     const select = el("select");
     select.id = `binding-${this._open}-${this._editingChannel}-${name}`;
     select.name = name;
     if (optional) {
-      const empty = el("option", null, this._t("target_none"));
+      // An empty optional target does not always mean "nothing happens", so the
+      // placeholder must say what leaving it empty actually does.
+      const empty = el("option", null, emptyLabel || this._t("target_none"));
       empty.value = "";
       select.appendChild(empty);
     } else {
@@ -2032,7 +2240,12 @@ class IkeaBilresaPanel extends HTMLElement {
     return wrap;
   }
 
-  _entityField(name, label, domains, { optional = false, help, wide = false } = {}) {
+  _entityField(
+    name,
+    label,
+    domains,
+    { optional = false, help, wide = false, emptyLabel } = {},
+  ) {
     const current = this._editorData[name];
     const records = this._entityRecords(domains);
     const options = records.map((state) => ({
@@ -2042,7 +2255,12 @@ class IkeaBilresaPanel extends HTMLElement {
     if (current && !options.some((option) => option.value === current)) {
       options.unshift({ value: current, label: current });
     }
-    return this._selectField(name, label, options, { optional, help, wide });
+    return this._selectField(name, label, options, {
+      optional,
+      help,
+      wide,
+      emptyLabel,
+    });
   }
 
   _numberField(name, label, min, max, step, unit) {
@@ -2069,6 +2287,17 @@ class IkeaBilresaPanel extends HTMLElement {
     const error = this._fieldError(name);
     if (error) wrap.appendChild(el("span", "field-error", error));
     return wrap;
+  }
+
+  _formSection(parent, title) {
+    // A title exists to tell two groups apart. A button binding has only one
+    // group, so titling it would repeat the editor's own heading.
+    const section = el("section", "form-section");
+    if (title) section.appendChild(el("h4", "form-section-title", title));
+    const grid = el("div", "form-grid");
+    section.appendChild(grid);
+    parent.appendChild(section);
+    return grid;
   }
 
   _scenesField() {
@@ -2106,17 +2335,18 @@ class IkeaBilresaPanel extends HTMLElement {
     this._snapshot = await this._hass.callWS({ type: OVERVIEW });
   }
 
-  async _saveBinding(wheel, channel) {
+  async _saveBinding(wheel, control) {
     if (this._editorBusy) return;
     this._editorBusy = true;
     this._editorErrors = {};
     this._editorMessage = null;
     this._render();
     try {
+      const number = this._controlNumber(wheel, control);
       const response = await this._hass.callWS({
         type: BINDING_SAVE,
         wheel: wheel.key,
-        channel: channel.channel,
+        [wheel.variant === "dual_button" ? "button" : "channel"]: number,
         data: this._editorData,
         binding_id: this._editorBinding?.id,
         expected_revision: this._editorBinding?.revision,
@@ -2128,7 +2358,7 @@ class IkeaBilresaPanel extends HTMLElement {
         } else if (response.error === "conflict") {
           this._editorBinding = response.binding;
           this._editorData = {
-            ...DEFAULT_BINDING,
+            ...this._defaultBindingFor(wheel),
             ...(response.binding?.data || {}),
           };
           this._editorMessage = this._t("binding_conflict");
@@ -2141,12 +2371,12 @@ class IkeaBilresaPanel extends HTMLElement {
       const refreshedWheel = this._snapshot.wheels.find(
         (item) => item.key === wheel.key,
       );
-      const refreshedChannel = refreshedWheel?.channels.find(
-        (item) => item.channel === channel.channel,
+      const refreshedControl = this._controlsFor(refreshedWheel).find(
+        (item) => this._controlNumber(refreshedWheel, item) === number,
       );
-      this._editorBinding = refreshedChannel?.binding || response.binding;
+      this._editorBinding = refreshedControl?.binding || response.binding;
       this._editorData = {
-        ...DEFAULT_BINDING,
+        ...this._defaultBindingFor(wheel),
         ...(this._editorBinding?.data || {}),
       };
       this._editorMessage = this._t("binding_saved");
@@ -2175,7 +2405,9 @@ class IkeaBilresaPanel extends HTMLElement {
         if (response.error === "conflict") {
           this._editorBinding = response.binding;
           this._editorData = {
-            ...DEFAULT_BINDING,
+            ...(this._editingKind === "button"
+              ? DEFAULT_BUTTON_BINDING
+              : DEFAULT_BINDING),
             ...(response.binding?.data || {}),
           };
           this._editorMessage = this._t("binding_conflict");
@@ -2196,14 +2428,20 @@ class IkeaBilresaPanel extends HTMLElement {
     }
   }
 
-  _bindingForm(wheel, channel) {
+  _bindingForm(wheel, control) {
+    const isButton = wheel.variant === "dual_button";
+    const number = this._controlNumber(wheel, control);
     const form = el("form", "binding-form");
-    form.setAttribute("aria-label", this._t("binding_editor_title", {
-      channel: channel.channel,
-    }));
+    form.setAttribute(
+      "aria-label",
+      this._t(
+        isButton ? "binding_editor_button_title" : "binding_editor_title",
+        isButton ? { button: number } : { channel: number },
+      ),
+    );
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      this._saveBinding(wheel, channel);
+      this._saveBinding(wheel, control);
     });
 
     if (this._editorMessage) {
@@ -2212,39 +2450,52 @@ class IkeaBilresaPanel extends HTMLElement {
       form.appendChild(message);
     }
 
-    const primary = el("div", "form-grid");
-    primary.appendChild(
-      this._selectField(
-        "mode",
-        this._t("field_mode"),
-        Object.keys(MODE_DOMAINS).map((mode) => ({
-          value: mode,
-          label: this._t(`mode_${mode}`),
-        })),
-      ),
+    // The gesture ledger above lists rotation, short, double, triple and hold
+    // as one sequence. The editor follows that same order, and one grid row
+    // carries one gesture: its action beside its target. Fields are grouped by
+    // what they belong to, never by how advanced they are — a double press is
+    // no more advanced than a short press.
+    const sections = el("div", "form-sections");
+
+    if (!isButton) {
+      const rotation = this._formSection(sections, this._t("section_rotation"));
+      rotation.appendChild(
+        this._selectField(
+          "mode",
+          this._t("field_mode"),
+          Object.keys(MODE_DOMAINS).map((mode) => ({
+            value: mode,
+            label: this._t(`mode_${mode}`),
+          })),
+        ),
+      );
+      rotation.appendChild(
+        this._entityField(
+          "target",
+          this._t("field_target"),
+          MODE_DOMAINS[this._editorData.mode] || [],
+        ),
+      );
+      rotation.appendChild(
+        this._numberField("step", this._t("field_step"), 1, 25, 1, "%"),
+      );
+      rotation.appendChild(
+        this._numberField(
+          "transition",
+          this._t("field_transition"),
+          0,
+          5,
+          0.1,
+          "s",
+        ),
+      );
+    }
+
+    const button = this._formSection(
+      sections,
+      isButton ? null : this._t("section_button"),
     );
-    primary.appendChild(
-      this._entityField(
-        "target",
-        this._t("field_target"),
-        MODE_DOMAINS[this._editorData.mode] || [],
-        { wide: true },
-      ),
-    );
-    primary.appendChild(
-      this._numberField("step", this._t("field_step"), 1, 25, 1, "%"),
-    );
-    primary.appendChild(
-      this._numberField(
-        "transition",
-        this._t("field_transition"),
-        0,
-        5,
-        0.1,
-        "s",
-      ),
-    );
-    primary.appendChild(
+    button.appendChild(
       this._selectField(
         "click_action",
         this._t("field_click_action"),
@@ -2254,15 +2505,44 @@ class IkeaBilresaPanel extends HTMLElement {
         })),
       ),
     );
-    primary.appendChild(
+    if (!isButton || this._editorData.click_action !== "none") {
+      button.appendChild(
+        this._entityField(
+          "click_target",
+          this._t("field_click_target"),
+          ["light", "switch"],
+          {
+            optional: !isButton,
+            // A wheel with no explicit short-press target falls back to the
+            // rotation target, which the gesture ledger already reports. Saying
+            // "no target" here contradicted that on the same screen.
+            emptyLabel: isButton ? undefined : this._t("target_same_as_rotation"),
+          },
+        ),
+      );
+    }
+    if (!isButton) button.appendChild(this._scenesField());
+    // Double and triple press take a target but never an action, so each owns
+    // a full row instead of leaving a hole where an action select would be.
+    button.appendChild(
       this._entityField(
-        "click_target",
-        this._t("field_click_target"),
+        "double_press_target",
+        this._t("field_double_target"),
         ["light", "switch"],
-        { optional: true },
+        { optional: true, wide: true },
       ),
     );
-    primary.appendChild(
+    if (!isButton) {
+      button.appendChild(
+        this._entityField(
+          "triple_press_target",
+          this._t("field_triple_target"),
+          ["light", "switch"],
+          { optional: true, wide: true },
+        ),
+      );
+    }
+    button.appendChild(
       this._selectField(
         "hold_action",
         this._t("field_hold_action"),
@@ -2272,19 +2552,36 @@ class IkeaBilresaPanel extends HTMLElement {
         })),
       ),
     );
-    if (this._editorData.hold_action === "toggle") {
-      primary.appendChild(
+    if (this._editorData.hold_action !== "none") {
+      button.appendChild(
         this._entityField(
           "hold_target",
           this._t("field_hold_target"),
-          ["light", "switch"],
-          { optional: true },
+          this._editorData.hold_action === "ramp"
+            ? ["light"]
+            : ["light", "switch"],
+          { optional: !isButton },
         ),
       );
     }
-    primary.appendChild(this._scenesField());
-    form.appendChild(primary);
+    if (isButton && this._editorData.hold_action === "ramp") {
+      button.appendChild(
+        this._selectField(
+          "ramp_direction",
+          this._t("field_ramp_direction"),
+          ["alternate", "up", "down"].map((direction) => ({
+            value: direction,
+            label: this._t(`ramp_direction_${direction}`),
+          })),
+          { wide: true },
+        ),
+      );
+    }
+    form.appendChild(sections);
 
+    // What is left is genuinely set-once: a recognition policy and the limits
+    // of the rotation range. Minimum and maximum stay adjacent because they
+    // are one pair, which the old flat ordering split across two rows.
     const advanced = el("details", "advanced");
     const summary = el("summary", null, this._t("advanced_options"));
     advanced.appendChild(summary);
@@ -2293,58 +2590,61 @@ class IkeaBilresaPanel extends HTMLElement {
       this._selectField(
         "button_response",
         this._t("field_button_response"),
-        ["multi_press", "fast"].map((response) => ({
+        ["multi_press", "fast", "instant"].map((response) => ({
           value: response,
-          label: this._t(`button_response_${response}`),
+          label: this._t(
+            `${isButton ? "dual_button_response" : "button_response"}_${response}`,
+          ),
         })),
+        { wide: true },
       ),
     );
-    advancedGrid.appendChild(
-      this._numberField(
-        "acceleration",
-        this._t("field_acceleration"),
-        0,
-        100,
-        5,
-        "%",
-      ),
-    );
-    advancedGrid.appendChild(
-      this._numberField(
-        "min_brightness",
-        this._t("field_min_brightness"),
-        0,
-        50,
-        1,
-        "%",
-      ),
-    );
-    advancedGrid.appendChild(
-      this._numberField(
-        "max_brightness",
-        this._t("field_max_brightness"),
-        1,
-        100,
-        1,
-        "%",
-      ),
-    );
-    advancedGrid.appendChild(
-      this._entityField(
-        "double_press_target",
-        this._t("field_double_target"),
-        ["light", "switch"],
-        { optional: true },
-      ),
-    );
-    advancedGrid.appendChild(
-      this._entityField(
-        "triple_press_target",
-        this._t("field_triple_target"),
-        ["light", "switch"],
-        { optional: true },
-      ),
-    );
+    if (!isButton) {
+      // Set-once, so it belongs under the disclosure rather than beside the
+      // rotation fields - PANEL_DESIGN.md. Full width because its help text
+      // carries the one thing a reader has to know: do not correct twice.
+      advancedGrid.appendChild(
+        this._selectField(
+          "step_curve",
+          this._t("field_step_curve"),
+          ["linear", "perceptual"].map((curve) => ({
+            value: curve,
+            label: this._t(`step_curve_${curve}`),
+          })),
+          { wide: true, help: this._t("field_step_curve_help") },
+        ),
+      );
+      advancedGrid.appendChild(
+        this._numberField(
+          "min_brightness",
+          this._t("field_min_brightness"),
+          0,
+          50,
+          1,
+          "%",
+        ),
+      );
+      advancedGrid.appendChild(
+        this._numberField(
+          "max_brightness",
+          this._t("field_max_brightness"),
+          1,
+          100,
+          1,
+          "%",
+        ),
+      );
+      advancedGrid.appendChild(
+        this._numberField(
+          "acceleration",
+          this._t("field_acceleration"),
+          0,
+          100,
+          5,
+          "%",
+        ),
+      );
+    }
     advanced.appendChild(advancedGrid);
     form.appendChild(advanced);
 
@@ -2378,7 +2678,17 @@ class IkeaBilresaPanel extends HTMLElement {
     if (this._deleteConfirm) {
       const confirm = el("div", "delete-confirm");
       confirm.setAttribute("role", "alert");
-      confirm.appendChild(el("span", null, this._t("delete_binding_confirm")));
+      confirm.appendChild(
+        el(
+          "span",
+          null,
+          this._t(
+            isButton
+              ? "delete_button_binding_confirm"
+              : "delete_binding_confirm",
+          ),
+        ),
+      );
       const deleteButton = el(
         "button",
         "action-button",
@@ -2401,29 +2711,38 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _channelDetail(wheel, channel) {
-    const configured = channel.profile !== null && channel.profile !== undefined;
+    const isButton = wheel.variant === "dual_button";
+    const number = this._controlNumber(wheel, channel);
+    const configured = this._isConfigured(channel);
     const missingTarget =
       channel.target_missing ||
       (channel.actions || []).some((action) => action.target_missing);
     const card = el("div", "channel-detail");
     card.dataset.state = missingTarget ? "warning" : configured ? "ready" : "empty";
 
-    if (!configured && this._editingChannel !== channel.channel) {
+    if (!configured && this._editingChannel !== number) {
       const empty = el("div", "channel-empty");
       empty.appendChild(
         el(
           "div",
           "channel-empty-title",
-          this._t("channel_empty_title", { channel: channel.channel }),
+          this._t(
+            isButton ? "button_empty_title" : "channel_empty_title",
+            isButton ? { button: number } : { channel: number },
+          ),
         ),
       );
       empty.appendChild(
-        el("div", "channel-empty-body", this._t("channel_empty_body")),
+        el(
+          "div",
+          "channel-empty-body",
+          this._t(isButton ? "button_empty_body" : "channel_empty_body"),
+        ),
       );
       const add = el("button", "action-button", this._t("add_binding"));
       add.type = "button";
       add.dataset.primary = "true";
-      add.addEventListener("click", () => this._startEditor(channel));
+      add.addEventListener("click", () => this._startEditor(wheel, channel));
       empty.appendChild(add);
       card.appendChild(empty);
       return card;
@@ -2435,7 +2754,10 @@ class IkeaBilresaPanel extends HTMLElement {
       el(
         "div",
         "channel-detail-title",
-        this._t("channel_title", { channel: channel.channel }),
+        this._t(
+          isButton ? "button_title" : "channel_title",
+          isButton ? { button: number } : { channel: number },
+        ),
       ),
     );
     let summary = this._t("not_configured");
@@ -2452,14 +2774,14 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     copy.appendChild(el("div", "channel-detail-summary", summary));
     head.appendChild(copy);
-    if (this._editingChannel !== channel.channel) {
+    if (this._editingChannel !== number) {
       const edit = el(
         "button",
         "action-button",
         this._t(configured ? "edit_binding" : "add_binding"),
       );
       edit.type = "button";
-      edit.addEventListener("click", () => this._startEditor(channel));
+      edit.addEventListener("click", () => this._startEditor(wheel, channel));
       head.appendChild(edit);
     }
     card.appendChild(head);
@@ -2538,7 +2860,7 @@ class IkeaBilresaPanel extends HTMLElement {
       card.appendChild(actions);
     }
 
-    if (this._editingChannel === channel.channel) {
+    if (this._editingChannel === number) {
       card.appendChild(this._bindingForm(wheel, channel));
     }
     return card;
@@ -2546,6 +2868,172 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _isNoAction(action) {
     return !action.target_label && action.action_label === this._t("action_none");
+  }
+
+
+  _settingsStateFor(wheel) {
+    if (this._settingsDraftKey === wheel.key && this._settingsDraft) {
+      return this._settingsDraft;
+    }
+    const stored = wheel.settings || {};
+    const enabled = {};
+    (wheel.channels || []).forEach((channel) => {
+      enabled[String(channel.channel)] = channel.enabled !== false;
+    });
+    return {
+      channel_enabled: enabled,
+      step: stored.step ?? 2,
+      acceleration: stored.acceleration ?? 0,
+    };
+  }
+
+  _updateSettingsDraft(wheel, patch) {
+    this._settingsDraft = { ...this._settingsStateFor(wheel), ...patch };
+    this._settingsDraftKey = wheel.key;
+    this._settingsMessage = null;
+    this._render();
+  }
+
+  async _saveSettings(wheel) {
+    if (this._settingsBusy) return;
+    this._settingsBusy = true;
+    this._settingsMessage = null;
+    this._render();
+    try {
+      const draft = this._settingsStateFor(wheel);
+      const payload = {
+        type: SETTINGS_SAVE,
+        wheel: wheel.key,
+        channel_enabled: draft.channel_enabled,
+        step: Number(draft.step),
+        acceleration: Number(draft.acceleration),
+      };
+      // Omitted, never null: a wheel saving for the first time has no stored
+      // revision, and the command's schema takes a string or nothing. The
+      // server still treats a missing token as "I expect no stored settings",
+      // so a subentry created meanwhile is reported as a conflict.
+      const revision = wheel.settings?.revision;
+      if (revision) payload.expected_revision = revision;
+      const response = await this._hass.callWS(payload);
+      if (!response.ok) {
+        this._settingsMessage = this._t(
+          response.error === "conflict"
+            ? "settings_error_conflict"
+            : "settings_error_generic",
+        );
+        // A conflict means the stored value is the truth now: drop the draft
+        // so the refreshed snapshot is what the owner sees and re-edits.
+        if (response.error === "conflict") {
+          this._settingsDraft = null;
+          this._settingsDraftKey = null;
+          await this._refreshSnapshot();
+        }
+        return;
+      }
+      this._settingsDraft = null;
+      this._settingsDraftKey = null;
+      await this._refreshSnapshot();
+      this._settingsMessage = this._t("settings_saved");
+    } catch (err) {
+      this._settingsMessage = this._t("settings_error_generic");
+    } finally {
+      this._settingsBusy = false;
+      this._render();
+    }
+  }
+
+  _settingsSection(wheel) {
+    const draft = this._settingsStateFor(wheel);
+    const section = el("section", "settings-section");
+    section.appendChild(el("h4", "form-section-title", this._t("settings_title")));
+    section.appendChild(el("p", "settings-intro", this._t("settings_intro")));
+
+    const toggles = el("div", "settings-toggles");
+    (wheel.channels || []).forEach((channel) => {
+      const key = String(channel.channel);
+      const row = el("label", "settings-toggle");
+      const box = el("input");
+      box.type = "checkbox";
+      box.checked = draft.channel_enabled[key] !== false;
+      box.addEventListener("change", () =>
+        this._updateSettingsDraft(wheel, {
+          channel_enabled: {
+            ...draft.channel_enabled,
+            [key]: box.checked,
+          },
+        }),
+      );
+      row.appendChild(box);
+      row.appendChild(
+        el(
+          "span",
+          null,
+          this._t("settings_channel_enabled", { channel: channel.channel }),
+        ),
+      );
+      toggles.appendChild(row);
+    });
+    section.appendChild(toggles);
+
+    const grid = el("div", "settings-grid");
+    grid.appendChild(
+      this._settingsNumber(
+        wheel,
+        "step",
+        this._t("settings_step"),
+        draft.step,
+        1,
+        25,
+        1,
+      ),
+    );
+    grid.appendChild(
+      this._settingsNumber(
+        wheel,
+        "acceleration",
+        this._t("settings_acceleration"),
+        draft.acceleration,
+        0,
+        100,
+        5,
+        this._t("settings_acceleration_help"),
+      ),
+    );
+    section.appendChild(grid);
+
+    const actions = el("div", "settings-actions");
+    const save = el("button", "action-button", this._t("settings_save"));
+    save.type = "button";
+    save.dataset.primary = "true";
+    save.disabled = this._settingsBusy;
+    save.addEventListener("click", () => this._saveSettings(wheel));
+    actions.appendChild(save);
+    if (this._settingsMessage) {
+      actions.appendChild(el("span", "settings-message", this._settingsMessage));
+    }
+    section.appendChild(actions);
+    return section;
+  }
+
+  _settingsNumber(wheel, name, label, value, min, max, step, help) {
+    const shell = el("div", "field");
+    const labelNode = el("label", null, label);
+    labelNode.htmlFor = `settings-${wheel.key}-${name}`;
+    shell.appendChild(labelNode);
+    const input = el("input");
+    input.id = `settings-${wheel.key}-${name}`;
+    input.name = name;
+    input.type = "number";
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(value);
+    input.addEventListener("change", () =>
+      this._updateSettingsDraft(wheel, { [name]: Number(input.value) }),
+    );
+    shell.appendChild(input);
+    if (help) shell.appendChild(el("span", "field-help", help));
+    return shell;
   }
 
   _channelsView(wheel) {
@@ -2580,12 +3068,17 @@ class IkeaBilresaPanel extends HTMLElement {
       dot.tabIndex = channel.channel === open.channel ? 0 : -1;
       const configured =
         channel.profile !== null && channel.profile !== undefined;
+      // A disabled channel reads as disabled before anything else: whatever
+      // binding it still holds is not going to run.
+      if (channel.enabled === false) dot.classList.add("channel-position-off");
       dot.setAttribute(
         "aria-label",
         `${this._t("channel_title", { channel: channel.channel })}: ${
-          configured
-            ? channel.behaviour || channel.profile
-            : this._t("not_configured")
+          channel.enabled === false
+            ? this._t("settings_disabled_badge")
+            : configured
+              ? channel.behaviour || channel.profile
+              : this._t("not_configured")
         }`,
       );
       dot.addEventListener("click", () => this._openChannelAt(channel.channel));
@@ -2615,10 +3108,98 @@ class IkeaBilresaPanel extends HTMLElement {
     workbench.appendChild(surface);
 
     wrap.appendChild(workbench);
+    wrap.appendChild(this._settingsSection(wheel));
+    return wrap;
+  }
+
+  _buttonsView(wheel) {
+    const wrap = el("div");
+    wrap.appendChild(this._sectionHead(this._t("detail_buttons_intro")));
+
+    const buttons = wheel.buttons || [];
+    const open =
+      buttons.find((item) => item.button === this._openButton) || buttons[0];
+    if (!open) return wrap;
+
+    const workbench = el("div", "channel-workbench");
+    const spine = el("div", "channel-spine");
+    spine.setAttribute("role", "tablist");
+    spine.setAttribute("aria-orientation", "vertical");
+    spine.setAttribute("aria-label", this._t("button_spine"));
+    buttons.forEach((button, index) => {
+      const position = el("button", "channel-position", String(button.button));
+      position.type = "button";
+      position.id = `button-${wheel.key}-${button.button}`;
+      position.setAttribute("role", "tab");
+      position.setAttribute(
+        "aria-selected",
+        String(button.button === open.button),
+      );
+      position.setAttribute(
+        "aria-controls",
+        `button-panel-${wheel.key}-${button.button}`,
+      );
+      position.tabIndex = button.button === open.button ? 0 : -1;
+      position.setAttribute(
+        "aria-label",
+        `${this._t("button_title", { button: button.button })}: ${
+          this._isConfigured(button)
+            ? button.behaviour || this._t("configured")
+            : this._t("not_configured")
+        }`,
+      );
+      position.addEventListener("click", () =>
+        this._openButtonAt(button.button),
+      );
+      position.addEventListener("keydown", (event) => {
+        const keys = {
+          ArrowDown: (index + 1) % buttons.length,
+          ArrowRight: (index + 1) % buttons.length,
+          ArrowUp: (index - 1 + buttons.length) % buttons.length,
+          ArrowLeft: (index - 1 + buttons.length) % buttons.length,
+          Home: 0,
+          End: buttons.length - 1,
+        };
+        const next = keys[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        spine.querySelectorAll('[role="tab"]')[next]?.focus();
+      });
+      spine.appendChild(position);
+    });
+    workbench.appendChild(spine);
+
+    const surface = el("div", "channel-surface");
+    surface.id = `button-panel-${wheel.key}-${open.button}`;
+    surface.setAttribute("role", "tabpanel");
+    surface.setAttribute(
+      "aria-labelledby",
+      `button-${wheel.key}-${open.button}`,
+    );
+    surface.appendChild(this._channelDetail(wheel, open));
+    workbench.appendChild(surface);
+    wrap.appendChild(workbench);
     return wrap;
   }
 
   _gestureLabel(activity) {
+    const button = activity.button;
+    if (button !== null && button !== undefined) {
+      const keys = {
+        press:
+          activity.presses === 2
+            ? "gesture_button_press_double"
+            : "gesture_button_press_single",
+        hold: "gesture_button_hold",
+        release: "gesture_button_release",
+      };
+      return this._withObservedDuration(
+        this._t(keys[activity.gesture] || "gesture_button_unknown", {
+          button,
+        }),
+        activity,
+      );
+    }
     const channel = activity.channel ?? "?";
     if (activity.gesture === "rotate") {
       const direction = this._t(
@@ -2639,11 +3220,36 @@ class IkeaBilresaPanel extends HTMLElement {
             : "gesture_press_single";
       return this._t(key, { channel });
     }
-    if (activity.gesture === "hold") return this._t("gesture_hold", { channel });
+    if (activity.gesture === "hold") {
+      return this._withObservedDuration(
+        this._t("gesture_hold", { channel }),
+        activity,
+      );
+    }
     if (activity.gesture === "release") {
-      return this._t("gesture_release", { channel });
+      return this._withObservedDuration(
+        this._t("gesture_release", { channel }),
+        activity,
+      );
     }
     return this._t("gesture_unknown", { channel });
+  }
+
+  _withObservedDuration(label, activity) {
+    const milliseconds = Number(activity.observed_duration_ms);
+    if (
+      !Number.isFinite(milliseconds) ||
+      milliseconds < 0 ||
+      !["hold", "release"].includes(activity.gesture)
+    ) {
+      return label;
+    }
+    const seconds = new Intl.NumberFormat(this._language || "en", {
+      maximumFractionDigits: 2,
+    }).format(milliseconds / 1000);
+    return `${label} · ${this._t("gesture_observed_duration", {
+      duration: seconds,
+    })}`;
   }
 
   _dispatchLabel(activity) {
@@ -2652,7 +3258,12 @@ class IkeaBilresaPanel extends HTMLElement {
       pending: ["unknown", "dispatch_pending"],
       failed: ["failed", "dispatch_failed"],
       skipped: ["failed", "dispatch_skipped"],
-      not_configured: ["failed", "dispatch_not_configured"],
+      not_configured: [
+        "unknown",
+        activity.button !== null && activity.button !== undefined
+          ? "dispatch_not_configured_button"
+          : "dispatch_not_configured",
+      ],
       completed: ["success", "dispatch_completed"],
       received: ["unknown", "dispatch_received"],
     };
@@ -2703,7 +3314,72 @@ class IkeaBilresaPanel extends HTMLElement {
     return JSON.stringify(result);
   }
 
-  async _testBinding(wheel, channel, gesture, extra = {}) {
+  _recognizedResult(activity) {
+    if (activity.gesture === "press") {
+      const press =
+        activity.presses === 2
+          ? "result_gesture_double_press"
+          : activity.presses === 3
+            ? "result_gesture_triple_press"
+            : "result_gesture_press";
+      return this._t(press);
+    }
+    const labels = {
+      rotate: "result_gesture_rotate",
+      hold: "result_gesture_hold",
+      release: "result_gesture_release",
+    };
+    return this._t(labels[activity.gesture] || "result_gesture_received");
+  }
+
+  _liveResult(activity) {
+    return activity.result === null || activity.result === undefined
+      ? this._recognizedResult(activity)
+      : this._formatResult(activity.result);
+  }
+
+  _liveResultLabel(activity) {
+    return this._t(
+      activity.result === null || activity.result === undefined
+        ? "live_event_label"
+        : "live_result_label",
+    );
+  }
+
+  _liveExplanation(activity) {
+    if (activity.result !== null && activity.result !== undefined) return null;
+    if (activity.dispatch_status === "not_configured") {
+      return this._t(
+        activity.button !== null && activity.button !== undefined
+          ? "result_not_configured_button_detail"
+          : "result_not_configured_channel_detail",
+      );
+    }
+    if (
+      activity.dispatch_status === "received" ||
+      activity.dispatch_status === "pending"
+    ) {
+      return this._t("result_pending_detail");
+    }
+    return this._t("result_unavailable_detail");
+  }
+
+  _configureFromLive(wheel, activity) {
+    const number =
+      wheel.variant === "dual_button" ? activity.button : activity.channel;
+    const control = this._controlsFor(wheel).find(
+      (item) => this._controlNumber(wheel, item) === number,
+    );
+    if (!control) return;
+    this._stopActivity();
+    this._activityError = false;
+    this._view = wheel.variant === "dual_button" ? "buttons" : "channels";
+    if (wheel.variant === "dual_button") this._openButton = number;
+    else this._openChannel = number;
+    this._startEditor(wheel, control);
+  }
+
+  async _testBinding(wheel, control, gesture, extra = {}) {
     if (this._testBusy) return;
     this._testBusy = true;
     this._testMessage = null;
@@ -2712,7 +3388,7 @@ class IkeaBilresaPanel extends HTMLElement {
       const response = await this._hass.callWS({
         type: BINDING_TEST,
         wheel: wheel.key,
-        channel,
+        [wheel.variant === "dual_button" ? "button" : "channel"]: control,
         gesture,
         ...extra,
       });
@@ -2732,32 +3408,54 @@ class IkeaBilresaPanel extends HTMLElement {
   _testPanel(wheel) {
     const panel = el("details", "detail-card test-panel");
     panel.appendChild(el("summary", null, this._t("test_controls_heading")));
-    panel.appendChild(el("p", null, this._t("test_controls_intro")));
+    const isButton = wheel.variant === "dual_button";
+    panel.appendChild(
+      el(
+        "p",
+        null,
+        this._t(
+          isButton ? "test_controls_button_intro" : "test_controls_intro",
+        ),
+      ),
+    );
     if (this._testMessage) {
       const message = el("p", "form-message", this._testMessage);
       message.setAttribute("role", "status");
       panel.appendChild(message);
     }
-    for (const channel of wheel.channels.filter((item) => item.binding)) {
+    const controls = this._controlsFor(wheel);
+    for (const control of controls.filter((item) => item.binding)) {
+      const number = this._controlNumber(wheel, control);
       const actions = el("div", "test-actions");
       actions.setAttribute(
         "aria-label",
-        this._t("test_channel", { channel: channel.channel }),
+        this._t(isButton ? "test_button" : "test_channel", {
+          [isButton ? "button" : "channel"]: number,
+        }),
       );
-      const tests = [
-        ["test_rotate_down", "rotate", { direction: "down", notches: 1 }],
-        ["test_rotate_up", "rotate", { direction: "up", notches: 1 }],
-        ["test_single", "press", { presses: 1 }],
-        ["test_double", "press", { presses: 2 }],
-        ["test_triple", "press", { presses: 3 }],
-        ["test_hold", "hold", {}],
-        ["test_release", "release", {}],
-      ];
+      const tests = isButton
+        ? [
+            ["test_single", "press", { presses: 1 }],
+            ["test_double", "press", { presses: 2 }],
+            ["test_hold", "hold", {}],
+            ["test_release", "release", {}],
+          ]
+        : [
+            ["test_rotate_down", "rotate", { direction: "down", notches: 1 }],
+            ["test_rotate_up", "rotate", { direction: "up", notches: 1 }],
+            ["test_single", "press", { presses: 1 }],
+            ["test_double", "press", { presses: 2 }],
+            ["test_triple", "press", { presses: 3 }],
+            ["test_hold", "hold", {}],
+            ["test_release", "release", {}],
+          ];
       actions.appendChild(
         el(
           "strong",
           null,
-          this._t("channel_title", { channel: channel.channel }),
+          this._t(isButton ? "button_title" : "channel_title", {
+            [isButton ? "button" : "channel"]: number,
+          }),
         ),
       );
       for (const [label, gesture, extra] of tests) {
@@ -2765,47 +3463,62 @@ class IkeaBilresaPanel extends HTMLElement {
         button.type = "button";
         button.disabled = this._testBusy;
         button.addEventListener("click", () =>
-          this._testBinding(wheel, channel.channel, gesture, extra),
+          this._testBinding(wheel, number, gesture, extra),
         );
         actions.appendChild(button);
       }
       panel.appendChild(actions);
     }
-    if (!wheel.channels.some((item) => item.binding)) {
-      panel.appendChild(el("p", null, this._t("test_no_bindings")));
+    if (!controls.some((item) => item.binding)) {
+      panel.appendChild(
+        el(
+          "p",
+          null,
+          this._t(
+            isButton ? "test_no_button_bindings" : "test_no_bindings",
+          ),
+        ),
+      );
     }
     return panel;
   }
 
-  _liveChannels(wheel) {
+  _liveControls(wheel) {
+    const isButton = wheel.variant === "dual_button";
     const card = el("section", "detail-card live-channels");
-    card.appendChild(el("h4", null, this._t("live_channels_heading")));
-    for (const channel of wheel.channels) {
+    card.appendChild(
+      el(
+        "h4",
+        null,
+        this._t(isButton ? "live_buttons_heading" : "live_channels_heading"),
+      ),
+    );
+    for (const control of this._controlsFor(wheel)) {
+      const number = this._controlNumber(wheel, control);
       const row = el("div", "live-channel");
-      row.appendChild(
-        el("span", "channel-n", String(channel.channel)),
-      );
+      row.appendChild(el("span", "channel-n", String(number)));
       const copy = el("div", "live-channel-copy");
       copy.appendChild(
         el(
           "div",
           "live-channel-title",
-          this._t("channel_title", { channel: channel.channel }),
+          this._t(isButton ? "button_title" : "channel_title", {
+            [isButton ? "button" : "channel"]: number,
+          }),
         ),
       );
-      const configured =
-        channel.profile !== null && channel.profile !== undefined;
-      const target = channel.target_missing
+      const configured = this._isConfigured(control);
+      const target = control.target_missing
         ? this._t("target_unavailable", {
-            target: channel.target_label || this._t("target_none"),
+            target: control.target_label || this._t("target_none"),
           })
-        : channel.target_label;
+        : control.target_label;
       copy.appendChild(
         el(
           "div",
           "live-channel-summary",
           configured
-            ? [channel.behaviour || channel.profile, target]
+            ? [control.behaviour || control.profile, target]
                 .filter(Boolean)
                 .join(" · ")
             : this._t("not_configured"),
@@ -2842,8 +3555,13 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _liveView(wheel) {
+    const isButton = wheel.variant === "dual_button";
     const wrap = el("div");
-    wrap.appendChild(this._sectionHead(this._t("live_intro")));
+    wrap.appendChild(
+      this._sectionHead(
+        this._t(isButton ? "live_button_intro" : "live_intro"),
+      ),
+    );
     if (this._activityError) wrap.appendChild(this._banner(this._t("live_error")));
 
     const layout = el("div", "live-layout");
@@ -2864,23 +3582,34 @@ class IkeaBilresaPanel extends HTMLElement {
     const latest = this._activities[0];
     const body = el("div", "live-body");
     if (!latest) {
-      body.appendChild(el("div", "waiting-title", this._t("live_waiting_title")));
       body.appendChild(
-        el("div", "live-explanation", this._t("live_waiting_body")),
+        el(
+          "div",
+          "waiting-title",
+          this._t(
+            isButton ? "live_button_waiting_title" : "live_waiting_title",
+          ),
+        ),
+      );
+      body.appendChild(
+        el(
+          "div",
+          "live-explanation",
+          this._t(
+            isButton ? "live_button_waiting_body" : "live_waiting_body",
+          ),
+        ),
       );
       output.appendChild(body);
     } else {
       body.appendChild(
-        el("div", "live-result-label", this._t("live_result_label")),
+        el("div", "live-result-label", this._liveResultLabel(latest)),
       );
-      body.appendChild(el("div", "live-result", this._formatResult(latest.result)));
-      if (latest.result === null || latest.result === undefined) {
+      body.appendChild(el("div", "live-result", this._liveResult(latest)));
+      const explanation = this._liveExplanation(latest);
+      if (explanation) {
         body.appendChild(
-          el(
-            "div",
-            "live-explanation",
-            this._t("result_unavailable_detail"),
-          ),
+          el("div", "live-explanation", explanation),
         );
       }
       const [dispatchState, dispatchKey] = this._dispatchLabel(latest);
@@ -2888,6 +3617,27 @@ class IkeaBilresaPanel extends HTMLElement {
       dispatch.appendChild(this._statusDot(dispatchState));
       dispatch.appendChild(el("span", null, this._t(dispatchKey)));
       body.appendChild(dispatch);
+      if (latest.dispatch_status === "not_configured") {
+        const number = isButton ? latest.button : latest.channel;
+        const control = this._controlsFor(wheel).find(
+          (item) => this._controlNumber(wheel, item) === number,
+        );
+        if (control) {
+          const configure = el(
+            "button",
+            "action-button live-setup-action",
+            this._t(isButton ? "live_setup_button" : "live_setup_channel", {
+              [isButton ? "button" : "channel"]: number,
+            }),
+          );
+          configure.type = "button";
+          configure.dataset.primary = "true";
+          configure.addEventListener("click", () =>
+            this._configureFromLive(wheel, latest),
+          );
+          body.appendChild(configure);
+        }
+      }
       output.appendChild(body);
 
       output.appendChild(el("div", "gesture-caption", this._gestureLabel(latest)));
@@ -2903,11 +3653,16 @@ class IkeaBilresaPanel extends HTMLElement {
     layout.appendChild(output);
 
     const side = el("div", "live-side");
-    side.appendChild(this._liveChannels(wheel));
+    side.appendChild(this._liveControls(wheel));
     if (this._activities.length) {
       const recent = el("section", "detail-card recent");
-      recent.appendChild(el("h4", null, this._t("live_recent")));
+      const recentHeading = el("h4", null, this._t("live_recent"));
+      recentHeading.id = `live-recent-${wheel.key}`;
+      recent.appendChild(recentHeading);
       const list = el("ol");
+      list.id = `live-recent-list-${wheel.key}`;
+      list.tabIndex = 0;
+      list.setAttribute("aria-labelledby", recentHeading.id);
       for (const activity of this._activities) {
         const item = el("li");
         item.appendChild(el("span", null, this._gestureLabel(activity)));
@@ -3021,8 +3776,14 @@ class IkeaBilresaPanel extends HTMLElement {
     );
     activityFacts.appendChild(
       this._fact(
-        this._t("detail_last_channel"),
-        wheel.last_active_channel ?? this._t("detail_no_last_channel"),
+        this._t(
+          wheel.variant === "dual_button"
+            ? "detail_last_button"
+            : "detail_last_channel",
+        ),
+        wheel.variant === "dual_button"
+          ? wheel.last_active_button ?? this._t("detail_no_last_button")
+          : wheel.last_active_channel ?? this._t("detail_no_last_channel"),
       ),
     );
     activity.appendChild(activityFacts);
@@ -3061,6 +3822,8 @@ class IkeaBilresaPanel extends HTMLElement {
     if (this._view === "live") panel.appendChild(this._liveView(wheel));
     else if (this._view === "diagnostics") {
       panel.appendChild(this._diagnosticsView(wheel));
+    } else if (this._view === "buttons") {
+      panel.appendChild(this._buttonsView(wheel));
     } else panel.appendChild(this._channelsView(wheel));
     return panel;
   }
@@ -3151,19 +3914,25 @@ class IkeaBilresaPanel extends HTMLElement {
       wrap.appendChild(this._banner(this._t("banner_updates_stopped")));
     }
     const missing = this._snapshot.wheels.filter((wheel) =>
-      wheel.channels.some((channel) => channel.target_missing),
+      this._controlsFor(wheel).some((control) => control.target_missing),
     );
     if (missing.length === 1) {
-      // The backend knows which wheel and which channel, so the banner says so.
-      // "Wheels with an unavailable target: 1" is a log line, not a sentence.
+      // The backend knows the exact device and control, so the banner says so.
       const wheel = missing[0];
-      const channel = wheel.channels.find((item) => item.target_missing);
+      const control = this._controlsFor(wheel).find(
+        (item) => item.target_missing,
+      );
+      const isButton = wheel.variant === "dual_button";
       wrap.appendChild(
         this._banner(
-          this._t("banner_target_missing_named", {
-            wheel: wheel.name,
-            channel: channel.channel,
-          }),
+          this._t(
+            isButton
+              ? "banner_target_missing_button_named"
+              : "banner_target_missing_named",
+            isButton
+              ? { wheel: wheel.name, button: control.button }
+              : { wheel: wheel.name, channel: control.channel },
+          ),
         ),
       );
     } else if (missing.length > 1) {
