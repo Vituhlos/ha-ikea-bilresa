@@ -8,10 +8,17 @@ Status: **Implemented + Static + local Unit (378 Python, 24 frontend). Feature
 complete end to end. Not committed, not released, not deployed. No Hardware,
 and none is claimed — no physical gesture has touched any of this.**
 
-Branch: **`agent/channel-controls-0.7`**, branched from `agent/dual-button-0.6`
-at `c79da3e`. Deliberately *not* on the RC branch: `agent/dual-button-0.6` is
-mid hardware-checklist for 0.6.0 and two new entity platforms would invalidate
-the validation state recorded above.
+Built on **`agent/channel-controls-0.7`** off `agent/dual-button-0.6` at
+`c79da3e`, then fast-forwarded onto the publication branch and released as
+`v0.6.0-rc.11`.
+
+**Owner decision (2026-08-02): ship it inside 0.6.0, not as 0.7.0.** The
+recommendation here was the opposite — keep the RC train's scope frozen,
+because the hardware validation recorded in the sections below was earned
+against rc.10 and two new entity platforms widen what 0.6.0 has to prove. The
+owner chose rc.11 anyway, so **0.6.0's hardware checklist now also owes the
+dials, the button switches and the disabled-channel gate.** Do not read the
+rc.10 hardware results as covering them.
 
 ### Where this came from
 

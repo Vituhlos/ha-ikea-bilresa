@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.11] - 2026-08-02
+
 ### Added
 
 - **Per-channel dials** — every selector channel gets a `number` entity with a
