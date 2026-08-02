@@ -1,6 +1,153 @@
 # Project status and agent handoff
 
-Last updated: **2026-07-29 by Claude Code**
+Last updated: **2026-08-02 by Claude Code**
+
+## Channel dials, button switches and per-wheel settings — backend only (2026-08-02)
+
+Status: **Implemented + Static + local Unit (378 Python, 24 frontend). Feature
+complete end to end. Not committed, not released, not deployed. No Hardware,
+and none is claimed — no physical gesture has touched any of this.**
+
+Branch: **`agent/channel-controls-0.7`**, branched from `agent/dual-button-0.6`
+at `c79da3e`. Deliberately *not* on the RC branch: `agent/dual-button-0.6` is
+mid hardware-checklist for 0.6.0 and two new entity platforms would invalidate
+the validation state recorded above.
+
+### Where this came from
+
+`64bitjoe/ha-ikea-bilresa` forked `main` (v0.5.0) on 2026-07-29 and added three
+features in 10 commits, then tagged its own "0.6.0". The owner asked for all of
+it, with the settings surfaced in the panel rather than a config-flow handler.
+The fork's own `WheelSettingsSubentryFlowHandler` and its `entity.py` are
+therefore **not** ported: the first is replaced by the panel, and the second is
+a flattened copy of device-info logic that this branch has since deepened
+(`linked_to_matter`, `update_wheel`).
+
+### The acceleration decision, and what was actually measured
+
+The fork's `accelerate()` claims in a comment to be "the same formula as light
+bindings". It is not: it is `n * (1 + a/100 * (n-1))`, driven by batch size
+alone. Both laws were replayed over the committed capture
+`hardware-2026-07-29-round1-decode-only.json` (21 rotations, 37 notches,
+5.81 s):
+
+```text
+acceleration   raw   fork (batch)   ours (velocity)
+   0 %          37      37 (x1.00)      37 (x1.00)
+  50 %          37      63 (x1.70)      57 (x1.54)
+ 100 %          37      89 (x2.41)      80 (x2.16)
+```
+
+Totals are close; the distribution is not. The fork returns 1 for every
+single-notch row even mid-scroll, because rc.5 emits an eager notch per
+`InitialPress` — so batch size measures our own dispatch shape, not how fast
+the wheel turns. And the formula is quadratic in batch size: the 14-notch batch
+recorded in the RC.5 stress run becomes **196 notches** at 100 %, which on a
+1–100 dial is an instant slam to the limit. `_MAX_ACCELERATION_MULTIPLIER = 3.0`
+bounds ours.
+
+This is replay evidence — **Unit, not Hardware**. Which one feels better in the
+hand is unmeasured for both, and this branch's own constants remain the
+unmeasured design choices recorded in the item #1 section below.
+
+### What changed
+
+A pure refactor first, verified separately: `ScrollAccelerator` lifted out of
+`LightBinding` into `channel_controls.py`, with `_accelerate` / `_reset_velocity`
+kept as thin delegating methods so existing tests hold it unchanged. One real
+bug was introduced and caught by those tests — `clock=time.monotonic` as a
+default argument binds at import and defeats `monkeypatch`; the clock is now
+resolved per call.
+
+Then the feature:
+
+- `channel_controls.py` — `ScrollAccelerator`, `WheelSettings`, dial math.
+- `entity.py` — `BilresaChannelEntity` base plus `async_setup_channel_platform`,
+  shared by the two new platforms only. `event.py` keeps its own copy on
+  purpose; rewriting it would mix a refactor into a feature.
+- `number.py` / `switch.py` — one dial and one toggle per wheel channel. Dual
+  buttons are skipped: they have endpoints, not channels.
+- `coordinator.py` — `async_setup_settings` / `settings_for` / `channel_enabled`,
+  and the suppression gate at the very top of `_dispatch`, plus an
+  `actions_suppressed` telemetry counter.
+- `__init__.py` — `NUMBER` and `SWITCH` platforms; settings loaded *before* the
+  platforms so a dial never appears available and then corrects itself.
+
+Storage is a `wheel_settings` config subentry keyed by node id, absent meaning
+"all channels enabled" so a wheel whose channel set grows later cannot silently
+gain dead channels.
+
+Then the panel, per the owner's decision that the settings live there rather
+than in a config-flow handler:
+
+- `panel_models.py` — `ChannelSummary.enabled`, a `WheelSettingsEditor` on each
+  wheel, and `settings_subentry()`. **`CONTRACT_VERSION` 4 → 5.** A dual button
+  gets no editor: it has no channels and no dials.
+- `panel_api.py` — `ikea_bilresa/settings/save`, admin-only, with the same
+  revision-token conflict handling as `ws_binding_save`. It rejects a channel
+  the device does not report, and refuses a dual button outright.
+- `panel_strings.py` — 11 new keys in EN and CS.
+- `ikea_bilresa_panel.js` — a settings section under the channel workbench, and
+  a disabled position struck through on the spine so it reads as off before
+  anything is clicked. Deliberately not merely dimmed: dimming already means
+  "unconfigured" in this panel, which is a different state.
+
+The draft is keyed by wheel, so switching wheels in the rail cannot carry one
+wheel's unsaved edits onto another, and a save conflict drops the draft rather
+than letting the next save clobber whatever the other panel stored.
+
+Local validation on Windows / Python 3.14:
+
+```text
+JSON parse strings + en/cs                           passed
+python -m compileall -q custom_components tests      passed
+ruff format --check / ruff check                     passed (48 files)
+mypy custom_components/ikea_bilresa                  passed (25 files)
+node --check panel asset                             passed
+node --test panel + icon frontend tests              passed (24 tests)
+EN/CS panel string alignment                         passed (276 keys each)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 py -3.14 -m pytest  378 passed
+git diff --check                                     passed (CRLF warnings only)
+hassfest / HACS validation                           not run (CI only)
+```
+
+Two existing panel guards were widened deliberately, and both are the kind that
+should never move silently: `test_commands_register_once` (7 → 8) and
+`test_write_surface_is_limited_to_binding_mutations_and_tests`, whose docstring
+now records *why* `ws_settings_save` is allowed on the list — one subentry type,
+four validated fields, a wheel that currently exists.
+
+Three existing tests changed meaning, deliberately: two coupled to velocity
+internals that moved, and `test_only_physical_device_platform_is_forwarded`,
+whose intent (no integration *service* device) is preserved — every new
+platform attaches to a wheel's own reconciled identifiers.
+
+### Known gaps — read before continuing
+
+- **Nothing has been seen in a real browser.** The panel section is held by
+  unit tests against the production custom element, not by a screenshot, a
+  harness render or a deployed instance. Checklist item #4's light/dark/custom
+  theme and keyboard/screen-reader pass do not cover it.
+- **No Hardware at all.** No physical gesture has moved a dial or flipped a
+  switch. In particular the claim that a disabled channel is *completely*
+  silent is held by a unit test over `_dispatch`, not observed on a wheel.
+- **The new tests were not confirmed to fail against a reverted gate.** The
+  repo standard is to check that; it was reasoned, not measured.
+- `README.md` and `README.cs.md` are not updated. `strings.json` / `en.json` /
+  `cs.json` are untouched on purpose — these settings have no config-flow
+  handler, so they need no HA translation keys; everything user-facing is in
+  `panel_strings.py`.
+- `DEFAULT_DIAL_STEP = 2` (about 50 notches for a full sweep) is a guess, not a
+  measurement. So is the 1–25 range on the step field.
+- `CONTRACT_VERSION` moved to 5. A browser holding an old panel module open
+  across the upgrade will not render the settings section until it reloads.
+
+Single best next action: deploy to a real Home Assistant and open the panel —
+the section has never been rendered by a browser. Then a Hardware pass: disable
+channel 2 on `Kolečko Obývák`, confirm the wheel's own `event` entity does not
+fire and no automation triggers, then re-enable and confirm the dial moves.
+Afterwards `README.md` / `README.cs.md`, and CI for the exact revision
+(mypy/hassfest are the gates local Python 3.14 cannot supply).
 
 ## Checklist item #1 — batch smoothing mechanism (durations still unmeasured)
 

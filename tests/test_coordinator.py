@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from custom_components.ikea_bilresa.channel_controls import (
+    DEFAULT_SETTINGS,
+    WheelSettings,
+)
 from custom_components.ikea_bilresa.const import (
     ACTION_PRESS,
+    ACTION_ROTATE,
     CLUSTER_SWITCH,
     CONF_CHANNEL,
+    CONF_CHANNEL_ENABLED,
     CONF_ENDPOINT,
     CONF_NODE_ID,
+    DIRECTION_UP,
     DOMAIN,
     EVENT_BILRESA,
     SUBENTRY_BINDING,
@@ -334,3 +342,94 @@ def test_public_event_includes_registry_device_id_without_breaking_payload(
     assert event_data["device_id"] == "device-123"
     assert event_data["node_id"] == 12
     assert event_data["presses"] == 1
+
+
+def _dispatch_coordinator(monkeypatch) -> tuple[Any, Mock, Mock]:
+    """A coordinator with the bus and dispatcher captured, ready to dispatch."""
+    bus = SimpleNamespace(async_fire=Mock())
+    hass = SimpleNamespace(bus=bus)
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.dr.async_get",
+        lambda _hass: SimpleNamespace(async_get_device=Mock(return_value=None)),
+    )
+    dispatch = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.async_dispatcher_send", dispatch
+    )
+    return BilresaCoordinator(hass, "ws://matter/ws"), bus.async_fire, dispatch
+
+
+def _rotate(node_id: int, channel: int) -> WheelAction:
+    return WheelAction(
+        node_id=node_id,
+        wheel_name="Test wheel",
+        channel=channel,
+        endpoint_id=3,
+        type=ACTION_ROTATE,
+        direction=DIRECTION_UP,
+        notches=2,
+    )
+
+
+def test_disabled_channel_fires_nothing_at_all(monkeypatch) -> None:
+    """The owner's rule: a disabled channel behaves as if it did not exist.
+
+    Not merely "the dial does not move" — no bus event, no channel signal, so
+    no binding, no automation trigger and no entity movement either.
+    """
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"2": False}}
+        )
+    }
+
+    coordinator._dispatch(_rotate(12, 2))
+
+    fire.assert_not_called()
+    dispatch.assert_not_called()
+    assert coordinator.telemetry["actions_dispatched"] == 0
+    assert coordinator.telemetry["actions_suppressed"] == 1
+
+
+def test_disabling_one_channel_leaves_its_siblings_alone(monkeypatch) -> None:
+    coordinator, fire, _dispatch = _dispatch_coordinator(monkeypatch)
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"2": False}}
+        )
+    }
+
+    coordinator._dispatch(_rotate(12, 1))
+
+    fire.assert_called_once()
+    assert coordinator.telemetry["actions_dispatched"] == 1
+    assert coordinator.telemetry["actions_suppressed"] == 0
+
+
+def test_settings_for_one_wheel_do_not_silence_another(monkeypatch) -> None:
+    """Settings are keyed by node, so one wheel cannot mute its neighbour."""
+    coordinator, fire, _dispatch = _dispatch_coordinator(monkeypatch)
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"2": False}}
+        )
+    }
+
+    coordinator._dispatch(_rotate(15, 2))
+
+    fire.assert_called_once()
+    assert coordinator.channel_enabled(15, 2)
+
+
+def test_a_wheel_without_settings_has_every_channel_enabled(monkeypatch) -> None:
+    coordinator, fire, _dispatch = _dispatch_coordinator(monkeypatch)
+
+    coordinator._dispatch(_rotate(12, 3))
+
+    fire.assert_called_once()
+    assert coordinator.settings_for(12) is DEFAULT_SETTINGS

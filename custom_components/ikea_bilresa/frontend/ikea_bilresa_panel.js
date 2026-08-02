@@ -22,6 +22,7 @@ const ACTIVITY_SUBSCRIBE = "ikea_bilresa/activity/subscribe";
 const BINDING_SAVE = "ikea_bilresa/binding/save";
 const BINDING_DELETE = "ikea_bilresa/binding/delete";
 const BINDING_TEST = "ikea_bilresa/binding/test";
+const SETTINGS_SAVE = "ikea_bilresa/settings/save";
 const ACTIVITY_LIMIT = 8;
 
 const MODE_DOMAINS = {
@@ -744,6 +745,57 @@ const STYLES = `
     color: var(--text-primary-color, #fff);
   }
   .channel-position:active { transform: translateY(1px); }
+  /* Struck through rather than merely dimmed: dimming reads as "unconfigured",
+     which this is not — it is a position that has been switched off. */
+  .channel-position-off {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+
+  .settings-section {
+    margin-block-start: 24px;
+    padding-block-start: 20px;
+    border-block-start: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+  }
+  .settings-title {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .settings-intro {
+    margin: 0 0 16px;
+    color: var(--secondary-text-color);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .settings-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-block-end: 16px;
+  }
+  .settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-block-size: 44px;
+    cursor: pointer;
+  }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .settings-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-block-start: 16px;
+  }
+  .settings-message {
+    color: var(--secondary-text-color);
+    font-size: 13px;
+  }
   .channel-surface {
     min-inline-size: 0;
     padding: var(--_space-8);
@@ -1452,6 +1504,12 @@ class IkeaBilresaPanel extends HTMLElement {
     this._editorBinding = null;
     this._editorErrors = {};
     this._editorBusy = false;
+    // Per-wheel settings draft, keyed by wheel so switching wheels in the rail
+    // cannot carry one wheel's unsaved edits onto another.
+    this._settingsDraft = null;
+    this._settingsDraftKey = null;
+    this._settingsBusy = false;
+    this._settingsMessage = null;
     this._editorMessage = null;
     this._deleteConfirm = false;
     this._testBusy = false;
@@ -2781,6 +2839,161 @@ class IkeaBilresaPanel extends HTMLElement {
     return !action.target_label && action.action_label === this._t("action_none");
   }
 
+
+  _settingsStateFor(wheel) {
+    if (this._settingsDraftKey === wheel.key && this._settingsDraft) {
+      return this._settingsDraft;
+    }
+    const stored = wheel.settings || {};
+    const enabled = {};
+    (wheel.channels || []).forEach((channel) => {
+      enabled[String(channel.channel)] = channel.enabled !== false;
+    });
+    return {
+      channel_enabled: enabled,
+      step: stored.step ?? 2,
+      acceleration: stored.acceleration ?? 0,
+    };
+  }
+
+  _updateSettingsDraft(wheel, patch) {
+    this._settingsDraft = { ...this._settingsStateFor(wheel), ...patch };
+    this._settingsDraftKey = wheel.key;
+    this._settingsMessage = null;
+    this._render();
+  }
+
+  async _saveSettings(wheel) {
+    if (this._settingsBusy) return;
+    this._settingsBusy = true;
+    this._settingsMessage = null;
+    this._render();
+    try {
+      const draft = this._settingsStateFor(wheel);
+      const response = await this._hass.callWS({
+        type: SETTINGS_SAVE,
+        wheel: wheel.key,
+        channel_enabled: draft.channel_enabled,
+        step: Number(draft.step),
+        acceleration: Number(draft.acceleration),
+        expected_revision: wheel.settings?.revision,
+      });
+      if (!response.ok) {
+        this._settingsMessage = this._t(
+          response.error === "conflict"
+            ? "settings_error_conflict"
+            : "settings_error_generic",
+        );
+        // A conflict means the stored value is the truth now: drop the draft
+        // so the refreshed snapshot is what the owner sees and re-edits.
+        if (response.error === "conflict") {
+          this._settingsDraft = null;
+          this._settingsDraftKey = null;
+          await this._refreshSnapshot();
+        }
+        return;
+      }
+      this._settingsDraft = null;
+      this._settingsDraftKey = null;
+      await this._refreshSnapshot();
+      this._settingsMessage = this._t("settings_saved");
+    } catch (err) {
+      this._settingsMessage = this._t("settings_error_generic");
+    } finally {
+      this._settingsBusy = false;
+      this._render();
+    }
+  }
+
+  _settingsSection(wheel) {
+    const draft = this._settingsStateFor(wheel);
+    const section = el("section", "settings-section");
+    section.appendChild(el("h3", "settings-title", this._t("settings_title")));
+    section.appendChild(el("p", "settings-intro", this._t("settings_intro")));
+
+    const toggles = el("div", "settings-toggles");
+    (wheel.channels || []).forEach((channel) => {
+      const key = String(channel.channel);
+      const row = el("label", "settings-toggle");
+      const box = el("input");
+      box.type = "checkbox";
+      box.checked = draft.channel_enabled[key] !== false;
+      box.addEventListener("change", () =>
+        this._updateSettingsDraft(wheel, {
+          channel_enabled: {
+            ...draft.channel_enabled,
+            [key]: box.checked,
+          },
+        }),
+      );
+      row.appendChild(box);
+      row.appendChild(
+        el(
+          "span",
+          null,
+          this._t("settings_channel_enabled", { channel: channel.channel }),
+        ),
+      );
+      toggles.appendChild(row);
+    });
+    section.appendChild(toggles);
+
+    const grid = el("div", "settings-grid");
+    grid.appendChild(
+      this._settingsNumber(
+        wheel,
+        "step",
+        this._t("settings_step"),
+        draft.step,
+        1,
+        25,
+        1,
+      ),
+    );
+    grid.appendChild(
+      this._settingsNumber(
+        wheel,
+        "acceleration",
+        this._t("settings_acceleration"),
+        draft.acceleration,
+        0,
+        100,
+        5,
+        this._t("settings_acceleration_help"),
+      ),
+    );
+    section.appendChild(grid);
+
+    const actions = el("div", "settings-actions");
+    const save = el("button", "primary", this._t("settings_save"));
+    save.type = "button";
+    save.disabled = this._settingsBusy;
+    save.addEventListener("click", () => this._saveSettings(wheel));
+    actions.appendChild(save);
+    if (this._settingsMessage) {
+      actions.appendChild(el("span", "settings-message", this._settingsMessage));
+    }
+    section.appendChild(actions);
+    return section;
+  }
+
+  _settingsNumber(wheel, name, label, value, min, max, step, help) {
+    const shell = el("div", "field");
+    shell.appendChild(el("label", "field-label", label));
+    const input = el("input");
+    input.type = "number";
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(value);
+    input.addEventListener("change", () =>
+      this._updateSettingsDraft(wheel, { [name]: Number(input.value) }),
+    );
+    shell.appendChild(input);
+    if (help) shell.appendChild(el("p", "field-help", help));
+    return shell;
+  }
+
   _channelsView(wheel) {
     const wrap = el("div");
     wrap.appendChild(this._sectionHead(this._t("detail_channels_intro")));
@@ -2813,12 +3026,17 @@ class IkeaBilresaPanel extends HTMLElement {
       dot.tabIndex = channel.channel === open.channel ? 0 : -1;
       const configured =
         channel.profile !== null && channel.profile !== undefined;
+      // A disabled channel reads as disabled before anything else: whatever
+      // binding it still holds is not going to run.
+      if (channel.enabled === false) dot.classList.add("channel-position-off");
       dot.setAttribute(
         "aria-label",
         `${this._t("channel_title", { channel: channel.channel })}: ${
-          configured
-            ? channel.behaviour || channel.profile
-            : this._t("not_configured")
+          channel.enabled === false
+            ? this._t("settings_disabled_badge")
+            : configured
+              ? channel.behaviour || channel.profile
+              : this._t("not_configured")
         }`,
       );
       dot.addEventListener("click", () => this._openChannelAt(channel.channel));
@@ -2848,6 +3066,7 @@ class IkeaBilresaPanel extends HTMLElement {
     workbench.appendChild(surface);
 
     wrap.appendChild(workbench);
+    wrap.appendChild(this._settingsSection(wheel));
     return wrap;
   }
 

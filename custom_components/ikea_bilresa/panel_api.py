@@ -15,8 +15,12 @@ optimistic-concurrency tokens for updates and deletion.
   view only.
 
 The mutation contract is deliberately narrow: it can create, update or delete a
-binding subentry and nothing else. It cannot mutate wheels, Matter devices,
-entities or arbitrary config entries.
+binding subentry, and create or update one `wheel_settings` subentry per wheel.
+Nothing else. It cannot mutate wheels, Matter devices, entities or arbitrary
+config entries.
+
+- `ikea_bilresa/settings/save` — per-wheel channel enables, dial step and
+  acceleration, for a wheel that currently exists.
 """
 
 from __future__ import annotations
@@ -43,9 +47,12 @@ from .const import (
     ACTION_PRESS,
     ACTION_RELEASE,
     ACTION_ROTATE,
+    CONF_ACCELERATION,
     CONF_CHANNEL,
+    CONF_CHANNEL_ENABLED,
     CONF_ENDPOINT,
     CONF_NODE_ID,
+    CONF_STEP,
     DIRECTION_DOWN,
     DIRECTION_UP,
     DOMAIN,
@@ -56,9 +63,15 @@ from .const import (
     SIGNAL_CONNECTION,
     SIGNAL_WHEELS_UPDATED,
     SUBENTRY_BINDING,
+    SUBENTRY_WHEEL,
 )
 from .engine import WheelAction
-from .panel_models import CONTRACT_VERSION, async_overview_snapshot, wheel_key
+from .panel_models import (
+    CONTRACT_VERSION,
+    async_overview_snapshot,
+    settings_subentry,
+    wheel_key,
+)
 from .presentation import generated_binding_title, generated_button_binding_title
 
 TYPE_OVERVIEW = f"{DOMAIN}/overview"
@@ -67,6 +80,7 @@ TYPE_ACTIVITY_SUBSCRIBE = f"{DOMAIN}/activity/subscribe"
 TYPE_BINDING_SAVE = f"{DOMAIN}/binding/save"
 TYPE_BINDING_DELETE = f"{DOMAIN}/binding/delete"
 TYPE_BINDING_TEST = f"{DOMAIN}/binding/test"
+TYPE_SETTINGS_SAVE = f"{DOMAIN}/settings/save"
 TYPE_TRACE = f"{DOMAIN}/trace"
 
 _COMMANDS_REGISTERED = f"{DOMAIN}_ws_registered"
@@ -192,6 +206,17 @@ def _button_index(entry: Any, node_id: int, endpoint_id: Any) -> int | None:
         return endpoints.index(endpoint_id) + 1
     except ValueError:
         return None
+
+
+@callback
+def _settings_title(hass: HomeAssistant, entry: Any, wheel: str) -> str:
+    """Name a settings subentry after the wheel, as the config flow would."""
+    snapshot = async_overview_snapshot(hass, entry)
+    name = next(
+        (item["name"] for item in snapshot["wheels"] if item["key"] == wheel),
+        "BILRESA",
+    )
+    return f"{name} · settings"
 
 
 @callback
@@ -599,6 +624,108 @@ def ws_binding_test(
     connection.send_result(msg["id"], {"ok": True, "action_id": action.action_id})
 
 
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): TYPE_SETTINGS_SAVE,
+        vol.Required("wheel"): str,
+        vol.Required("channel_enabled"): {vol.Coerce(str): bool},
+        vol.Required("step"): vol.All(vol.Coerce(float), vol.Range(min=1, max=25)),
+        vol.Required("acceleration"): vol.All(
+            vol.Coerce(float), vol.Range(min=0, max=100)
+        ),
+        vol.Optional("expected_revision"): str,
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_settings_save(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Save one wheel's channel settings, creating the subentry on first save.
+
+    The mutation surface stays as narrow as the binding one: it writes only a
+    `wheel_settings` subentry for a wheel that currently exists, and only the
+    four fields above.
+    """
+    entry = _loaded_entry(hass)
+    if entry is None:
+        connection.send_result(msg["id"], {"ok": False, "error": "unloaded"})
+        return
+    node_id = _node_for_key(entry, msg["wheel"])
+    if node_id is None:
+        connection.send_result(msg["id"], {"ok": False, "error": "wheel_missing"})
+        return
+    wheel = entry.runtime_data.wheels[node_id]
+    if wheel.is_dual_button:
+        connection.send_result(msg["id"], {"ok": False, "error": "control_mismatch"})
+        return
+
+    known = {
+        endpoint.channel
+        for endpoint in wheel.endpoints.values()
+        if endpoint.channel is not None
+    }
+    enabled: dict[str, bool] = {}
+    for raw_channel, value in msg["channel_enabled"].items():
+        try:
+            channel = int(raw_channel)
+        except (TypeError, ValueError):
+            connection.send_result(msg["id"], {"ok": False, "error": "control_missing"})
+            return
+        if channel not in known:
+            connection.send_result(msg["id"], {"ok": False, "error": "control_missing"})
+            return
+        enabled[str(channel)] = bool(value)
+
+    existing = settings_subentry(entry, node_id)
+    if existing is not None:
+        current_revision = binding_revision(existing)
+        if msg.get("expected_revision") != current_revision:
+            connection.send_result(
+                msg["id"],
+                {"ok": False, "error": "conflict", "revision": current_revision},
+            )
+            return
+
+    data = {
+        CONF_NODE_ID: node_id,
+        CONF_CHANNEL_ENABLED: enabled,
+        CONF_STEP: msg["step"],
+        CONF_ACCELERATION: msg["acceleration"],
+    }
+    title = _settings_title(hass, entry, msg["wheel"])
+    if existing is None:
+        subentry = ConfigSubentry(
+            data=MappingProxyType(data),
+            subentry_type=SUBENTRY_WHEEL,
+            title=title,
+            unique_id=f"{node_id}:settings",
+        )
+        hass.config_entries.async_add_subentry(entry, subentry)
+        saved = subentry
+    else:
+        hass.config_entries.async_update_subentry(
+            entry, existing, title=title, data=data
+        )
+        saved = entry.subentries[existing.subentry_id]
+
+    # In place, like bindings: disabling a channel must not need a reload.
+    entry.runtime_data.async_setup_settings(entry)
+    async_dispatcher_send(hass, SIGNAL_BINDINGS_UPDATED)
+    connection.send_result(
+        msg["id"],
+        {
+            "ok": True,
+            "settings": {
+                "subentry_id": saved.subentry_id,
+                "revision": binding_revision(saved),
+            },
+        },
+    )
+
+
 @callback
 def async_register_commands(hass: HomeAssistant) -> None:
     """Register once per Home Assistant run.
@@ -615,5 +742,6 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_binding_save)
     websocket_api.async_register_command(hass, ws_binding_delete)
     websocket_api.async_register_command(hass, ws_binding_test)
+    websocket_api.async_register_command(hass, ws_settings_save)
     websocket_api.async_register_command(hass, ws_trace)
     hass.data[_COMMANDS_REGISTERED] = True

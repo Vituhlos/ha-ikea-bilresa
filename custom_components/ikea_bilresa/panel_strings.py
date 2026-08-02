@@ -102,6 +102,25 @@ STRINGS: dict[str, dict[str, str]] = {
         "back": "Back to all BILRESA devices",
         "wheel_switcher": "BILRESA devices",
         "detail_views": "Device detail views",
+        "settings_title": "Channel behaviour",
+        "settings_intro": (
+            "Switch a selector position off and it is ignored entirely — no "
+            "dial, no toggle, no events, nothing. Useful when the selector "
+            "gets flipped by accident."
+        ),
+        "settings_channel_enabled": "Channel {channel} active",
+        "settings_step": "Dial change per notch",
+        "settings_acceleration": "Acceleration",
+        "settings_acceleration_help": (
+            "Turning faster moves the dial further per notch."
+        ),
+        "settings_save": "Save",
+        "settings_saved": "Settings saved",
+        "settings_disabled_badge": "Off",
+        "settings_error_conflict": (
+            "These settings were changed elsewhere. Reopen the wheel and try again."
+        ),
+        "settings_error_generic": "The settings could not be saved.",
         "tab_channels": "Channels",
         "tab_buttons": "Buttons",
         "tab_live": "Live test",
@@ -467,6 +486,26 @@ STRINGS: dict[str, dict[str, str]] = {
         "back": "Zpět na všechna zařízení BILRESA",
         "wheel_switcher": "Zařízení BILRESA",
         "detail_views": "Pohledy detailu zařízení",
+        "settings_title": "Chování kanálů",
+        "settings_intro": (
+            "Vypnutý kanál je zcela ignorován — žádný číselník, žádné "
+            "přepínání, žádné události. Hodí se, když přepínač někdo cvakne "
+            "omylem."
+        ),
+        "settings_channel_enabled": "Kanál {channel} aktivní",
+        "settings_step": "Změna číselníku na zub",
+        "settings_acceleration": "Akcelerace",
+        "settings_acceleration_help": (
+            "Čím rychleji točíš, tím větší skok na jeden zub."
+        ),
+        "settings_save": "Uložit",
+        "settings_saved": "Nastavení uloženo",
+        "settings_disabled_badge": "Vypnuto",
+        "settings_error_conflict": (
+            "Nastavení mezitím změnil někdo jiný. Otevři kolečko znovu a zkus "
+            "to ještě jednou."
+        ),
+        "settings_error_generic": "Nastavení se nepodařilo uložit.",
         "tab_channels": "Kanály",
         "tab_buttons": "Tlačítka",
         "tab_live": "Živý test",

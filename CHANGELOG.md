@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- **Per-channel dials** — every selector channel gets a `number` entity with a
+  **1–100 range** that scrolling moves in real time. It survives restarts and
+  can also be set from the UI or `number.set_value`, so a channel is useful on
+  its own without configuring a binding.
+- **Per-channel button switches** — each channel's centre button flips its own
+  `switch` entity on a single press. Double press, triple press and hold keep
+  firing their own events.
+- **Per-wheel channel settings** — a channel can be switched off entirely. A
+  disabled channel is ignored completely: no bus event, no automation trigger,
+  no binding and no entity movement, so an accidental flip of the selector does
+  nothing at all. Each wheel also carries its own dial step and acceleration.
+
+### Changed
+
+- The scroll accelerator moved out of `binding.py` into
+  `channel_controls.ScrollAccelerator`, shared with the new dials so one
+  `Acceleration` setting means one thing across a wheel. Behaviour is
+  unchanged.
+
 ## [0.6.0-rc.10] - 2026-07-29
 
 ### Changed

@@ -15,8 +15,13 @@ from custom_components.ikea_bilresa.const import SUBENTRY_BINDING
 
 
 def test_only_physical_device_platform_is_forwarded() -> None:
-    """The integration overview must not gain an integration service device."""
-    assert PLATFORMS == [Platform.EVENT]
+    """The integration overview must not gain an integration service device.
+
+    Every forwarded platform attaches its entities to a wheel's own reconciled
+    device identifiers. A platform that needed a device of its own would be the
+    regression this guards against.
+    """
+    assert PLATFORMS == [Platform.EVENT, Platform.NUMBER, Platform.SWITCH]
 
 
 @pytest.mark.asyncio

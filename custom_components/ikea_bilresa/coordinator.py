@@ -19,6 +19,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
 
 from .binding import LightBinding
+from .channel_controls import DEFAULT_SETTINGS, WheelSettings
 from .const import (
     ATTR_SWITCH_CURRENT_POSITION,
     CLUSTER_SWITCH,
@@ -30,8 +31,10 @@ from .const import (
     ISSUE_CANNOT_CONNECT,
     SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
+    SIGNAL_SETTINGS_UPDATED,
     SIGNAL_WHEELS_UPDATED,
     SUBENTRY_BINDING,
+    SUBENTRY_WHEEL,
     signal_channel,
     signal_raw_button,
 )
@@ -66,6 +69,7 @@ class BilresaCoordinator:
         self.url = url
         self.connected = False
         self.wheels: dict[int, BilresaWheel] = {}
+        self.wheel_settings: dict[int, WheelSettings] = {}
         self._engine = GestureEngine()
         # Shared by every binding so one capture covers all of them at once.
         self.rotation_trace = RotationTrace()
@@ -82,6 +86,7 @@ class BilresaCoordinator:
         self._ignored_counts: Counter[str] = Counter()
         self._recent_events: deque[dict[str, Any]] = deque(maxlen=20)
         self._actions_dispatched = 0
+        self._actions_suppressed = 0
         self._connection_count = 0
         self._fallback_count = 0
         self._last_event_at: datetime | None = None
@@ -104,6 +109,7 @@ class BilresaCoordinator:
             "event_counts": dict(self._event_counts),
             "ignored_counts": dict(self._ignored_counts),
             "actions_dispatched": self._actions_dispatched,
+            "actions_suppressed": self._actions_suppressed,
             "connection_count": self._connection_count,
             "fallback_count": self._fallback_count,
             "last_fallback_reason": self._last_fallback_reason,
@@ -163,6 +169,35 @@ class BilresaCoordinator:
                 self.url, async_get_clientsession(self.hass), self._on_event
             )
             await self._client.start()
+
+    # -- per-wheel channel settings ---------------------------------------
+
+    @callback
+    def async_setup_settings(self, entry: ConfigEntry) -> None:
+        """(Re)load per-wheel settings from the entry's subentries, in place.
+
+        Called on setup and whenever a `wheel_settings` subentry changes, so
+        disabling a channel never needs a reload / reconnect.
+        """
+        settings: dict[int, WheelSettings] = {}
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type != SUBENTRY_WHEEL:
+                continue
+            parsed = WheelSettings.from_data(dict(subentry.data))
+            if parsed.node_id is not None:
+                settings[parsed.node_id] = parsed
+        self.wheel_settings = settings
+        async_dispatcher_send(self.hass, SIGNAL_SETTINGS_UPDATED)
+
+    @callback
+    def settings_for(self, node_id: int) -> WheelSettings:
+        """Settings for one wheel, falling back to the defaults."""
+        return self.wheel_settings.get(node_id, DEFAULT_SETTINGS)
+
+    @callback
+    def channel_enabled(self, node_id: int, channel: int | None) -> bool:
+        """Whether a wheel channel acts at all, or is ignored entirely."""
+        return self.settings_for(node_id).channel_enabled(channel)
 
     # -- bindings ---------------------------------------------------------
 
@@ -304,6 +339,19 @@ class BilresaCoordinator:
 
     @callback
     def _dispatch(self, action: WheelAction) -> None:
+        # A disabled channel is silent all the way down: no bus event, no
+        # channel signal, no binding, no entity movement. The owner's intent is
+        # "this selector position does not exist", so anything that leaked past
+        # here would still let an accidental flip act.
+        if not self.channel_enabled(action.node_id, action.channel):
+            self._actions_suppressed += 1
+            _LOGGER.debug(
+                "suppressed (channel disabled): node=%s ch=%s %s",
+                action.node_id,
+                action.channel,
+                action.type,
+            )
+            return
         self._actions_dispatched += 1
         _LOGGER.debug(
             "action: node=%s ch=%s %s dir=%s notches=%s presses=%s",

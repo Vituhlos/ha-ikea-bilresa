@@ -66,12 +66,13 @@ from .const import (
     MODE_VOLUME,
     ROLE_BUTTON,
     SUBENTRY_BINDING,
+    SUBENTRY_WHEEL,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
 from .model import BilresaWheel
 from .panel_strings import localize
 
-CONTRACT_VERSION = 4
+CONTRACT_VERSION = 5
 
 # Deliberately short: this is an addressing token, not a secret. Long enough not
 # to collide across a household, short enough to read in a bug report.
@@ -119,6 +120,9 @@ class ChannelSummary:
     """One channel of one wheel, as a human reads it."""
 
     channel: int
+    # False means the owner switched this selector position off entirely: the
+    # coordinator drops its actions before anything else sees them.
+    enabled: bool = True
     configured: bool = False
     profile: str | None = None
     behaviour: str | None = None
@@ -142,6 +146,21 @@ class ButtonSummary:
 
 
 @dataclass(slots=True)
+class WheelSettingsEditor:
+    """The editable per-wheel settings, with a concurrency token.
+
+    `subentry_id` is None until the owner saves for the first time: a wheel
+    without stored settings still renders its defaults, and the first save
+    creates the subentry.
+    """
+
+    subentry_id: str | None
+    revision: str | None
+    step: float
+    acceleration: float
+
+
+@dataclass(slots=True)
 class WheelOverview:
     """One physical BILRESA device. No node ID, endpoint, serial or product."""
 
@@ -156,6 +175,7 @@ class WheelOverview:
     last_active_button: int | None
     channels: list[ChannelSummary] = field(default_factory=list)
     buttons: list[ButtonSummary] = field(default_factory=list)
+    settings: WheelSettingsEditor | None = None
 
 
 @dataclass(slots=True)
@@ -235,6 +255,31 @@ def _binding_by_channel(entry: Any, node_id: int) -> dict[int, Any]:
         if channel is not None:
             bindings[channel] = subentry
     return bindings
+
+
+@callback
+def settings_subentry(entry: Any, node_id: int) -> Any | None:
+    """This wheel's `wheel_settings` subentry, if it has been saved yet."""
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_WHEEL:
+            continue
+        if _as_int(dict(subentry.data).get(CONF_NODE_ID)) == node_id:
+            return subentry
+    return None
+
+
+@callback
+def _settings_editor(entry: Any, node_id: int, settings: Any) -> WheelSettingsEditor:
+    """Serialize a wheel's settings with a token for conflict detection."""
+    subentry = settings_subentry(entry, node_id)
+    return WheelSettingsEditor(
+        subentry_id=subentry.subentry_id if subentry else None,
+        # `binding_revision` is generic over subentries despite its name; the
+        # token has to change whenever the stored data does, nothing more.
+        revision=binding_revision(subentry) if subentry else None,
+        step=settings.step,
+        acceleration=settings.acceleration,
+    )
 
 
 @callback
@@ -514,6 +559,7 @@ def _channel_summaries(
     wheel: BilresaWheel,
     bindings: dict[int, Any],
     language: str | None,
+    settings: Any,
 ) -> list[ChannelSummary]:
     """One summary per channel the device itself reports.
 
@@ -527,9 +573,10 @@ def _channel_summaries(
     )
     summaries: list[ChannelSummary] = []
     for channel in channels:
+        enabled = settings.channel_enabled(channel)
         subentry = bindings.get(channel)
         if subentry is None:
-            summaries.append(ChannelSummary(channel=channel))
+            summaries.append(ChannelSummary(channel=channel, enabled=enabled))
             continue
         data = dict(subentry.data)
         target = data.get(CONF_TARGET)
@@ -539,6 +586,7 @@ def _channel_summaries(
         summaries.append(
             ChannelSummary(
                 channel=channel,
+                enabled=enabled,
                 configured=True,
                 # The stored scroll mode. CONF_BINDING_PROFILE is not persisted.
                 profile=data.get(CONF_MODE),
@@ -710,11 +758,12 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
         )
         name, area = _wheel_name_and_area(hass, link.device, wheel)
         last_activity, last_channel, last_button = _last_activity(hass, wheel)
+        settings = coordinator.settings_for(node_id)
         channels = (
             []
             if wheel.is_dual_button
             else _channel_summaries(
-                hass, wheel, _binding_by_channel(entry, node_id), language
+                hass, wheel, _binding_by_channel(entry, node_id), language, settings
             )
         )
         buttons = (
@@ -739,6 +788,13 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
                 last_active_button=last_button,
                 channels=channels,
                 buttons=buttons,
+                # A dual button has no channels to disable and no dials, so it
+                # gets no settings editor at all.
+                settings=(
+                    None
+                    if wheel.is_dual_button
+                    else _settings_editor(entry, node_id, settings)
+                ),
             )
         )
 

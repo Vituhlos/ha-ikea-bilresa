@@ -7,6 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from custom_components.ikea_bilresa.channel_controls import (
+    DEFAULT_SETTINGS,
+)
 from custom_components.ikea_bilresa.const import (
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
@@ -107,13 +110,16 @@ def _button_subentry(node_id: int, endpoint: int, **data) -> SimpleNamespace:
     )
 
 
-def _entry(wheels, subentries=()) -> SimpleNamespace:
+def _entry(wheels, subentries=(), settings=None) -> SimpleNamespace:
+    per_node = settings or {}
     coordinator = SimpleNamespace(
         url="ws://matter/ws",
         wheels={w.node_id: w for w in wheels},
         matter_server_info={"compressed_fabric_id": 2},
         connected=True,
         event_source="core_matter_client",
+        wheel_settings=per_node,
+        settings_for=lambda node_id: per_node.get(node_id, DEFAULT_SETTINGS),
     )
     return SimpleNamespace(
         subentries={str(i): s for i, s in enumerate(subentries)},

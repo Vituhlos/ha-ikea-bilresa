@@ -438,3 +438,78 @@ test("dual-button save sends only its safe display number", async () => {
   assert.equal("channel" in messages[0], false);
   assert.equal("endpoint" in messages[0], false);
 });
+
+test("saving wheel settings sends the disabled channel and its revision", async () => {
+  let message;
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [
+      { channel: 1, enabled: true },
+      { channel: 2, enabled: true },
+    ],
+    settings: { subentry_id: "s1", revision: "rev-1", step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  panel._updateSettingsDraft(wheel, {
+    channel_enabled: { 1: true, 2: false },
+  });
+  await panel._saveSettings(wheel);
+
+  assert.equal(message.type, "ikea_bilresa/settings/save");
+  assert.equal(message.wheel, "wheel-a");
+  assert.deepEqual(message.channel_enabled, { 1: true, 2: false });
+  assert.equal(message.expected_revision, "rev-1");
+});
+
+test("a settings conflict drops the draft instead of resending it", async () => {
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [{ channel: 1, enabled: true }],
+    settings: { subentry_id: "s1", revision: "stale", step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      return { ok: false, error: "conflict" };
+    },
+  };
+
+  panel._updateSettingsDraft(wheel, { channel_enabled: { 1: false } });
+  await panel._saveSettings(wheel);
+
+  // Losing the draft is the point: the stored value is the truth now, and
+  // silently keeping the rejected edit would let the next save clobber it.
+  assert.equal(panel._settingsDraft, null);
+  assert.equal(panel._settingsDraftKey, null);
+});
+
+test("a wheel without stored settings still offers the defaults", () => {
+  const panel = newPanel();
+  const state = panel._settingsStateFor({
+    key: "wheel-b",
+    channels: [{ channel: 1, enabled: true }, { channel: 2, enabled: false }],
+  });
+
+  assert.deepEqual(state.channel_enabled, { 1: true, 2: false });
+  assert.equal(state.step, 2);
+  assert.equal(state.acceleration, 0);
+});
+
+test("one wheel's unsaved draft never leaks onto another", () => {
+  const panel = newPanel();
+  const first = { key: "wheel-a", channels: [{ channel: 1, enabled: true }] };
+  const second = { key: "wheel-b", channels: [{ channel: 1, enabled: true }] };
+
+  panel._updateSettingsDraft(first, { channel_enabled: { 1: false } });
+
+  assert.deepEqual(panel._settingsStateFor(second).channel_enabled, { 1: true });
+});

@@ -29,7 +29,7 @@ from .presentation import migrate_generated_binding_title
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.EVENT]
+PLATFORMS: list[Platform] = [Platform.EVENT, Platform.NUMBER, Platform.SWITCH]
 
 type BilresaConfigEntry = ConfigEntry[BilresaCoordinator]
 
@@ -94,6 +94,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     _LOGGER.info("Connecting IKEA BILRESA listener to Matter Server at %s", url)
     await coordinator.async_start()
 
+    # Settings before the platforms: a dial or switch must know on its first
+    # state write whether its channel is disabled, rather than appearing
+    # available for a moment and then correcting itself.
+    coordinator.async_setup_settings(entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_setup_bindings(entry)
 
@@ -115,6 +119,7 @@ async def _async_update_listener(
     if configured_url != entry.runtime_data.url:
         await hass.config_entries.async_reload(entry.entry_id)
         return
+    entry.runtime_data.async_setup_settings(entry)
     entry.runtime_data.async_setup_bindings(entry)
 
 
