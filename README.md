@@ -201,6 +201,31 @@ triggers:
       type: rotate
 ```
 
+### Immediate short-release actions
+
+For an automation that should react as soon as a short button press is released,
+listen to `ikea_bilresa_event` with `type: short_release`, filtered by your wheel's
+`node_id` and `channel`. Do not filter on `presses: 1`: the final click count is
+not yet known at release time.
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12  # Replace with your wheel's Matter node ID.
+      channel: 1
+      type: short_release
+```
+
+This bus-only event is emitted for each short release, including releases within
+a double or triple click. Completed `press` events still follow with the final
+count. Replace the automation's completed single-press trigger rather than
+adding a second trigger for the same action, or it will run twice. A separate
+double-click action can override the early action, but the interim effect will
+be visible. Long holds do not emit this event. Existing event entities, device
+triggers and direct light bindings keep their completed-gesture behavior.
+
 ## Multiple wheels
 
 Everything is keyed by Matter node and endpoint, so **any number of wheels** work
