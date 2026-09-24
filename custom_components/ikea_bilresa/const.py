@@ -82,6 +82,7 @@ ACTION_ROTATE = "rotate"
 ACTION_PRESS = "press"
 ACTION_HOLD = "hold"
 ACTION_RELEASE = "release"
+ACTION_SHORT_RELEASE = "short_release"
 
 DIRECTION_UP = "up"
 DIRECTION_DOWN = "down"
