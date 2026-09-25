@@ -62,6 +62,24 @@ def _matter_server_url(hass: HomeAssistant) -> str:
     return DEFAULT_MATTER_URL
 
 
+def _matter_device_name(hass: HomeAssistant, serial: str) -> str | None:
+    """Return the user-facing name of the wheel's core Matter device."""
+    device_registry = async_get_device_registry(hass)
+    identifier = ("matter", f"serial_{serial}")
+    if not hasattr(device_registry, "async_get_device_by_identifier"):
+        # Home Assistant before 2026.8 keeps identifiers globally unique.
+        device = device_registry.async_get_device(identifiers={identifier})
+        return (device.name_by_user or device.name) if device else None
+    # Identifiers are only unique per config entry since 2026.8, and this
+    # integration's own wheel device carries the same Matter identifier.
+    for entry in hass.config_entries.async_entries("matter"):
+        if device := device_registry.async_get_device_by_identifier(
+            identifier, entry.entry_id
+        ):
+            return device.name_by_user or device.name
+    return None
+
+
 async def _async_can_connect(hass: HomeAssistant, url: str) -> bool:
     """Return True if a Matter Server answers with a ServerInfo message."""
     session = async_get_clientsession(hass)
@@ -147,16 +165,11 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
     @callback
     def _wheel_options(self) -> list[selector.SelectOptionDict]:
         coordinator = self._get_entry().runtime_data
-        device_registry = async_get_device_registry(self.hass)
         options: list[selector.SelectOptionDict] = []
         for node_id, wheel in coordinator.wheels.items():
             label = wheel.name
             if wheel.serial:
-                device = device_registry.async_get_device(
-                    identifiers={("matter", f"serial_{wheel.serial}")}
-                )
-                if device:
-                    label = device.name_by_user or device.name or label
+                label = _matter_device_name(self.hass, wheel.serial) or label
             options.append(
                 selector.SelectOptionDict(
                     value=str(node_id), label=f"{label} (node {node_id})"
