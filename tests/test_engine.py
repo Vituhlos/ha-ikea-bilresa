@@ -96,10 +96,52 @@ def test_scroll_down_direction(wheel: BilresaWheel) -> None:
     assert action.notches == 2
 
 
-def test_press_variants_ignored_for_rotate(wheel: BilresaWheel) -> None:
+def test_short_release_ignored_for_rotate(wheel: BilresaWheel) -> None:
     engine = GestureEngine()
-    assert engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "initial_press")) is None
     assert engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "short_release")) is None
+
+
+def test_initial_press_moves_first_notch_early(wheel: BilresaWheel) -> None:
+    engine = GestureEngine()
+    action = engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "initial_press"))
+    assert action.type == ACTION_ROTATE
+    assert action.direction == DIRECTION_UP
+    assert action.notches == 1
+
+
+def test_single_notch_after_initial_press_not_doubled(wheel: BilresaWheel) -> None:
+    engine = GestureEngine()
+    first = engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "initial_press"))
+    engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "short_release"))
+    done = engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "multi_press_complete", 1))
+    assert first.notches == 1
+    assert done is None
+
+
+def test_gesture_total_kept_with_early_first_notch(wheel: BilresaWheel) -> None:
+    # Real stream: initial_press per batch, cumulative ongoing counts, final complete.
+    engine = GestureEngine()
+    stream = [
+        ("initial_press", None),
+        ("multi_press_ongoing", 6),
+        ("short_release", None),
+        ("initial_press", None),  # mid-gesture: must not add a notch
+        ("multi_press_ongoing", 12),
+        ("short_release", None),
+        ("multi_press_complete", 12),
+    ]
+    actions = [
+        engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, e, c)) for e, c in stream
+    ]
+    assert sum(a.notches for a in actions if a) == 12
+
+
+def test_next_gesture_gets_early_notch_again(wheel: BilresaWheel) -> None:
+    engine = GestureEngine()
+    engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "initial_press"))
+    engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "multi_press_complete", 3))
+    action = engine.process(wheel, _decoded(1, ROLE_SCROLL_UP, "initial_press"))
+    assert action.notches == 1
 
 
 @pytest.mark.parametrize(("count", "presses"), [(1, 1), (2, 2), (3, 3)])

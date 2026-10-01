@@ -23,6 +23,7 @@ from .const import (
     ACTION_ROTATE,
     DIRECTION_DOWN,
     DIRECTION_UP,
+    EVT_INITIAL_PRESS,
     EVT_LONG_PRESS,
     EVT_LONG_RELEASE,
     EVT_MULTI_PRESS_COMPLETE,
@@ -36,6 +37,7 @@ from .model import BilresaWheel
 
 _LOGGER = logging.getLogger(__name__)
 
+_INITIAL = SWITCH_EVENT_NAMES[EVT_INITIAL_PRESS]
 _ONGOING = SWITCH_EVENT_NAMES[EVT_MULTI_PRESS_ONGOING]
 _COMPLETE = SWITCH_EVENT_NAMES[EVT_MULTI_PRESS_COMPLETE]
 _LONG_PRESS = SWITCH_EVENT_NAMES[EVT_LONG_PRESS]
@@ -79,7 +81,13 @@ class GestureEngine:
         count = decoded.get("count")
         key = (wheel.node_id, decoded["endpoint_id"])
 
-        if event_type == _ONGOING and count is not None:
+        if event_type == _INITIAL and not self._counts.get(key):
+            # First notch of a new gesture: initial_press arrives ~0.5 s before
+            # the first batched count, so move one notch right away and count it
+            # as applied (later counts then add only the rest).
+            delta = 1
+            self._counts[key] = 1
+        elif event_type == _ONGOING and count is not None:
             last = self._counts.get(key, 0)
             if count <= last:  # counter wrapped -> a new gesture started
                 last = 0
