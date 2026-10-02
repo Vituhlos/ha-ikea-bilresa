@@ -140,12 +140,13 @@ Key facts we verified on the hardware:
   matching `transition` on the target bridges the batches into a smooth ramp.
 - A **single notch** = `initial_press` + `short_release` + `multi_press_complete
   count=1` (no ongoing).
-- `initial_press` is the Matter event for the **first press** of a multi‑press
-  sequence; `multi_press_ongoing` only reports presses 2…n (its count starts at
-  2). On a rotary endpoint it therefore means "gesture started, ≥ 1 notch". It
-  arrives well before the first count: median 0.53 s earlier (p25 0.49 s,
-  p75 0.68 s; 180 gestures, fw 1.9.15). The wheel also sends one
-  `initial_press` per batch inside a gesture; only the first one is a new notch.
+- Per the Matter spec, `initial_press` is generated for **each press** of a
+  multi‑press sequence; `multi_press_ongoing` follows presses 2…n (its count
+  starts at 2). So the first `initial_press` of a gesture is press 1 = the first
+  notch. The wheel reports each batch as one press (`initial_press` +
+  `multi_press_ongoing` + `short_release`), so later `initial_press` events in a
+  gesture add no notch. The first one arrives well before the first count:
+  median 0.53 s earlier (p25 0.49 s, p75 0.68 s; 180 gestures, fw 1.9.15).
 - **Button:** single = complete `count=1`; double = complete `count=2`; triple =
   complete `count=3`; **hold** = `initial_press` + `long_press` + `long_release`
   (no complete). `MultiPressMax` for the button is 3.
