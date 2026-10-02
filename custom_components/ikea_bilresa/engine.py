@@ -89,7 +89,12 @@ class GestureEngine:
             self._counts[key] = 1
         elif event_type == _ONGOING and count is not None:
             last = self._counts.get(key, 0)
-            if count <= last:  # counter wrapped -> a new gesture started
+            # counter wrapped -> a new gesture started. An ongoing count equal
+            # to the early notch's 1 can't occur: ongoing counts start at 2.
+            # Matter Application Cluster spec §1.13.6.6.2, constraint
+            # "2 to MultiPressMax"; spec model in matter.js:
+            # https://github.com/matter-js/matter.js/blob/0d30528a4a92ec11a9034a0ed7db89de2ed03a5c/packages/model/src/standard/elements/switch.element.ts#L76-L77
+            if count <= last:
                 last = 0
             delta = count - last
             self._counts[key] = count
@@ -100,7 +105,7 @@ class GestureEngine:
             delta = count - last
             self._counts[key] = 0  # gesture finished, reset baseline
         else:
-            # initial_press / short_release / long_* carry no scroll delta
+            # mid-gesture initial_press / short_release / long_* carry no delta
             return None
 
         if delta <= 0:
