@@ -121,7 +121,7 @@ OTA. `SerialNumber` is `0/40/15`.
 One scroll "gesture" on a rotary endpoint produces, in order:
 
 ```
-initial_press                                   # start (noise)
+initial_press                                   # gesture start = 1st notch
 multi_press_ongoing  count = 6                  # CUMULATIVE within the gesture…
 multi_press_ongoing  count = 12                 # …and it LEAPS (not +1)
 multi_press_ongoing  count = 16
@@ -140,6 +140,13 @@ Key facts we verified on the hardware:
   matching `transition` on the target bridges the batches into a smooth ramp.
 - A **single notch** = `initial_press` + `short_release` + `multi_press_complete
   count=1` (no ongoing).
+- Per the Matter spec, `initial_press` is generated for **each press** of a
+  multi‑press sequence; `multi_press_ongoing` follows presses 2…n (its count
+  starts at 2). So the first `initial_press` of a gesture is press 1 = the first
+  notch. The wheel reports each batch as one press (`initial_press` +
+  `multi_press_ongoing` + `short_release`), so later `initial_press` events in a
+  gesture add no notch. The first one arrives well before the first count:
+  median 0.53 s earlier (p25 0.49 s, p75 0.68 s; 180 gestures, fw 1.9.15).
 - **Button:** single = complete `count=1`; double = complete `count=2`; triple =
   complete `count=3`; **hold** = `initial_press` + `long_press` + `long_release`
   (no complete). `MultiPressMax` for the button is 3.
@@ -252,7 +259,10 @@ any of them: `automation.turn_on` on the entity_id.
   (`multi_press_ongoing`) / `totalNumberOfPressesCounted` (`multi_press_complete`)
   within a gesture; reset the running count on each `multi_press_complete` or
   when the count decreases (new gesture).
-- Ignore `initial_press` / `short_release` for scrolling (they carry no delta).
+- `initial_press` carries no count, but the first one of a gesture can be
+  applied as 1 notch right away (~0.5 s faster first reaction); later counts
+  then add only the remainder. Ignore mid‑gesture `initial_press` and all
+  `short_release` events for scrolling.
 - For a smooth ramp on a WiFi/ESPHome light, apply the step with a
   `transition ≈ 1 s` so the light interpolates between the ~1 s event batches.
 - A truly analogue "DIRIGERA hub" feel is **not** achievable here: the device's

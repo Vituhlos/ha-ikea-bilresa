@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Changed
 - Editing a light binding now updates in place instead of reloading the config
   entry — no reconnect.
+- **Faster first reaction to scrolling**: the first notch of a gesture is now
+  applied on `initial_press`, which arrives ~0.5 s before the first batched
+  count; later counts add only the remaining notches, so totals are unchanged.
 
 ### Fixed
 - A button press now briefly suppresses trailing scroll events, so pressing to
