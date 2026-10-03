@@ -23,6 +23,7 @@ from homeassistant.helpers.entity_registry import async_get as async_get_entity_
 
 from .const import CONF_URL, DEFAULT_MATTER_URL, DOMAIN, SUBENTRY_BINDING
 from .coordinator import BilresaCoordinator
+from .legacy_triggers import async_setup_legacy_trigger_notice
 from .panel import async_remove_panel, async_setup_panel
 from .panel_api import async_register_commands
 from .presentation import migrate_generated_binding_title
@@ -101,6 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     coordinator.async_setup_device_links(entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_setup_bindings(entry)
+    async_setup_legacy_trigger_notice(hass, entry)
 
     # Panel last, and never fatal: a panel that cannot be served must degrade to
     # "no panel", not to a failed setup. Wheels, bindings and events do not

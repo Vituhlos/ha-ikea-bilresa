@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **Automation triggers for every gesture.** Seven triggers
+  (`ikea_bilresa.rotated_up`, `rotated_down`, `pressed`, `double_pressed`,
+  `triple_pressed`, `held`, `released`) that target the wheel's `Channel`
+  entities or the dual button's `Button` entities. Home Assistant offers them
+  in the automation editor wherever those entities are, including on the core
+  Matter device. A target naming the whole device reacts to this integration's
+  entities only, not to core Matter's own event entities on the same device.
+- **Entity names and gesture names are translated.** `Channel 1`, `Dial 1` and
+  `Button 1` were English text written into the code, so they stayed English
+  on every instance. They now come from the translations, as do the names of
+  the seven gestures and of the `notches`, `presses` and observed-duration
+  attributes. Czech follows the wording Home Assistant itself uses.
+- A Repairs notice that lists the automations still using a removed device
+  trigger and says what to replace it with. It clears by itself.
+
+### Removed
+- **Device triggers** ("Channel 1 scrolled up" on the device page). Since Home
+  Assistant 2026.8 a device trigger works only on a device its own integration
+  owns, and the wheel's device belongs to core Matter. **Automations that use
+  one stop working and must be switched to the new triggers above**; Repairs
+  names them. Automations built on the event entities, on the bundled
+  blueprint or on the `ikea_bilresa_event` bus event are unaffected.
+
 ### Fixed
 - **Every wheel and dual button appeared twice in Home Assistant 2026.8 and
   newer.** Home Assistant 2026.8 made each device belong to a single
@@ -32,6 +56,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   device, and removes the one earlier releases wrote.
 - A wheel commissioned while Home Assistant is running is moved onto its
   Matter device as soon as core Matter creates it, without a reload.
+- Displayed entity names follow the instance language. Existing entity IDs are
+  kept. On a new installation Home Assistant derives entity IDs from the
+  translated name where it does so for the language, for example
+  `event.<wheel>_kanal_1` on a Czech instance.
 - **Minimum Home Assistant is now 2026.8.0** (was 2026.6.0). Home Assistant
   2026.8 changed the device registry so that each device belongs to one
   integration; the upcoming device-link rework targets that model only. The

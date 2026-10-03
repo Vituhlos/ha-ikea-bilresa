@@ -93,7 +93,7 @@ Repeat on all three channels:
 - [ ] A new gesture resets the cumulative count correctly.
 - [ ] Single, double, and triple press are distinguished.
 - [ ] Long press emits `hold`; releasing it emits `release` exactly once.
-- [ ] Event entity, device trigger, and `ikea_bilresa_event` agree.
+- [ ] Event entity, the `ikea_bilresa.*` trigger, and `ikea_bilresa_event` agree.
 
 ## C. Binding behavior
 
@@ -182,8 +182,8 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       completion contract and confirm the integration neither gets stuck nor
       emits a false action. **Real E2489 emits `MultiPressComplete(0)`; RC.3
       ignores it and accepts the next valid single exactly once.**
-- [ ] Event entity, device trigger and `ikea_bilresa_event` agree for each
-      gesture on each button.
+- [ ] Event entity, the `ikea_bilresa.*` trigger and `ikea_bilresa_event`
+      agree for each gesture on each button.
 
 ### F3. Button binding behaviour
 

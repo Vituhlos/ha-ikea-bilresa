@@ -45,6 +45,7 @@ class BilresaChannelDial(BilresaChannelEntity, RestoreNumber):
     """A 1-100 value per wheel channel, adjusted by scrolling."""
 
     _attr_icon = "mdi:knob"
+    _attr_translation_key = "dial"
     _attr_native_min_value = DIAL_MIN
     _attr_native_max_value = DIAL_MAX
     _attr_native_step = 1.0
@@ -59,7 +60,7 @@ class BilresaChannelDial(BilresaChannelEntity, RestoreNumber):
     ) -> None:
         super().__init__(coordinator, wheel, channel, link)
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}_dial"
-        self._attr_name = f"Dial {channel}"
+        self._attr_translation_placeholders = {"channel": str(channel)}
         self._attr_native_value = DIAL_DEFAULT
         self._accelerator = self._new_accelerator()
 

@@ -9,7 +9,7 @@
 Add first-party-style Home Assistant control for the **IKEA BILRESA scroll
 wheel and dual button** (Matter over Thread). The wheel reacts to real-time
 `MultiPressOngoing` events for DIRIGERA-like smoothness; the dual button gains
-independent events, bindings, device triggers and the same BILRESA panel.
+independent events, bindings, automation triggers and the same BILRESA panel.
 
 > **Status:** latest stable release v0.5.0; prerelease **v0.6.0-rc.6** adds the
 > BILRESA dual button through roadmap phases B0-B3. Its two buttons have
@@ -179,7 +179,7 @@ press or hold, Instant is accepted only when those separate actions are
 disabled. **Fast release** runs after the first short release and remains safe
 for a normal hold; multi-press aware waits for the BILRESA completion event.
 Existing bindings without this setting retain the completion-aware behavior
-until explicitly changed. Public event entities and device triggers keep exact
+until explicitly changed. Public event entities and triggers keep exact
 single/double/triple classification in every mode.
 
 The integration then dims that light in real time. Add as many bindings as you
@@ -229,6 +229,49 @@ includes registry `device_id` when available.
 | `triple_press` | Triple press | `presses` = 3 |
 | `hold` | Button long-pressed | — |
 | `release` | Button released after a hold | — |
+
+### Triggers
+
+The integration provides one automation trigger per gesture. In the automation
+editor, pick the wheel (or one of its `Channel` entities) as the target and
+choose the trigger:
+
+| Trigger | Fires when |
+|---------|------------|
+| `ikea_bilresa.rotated_up` | a channel is scrolled up |
+| `ikea_bilresa.rotated_down` | a channel is scrolled down |
+| `ikea_bilresa.pressed` | a button is pressed once |
+| `ikea_bilresa.double_pressed` | a button is pressed twice |
+| `ikea_bilresa.triple_pressed` | a wheel button is pressed 3 times |
+| `ikea_bilresa.held` | a button is held down |
+| `ikea_bilresa.released` | a button is released after being held down |
+
+```yaml
+triggers:
+  - trigger: ikea_bilresa.rotated_up
+    target:
+      entity_id: event.bilresa_scroll_wheel_channel_1
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.example
+    data:
+      brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
+      transition: 1
+mode: parallel
+max: 20
+```
+
+A target that names the whole device covers every channel of that wheel. The
+dual button has no rotation and no triple press, so those two triggers never
+fire for it.
+
+> **Upgrading from 0.5.x or an earlier 0.6.0 pre-release:** the former *device
+> triggers* ("Channel 1 scrolled up" on the device page) were removed. Since
+> Home Assistant 2026.8 a device belongs to a single integration, and a device
+> trigger only works on a device its own integration owns. Automations that
+> still use one are listed under **Settings → System → Repairs**; replace the
+> trigger with the matching one above.
 
 ### Example automations
 
@@ -310,7 +353,7 @@ logger:
       updates. *(next)*
 - [x] Scroll modes (brightness / colour temperature / colour), acceleration,
       maximum brightness, double/triple/hold actions. *(next)*
-- [x] **Device triggers** and a **smooth-dimming blueprint**. *(next)*
+- [x] **Automation triggers** and a **smooth-dimming blueprint**. *(next)*
 - [x] Scene cycling, hold-to-ramp and System Health information. *(next)*
 - [x] Parent Matter Server URL reconfiguration. *(next)*
 - [x] Discovery feasibility reviewed — no supported dependency-discovery source;

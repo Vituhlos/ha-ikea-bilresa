@@ -54,7 +54,9 @@ def test_button_event_identity_and_types() -> None:
     entity = _button(2)
     assert entity.device_class is EventDeviceClass.BUTTON
     assert entity.unique_id == "15_ep2"
-    assert entity.name == "Button 2"
+    # The name itself comes from the translations; see test_translations.py.
+    assert entity.translation_key == "button"
+    assert entity.translation_placeholders == {"button": "2"}
     assert entity.icon == "bilresa:dual-button"
     assert ET_TRIPLE_PRESS not in entity.event_types
 

@@ -314,6 +314,7 @@ SIGNAL_SETTINGS_UPDATED = f"{DOMAIN}_settings_updated"
 
 # --- repair issues ------------------------------------------------------
 ISSUE_CANNOT_CONNECT = "cannot_connect"
+ISSUE_LEGACY_DEVICE_TRIGGERS = "legacy_device_triggers"
 # Grace period before a lost connection is surfaced as a repair issue.
 DISCONNECT_GRACE_SECONDS = 60
 

@@ -200,26 +200,99 @@
     "cannot_connect": {
       "title": "Cannot reach the Matter Server",
       "description": "IKEA BILRESA cannot connect to the Matter Server at {url}. Scroll wheels won't respond until the connection is restored. Check that the Matter Server add-on is running."
+    },
+    "legacy_device_triggers": {
+      "title": "Automations use retired BILRESA device triggers",
+      "description": "These automations still start from a BILRESA device trigger and no longer run:\n\n{automations}\n\nDevice triggers were removed, because since Home Assistant 2026.8 the wheel's device belongs to the Matter integration alone. Open each automation, delete the device trigger and add one of the BILRESA triggers instead, for example **BILRESA scrolled up**, with the wheel's Channel entity as its target. This notice disappears once no automation uses a device trigger."
     }
   },
-  "device_automation": {
-    "trigger_type": {
-      "rotate_up": "{subtype} scrolled up",
-      "rotate_down": "{subtype} scrolled down",
-      "press": "{subtype} pressed",
-      "double_press": "{subtype} double-pressed",
-      "triple_press": "{subtype} triple-pressed",
-      "hold": "{subtype} held",
-      "release": "{subtype} released"
+  "entity": {
+    "event": {
+      "channel": {
+        "name": "Channel {channel}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "rotate_up": "Scrolled up",
+              "rotate_down": "Scrolled down",
+              "press": "Pressed once",
+              "double_press": "Pressed twice",
+              "triple_press": "Pressed 3 times",
+              "hold": "Held down",
+              "release": "Released after being held down"
+            }
+          },
+          "notches": {
+            "name": "Notches"
+          },
+          "presses": {
+            "name": "Presses"
+          },
+          "observed_duration_ms": {
+            "name": "Observed duration"
+          }
+        }
+      },
+      "button": {
+        "name": "Button {button}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "press": "Pressed once",
+              "double_press": "Pressed twice",
+              "triple_press": "Pressed 3 times",
+              "hold": "Held down",
+              "release": "Released after being held down"
+            }
+          },
+          "presses": {
+            "name": "Presses"
+          },
+          "observed_duration_ms": {
+            "name": "Observed duration"
+          }
+        }
+      }
     },
-    "trigger_subtype": {
-      "channel_1": "Channel 1",
-      "channel_2": "Channel 2",
-      "channel_3": "Channel 3",
-      "button_1": "Button 1",
-      "button_2": "Button 2",
-      "button_3": "Button 3",
-      "button_4": "Button 4"
+    "number": {
+      "dial": {
+        "name": "Dial {channel}"
+      }
+    },
+    "switch": {
+      "channel_button": {
+        "name": "Button {channel}"
+      }
+    }
+  },
+  "triggers": {
+    "rotated_up": {
+      "name": "BILRESA scrolled up",
+      "description": "Triggers when a BILRESA wheel channel is scrolled up."
+    },
+    "rotated_down": {
+      "name": "BILRESA scrolled down",
+      "description": "Triggers when a BILRESA wheel channel is scrolled down."
+    },
+    "pressed": {
+      "name": "BILRESA pressed once",
+      "description": "Triggers when a BILRESA button is pressed once."
+    },
+    "double_pressed": {
+      "name": "BILRESA pressed twice",
+      "description": "Triggers when a BILRESA button is pressed twice."
+    },
+    "triple_pressed": {
+      "name": "BILRESA pressed 3 times",
+      "description": "Triggers when a BILRESA wheel button is pressed 3 times."
+    },
+    "held": {
+      "name": "BILRESA held down",
+      "description": "Triggers when a BILRESA button is held down."
+    },
+    "released": {
+      "name": "BILRESA released after being held down",
+      "description": "Triggers when a BILRESA button is released after being held down."
     }
   }
 }

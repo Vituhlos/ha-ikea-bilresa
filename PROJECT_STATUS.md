@@ -2,6 +2,101 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
+## Device registry plan, Steps 3 and 4: named triggers and translated names (2026-10-03)
+
+Status: **Implemented + Static + Unit (local, Windows stand-ins; 475 tests).
+CI not yet run for this commit. Not deployed. Hardware not exercised.**
+
+### What changed
+
+- **Removed** `device_trigger.py`, its test and the `device_automation`
+  translation section. A device trigger validates only on a device whose
+  config entry belongs to the trigger's domain; ours no longer does.
+- **New `trigger.py` + `triggers.yaml` + `icons.json`:** seven triggers, one
+  per gesture (`rotated_up`, `rotated_down`, `pressed`, `double_pressed`,
+  `triple_pressed`, `held`, `released`). Each subclasses Home Assistant's
+  `StatelessEntityTriggerBase`, the base the core `event` integration uses,
+  and compares the event entity's `event_type`. `entity_filter()` keeps only
+  entities whose registry platform is `ikea_bilresa`, so a target naming the
+  whole Matter device does not pick up core Matter's own event entities. The
+  description targets `integration: ikea_bilresa, domain: event`.
+- **Entity names from translations.** `event.py`, `number.py` and `switch.py`
+  no longer set `_attr_name`; they set a translation key (`channel`, `button`,
+  `dial`, `channel_button`) and a placeholder for the number. Event types and
+  the `notches`, `presses` and `observed_duration_ms` attributes are translated
+  on the event entities, so the built-in `event.received` trigger shows
+  readable gesture names too.
+- **New `legacy_triggers.py`:** after Home Assistant has started, and on
+  `automation_reloaded`, scan each automation's `raw_config` for a `device`
+  trigger with `domain: ikea_bilresa` and keep one Repairs issue in step with
+  the result.
+- English and Czech in `strings.json`, `translations/en.json` and
+  `translations/cs.json`. Czech terms follow core Home Assistant's own Czech
+  translation, read from the installed 2026.9.4 package ("Stisknuto dvakrát",
+  "Dlouze drženo", "Uvolněno po dlouhém stisknutí", "Spustí se, když ...").
+- Documentation: both READMEs (new Triggers section, upgrade note),
+  `CHANGELOG.md`, `docs/HARDWARE_TEST.md`, `docs/V0.6.0_CHECKLIST.md` item 8.
+
+### Tests
+
+- `tests/test_trigger.py` (13): every trigger fires for its gesture and for no
+  other, through the real automation engine; repeated identical gestures fire
+  every time; other channels are ignored; a device target covers our entities
+  but not core Matter's; an unavailable entity does not fire; and
+  `get_triggers_for_target` on the Matter device returns all seven.
+- `tests/test_legacy_triggers.py` (18): every way a device trigger can be
+  written, what must be left alone, the notice through the real automation
+  integration including its clearing after a reload, and the wiring.
+- `tests/test_translations.py` (21): key and placeholder parity between the
+  source strings and every shipped language, no empty or untranslated Czech
+  entity/trigger/issue text, every gesture, trigger and issue has its text,
+  `triggers.yaml` and `icons.json` cover every trigger, no `_attr_name` left in
+  the sources, and the names Home Assistant actually renders in English and
+  Czech.
+
+```text
+python -m json.tool (strings, en, cs, icons) / yaml.safe_load   passed
+python -m compileall -q custom_components tests                 passed
+ruff format --check / ruff check custom_components tests        passed (55 files)
+mypy custom_components/ikea_bilresa                             passed (26 files)
+node --test (panel, iconset)                                    passed (27 tests)
+git diff --check                                                passed
+pytest -q -p bilresa_windows_local                              475 passed
+```
+
+CI for Step 2 (`6e994df`): 7 checks passed, the scheduled-only job skipped.
+
+### Findings worth keeping
+
+- Home Assistant decides which triggers to offer for a target from the
+  **live** entities on it (`entity_sources`), not from the registry. A test
+  that only writes registry entries and states gets an empty list.
+- Home Assistant turns `_attr_translation_key` on an entity class into a
+  property, so a test cannot read it off the class.
+- The Czech word for a notch is inconsistent across the repository:
+  `translations/cs.json` says "cvaknutí", `panel_strings.py` says "zub",
+  `README.cs.md` says "zářez". The new attribute name uses "cvaknutí" to match
+  its own file. **Owner's call which one to keep; not changed here.**
+
+### Known risks and assumptions
+
+- Automations built on the removed device triggers stop working. The Repairs
+  notice and the changelog reduce the surprise; they do not remove it.
+- The triggers are offered per target, not per entity capability:
+  `rotated_up`, `rotated_down` and `triple_pressed` are listed for the dual
+  button too and never fire there.
+- hassfest has not seen `triggers.yaml`, `icons.json` or the new translation
+  sections yet; that happens in CI.
+- Nothing here has run on a real Home Assistant. **Take a backup before
+  deploying**; the device registry change from Step 2 is one-way.
+- Languages beyond English and Czech: the owner asked; not added. Home
+  Assistant ships about 60 languages and nobody on this project can review
+  them.
+
+**Single best next action:** with the owner's go-ahead, back up Home Assistant,
+deploy this branch and run the on-instance checks listed under "Verification"
+in `docs/DEVICE_REGISTRY_PLAN.md`, then the hardware pass.
+
 ## Device registry plan, Step 2: entities attach to the Matter device (2026-10-03)
 
 Status: **Implemented + Static + Unit (local, Windows stand-ins; 428 tests).
@@ -87,8 +182,7 @@ layout before starting the manager.
 - Not yet observed on real Home Assistant. The registry change is one-way:
   **take a backup before deploying.**
 
-**Single best next action:** Step 3 of the plan (named triggers, translated
-entity names and gestures, Repairs notice, removal of `device_trigger.py`).
+Steps 3 and 4 followed the same day; see the section above.
 
 ## Device registry plan, Step 1: test environment on Home Assistant 2026.9.4 (2026-10-03)
 

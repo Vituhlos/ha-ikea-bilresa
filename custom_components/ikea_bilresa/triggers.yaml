@@ -1,0 +1,44 @@
+# Named BILRESA triggers. Each targets this integration's event entities, so
+# it is offered for any entity, device or area selection that contains one.
+
+rotated_up:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event
+
+rotated_down:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event
+
+pressed:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event
+
+double_pressed:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event
+
+triple_pressed:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event
+
+held:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event
+
+released:
+  target:
+    entity:
+      integration: ikea_bilresa
+      domain: event

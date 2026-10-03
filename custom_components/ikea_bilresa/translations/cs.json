@@ -200,26 +200,99 @@
     "cannot_connect": {
       "title": "Matter Server je nedostupný",
       "description": "IKEA BILRESA se nemůže připojit k Matter Serveru na {url}. Kolečka nebudou reagovat, dokud se spojení neobnoví. Zkontroluj, že add-on Matter Server běží."
+    },
+    "legacy_device_triggers": {
+      "title": "Automatizace používají zrušené spouštěče zařízení BILRESA",
+      "description": "Tyto automatizace se stále spouštějí spouštěčem zařízení BILRESA a už neběží:\n\n{automations}\n\nSpouštěče zařízení byly odstraněny, protože od Home Assistantu 2026.8 patří zařízení kolečka výhradně integraci Matter. Otevři každou automatizaci, smaž spouštěč zařízení a přidej místo něj některý ze spouštěčů BILRESA, například **BILRESA otočeno nahoru**, s entitou Kanál daného kolečka jako cílem. Toto upozornění zmizí, jakmile žádná automatizace spouštěč zařízení nepoužívá."
     }
   },
-  "device_automation": {
-    "trigger_type": {
-      "rotate_up": "{subtype} otočeno nahoru",
-      "rotate_down": "{subtype} otočeno dolů",
-      "press": "{subtype} stisknuto",
-      "double_press": "{subtype} dvojstisk",
-      "triple_press": "{subtype} trojstisk",
-      "hold": "{subtype} podrženo",
-      "release": "{subtype} uvolněno"
+  "entity": {
+    "event": {
+      "channel": {
+        "name": "Kanál {channel}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "rotate_up": "Otočeno nahoru",
+              "rotate_down": "Otočeno dolů",
+              "press": "Stisknuto jednou",
+              "double_press": "Stisknuto dvakrát",
+              "triple_press": "Stisknuto třikrát",
+              "hold": "Dlouze drženo",
+              "release": "Uvolněno po dlouhém stisknutí"
+            }
+          },
+          "notches": {
+            "name": "Počet cvaknutí"
+          },
+          "presses": {
+            "name": "Počet stisknutí"
+          },
+          "observed_duration_ms": {
+            "name": "Naměřená doba"
+          }
+        }
+      },
+      "button": {
+        "name": "Tlačítko {button}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "press": "Stisknuto jednou",
+              "double_press": "Stisknuto dvakrát",
+              "triple_press": "Stisknuto třikrát",
+              "hold": "Dlouze drženo",
+              "release": "Uvolněno po dlouhém stisknutí"
+            }
+          },
+          "presses": {
+            "name": "Počet stisknutí"
+          },
+          "observed_duration_ms": {
+            "name": "Naměřená doba"
+          }
+        }
+      }
     },
-    "trigger_subtype": {
-      "channel_1": "Kanál 1",
-      "channel_2": "Kanál 2",
-      "channel_3": "Kanál 3",
-      "button_1": "Tlačítko 1",
-      "button_2": "Tlačítko 2",
-      "button_3": "Tlačítko 3",
-      "button_4": "Tlačítko 4"
+    "number": {
+      "dial": {
+        "name": "Číselník {channel}"
+      }
+    },
+    "switch": {
+      "channel_button": {
+        "name": "Tlačítko {channel}"
+      }
+    }
+  },
+  "triggers": {
+    "rotated_up": {
+      "name": "BILRESA otočeno nahoru",
+      "description": "Spustí se, když je kanál kolečka BILRESA otočen nahoru."
+    },
+    "rotated_down": {
+      "name": "BILRESA otočeno dolů",
+      "description": "Spustí se, když je kanál kolečka BILRESA otočen dolů."
+    },
+    "pressed": {
+      "name": "BILRESA stisknuto jednou",
+      "description": "Spustí se, když je tlačítko BILRESA stisknuto jednou."
+    },
+    "double_pressed": {
+      "name": "BILRESA stisknuto dvakrát",
+      "description": "Spustí se, když je tlačítko BILRESA stisknuto dvakrát."
+    },
+    "triple_pressed": {
+      "name": "BILRESA stisknuto třikrát",
+      "description": "Spustí se, když je tlačítko kolečka BILRESA stisknuto třikrát."
+    },
+    "held": {
+      "name": "BILRESA dlouze drženo",
+      "description": "Spustí se, když je tlačítko BILRESA dlouze drženo."
+    },
+    "released": {
+      "name": "BILRESA uvolněno po dlouhém stisknutí",
+      "description": "Spustí se, když je tlačítko BILRESA uvolněno po dlouhém stisknutí."
     }
   }
 }

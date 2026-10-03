@@ -1,0 +1,25 @@
+{
+  "triggers": {
+    "rotated_up": {
+      "trigger": "mdi:rotate-right"
+    },
+    "rotated_down": {
+      "trigger": "mdi:rotate-left"
+    },
+    "pressed": {
+      "trigger": "mdi:gesture-tap"
+    },
+    "double_pressed": {
+      "trigger": "mdi:gesture-double-tap"
+    },
+    "triple_pressed": {
+      "trigger": "mdi:gesture-tap-button"
+    },
+    "held": {
+      "trigger": "mdi:gesture-tap-hold"
+    },
+    "released": {
+      "trigger": "mdi:gesture-tap-box"
+    }
+  }
+}

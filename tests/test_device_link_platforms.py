@@ -30,6 +30,8 @@ from custom_components.ikea_bilresa.const import (
 from custom_components.ikea_bilresa.coordinator import BilresaCoordinator
 from custom_components.ikea_bilresa.model import BilresaWheel, SwitchEndpoint
 
+pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
+
 MATTER_URL = "ws://matter:5580/ws"
 SERVER_INFO = {"compressed_fabric_id": 2}
 WHEEL_NODE = 13
@@ -116,6 +118,9 @@ class _Instance:
                 self.hass, domain=domain, platform_name=DOMAIN
             )
             platform.config_entry = self.entry
+            # Home Assistant loads these before a platform adds entities;
+            # entity names and entity IDs are built from them.
+            await platform.platform_data.async_load_translations()
             added: list[Entity] = []
             await module.async_setup_entry(self.hass, self.entry, added.extend)
             await platform.async_add_entities(added)

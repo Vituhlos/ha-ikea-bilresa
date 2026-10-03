@@ -170,7 +170,7 @@ def parse_node(node: dict[str, Any]) -> BilresaWheel | None:
     if _is_dual_button_shape(endpoints):
         # E2489 uses the semantic up/down tags for its two physical buttons.
         # Normalize both endpoints here so every downstream consumer (gesture
-        # engine, event entities, device triggers, bindings and panel) sees the
+        # engine, event entities, triggers, bindings and panel) sees the
         # button semantics that the hardware actually exposes.
         for endpoint in endpoints.values():
             endpoint.role = ROLE_BUTTON

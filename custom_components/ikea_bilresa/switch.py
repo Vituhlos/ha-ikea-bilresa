@@ -42,6 +42,7 @@ class BilresaChannelButtonSwitch(BilresaChannelEntity, SwitchEntity, RestoreEnti
     """
 
     _attr_icon = "mdi:gesture-tap-button"
+    _attr_translation_key = "channel_button"
 
     def __init__(
         self,
@@ -52,7 +53,7 @@ class BilresaChannelButtonSwitch(BilresaChannelEntity, SwitchEntity, RestoreEnti
     ) -> None:
         super().__init__(coordinator, wheel, channel, link)
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}_button"
-        self._attr_name = f"Button {channel}"
+        self._attr_translation_placeholders = {"channel": str(channel)}
         self._attr_is_on = False
 
     async def async_added_to_hass(self) -> None:

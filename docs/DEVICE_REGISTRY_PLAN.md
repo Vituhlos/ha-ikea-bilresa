@@ -1,7 +1,8 @@
 # Device registry plan: one device per wheel, compatible with HA 2027
 
-Status: **approved by the owner on 2026-10-03. Steps 1 and 2 implemented;
-Steps 3 and 4 open.** See `PROJECT_STATUS.md` for validation state.
+Status: **approved by the owner on 2026-10-03. Steps 1 to 4 implemented in
+code and documentation. Not deployed, not run on hardware.** See
+`PROJECT_STATUS.md` for validation state.
 Branch: `agent/dual-button-0.6`, on top of `v0.6.0-rc.13`.
 `PROJECT_STATUS.md` remains the canonical handoff; this file is the design.
 

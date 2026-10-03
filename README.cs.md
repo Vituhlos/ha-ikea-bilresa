@@ -13,7 +13,7 @@
 Přidává ovládání pro **kolečko i dvoutlačítko IKEA BILRESA** (Matter přes
 Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, takže
 je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
-propojení, device triggery a stejný panel BILRESA.
+propojení, spouštěče automatizací a stejný panel BILRESA.
 
 > **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.6**
 > přidává dvoutlačítko BILRESA v rozsahu B0–B3. Obě tlačítka mají nezávislé
@@ -177,7 +177,7 @@ režim uložit jen tehdy, když jsou tyto samostatné akce vypnuté. **Rychle po
 uvolnění** reaguje po prvním krátkém uvolnění a zůstává bezpečné pro běžné
 podržení; rozpoznání více stisků čeká na dokončovací událost BILRESY. Existující
 propojení bez uložené volby zachovají dosavadní čekání, dokud režim výslovně
-nezměníš. Veřejné event entity a device triggery přesně rozlišují jeden, dva a
+nezměníš. Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
 tři stisky ve všech režimech.
 
 Integrace pak to světlo stmívá v reálném čase. Přidej si klidně víc propojení —
@@ -226,6 +226,49 @@ class Home Assistantu; kompatibilní doménová událost navíc obsahuje registr
 | `triple_press` | Trojstisk | `presses` = 3 |
 | `hold` | Podržení tlačítka | — |
 | `release` | Uvolnění po podržení | — |
+
+### Spouštěče
+
+Integrace nabízí jeden spouštěč automatizace na každé gesto. V editoru
+automatizací vyber jako cíl kolečko (nebo některou z jeho entit `Kanál`) a zvol
+spouštěč:
+
+| Spouštěč | Spustí se, když |
+|----------|-----------------|
+| `ikea_bilresa.rotated_up` | je kanál otočen nahoru |
+| `ikea_bilresa.rotated_down` | je kanál otočen dolů |
+| `ikea_bilresa.pressed` | je tlačítko stisknuto jednou |
+| `ikea_bilresa.double_pressed` | je tlačítko stisknuto dvakrát |
+| `ikea_bilresa.triple_pressed` | je tlačítko kolečka stisknuto třikrát |
+| `ikea_bilresa.held` | je tlačítko dlouze drženo |
+| `ikea_bilresa.released` | je tlačítko uvolněno po dlouhém stisknutí |
+
+```yaml
+triggers:
+  - trigger: ikea_bilresa.rotated_up
+    target:
+      entity_id: event.bilresa_scroll_wheel_channel_1
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.priklad
+    data:
+      brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
+      transition: 1
+mode: parallel
+max: 20
+```
+
+Cíl, který pojmenuje celé zařízení, pokrývá všechny kanály daného kolečka.
+Dvoutlačítko nemá otáčení ani trojité stisknutí, takže tyto dva spouštěče se
+pro něj nikdy nespustí.
+
+> **Přechod z 0.5.x nebo dřívějšího prerelease 0.6.0:** dřívější *spouštěče
+> zařízení* („Kanál 1 otočeno nahoru" na stránce zařízení) byly odstraněny. Od
+> Home Assistantu 2026.8 patří zařízení jediné integraci a spouštěč zařízení
+> funguje jen na zařízení, které jeho integrace vlastní. Automatizace, které
+> nějaký stále používají, najdeš v **Nastavení → Systém → Opravy**; nahraď
+> v nich spouštěč odpovídajícím spouštěčem z tabulky výše.
 
 ### Příklady automatizací
 
@@ -306,7 +349,7 @@ logger:
       *(další)*
 - [x] Režimy scrollu (jas / teplota bílé / barva), akcelerace, max jas,
       akce double/triple/hold. *(další)*
-- [x] **Device triggers** a **blueprint na plynulé stmívání**. *(další)*
+- [x] **Spouštěče automatizací** a **blueprint na plynulé stmívání**. *(další)*
 - [x] Cyklení scén, hold-to-ramp a informace System Health. *(další)*
 - [x] Změna URL Matter Serveru přes parent reconfigure flow. *(další)*
 - [x] Prověřené discovery — HA nemá podporovaný discovery zdroj pro závislost na

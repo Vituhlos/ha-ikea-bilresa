@@ -128,6 +128,7 @@ class BilresaChannelEvent(EventEntity):
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_icon = "mdi:knob"
     _attr_event_types = WHEEL_EVENT_TYPES
+    _attr_translation_key = "channel"
 
     def __init__(
         self,
@@ -140,7 +141,7 @@ class BilresaChannelEvent(EventEntity):
         self._wheel = wheel
         self._channel = channel
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}"
-        self._attr_name = f"Channel {channel}"
+        self._attr_translation_placeholders = {"channel": str(channel)}
         attach_to_device(self, wheel, link, model="BILRESA scroll wheel")
 
     @callback
@@ -205,6 +206,7 @@ class BilresaButtonEvent(EventEntity):
     _attr_has_entity_name = True
     _attr_device_class = EventDeviceClass.BUTTON
     _attr_icon = "bilresa:dual-button"
+    _attr_translation_key = "button"
 
     def __init__(
         self,
@@ -219,7 +221,7 @@ class BilresaButtonEvent(EventEntity):
         self._wheel = wheel
         self._endpoint_id = endpoint_id
         self._attr_unique_id = f"{wheel.node_id}_ep{endpoint_id}"
-        self._attr_name = f"Button {button_index}"
+        self._attr_translation_placeholders = {"button": str(button_index)}
         self._attr_event_types = button_event_types(multi_press_max)
         attach_to_device(self, wheel, link, model="BILRESA dual button")
 
