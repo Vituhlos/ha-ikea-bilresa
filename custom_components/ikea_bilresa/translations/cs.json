@@ -62,7 +62,7 @@
           "data_description": {
             "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
             "transition": "Rychlé otáčení dorazí do Home Assistantu po dávkách cvaknutí. Jedno cvaknutí se použije vždy okamžitě, aby kolečko zůstalo svižné; větší dávka se rozloží nanejvýš na tuto dobu, úměrně své velikosti. 0 vyhlazení vypne.",
-            "step_curve": "Percepční zajistí, že každý zub vypadá stejně velký. Nech lineární, pokud si lampa svoji stmívací křivku koriguje sama — jinak se korekce sečtou."
+            "step_curve": "Pokud ti rychlé otáčení skáče, hlavně u spodního konce rozsahu, přepni na percepční a zkus to znovu. Nech lineární, pokud si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než nekorigovat vůbec."
           }
         },
         "profile": {
@@ -100,7 +100,7 @@
           "data_description": {
             "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
             "transition": "Rychlé otáčení dorazí do Home Assistantu po dávkách cvaknutí. Jedno cvaknutí se použije vždy okamžitě, aby kolečko zůstalo svižné; větší dávka se rozloží nanejvýš na tuto dobu, úměrně své velikosti. 0 vyhlazení vypne.",
-            "step_curve": "Percepční zajistí, že každý zub vypadá stejně velký. Nech lineární, pokud si lampa svoji stmívací křivku koriguje sama — jinak se korekce sečtou."
+            "step_curve": "Pokud ti rychlé otáčení skáče, hlavně u spodního konce rozsahu, přepni na percepční a zkus to znovu. Nech lineární, pokud si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než nekorigovat vůbec."
           }
         }
       },

@@ -104,9 +104,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "detail_views": "Device detail views",
         "field_step_curve": "Step placement",
         "field_step_curve_help": (
-            "Perceptual makes every notch look the same size. Leave it linear "
-            "if the lamp already corrects its own dimming curve, or the two "
-            "corrections stack."
+            "If fast scrolling looks like it jumps, especially near the bottom "
+            "of the range, switch to perceptual and scroll again. Leave it "
+            "linear if the lamp already evens out its own dimming — correcting "
+            "twice is worse than not correcting at all."
         ),
         "step_curve_linear": "Linear (default)",
         "step_curve_perceptual": "Perceptual (even to the eye)",
@@ -496,9 +497,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "detail_views": "Pohledy detailu zařízení",
         "field_step_curve": "Rozložení kroků",
         "field_step_curve_help": (
-            "Percepční zajistí, že každý zub vypadá stejně velký. Nech "
-            "lineární, pokud si lampa stmívací křivku koriguje sama — jinak "
-            "se korekce sečtou."
+            "Pokud ti rychlé otáčení skáče, hlavně u spodního konce rozsahu, "
+            "přepni na percepční a zkus to znovu. Nech lineární, pokud si lampa "
+            "stmívání vyrovnává sama — korigovat dvakrát je horší než "
+            "nekorigovat vůbec."
         ),
         "step_curve_linear": "Lineární (výchozí)",
         "step_curve_perceptual": "Percepční (rovnoměrné pro oko)",

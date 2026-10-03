@@ -62,7 +62,7 @@
           "data_description": {
             "button_response": "Instant runs on the initial press and requires multi-press and hold actions to be disabled. Fast release runs after the first short release. Multi-press aware waits for the completed gesture. Public BILRESA events remain fully classified in every mode.",
             "transition": "Fast rotation reaches Home Assistant in batches of notches. A single notch is always applied immediately, so the wheel stays responsive; a larger batch is spread over up to this long, in proportion to its size. 0 turns smoothing off.",
-            "step_curve": "Perceptual makes every notch look the same size. Leave linear if the lamp already corrects its own dimming curve, or you will correct twice."
+            "step_curve": "If fast scrolling looks like it jumps, especially near the bottom of the range, switch this to perceptual and scroll again. Leave it linear if the lamp already evens out its own dimming — correcting twice is worse than not correcting at all."
           }
         },
         "profile": {
@@ -100,7 +100,7 @@
           "data_description": {
             "button_response": "Instant runs on the initial press and requires multi-press and hold actions to be disabled. Fast release runs after the first short release. Multi-press aware waits for the completed gesture. Public BILRESA events remain fully classified in every mode.",
             "transition": "Fast rotation reaches Home Assistant in batches of notches. A single notch is always applied immediately, so the wheel stays responsive; a larger batch is spread over up to this long, in proportion to its size. 0 turns smoothing off.",
-            "step_curve": "Perceptual makes every notch look the same size. Leave linear if the lamp already corrects its own dimming curve, or you will correct twice."
+            "step_curve": "If fast scrolling looks like it jumps, especially near the bottom of the range, switch this to perceptual and scroll again. Leave it linear if the lamp already evens out its own dimming — correcting twice is worse than not correcting at all."
           }
         }
       },
