@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- **Every wheel and dual button appeared twice in Home Assistant 2026.8 and
+  newer.** Home Assistant 2026.8 made each device belong to a single
+  integration. This integration used to add itself to the core Matter device;
+  the new registry answered that by forking a second device of the same name,
+  and scattered the BILRESA entities across the two. The entities now attach
+  to the Matter device by reference, which is the pattern Home Assistant
+  prescribes, so there is one device per wheel again. Existing installations
+  are repaired on the first start: entities are moved onto the Matter device,
+  keeping their entity IDs, and the empty duplicate is removed. A duplicate
+  that still carries an entity from somewhere else, such as a helper you
+  attached to it, is left in place and reported in the log.
+- The integration no longer calls device registry functions that Home
+  Assistant has scheduled for removal in 2027.8 to 2027.10, and no longer logs
+  the corresponding warnings.
+
 ### Changed
+- `device_id` in the `ikea_bilresa_event` bus event now names the core Matter
+  device when the wheel is linked to one. On Home Assistant 2026.8 and newer it
+  previously named the duplicate. An automation that filters this event by
+  `device_id` needs the new ID; filtering by `node_id` is unaffected.
+- The integration no longer writes its own identifier onto the core Matter
+  device, and removes the one earlier releases wrote.
+- A wheel commissioned while Home Assistant is running is moved onto its
+  Matter device as soon as core Matter creates it, without a reload.
 - **Minimum Home Assistant is now 2026.8.0** (was 2026.6.0). Home Assistant
   2026.8 changed the device registry so that each device belongs to one
   integration; the upcoming device-link rework targets that model only. The

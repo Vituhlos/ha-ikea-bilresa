@@ -55,8 +55,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: BilresaConfigEntry) ->
             entity_registry.async_remove(entity_id)
 
         device_registry = async_get_device_registry(hass)
-        service_device = device_registry.async_get_device(
-            identifiers={(DOMAIN, entry.entry_id)}
+        service_device = device_registry.async_get_device_by_identifier(
+            (DOMAIN, entry.entry_id), entry.entry_id
         )
         if (
             service_device is not None
@@ -98,6 +98,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     # state write whether its channel is disabled, rather than appearing
     # available for a moment and then correcting itself.
     coordinator.async_setup_settings(entry)
+    coordinator.async_setup_device_links(entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_setup_bindings(entry)
 

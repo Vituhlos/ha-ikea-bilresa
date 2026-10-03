@@ -23,9 +23,33 @@ from .const import (
     signal_channel,
 )
 from .coordinator import BilresaCoordinator
-from .device_link import reconcile_wheel_device
+from .device_link import MatterDeviceLink, node_identifier
 from .engine import WheelAction
 from .model import BilresaWheel
+
+
+def attach_to_device(
+    entity: Entity, wheel: BilresaWheel, link: MatterDeviceLink, *, model: str
+) -> None:
+    """Point a not-yet-registered entity at the device it belongs on.
+
+    Linked: reference the core Matter device without describing it. A
+    `device_info` naming another config entry's device would make Home
+    Assistant fork a duplicate owned by this integration, and core Matter's
+    name and hardware metadata stay authoritative.
+
+    Standalone: describe a device of our own, identified by our node id only.
+    """
+    if link.device is not None:
+        entity.device_entry = link.device
+        entity._attr_device_info = None  # noqa: SLF001
+        return
+    entity._attr_device_info = DeviceInfo(  # noqa: SLF001
+        identifiers={node_identifier(wheel.node_id)},
+        manufacturer="IKEA of Sweden",
+        model=model,
+        name=wheel.name,
+    )
 
 
 class BilresaChannelEntity(Entity):
@@ -39,42 +63,22 @@ class BilresaChannelEntity(Entity):
         coordinator: BilresaCoordinator,
         wheel: BilresaWheel,
         channel: int,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
+        link: MatterDeviceLink,
     ) -> None:
         self._coordinator = coordinator
         self._wheel = wheel
         self._channel = channel
-        self._set_device_info(identifiers, linked_to_matter)
+        attach_to_device(self, wheel, link, model="BILRESA scroll wheel")
 
     @callback
-    def update_wheel(
-        self,
-        wheel: BilresaWheel,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
-    ) -> None:
-        """Refresh metadata after a Matter node or firmware update."""
+    def update_wheel(self, wheel: BilresaWheel) -> None:
+        """Refresh metadata after a Matter node or firmware update.
+
+        The device is not touched here: once the entity is registered, the
+        entity registry is what moves it, and Home Assistant refreshes
+        `device_entry` from there.
+        """
         self._wheel = wheel
-        self._set_device_info(identifiers, linked_to_matter)
-
-    @callback
-    def _set_device_info(
-        self, identifiers: set[tuple[str, str]], linked_to_matter: bool
-    ) -> None:
-        """Set registry metadata using identifiers already reconciled safely."""
-        if linked_to_matter:
-            # Keep core Matter's name and hardware metadata authoritative.
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
-            return
-        self._attr_device_info = DeviceInfo(
-            identifiers=identifiers,
-            manufacturer="IKEA of Sweden",
-            model="BILRESA scroll wheel",
-            name=self._wheel.name,
-        )
 
     @property
     def available(self) -> bool:
@@ -130,7 +134,7 @@ def async_setup_channel_platform(
     entry,
     async_add_entities: AddEntitiesCallback,
     factory: Callable[
-        [BilresaCoordinator, BilresaWheel, int, set[tuple[str, str]], bool],
+        [BilresaCoordinator, BilresaWheel, int, MatterDeviceLink],
         BilresaChannelEntity,
     ],
 ) -> None:
@@ -149,15 +153,9 @@ def async_setup_channel_platform(
         for wheel in coordinator.wheels.values():
             if wheel.is_dual_button:
                 continue
-            link = reconcile_wheel_device(
-                hass,
-                config_entry_id=entry.entry_id,
-                matter_url=coordinator.url,
-                server_info=coordinator.matter_server_info,
-                wheel=wheel,
-            )
-            identifiers = set(link.identifiers)
-            linked = link.device is not None
+            # Reconcile before constructing: existing registry entries are
+            # moved first, so a new entity never lands beside a stale one.
+            link = coordinator.device_links.link_for(wheel)
             channels = sorted(
                 {e.channel for e in wheel.endpoints.values() if e.channel is not None}
             )
@@ -166,11 +164,11 @@ def async_setup_channel_platform(
                 desired.add(key)
                 existing = entities.get(key)
                 if existing is None:
-                    entity = factory(coordinator, wheel, channel, identifiers, linked)
+                    entity = factory(coordinator, wheel, channel, link)
                     entities[key] = entity
                     pending.append(entity)
                 else:
-                    existing.update_wheel(wheel, identifiers, linked_to_matter=linked)
+                    existing.update_wheel(wheel)
         for key in list(entities):
             if key not in desired:
                 entity = entities.pop(key)

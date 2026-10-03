@@ -15,6 +15,7 @@ from custom_components.ikea_bilresa.const import (
     ET_TRIPLE_PRESS,
     button_event_types,
 )
+from custom_components.ikea_bilresa.device_link import MatterDeviceLink
 from custom_components.ikea_bilresa.engine import WheelAction
 from custom_components.ikea_bilresa.event import BilresaButtonEvent, BilresaChannelEvent
 
@@ -24,8 +25,7 @@ def test_channel_event_uses_button_device_class() -> None:
         Mock(),
         SimpleNamespace(node_id=101, name="Test wheel"),
         1,
-        {("matter", "test")},
-        linked_to_matter=True,
+        MatterDeviceLink(None),
     )
 
     assert entity.device_class is EventDeviceClass.BUTTON
@@ -46,8 +46,7 @@ def _button(endpoint_id: int, *, multi_press_max: int | None = 2) -> BilresaButt
         endpoint_id,
         endpoint_id,
         multi_press_max,
-        {("matter", "test")},
-        linked_to_matter=True,
+        MatterDeviceLink(None),
     )
 
 

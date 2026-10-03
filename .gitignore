@@ -14,3 +14,7 @@ Thumbs.db
 # Home Assistant local test artifacts
 *.log
 .code-review-graph/
+
+# Test coverage artifacts
+.coverage
+coverage.xml

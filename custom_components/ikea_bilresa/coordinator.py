@@ -12,7 +12,6 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -38,6 +37,7 @@ from .const import (
     signal_channel,
     signal_raw_button,
 )
+from .device_link import DeviceLinkManager
 from .engine import GestureEngine, WheelAction
 from .matter_core import CoreMatterEventSource, CoreMatterUnavailable
 from .matter_ws import MatterWSClient
@@ -70,6 +70,9 @@ class BilresaCoordinator:
         self.connected = False
         self.wheels: dict[int, BilresaWheel] = {}
         self.wheel_settings: dict[int, WheelSettings] = {}
+        # Where each wheel's entities sit in the device registry. Scoped to a
+        # config entry by `async_setup_device_links`.
+        self._device_links: DeviceLinkManager | None = None
         self._engine = GestureEngine()
         # Shared by every binding so one capture covers all of them at once.
         self.rotation_trace = RotationTrace()
@@ -171,6 +174,23 @@ class BilresaCoordinator:
             await self._client.start()
 
     # -- per-wheel channel settings ---------------------------------------
+
+    @callback
+    def async_setup_device_links(self, entry: ConfigEntry) -> None:
+        """Start placing wheel entities on their devices for this config entry.
+
+        Must run before the entity platforms are forwarded: they ask for each
+        wheel's link while they build their entities.
+        """
+        self._device_links = DeviceLinkManager(self.hass, entry.entry_id, self)
+        entry.async_on_unload(self._device_links.async_start())
+
+    @property
+    def device_links(self) -> DeviceLinkManager:
+        """The device link manager; available once the entry is being set up."""
+        if self._device_links is None:
+            raise RuntimeError("Device links are set up with the config entry")
+        return self._device_links
 
     @callback
     def async_setup_settings(self, entry: ConfigEntry) -> None:
@@ -363,11 +383,11 @@ class BilresaCoordinator:
             action.presses,
         )
         event_data = asdict(action)
-        device = dr.async_get(self.hass).async_get_device(
-            identifiers={(DOMAIN, str(action.node_id))}
-        )
-        if device is not None:
-            event_data["device_id"] = device.id
+        if (
+            self._device_links is not None
+            and (device_id := self._device_links.device_id(action.node_id)) is not None
+        ):
+            event_data["device_id"] = device_id
         self.hass.bus.async_fire(EVENT_BILRESA, event_data)
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
@@ -430,6 +450,8 @@ class BilresaCoordinator:
         node_id = data if isinstance(data, int) else (data or {}).get("node_id")
         if node_id in self.wheels:
             wheel = self.wheels.pop(node_id)
+            if self._device_links is not None:
+                self._device_links.forget(node_id)
             _LOGGER.info("BILRESA wheel removed: node %s '%s'", node_id, wheel.name)
             async_dispatcher_send(self.hass, SIGNAL_WHEELS_UPDATED)
 

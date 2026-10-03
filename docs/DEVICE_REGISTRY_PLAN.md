@@ -1,6 +1,7 @@
 # Device registry plan: one device per wheel, compatible with HA 2027
 
-Status: **proposal, not approved, nothing implemented** (2026-10-03).
+Status: **approved by the owner on 2026-10-03. Steps 1 and 2 implemented;
+Steps 3 and 4 open.** See `PROJECT_STATUS.md` for validation state.
 Branch: `agent/dual-button-0.6`, on top of `v0.6.0-rc.13`.
 `PROJECT_STATUS.md` remains the canonical handoff; this file is the design.
 
@@ -187,6 +188,26 @@ After Home Assistant has started, scan automation `raw_config` for device
 triggers with `domain: ikea_bilresa` and raise one Repairs issue listing the
 affected automations and the replacement trigger. The issue clears when none
 remain. Lives beside the existing `ISSUE_CANNOT_CONNECT`; English and Czech.
+
+### Owner requirement added 2026-10-03: every string translated properly
+
+The owner requires the integration to be multilingual, with wording that
+follows each language's own rules and Home Assistant's established
+terminology for that language. For Step 3 this means:
+
+- no user-visible string may be hard-coded in Python. Entity names are today:
+  `Channel N`, `Dial N` and `Button N` are English literals in `event.py`,
+  `number.py` and `switch.py`. They move to `translation_key` with a
+  placeholder for the number, so a Czech instance shows Czech names. Entity
+  IDs of existing installations do not change; displayed names do.
+- every new trigger, gesture name and Repairs text ships in English and Czech
+  together, and the parity test covers the new keys;
+- Czech wording is checked against the terms core Home Assistant itself uses
+  in Czech (trigger, event, device, entity, repair), not translated ad hoc.
+
+Open question for the owner: whether languages beyond English and Czech are
+wanted now. The structure supports any number; each needs a reviewer who
+knows the language.
 
 ## Step 4 — documentation and handoff
 

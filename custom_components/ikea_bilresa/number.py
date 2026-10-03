@@ -21,6 +21,7 @@ from .const import (
     DIRECTION_UP,
 )
 from .coordinator import BilresaCoordinator
+from .device_link import MatterDeviceLink
 from .engine import WheelAction
 from .entity import BilresaChannelEntity, async_setup_channel_platform
 from .model import BilresaWheel
@@ -36,9 +37,7 @@ async def async_setup_entry(
         hass,
         entry,
         async_add_entities,
-        lambda coordinator, wheel, channel, identifiers, linked: BilresaChannelDial(
-            coordinator, wheel, channel, identifiers, linked_to_matter=linked
-        ),
+        BilresaChannelDial,
     )
 
 
@@ -56,13 +55,9 @@ class BilresaChannelDial(BilresaChannelEntity, RestoreNumber):
         coordinator: BilresaCoordinator,
         wheel: BilresaWheel,
         channel: int,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
+        link: MatterDeviceLink,
     ) -> None:
-        super().__init__(
-            coordinator, wheel, channel, identifiers, linked_to_matter=linked_to_matter
-        )
+        super().__init__(coordinator, wheel, channel, link)
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}_dial"
         self._attr_name = f"Dial {channel}"
         self._attr_native_value = DIAL_DEFAULT

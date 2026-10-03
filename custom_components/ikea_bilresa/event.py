@@ -6,7 +6,6 @@ import logging
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -29,8 +28,9 @@ from .const import (
     signal_channel,
 )
 from .coordinator import BilresaCoordinator
-from .device_link import reconcile_wheel_device
+from .device_link import MatterDeviceLink
 from .engine import WheelAction
+from .entity import attach_to_device
 from .model import BilresaWheel
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,19 +62,13 @@ async def async_setup_entry(
         desired.clear()
         pending.clear()
         for _node_id, wheel in coordinator.wheels.items():
-            link = reconcile_wheel_device(
-                hass,
-                config_entry_id=entry.entry_id,
-                matter_url=coordinator.url,
-                server_info=coordinator.matter_server_info,
-                wheel=wheel,
-            )
-            identifiers = set(link.identifiers)
-            linked = link.device is not None
+            # Reconcile before constructing: existing registry entries are
+            # moved first, so a new entity never lands beside a stale one.
+            link = coordinator.device_links.link_for(wheel)
             if wheel.is_dual_button:
-                _sync_buttons(wheel, identifiers, linked)
+                _sync_buttons(wheel, link)
             else:
-                _sync_channels(wheel, identifiers, linked)
+                _sync_channels(wheel, link)
         for key in list(entities):
             if key not in desired:
                 entity = entities.pop(key)
@@ -83,9 +77,7 @@ async def async_setup_entry(
             async_add_entities(list(pending))
 
     @callback
-    def _sync_channels(
-        wheel: BilresaWheel, identifiers: set[tuple[str, str]], linked: bool
-    ) -> None:
+    def _sync_channels(wheel: BilresaWheel, link: MatterDeviceLink) -> None:
         channels = sorted(
             {e.channel for e in wheel.endpoints.values() if e.channel is not None}
         )
@@ -94,18 +86,14 @@ async def async_setup_entry(
             desired.add(key)
             existing = entities.get(key)
             if existing is None:
-                entity = BilresaChannelEvent(
-                    coordinator, wheel, channel, identifiers, linked_to_matter=linked
-                )
+                entity = BilresaChannelEvent(coordinator, wheel, channel, link)
                 entities[key] = entity
                 pending.append(entity)
             elif isinstance(existing, BilresaChannelEvent):
-                existing.update_wheel(wheel, identifiers, linked_to_matter=linked)
+                existing.update_wheel(wheel)
 
     @callback
-    def _sync_buttons(
-        wheel: BilresaWheel, identifiers: set[tuple[str, str]], linked: bool
-    ) -> None:
+    def _sync_buttons(wheel: BilresaWheel, link: MatterDeviceLink) -> None:
         # One entity per physical button, numbered 1..N in endpoint order.
         button_eps = sorted(
             ep for ep, e in wheel.endpoints.items() if e.role == ROLE_BUTTON
@@ -121,13 +109,12 @@ async def async_setup_entry(
                     endpoint_id,
                     index,
                     wheel.endpoints[endpoint_id].multi_press_max,
-                    identifiers,
-                    linked_to_matter=linked,
+                    link,
                 )
                 entities[key] = entity
                 pending.append(entity)
             elif isinstance(existing, BilresaButtonEvent):
-                existing.update_wheel(wheel, identifiers, linked_to_matter=linked)
+                existing.update_wheel(wheel)
 
     _sync()
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_WHEELS_UPDATED, _sync))
@@ -147,44 +134,19 @@ class BilresaChannelEvent(EventEntity):
         coordinator: BilresaCoordinator,
         wheel: BilresaWheel,
         channel: int,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
+        link: MatterDeviceLink,
     ) -> None:
         self._coordinator = coordinator
         self._wheel = wheel
         self._channel = channel
         self._attr_unique_id = f"{wheel.node_id}_ch{channel}"
         self._attr_name = f"Channel {channel}"
-        self._set_device_info(identifiers, linked_to_matter)
+        attach_to_device(self, wheel, link, model="BILRESA scroll wheel")
 
     @callback
-    def update_wheel(
-        self,
-        wheel: BilresaWheel,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
-    ) -> None:
+    def update_wheel(self, wheel: BilresaWheel) -> None:
         """Refresh metadata after a Matter node or firmware update."""
         self._wheel = wheel
-        self._set_device_info(identifiers, linked_to_matter)
-
-    @callback
-    def _set_device_info(
-        self, identifiers: set[tuple[str, str]], linked_to_matter: bool
-    ) -> None:
-        """Set registry metadata using identifiers already reconciled safely."""
-        if linked_to_matter:
-            # Keep core Matter's name and hardware metadata authoritative.
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
-            return
-        self._attr_device_info = DeviceInfo(
-            identifiers=identifiers,
-            manufacturer="IKEA of Sweden",
-            model="BILRESA scroll wheel",
-            name=self._wheel.name,
-        )
 
     @property
     def available(self) -> bool:
@@ -251,9 +213,7 @@ class BilresaButtonEvent(EventEntity):
         endpoint_id: int,
         button_index: int,
         multi_press_max: int | None,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
+        link: MatterDeviceLink,
     ) -> None:
         self._coordinator = coordinator
         self._wheel = wheel
@@ -261,34 +221,12 @@ class BilresaButtonEvent(EventEntity):
         self._attr_unique_id = f"{wheel.node_id}_ep{endpoint_id}"
         self._attr_name = f"Button {button_index}"
         self._attr_event_types = button_event_types(multi_press_max)
-        self._set_device_info(identifiers, linked_to_matter)
+        attach_to_device(self, wheel, link, model="BILRESA dual button")
 
     @callback
-    def update_wheel(
-        self,
-        wheel: BilresaWheel,
-        identifiers: set[tuple[str, str]],
-        *,
-        linked_to_matter: bool,
-    ) -> None:
+    def update_wheel(self, wheel: BilresaWheel) -> None:
         """Refresh metadata after a Matter node or firmware update."""
         self._wheel = wheel
-        self._set_device_info(identifiers, linked_to_matter)
-
-    @callback
-    def _set_device_info(
-        self, identifiers: set[tuple[str, str]], linked_to_matter: bool
-    ) -> None:
-        if linked_to_matter:
-            # Keep core Matter's name and hardware metadata authoritative.
-            self._attr_device_info = DeviceInfo(identifiers=identifiers)
-            return
-        self._attr_device_info = DeviceInfo(
-            identifiers=identifiers,
-            manufacturer="IKEA of Sweden",
-            model="BILRESA dual button",
-            name=self._wheel.name,
-        )
 
     @property
     def available(self) -> bool:

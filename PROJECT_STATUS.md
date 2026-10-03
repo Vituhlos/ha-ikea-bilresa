@@ -2,6 +2,94 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
+## Device registry plan, Step 2: entities attach to the Matter device (2026-10-03)
+
+Status: **Implemented + Static + Unit (local, Windows stand-ins; 428 tests).
+CI not yet run for this commit. Not deployed. Hardware not exercised.**
+
+### What changed
+
+- `device_link.py` is rewritten on the single-owner registry API:
+  - `resolve_matter_device()` looks devices up with
+    `async_get_device_by_identifier(identifier, matter_entry_id)`, scoped to the
+    URL-matched Matter config entries. The matching rules are unchanged.
+  - `MatterDeviceLink` now carries only `device`; the `identifiers` field is
+    gone because nothing describes another integration's device any more.
+  - `reconcile_wheel_device()` moves this node's entities onto the Matter
+    device, removes devices owned by our config entry only when no entity is
+    left on them, and takes our `(ikea_bilresa, node)` identifier off the
+    Matter device. Idempotent.
+  - new `DeviceLinkManager`: per-node device ID cache for the bus event, and a
+    device registry listener that links a wheel whose Matter device appears
+    after this integration saw the node.
+- `entity.py`: new `attach_to_device()`. Linked entities set `device_entry`
+  and no `device_info`; standalone entities describe a device carrying only our
+  identifier. Used by `BilresaChannelEntity`, `BilresaChannelEvent` and
+  `BilresaButtonEvent`. `update_wheel()` no longer touches the device.
+- `coordinator.py`: `async_setup_device_links(entry)`; `_dispatch()` reads
+  `device_id` from the manager instead of a registry lookup per notch.
+- `__init__.py`: the manager starts before the platforms are forwarded; the
+  1.1 to 1.2 migration uses `async_get_device_by_identifier`.
+- `config_flow.py`, `panel_models.py`, `diagnostics.py`: unchanged callers of
+  `resolve_matter_device()`.
+
+No Matter protocol, gesture, binding or stored-config code was touched.
+
+### Tests
+
+- `tests/test_device_link_registry.py` (21, real registries): resolution,
+  migration from the rc.13 duplicate layout and from the 0.5.0 standalone
+  layout, disabled entities, a duplicate that still holds a foreign entity,
+  node-prefix isolation (node 1 vs 13 vs 130), idempotence, the manager, a
+  Matter device created later, a Matter device removed.
+- `tests/test_device_link_platforms.py` (5): the real `event`, `number` and
+  `switch` platform setup on a real entity platform. Covers where Home
+  Assistant registers the entities, that no device of ours is created when
+  linked, the described standalone device, the full upgrade from the rc.13
+  layout with entity IDs preserved, and live entities following a late link.
+- `tests/test_no_deprecated_registry_api.py` (16): static scan of every source
+  file for the device registry API scheduled for removal.
+- The runtime guard was proven able to fail: with one `async_get_device` call
+  inserted into `reconcile_wheel_device()`, Home Assistant's frame helper
+  raised in the test. The static guard was proven on the previous sources,
+  where it reported four violations.
+- `test_coordinator.py`, `test_event.py`, `test_init.py`, `test_diagnostics.py`,
+  `test_panel_models.py`, `test_device_link.py` adapted to the new API.
+
+```text
+ruff format --check / ruff check custom_components tests   passed (52 files)
+mypy custom_components/ikea_bilresa                        passed (25 files)
+python -m compileall -q custom_components tests            passed
+git diff --check                                           passed
+pytest -q -p bilresa_windows_local --cov                   428 passed in 31.4 s
+                                                           device_link.py 98 %,
+                                                           total 81 %
+```
+
+CI for Step 1 (`4ffa69d`): 7 checks passed, the scheduled-only job skipped.
+
+### Finding worth keeping
+
+The manager's listener also reacts to a device of **our own** config entry
+that carries Matter identifiers: creating such a duplicate while the manager
+runs gets it removed at once, since nothing is attached to it. That is the
+intended self-healing, and it is why the platform tests build the legacy
+layout before starting the manager.
+
+### Known risks and assumptions
+
+- Between this commit and Step 3, a legacy device trigger no longer resolves a
+  node on a linked device, because our identifier is removed from it. On Home
+  Assistant 2026.8+ those triggers already failed validation there. Step 3
+  removes them.
+- `new_identifiers` is written on a device we do not own, only to remove our
+  own entry. Covered by tests on 2026.9.4; unverified on a live instance.
+- Not yet observed on real Home Assistant. The registry change is one-way:
+  **take a backup before deploying.**
+
+**Single best next action:** Step 3 of the plan (named triggers, translated
+entity names and gestures, Repairs notice, removal of `device_trigger.py`).
+
 ## Device registry plan, Step 1: test environment on Home Assistant 2026.9.4 (2026-10-03)
 
 Status: **Implemented + Static + Unit (local, Windows stand-ins; 390 tests).
@@ -51,8 +139,7 @@ Not run: CI (nothing pushed), coverage, hassfest, HACS validation.
 Known risk: the local Windows run replaces `fcntl`, `resource` and the socket
 block. It cannot stand in for Linux CI.
 
-**Single best next action:** Step 2 of the plan (rewrite `device_link.py` on
-the single-owner registry API). Read `docs/HARDWARE_TEST.md` first.
+Step 2 followed the same day; see the section above.
 
 ## Home Assistant 2026.8 split every BILRESA device in two; plan written (2026-10-03)
 

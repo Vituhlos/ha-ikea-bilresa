@@ -154,7 +154,7 @@ def _patch(
 ) -> None:
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.panel_models.resolve_matter_device",
-        lambda _hass, **_kw: MatterDeviceLink(device, frozenset()),
+        lambda _hass, **_kw: MatterDeviceLink(device),
     )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.panel_models.wheel_availability",

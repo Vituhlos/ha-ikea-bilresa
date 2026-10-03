@@ -21,7 +21,6 @@ from custom_components.ikea_bilresa.const import (
     CONF_ENDPOINT,
     CONF_NODE_ID,
     DIRECTION_UP,
-    DOMAIN,
     EVENT_BILRESA,
     SUBENTRY_BINDING,
     signal_raw_button,
@@ -314,17 +313,12 @@ def test_public_event_includes_registry_device_id_without_breaking_payload(
         "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
         lambda *_args: SimpleNamespace(source="core", server_info=None),
     )
-    registry = SimpleNamespace(
-        async_get_device=Mock(return_value=SimpleNamespace(id="device-123"))
-    )
-    monkeypatch.setattr(
-        "custom_components.ikea_bilresa.coordinator.dr.async_get",
-        lambda _hass: registry,
-    )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.coordinator.async_dispatcher_send", Mock()
     )
     coordinator = BilresaCoordinator(hass, "ws://matter/ws")
+    links = SimpleNamespace(device_id=Mock(return_value="device-123"))
+    coordinator._device_links = links
     action = WheelAction(
         node_id=12,
         wheel_name="Test wheel",
@@ -336,7 +330,7 @@ def test_public_event_includes_registry_device_id_without_breaking_payload(
 
     coordinator._dispatch(action)
 
-    registry.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "12")})
+    links.device_id.assert_called_once_with(12)
     event_type, event_data = bus.async_fire.call_args.args
     assert event_type == EVENT_BILRESA
     assert event_data["device_id"] == "device-123"
@@ -351,10 +345,6 @@ def _dispatch_coordinator(monkeypatch) -> tuple[Any, Mock, Mock]:
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
         lambda *_args: SimpleNamespace(source="core", server_info=None),
-    )
-    monkeypatch.setattr(
-        "custom_components.ikea_bilresa.coordinator.dr.async_get",
-        lambda _hass: SimpleNamespace(async_get_device=Mock(return_value=None)),
     )
     dispatch = Mock()
     monkeypatch.setattr(

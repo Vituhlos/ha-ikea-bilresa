@@ -76,7 +76,7 @@ async def test_reports_availability_per_wheel(monkeypatch) -> None:
     linked = SimpleNamespace(id="matter-device")
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.diagnostics.resolve_matter_device",
-        lambda _hass, **_kw: MatterDeviceLink(linked, frozenset()),
+        lambda _hass, **_kw: MatterDeviceLink(linked),
     )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.diagnostics.wheel_availability",
@@ -99,7 +99,7 @@ async def test_unlinked_wheel_reports_unknown_not_connected(monkeypatch) -> None
     """Without a link there is no evidence, and no evidence is not health."""
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.diagnostics.resolve_matter_device",
-        lambda _hass, **_kw: MatterDeviceLink(None, frozenset()),
+        lambda _hass, **_kw: MatterDeviceLink(None),
     )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.diagnostics.wheel_availability",
@@ -118,9 +118,7 @@ async def test_availability_does_not_leak_identifiers(monkeypatch) -> None:
     """The new fields must not reopen what the redaction policy closed."""
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.diagnostics.resolve_matter_device",
-        lambda _hass, **_kw: MatterDeviceLink(
-            SimpleNamespace(id="matter-device"), frozenset()
-        ),
+        lambda _hass, **_kw: MatterDeviceLink(SimpleNamespace(id="matter-device")),
     )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.diagnostics.wheel_availability",
