@@ -50,11 +50,43 @@ HACS now reports an update for this integration: installed is the commit hash,
 0.5.0.** It goes away once a proper `v0.6.0-rc.14` pre-release is cut from
 this branch.
 
+### Hardware, same evening (owner at the wheel, read back from Home Assistant)
+
+Partial pass on `Kolečko Obývák`, commit `311a535`:
+
+- **Bindings, 21:01.** Channel 2 (`light.zarovka_lustr`) and channel 1
+  (`light.linka`) each followed a continuous rotation: wheel events every
+  0.2-0.5 s, 39 and 34 light updates, lag 0.1-0.5 s, no error logged. The
+  owner judged it smooth. Brightness values are not recorded on this instance,
+  so only timing was checked, not the accounting.
+- **Named triggers, 21:06.** A test automation
+  (`automation.test_bilresa_nove_spoustece`, five `ikea_bilresa.*` triggers on
+  the three Channel entities, action: one persistent notification) ran **35
+  times for 35 gestures**, timestamps matching one to one: 6 `press` on
+  channels 1 and 2 and 29 `rotate_up` on channel 1. No log entry, no Repairs
+  issue. `rotated_down`, `double_pressed` and `held` were armed but the owner
+  did not perform those gestures.
+
+Two earlier attempts the same evening stalled for reasons outside this
+integration, both visible upstream of it:
+
+- 20:55, `light.linka`: the Shelly Plus 0-10V stopped answering `Light.Set`
+  (11 `DeviceConnectionTimeoutError`, about 34 s of silence, late replies to
+  abandoned requests afterwards). Same shape as the rc.10 note below.
+- 20:59, channel 2: the Matter Server log shows the wheel itself reporting
+  `threadNetworkDiagnostics` not-connected, a network fault and connected
+  again, twice within ten seconds, then delivering several seconds of switch
+  events within 25 ms. The integration processed them within milliseconds of
+  arrival. Wheel battery 46 % / 2.6 V; not shown to be the cause.
+
+Neither recurred at 21:01.
+
 ### Still owed
 
-- **Hardware (owner):** rotation, press, double press and hold through a
-  binding, the event entity, one `ikea_bilresa.*` trigger and the bus event;
-  record it in `docs/HARDWARE_TEST.md`.
+- **Hardware (owner):** double press, hold and release, the dual button, and
+  rotation down through a named trigger; record the pass in
+  `docs/HARDWARE_TEST.md`.
+- The test automation is still on the owner's instance; remove it when asked.
 - A version bump and `v0.6.0-rc.14` pre-release, on the owner's request only.
 - The owner's decision on one Czech word for a notch.
 
