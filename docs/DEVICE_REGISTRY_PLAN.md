@@ -1,8 +1,8 @@
 # Device registry plan: one device per wheel, compatible with HA 2027
 
-Status: **approved by the owner on 2026-10-03. Steps 1 to 4 implemented in
-code and documentation. Not deployed, not run on hardware.** See
-`PROJECT_STATUS.md` for validation state.
+Status: **approved by the owner on 2026-10-03. Steps 1 to 4 implemented,
+deployed on the owner's Home Assistant 2026.9.4 the same day and verified
+read-only there. Hardware pass still owed.** See `PROJECT_STATUS.md`.
 Branch: `agent/dual-button-0.6`, on top of `v0.6.0-rc.13`.
 `PROJECT_STATUS.md` remains the canonical handoff; this file is the design.
 

@@ -2,6 +2,64 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
+## Device registry plan deployed on the owner's Home Assistant (2026-10-03)
+
+Status: **Implemented + Static + Unit + CI + deployed and verified read-only on
+Home Assistant 2026.9.4. Hardware not exercised: nobody turned a wheel.**
+
+### How it was deployed
+
+- CI run `37145585300` for commit `311a535`: hassfest, HACS validation, Ruff,
+  mypy, frontend checks and unit tests passed; the scheduled-only pre-release
+  job was skipped.
+- Full backup first, at the owner's request: `d5b7029a`
+  (`pred-ikea-bilresa-device-registry-2026-10-03`, 932 MB, Home Assistant
+  config included, database not). The automatic backup `c6a699aa` from the
+  same morning includes the database.
+- HACS installed the exact commit `311a5351eb85e46837ee01cd5c434856eedb22f5`
+  from `agent/dual-button-0.6`. **No tag and no release were cut**;
+  `manifest.json` still says `0.6.0-rc.13`.
+- Pre-restart config check valid; Home Assistant restarted; the config entry
+  came back `loaded`.
+
+### What was observed afterwards
+
+| Check | Before (rc.13) | After |
+|---|---|---|
+| Registry devices for the three physical devices | 6 | **3** |
+| Devices owned by the `ikea_bilresa` config entry | 3 duplicates | **0** |
+| Our entities | 20, split across the pairs | **20, all on the Matter devices** |
+| Entity IDs | | **all 20 unchanged** |
+| Our identifier on the Matter devices | present | **removed**; only Matter's remain |
+| `list_linked_devices` for each Matter device | the duplicate | **empty** |
+| `get_triggers_for_target` on each Matter device | `event.received` only | **the seven `ikea_bilresa.*` triggers plus `event.received`** |
+| System log entries mentioning `ikea_bilresa` | 4 deprecation reports | **0** |
+| Repairs issues from this integration | | 0 |
+| Bindings | 6 | **6** |
+| Panel overview | | all three `linked_to_matter`, availability `connected` |
+| Matter event source | `core_matter_client` | `core_matter_client`, no fallback |
+| Displayed names (Czech instance) | `Channel 1`, `Dial 1`, `Button 1` | **`Kanál 1`, `Číselník 1`, `Tlačítko 1`** |
+
+A Matter event was received 27 seconds after the restart, so the listener is
+live. That is not a hardware test of this change.
+
+### Side effect to know about
+
+HACS now reports an update for this integration: installed is the commit hash,
+"latest" is `v0.5.0`. **Installing that "update" would be a downgrade to
+0.5.0.** It goes away once a proper `v0.6.0-rc.14` pre-release is cut from
+this branch.
+
+### Still owed
+
+- **Hardware (owner):** rotation, press, double press and hold through a
+  binding, the event entity, one `ikea_bilresa.*` trigger and the bus event;
+  record it in `docs/HARDWARE_TEST.md`.
+- A version bump and `v0.6.0-rc.14` pre-release, on the owner's request only.
+- The owner's decision on one Czech word for a notch.
+
+**Single best next action:** the owner's hardware pass on the deployed commit.
+
 ## Device registry plan, Steps 3 and 4: named triggers and translated names (2026-10-03)
 
 Status: **Implemented + Static + Unit (local, Windows stand-ins; 475 tests).
@@ -93,9 +151,7 @@ CI for Step 2 (`6e994df`): 7 checks passed, the scheduled-only job skipped.
   Assistant ships about 60 languages and nobody on this project can review
   them.
 
-**Single best next action:** with the owner's go-ahead, back up Home Assistant,
-deploy this branch and run the on-instance checks listed under "Verification"
-in `docs/DEVICE_REGISTRY_PLAN.md`, then the hardware pass.
+Deployment followed the same day; see the section above.
 
 ## Device registry plan, Step 2: entities attach to the Matter device (2026-10-03)
 
