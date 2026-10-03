@@ -1,6 +1,83 @@
 # Project status and agent handoff
 
-Last updated: **2026-08-02 by Claude Code**
+Last updated: **2026-10-03 by Claude Code**
+
+## Home Assistant 2026.8 split every BILRESA device in two; plan written, nothing implemented (2026-10-03)
+
+Status: **Analysis + plan only. No runtime code changed. Awaiting the owner's
+approval of `docs/DEVICE_REGISTRY_PLAN.md`.**
+
+### What was found
+
+Read-only inspection of the owner's Home Assistant **2026.9.4** running
+`v0.6.0-rc.13`:
+
+- Home Assistant 2026.8 made each device owned by one config entry. The three
+  physical devices (two wheels, one dual button) are now **six** registry
+  devices: one per pair owned by Matter, one by `ikea_bilresa`, both carrying
+  the same identifiers.
+- Our `event` and `number` entities of both wheels sit on the Matter device;
+  the six `switch` entities and the dual button's two `event` entities sit on
+  the duplicates.
+- The system log holds four deprecation reports against `device_link.py`
+  (lines 111, 197, 202, 236), removal in 2027.8 and 2027.9. `coordinator.py:366`,
+  `__init__.py:58` and the `device.config_entries` reads at
+  `device_link.py:112` and `:223` use the same deprecated API.
+- `device_automation/trigger/list` returns 21 / 21 / 8 `ikea_bilresa` triggers
+  on the duplicates and **zero** on the Matter devices. Core validation also
+  rejects a device trigger whose domain owns no config entry on the device.
+- `get_triggers_for_target` on the Matter devices returns the built-in
+  `event.received`, and our Channel entities expose all seven gesture types to
+  it. Entity-targeted triggers are not behind a Labs flag.
+- The owner's two wheel automations use core Matter's event entities through
+  templates, not our device triggers, so they are unaffected either way.
+
+### Owner's decisions
+
+- Put our entities on the Matter device (one device per wheel).
+- The result must be compatible with Home Assistant 2027.
+- Keep named BILRESA triggers; they are to be rebuilt on the entity-targeted
+  trigger platform.
+- Back up Home Assistant before any deployment of this change.
+
+### Repository state
+
+- `050d488` committed the four step-placement help-text files that were dirty
+  at session start (English and Czech, config flow and panel). Local branch is
+  one commit ahead of `origin/agent/dual-button-0.6`; **not pushed**.
+- New, uncommitted: `docs/DEVICE_REGISTRY_PLAN.md` and this section.
+
+### Validation
+
+```text
+python -m json.tool (strings.json, en.json, cs.json)   passed
+python -m compileall panel_strings.py                  passed
+ruff format --check / ruff check panel_strings.py      passed
+git diff --check                                       passed
+pytest                                                 not run: the local .venv
+                                                       has neither pytest nor
+                                                       homeassistant
+```
+
+Hardware: nothing exercised. CI: not run for `050d488`.
+
+### External pull requests and issues reviewed against rc.13
+
+- PR #8 (first notch on `initial_press`): already implemented in rc.13.
+- PR #5 (`short_release` on the bus): not in rc.13; small, would need porting.
+- PR #6 (deprecated registry lookup in the config flow): targets
+  `_wheel_options`, which no longer exists; superseded by the plan above.
+- Issue #3 (double press in the UI): done in the pre-releases.
+- Issue #4 (brand icon): not done; local `brand/` folders are supported from
+  Home Assistant 2026.3.
+
+None of them was answered, merged or closed in this session.
+
+### Single best next action
+
+Owner approves or amends `docs/DEVICE_REGISTRY_PLAN.md`; then start with its
+Step 1 (test environment on Home Assistant 2026.9.x), which changes no
+behaviour.
 
 ## Checklist item #1 is aimed at the wrong thing, and now there is a metric (2026-08-02)
 
