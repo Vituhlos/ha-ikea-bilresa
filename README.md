@@ -123,7 +123,7 @@ double press, hold and release (`MultiPressMax = 2`).
 
 ## Requirements
 
-- Home Assistant **2026.6** or newer.
+- Home Assistant **2026.8** or newer.
 - The **Matter Server** add-on (or an external Matter Server), with your BILRESA
   wheel(s) already commissioned to Matter and working.
 - The core **Matter** integration configured (used to auto-detect the server

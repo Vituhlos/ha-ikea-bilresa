@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.14] - 2026-10-03
+
 ### Added
+- **Optional perceptual step placement for brightness bindings.** A notch that
+  is a fixed percentage of the 0-255 range is not a fixed size to the eye: it
+  looks larger near the bottom of the range, which is part of why fast
+  scrolling can read as stepped. A binding can now place its steps on the
+  perceptual (CIE L*) scale instead. It changes only where this integration
+  puts its own steps and lands on the same final value. Linear stays the
+  default and existing bindings are untouched; leave it linear if the lamp
+  already evens out its own dimming. Brightness only.
 - **Automation triggers for every gesture.** Seven triggers
   (`ikea_bilresa.rotated_up`, `rotated_down`, `pressed`, `double_pressed`,
   `triple_pressed`, `held`, `released`) that target the wheel's `Channel`

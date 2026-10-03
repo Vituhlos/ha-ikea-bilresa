@@ -2,6 +2,28 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
+## `v0.6.0-rc.14` prepared (2026-10-03)
+
+The owner asked for `v0.6.0-rc.14` after the first hardware observations
+below. This commit only sets `manifest.json` to `0.6.0-rc.14`, dates the
+changelog section, adds the changelog entry that the perceptual step placement
+of `72323c0` never had, and corrects the minimum Home Assistant version in both
+READMEs to 2026.8. No runtime change relative to `311a535`, which is what the
+owner's instance ran during those observations.
+
+The test automation and its notification were removed from the owner's
+instance at his request.
+
+What rc.14 carries beyond rc.13, and how far each part is verified:
+
+| Part | Unit | CI | On the owner's instance | Hardware |
+|---|---|---|---|---|
+| Single-owner device link, duplicate cleanup | yes | yes | yes | not applicable |
+| Named triggers | yes | yes | offered on all three devices | `pressed`, `rotated_up` only |
+| Translated entity and gesture names | yes | yes | Czech names shown | not applicable |
+| Repairs notice for legacy device triggers | yes | yes | none raised (none in use) | not applicable |
+| Perceptual step placement (`72323c0`) | yes | yes | deployed, left at linear | **never exercised** |
+
 ## Device registry plan deployed on the owner's Home Assistant (2026-10-03)
 
 Status: **Implemented + Static + Unit + CI + deployed and verified read-only on
@@ -86,7 +108,6 @@ Neither recurred at 21:01.
 - **Hardware (owner):** double press, hold and release, the dual button, and
   rotation down through a named trigger; record the pass in
   `docs/HARDWARE_TEST.md`.
-- The test automation is still on the owner's instance; remove it when asked.
 - A version bump and `v0.6.0-rc.14` pre-release, on the owner's request only.
 - The owner's decision on one Czech word for a notch.
 

@@ -122,7 +122,7 @@ dvojitý stisk, podržení a uvolnění (`MultiPressMax = 2`).
 
 ## Požadavky
 
-- Home Assistant **2026.6** nebo novější.
+- Home Assistant **2026.8** nebo novější.
 - Add-on **Matter Server** (nebo externí Matter Server) s BILRESA kolečky už
   spárovanými do Matteru a funkčními.
 - Nakonfigurovaná jádrová integrace **Matter** (slouží k automatickému zjištění
