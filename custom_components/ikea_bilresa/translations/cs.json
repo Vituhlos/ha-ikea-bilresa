@@ -3,21 +3,21 @@
     "step": {
       "user": {
         "title": "IKEA BILRESA",
-        "description": "Připoj se k Matter Serveru, který už tvá kolečka BILRESA ovládá. URL je předvyplněná z tvé Matter integrace — nech ji tak, pokud Matter Server neběží jinde.",
+        "description": "Připojte se k Matter Serveru, který už vaše kolečka BILRESA ovládá. URL je předvyplněná z vaší integrace Matter — ponechte ji, pokud Matter Server neběží jinde.",
         "data": {
           "url": "URL websocketu Matter Serveru"
         }
       },
       "reconfigure": {
         "title": "Změnit připojení k Matter Serveru",
-        "description": "Aktualizuj URL websocketu Matter Serveru. Nová adresa se před opětovným připojením integrace otestuje.",
+        "description": "Zadejte novou URL websocketu Matter Serveru. Nová adresa se před opětovným připojením integrace otestuje.",
         "data": {
           "url": "URL websocketu Matter Serveru"
         }
       }
     },
     "error": {
-      "cannot_connect": "Připojení k Matter Serveru selhalo. Zkontroluj URL a že add-on Matter Server běží."
+      "cannot_connect": "Připojení k Matter Serveru selhalo. Zkontrolujte URL a to, že aplikace Matter Server běží."
     },
     "abort": {
       "already_configured": "IKEA BILRESA je už nastavená."
@@ -34,86 +34,86 @@
       "step": {
         "user": {
           "title": "Nastavit ovládání BILRESA",
-          "description": "Vyber zařízení BILRESA nebo zkopíruj existující propojení. U kanálu kolečka se zobrazí otáčení i akce tlačítka; u endpointu dual buttonu jen akce, které jeho hardware podporuje.",
+          "description": "Vyberte zařízení BILRESA nebo zkopírujte existující propojení. U kanálu kolečka se zobrazí otáčení i akce tlačítka; u tlačítka dvoutlačítka jen akce, které jeho hardware podporuje.",
           "data": {
             "binding_profile": "Výchozí profil",
             "copy_from": "Kopírovat nastavení z existujícího propojení (volitelné)",
             "node_id": "Zařízení BILRESA",
             "channel": "Kanál",
             "endpoint": "Tlačítko",
-            "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
-            "mode": "Scroll ovládá",
-            "step": "Změna na zářez (% rozsahu)",
-            "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
+            "target": "Cíl (světlo, přehrávač médií, kryt, klimatizace, ventilátor, číslo)",
+            "mode": "Otáčení ovládá",
+            "step": "Změna na jedno cvaknutí (% rozsahu)",
+            "acceleration": "Zrychlení (rychlejší otáčení = větší kroky)",
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "max_brightness": "Maximální jas (%)",
             "transition": "Vyhlazení velkých skoků (s)",
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
-            "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
-            "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
+            "double_press_target": "Dvojitý stisk: přepnout entitu (volitelné)",
+            "triple_press_target": "Trojitý stisk: přepnout entitu (volitelné)",
             "hold_target": "Cíl akce při podržení",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
-            "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)",
+            "scenes": "Scény střídané jednoduchým stiskem (volitelné, nahradí jeho akci)",
             "step_curve": "Rozložení kroků"
           },
           "data_description": {
-            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
+            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícenásobné stisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
             "transition": "Rychlé otáčení dorazí do Home Assistantu po dávkách cvaknutí. Jedno cvaknutí se použije vždy okamžitě, aby kolečko zůstalo svižné; větší dávka se rozloží nanejvýš na tuto dobu, úměrně své velikosti. 0 vyhlazení vypne.",
-            "step_curve": "Pokud ti rychlé otáčení skáče, hlavně u spodního konce rozsahu, přepni na percepční a zkus to znovu. Nech lineární, pokud si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než nekorigovat vůbec."
+            "step_curve": "Pokud vám rychlé otáčení skáče, hlavně u spodního konce rozsahu, přepněte na percepční a zkuste to znovu. Ponechte lineární, pokud si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než nekorigovat vůbec."
           }
         },
         "profile": {
-          "title": "Vyber profil kolečka",
-          "description": "Vyber výchozí hodnoty pro tento kanál kolečka. Na další obrazovce můžeš každou hodnotu upravit.",
+          "title": "Vyberte profil kolečka",
+          "description": "Vyberte výchozí hodnoty pro tento kanál kolečka. Na další obrazovce můžete každou hodnotu upravit.",
           "data": {
             "binding_profile": "Výchozí profil"
           }
         },
         "reconfigure": {
           "title": "Upravit ovládací propojení",
-          "description": "Uprav tento kanál kolečka nebo endpoint dual buttonu. Zobrazují se jen volby podporované vybraným hardwarem.",
+          "description": "Upravte tento kanál kolečka nebo tlačítko dvoutlačítka. Zobrazují se jen volby podporované vybraným hardwarem.",
           "data": {
             "node_id": "Zařízení BILRESA",
             "channel": "Kanál",
             "endpoint": "Tlačítko",
-            "target": "Cíl (světlo, media player, žaluzie, klima, ventilátor, číslo)",
-            "mode": "Scroll ovládá",
-            "step": "Změna na zářez (% rozsahu)",
-            "acceleration": "Akcelerace (rychlejší scroll = větší kroky)",
+            "target": "Cíl (světlo, přehrávač médií, kryt, klimatizace, ventilátor, číslo)",
+            "mode": "Otáčení ovládá",
+            "step": "Změna na jedno cvaknutí (% rozsahu)",
+            "acceleration": "Zrychlení (rychlejší otáčení = větší kroky)",
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "max_brightness": "Maximální jas (%)",
             "transition": "Vyhlazení velkých skoků (s)",
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
-            "double_press_target": "Dvojstisk: přepnout entitu (volitelné)",
-            "triple_press_target": "Trojstisk: přepnout entitu (volitelné)",
+            "double_press_target": "Dvojitý stisk: přepnout entitu (volitelné)",
+            "triple_press_target": "Trojitý stisk: přepnout entitu (volitelné)",
             "hold_target": "Cíl akce při podržení",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
-            "scenes": "Scény cyklené jednoduchým stiskem (volitelné, přepíše jeho akci)",
+            "scenes": "Scény střídané jednoduchým stiskem (volitelné, nahradí jeho akci)",
             "step_curve": "Rozložení kroků"
           },
           "data_description": {
-            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícestisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
+            "button_response": "Okamžitá odezva se spustí už při prvním stisku a vyžaduje vypnuté vícenásobné stisky i podržení. Rychlé uvolnění reaguje po prvním krátkém uvolnění. Rozpoznání více stisků počká na dokončené gesto. Veřejné události BILRESA zůstávají ve všech režimech plně rozpoznané.",
             "transition": "Rychlé otáčení dorazí do Home Assistantu po dávkách cvaknutí. Jedno cvaknutí se použije vždy okamžitě, aby kolečko zůstalo svižné; větší dávka se rozloží nanejvýš na tuto dobu, úměrně své velikosti. 0 vyhlazení vypne.",
-            "step_curve": "Pokud ti rychlé otáčení skáče, hlavně u spodního konce rozsahu, přepni na percepční a zkus to znovu. Nech lineární, pokud si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než nekorigovat vůbec."
+            "step_curve": "Pokud vám rychlé otáčení skáče, hlavně u spodního konce rozsahu, přepněte na percepční a zkuste to znovu. Ponechte lineární, pokud si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než nekorigovat vůbec."
           }
         }
       },
       "error": {
-        "fast_response_conflicts_with_multi_press": "Rychlou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeber nebo zvol rozpoznání více stisků.",
-        "instant_response_conflicts_with_multi_press": "Okamžitou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeber nebo zvol rozpoznání více stisků.",
-        "instant_response_conflicts_with_hold": "Okamžitou odezvu nelze kombinovat se samostatnou akcí podržení. Nastav podržení na Nedělat nic nebo zvol Rychlé uvolnění / Rozpoznání více stisků.",
-        "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním scrollu. Vyber odpovídající entitu nebo změň, co scroll ovládá.",
-        "target_required": "Vyber cíl této akce, nebo nastav Nedělat nic.",
+        "fast_response_conflicts_with_multi_press": "Rychlou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeberte nebo zvolte rozpoznání více stisků.",
+        "instant_response_conflicts_with_multi_press": "Okamžitou odezvu nelze kombinovat s cílem pro více stisků. Tento cíl odeberte nebo zvolte rozpoznání více stisků.",
+        "instant_response_conflicts_with_hold": "Okamžitou odezvu nelze kombinovat se samostatnou akcí podržení. Nastavte podržení na Nedělat nic nebo zvolte Rychle po uvolnění či rozpoznání více stisků.",
+        "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním. Vyberte odpovídající entitu nebo změňte, co otáčení ovládá.",
+        "target_required": "Vyberte cíl této akce, nebo nastavte Nedělat nic.",
         "ramp_requires_light": "Plynulá změna při podržení vyžaduje jako cíl světlo."
       },
       "abort": {
-        "no_devices": "Zatím se nenašlo žádné podporované zařízení BILRESA. Ověř, že zařízení funguje v Matter integraci, a zkus to znovu."
+        "no_devices": "Zatím se nenašlo žádné podporované zařízení BILRESA. Ověřte, že zařízení funguje v integraci Matter, a zkuste to znovu."
       }
     }
   },
@@ -131,8 +131,8 @@
         "brightness": "Jas světla",
         "color_temp": "Teplota bílé světla",
         "color": "Barva světla",
-        "volume": "Hlasitost media playeru",
-        "cover_position": "Poloha žaluzie",
+        "volume": "Hlasitost přehrávače médií",
+        "cover_position": "Poloha krytu",
         "temperature": "Cílová teplota klimatizace",
         "fan_speed": "Otáčky ventilátoru",
         "number": "Hodnota čísla"
@@ -199,11 +199,11 @@
   "issues": {
     "cannot_connect": {
       "title": "Matter Server je nedostupný",
-      "description": "IKEA BILRESA se nemůže připojit k Matter Serveru na {url}. Kolečka nebudou reagovat, dokud se spojení neobnoví. Zkontroluj, že add-on Matter Server běží."
+      "description": "IKEA BILRESA se nemůže připojit k Matter Serveru na {url}. Kolečka nebudou reagovat, dokud se spojení neobnoví. Zkontrolujte, že aplikace Matter Server běží."
     },
     "legacy_device_triggers": {
       "title": "Automatizace používají zrušené spouštěče zařízení BILRESA",
-      "description": "Tyto automatizace se stále spouštějí spouštěčem zařízení BILRESA a už neběží:\n\n{automations}\n\nSpouštěče zařízení byly odstraněny, protože od Home Assistantu 2026.8 patří zařízení kolečka výhradně integraci Matter. Otevři každou automatizaci, smaž spouštěč zařízení a přidej místo něj některý ze spouštěčů BILRESA, například **BILRESA otočeno nahoru**, s entitou Kanál daného kolečka jako cílem. Toto upozornění zmizí, jakmile žádná automatizace spouštěč zařízení nepoužívá."
+      "description": "Tyto automatizace se stále spouštějí spouštěčem zařízení BILRESA a už neběží:\n\n{automations}\n\nSpouštěče zařízení byly odstraněny, protože od Home Assistantu 2026.8 patří zařízení kolečka výhradně integraci Matter. Otevřete každou automatizaci, smažte spouštěč zařízení a přidejte místo něj některý ze spouštěčů BILRESA, například **BILRESA otočeno nahoru**, s entitou Kanál daného kolečka jako cílem. Toto upozornění zmizí, jakmile žádná automatizace spouštěč zařízení nepoužívá."
     }
   },
   "entity": {

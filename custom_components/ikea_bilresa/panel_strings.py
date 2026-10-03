@@ -445,7 +445,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "mode_color_temp": "Teplota bílé",
         "mode_color": "Barva",
         "mode_volume": "Hlasitost",
-        "mode_cover_position": "Poloha žaluzie",
+        "mode_cover_position": "Poloha krytu",
         "mode_temperature": "Teplota",
         "mode_fan_speed": "Rychlost ventilátoru",
         "mode_number": "Hodnota",
@@ -497,9 +497,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "detail_views": "Pohledy detailu zařízení",
         "field_step_curve": "Rozložení kroků",
         "field_step_curve_help": (
-            "Pokud ti rychlé otáčení skáče, hlavně u spodního konce rozsahu, "
-            "přepni na percepční a zkus to znovu. Nech lineární, pokud si lampa "
-            "stmívání vyrovnává sama — korigovat dvakrát je horší než "
+            "Pokud vám rychlé otáčení skáče, hlavně u spodního konce rozsahu, "
+            "přepněte na percepční a zkuste to znovu. Ponechte lineární, pokud "
+            "si lampa stmívání vyrovnává sama — korigovat dvakrát je horší než "
             "nekorigovat vůbec."
         ),
         "step_curve_linear": "Lineární (výchozí)",
@@ -511,17 +511,17 @@ STRINGS: dict[str, dict[str, str]] = {
             "omylem."
         ),
         "settings_channel_enabled": "Kanál {channel} aktivní",
-        "settings_step": "Změna číselníku na zub",
-        "settings_acceleration": "Akcelerace",
+        "settings_step": "Změna číselníku na jedno cvaknutí",
+        "settings_acceleration": "Zrychlení",
         "settings_acceleration_help": (
-            "Čím rychleji točíš, tím větší skok na jeden zub."
+            "Čím rychleji otáčíte, tím větší skok na jedno cvaknutí."
         ),
         "settings_save": "Uložit",
         "settings_saved": "Nastavení uloženo",
         "settings_disabled_badge": "Vypnuto",
         "settings_error_conflict": (
-            "Nastavení mezitím změnil někdo jiný. Otevři kolečko znovu a zkus "
-            "to ještě jednou."
+            "Nastavení mezitím změnil někdo jiný. Otevřete kolečko znovu a "
+            "zkuste to ještě jednou."
         ),
         "settings_error_generic": "Nastavení se nepodařilo uložit.",
         "tab_channels": "Kanály",
@@ -563,7 +563,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_editor_button_title": "Upravit propojení tlačítka {button}",
         "field_mode": "Režim otáčení",
         "field_target": "Cíl otáčení",
-        "field_step": "Krok na jeden zub",
+        "field_step": "Krok na jedno cvaknutí",
         "field_acceleration": "Zrychlení",
         "field_transition": "Vyhlazení velkých skoků",
         "field_min_brightness": "Minimální jas",
@@ -760,7 +760,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "test_no_button_bindings": ("Pro testování nejdřív nastavte některé tlačítko."),
         "direction_up": "nahoru",
         "direction_down": "dolů",
-        "gesture_rotate": "Kanál {channel} · otočení {direction} · {delta} kroků",
+        "gesture_rotate": ("Kanál {channel} · otočení {direction} · {delta} cvaknutí"),
         "gesture_press_single": "Kanál {channel} · jednoduchý stisk",
         "gesture_press_double": "Kanál {channel} · dvojitý stisk",
         "gesture_press_triple": "Kanál {channel} · trojitý stisk",

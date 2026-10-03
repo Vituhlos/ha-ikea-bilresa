@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **Czech wording is unified.** Every Czech text now addresses the reader
+  formally, as Home Assistant's own Czech translation mostly does; the
+  integration's settings used the informal form while the panel used the formal
+  one. A wheel detent is "cvaknutí" everywhere (it was also "zub" and "zářez"),
+  double and triple press are "dvojitý stisk" and "trojitý stisk", acceleration
+  is "zrychlení", and leftover English words ("scroll", "dual button") are
+  gone. Covers, media players and the Matter Server app use the names Home
+  Assistant gives them in Czech. English texts are unchanged.
+
 ## [0.6.0-rc.14] - 2026-10-03
 
 ### Added

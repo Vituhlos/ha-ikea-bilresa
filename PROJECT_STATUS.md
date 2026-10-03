@@ -2,6 +2,36 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
+## Czech wording unified after rc.14 (2026-10-03)
+
+Status: **Implemented + Static + Unit (475 tests, 27 frontend tests). Not
+released, not deployed: the owner's instance still runs rc.14.**
+
+The owner decided two things: a wheel detent is "cvaknutí", and every Czech
+text uses the formal address. An audit of the 154 integration strings, the 280
+panel strings and `README.cs.md` found no missing translation but mixed
+wording: informal address in the config flow against formal in the panel;
+"cvaknutí" / "zub" / "zářez"; "dvojstisk" / "dvojitý stisk"; "Akcelerace" /
+"Zrychlení"; English "scroll" and "dual button" inside Czech sentences.
+Core Home Assistant's Czech translation (2026.9.4 package) uses the formal
+address roughly four times as often as the informal one, and says "kryt",
+"přehrávač médií" and "aplikace" for cover, media player and add-on.
+
+Changed: `translations/cs.json`, the `cs` block of `panel_strings.py`,
+`README.cs.md`, `CHANGELOG.md`. English is untouched, so key and placeholder
+parity holds.
+
+Deliberately left alone: the single press is "krátký stisk" in the panel's
+field labels and "jednoduchý stisk" elsewhere. English has the same split
+("Short press" / "Single press"), and the panel wording was reviewed with the
+owner on rc.7, so this needs his decision rather than a rename.
+
+Open with the owner: he says the panel is "not 100 % yet" and has not said
+what is wrong. The Puppet screenshot tool only renders Lovelace dashboards, not
+custom panels (`Unknown config specified: ikea-bilresa`), and this machine
+cannot reach the instance on the LAN, so the panel can only be seen through a
+browser session the owner signs in to.
+
 ## `v0.6.0-rc.14` published and deployed (2026-10-03)
 
 Status: **Released (pre-release) + CI + deployed. Hardware: partial, see the
