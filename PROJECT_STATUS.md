@@ -2,7 +2,30 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
-## `v0.6.0-rc.14` prepared (2026-10-03)
+## `v0.6.0-rc.14` published and deployed (2026-10-03)
+
+Status: **Released (pre-release) + CI + deployed. Hardware: partial, see the
+table below.**
+
+- CI run `37146970911` passed for exact commit `1eb2387`: hassfest, HACS
+  validation, Ruff, mypy, frontend checks and unit tests.
+- Annotated tag `v0.6.0-rc.14` on `1eb2387`; pre-release published at
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.14.
+- HACS installed exactly `v0.6.0-rc.14`; config check valid; Home Assistant
+  restarted; config entry `loaded`.
+- Read back afterwards: manifest `0.6.0-rc.14`; 20 entities on the three Matter
+  devices (9 / 9 / 2), none unavailable; no device owned by this integration;
+  seven `ikea_bilresa.*` triggers offered on `Kolečko Obývák`; no log entry and
+  no Repairs issue from this integration; the HACS update entity is `off`, so
+  the misleading "update to v0.5.0" from the commit-hash install is gone.
+- The test automation and its notification are gone from the instance.
+
+**Single best next action:** the owner's remaining hardware gestures (double
+press, hold and release, rotation down through a trigger, the dual button),
+then the stable-release mechanics in `docs/V0.6.0_CHECKLIST.md` item 5.
+
+### What the release commit changed
+
 
 The owner asked for `v0.6.0-rc.14` after the first hardware observations
 below. This commit only sets `manifest.json` to `0.6.0-rc.14`, dates the
