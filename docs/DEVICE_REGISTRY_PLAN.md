@@ -80,8 +80,11 @@ does guarantee:
 - `requirements-test.txt`: `homeassistant` 2026.9.x with the matching
   `pytest-homeassistant-custom-component` (0.13.355 = 2026.8.1,
   0.13.360 = 2026.9.0b3, 0.13.368 = 2026.10.0b0; pick the exact pair).
-- `tests/conftest.py`: enable custom integrations. Today's tests are mock-only;
-  this class of defect is visible only against the real registries.
+- `tests/test_registry_premises.py`: four tests against the real registries
+  that pin the Home Assistant behaviour this plan relies on. Today's tests are
+  mock-only; this class of defect is visible only against the real registries.
+  No `conftest.py` is needed yet: these tests use the `hass` fixture without
+  loading the integration.
 - `hacs.json`: `"homeassistant": "2026.8.0"`.
 - `.github/workflows/ci.yml`: add a weekly scheduled job that installs the
   newest Home Assistant pre-release and runs pytest. It reports; it does not

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **Minimum Home Assistant is now 2026.8.0** (was 2026.6.0). Home Assistant
+  2026.8 changed the device registry so that each device belongs to one
+  integration; the upcoming device-link rework targets that model only. The
+  test suite now runs against Home Assistant 2026.9.4.
+
 ## [0.6.0-rc.13] - 2026-08-02
 
 ### Fixed

@@ -2,10 +2,62 @@
 
 Last updated: **2026-10-03 by Claude Code**
 
-## Home Assistant 2026.8 split every BILRESA device in two; plan written, nothing implemented (2026-10-03)
+## Device registry plan, Step 1: test environment on Home Assistant 2026.9.4 (2026-10-03)
 
-Status: **Analysis + plan only. No runtime code changed. Awaiting the owner's
-approval of `docs/DEVICE_REGISTRY_PLAN.md`.**
+Status: **Implemented + Static + Unit (local, Windows stand-ins; 390 tests).
+CI not run. No runtime code changed, no hardware involved.**
+
+The owner approved `docs/DEVICE_REGISTRY_PLAN.md` on 2026-10-03, including
+named BILRESA triggers on the entity-targeted trigger platform and a Home
+Assistant backup before any deployment. Step 1 of that plan is done:
+
+- `requirements-test.txt`: `homeassistant==2026.9.4` (the owner's version) and
+  `pytest-homeassistant-custom-component==0.13.367`. The previous pin, 2026.7.2,
+  predates the single-owner device registry, so no test could have seen the
+  duplicate-device defect.
+- `hacs.json`: minimum Home Assistant `2026.8.0` (was `2026.6.0`).
+- `.github/workflows/ci.yml`: a `prerelease` job that installs the newest test
+  helper, and with it the newest Home Assistant pre-release, and runs pytest.
+  It runs only on the weekly schedule or a manual dispatch and gates nothing.
+  **GitHub runs scheduled workflows from the default branch only, so the
+  schedule does nothing until this reaches `main`**; until then start it by
+  hand.
+- `tests/test_registry_premises.py`: four tests against the real registries
+  pinning what the plan relies on: a shared identifier forks one device per
+  config entry; identifier lookup is scoped to one config entry; an entity can
+  sit on another config entry's device without co-owning it; removing a device
+  removes entities of the same config entry and only detaches foreign ones.
+- `CHANGELOG.md` (minimum version), `docs/DEVELOPMENT.md` (how to run the suite
+  on Windows), `docs/DEVICE_REGISTRY_PLAN.md` (no `conftest.py` needed yet).
+
+All 386 pre-existing tests pass unchanged on Home Assistant 2026.9.4.
+
+```text
+python -m json.tool (strings.json, en.json, cs.json, hacs.json)  passed
+python -m compileall -q custom_components tests                  passed
+ruff format --check custom_components tests                      passed (49 files)
+ruff check custom_components tests                               passed
+mypy custom_components/ikea_bilresa                              passed (25 files)
+node --check + node --test (panel, iconset)                      passed (27 tests)
+git diff --check                                                 passed
+pytest -q -p bilresa_windows_local                               390 passed in 25.8 s
+                                                                 (Windows, Python 3.14.6,
+                                                                 local stand-ins, see
+                                                                 docs/DEVELOPMENT.md)
+```
+
+Not run: CI (nothing pushed), coverage, hassfest, HACS validation.
+
+Known risk: the local Windows run replaces `fcntl`, `resource` and the socket
+block. It cannot stand in for Linux CI.
+
+**Single best next action:** Step 2 of the plan (rewrite `device_link.py` on
+the single-owner registry API). Read `docs/HARDWARE_TEST.md` first.
+
+## Home Assistant 2026.8 split every BILRESA device in two; plan written (2026-10-03)
+
+Status: **Analysis + plan only. No runtime code changed.** The plan was
+approved later the same day; see the section above.
 
 ### What was found
 
