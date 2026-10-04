@@ -2,6 +2,33 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## rc.16 bug found by the owner: number box does not follow the slider (2026-10-04)
+
+Status: **Fixed in code (`12f9a26`) + tests + checked on the owner's instance
+without deploying. Not released; the instance still runs `v0.6.0-rc.16`.**
+
+The owner dragged the dial's step slider to 7 and the number box beside it
+kept showing 2. Cause: `ha-selector` is a controlled element and draws the
+value it was given; number fields update the draft without a re-render, so
+nothing handed the new value back. The draft, and therefore what Save would
+send, was correct; only the display was stale. `_haSelector` now sets
+`node.value` in its `value-changed` handler. This affected every slider in the
+editor, not only the dial.
+
+Checked by mounting the fixed script beside the installed panel in his
+browser: setting the real `ha-slider` to 7 moved the `ha-input` box, the
+selector value and the draft to 7. Nothing was saved. Read back from the
+instance at the same time: no settings or binding had been changed through
+rc.16 yet, so **a save through the new controls is still unobserved**.
+
+Separately, the Impeccable design skill (pbakaus/impeccable 4.5.0) was
+installed at the owner's request into the parent folder's
+`.claude/skills/impeccable`, guidance only: its launcher downloads a prebuilt
+engine binary, so the launchers sit in `scripts/_disabled/` and no hook was
+installed. An audit of the panel with it is planned for a new session.
+
+**Single best next action:** release the fix as rc.17 when the owner asks.
+
 ## `v0.6.0-rc.16` published and deployed (2026-10-04)
 
 Status: **Released (pre-release) + CI + deployed. Saving through the new
