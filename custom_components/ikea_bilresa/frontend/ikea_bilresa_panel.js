@@ -2409,6 +2409,11 @@ class IkeaBilresaPanel extends HTMLElement {
     node.required = Boolean(required);
     node.addEventListener("value-changed", (event) => {
       event.stopPropagation();
+      // The selector is a controlled element: it draws the value it was
+      // given, not the one it just reported. A field that changes without a
+      // re-render (a number) has to be handed its new value back, or the
+      // slider moves while the number beside it stays put.
+      node.value = event.detail?.value;
       onChange(event.detail?.value);
     });
     return node;

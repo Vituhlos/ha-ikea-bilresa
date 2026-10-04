@@ -882,3 +882,40 @@ test("the editor replaces the ledger instead of sitting under it", async () => {
   // No native multi-select anywhere: it cannot express the order of scenes.
   assert.ok(!source.includes("select.multiple"));
 });
+
+test("a Home Assistant selector is handed its new value back", () => {
+  // ha-selector draws the value it was given. Number fields change without a
+  // re-render, so without this the slider moved and the number box did not.
+  const panel = newPanel();
+  const listeners = {};
+  class FakeSelector {
+    addEventListener(name, handler) {
+      listeners[name] = handler;
+    }
+  }
+  registry.set("ha-selector", FakeSelector);
+  const previous = globalThis.document;
+  globalThis.document = { createElement: () => new FakeSelector() };
+  try {
+    const seen = [];
+    const node = panel._haSelector({
+      id: "x",
+      selector: { number: { min: 1, max: 25 } },
+      value: 2,
+      label: "Step",
+      onChange: (value) => seen.push(value),
+    });
+    assert.equal(node.value, 2);
+
+    listeners["value-changed"]({
+      stopPropagation: () => undefined,
+      detail: { value: 7 },
+    });
+
+    assert.equal(node.value, 7);
+    assert.deepEqual(seen, [7]);
+  } finally {
+    registry.delete("ha-selector");
+    globalThis.document = previous;
+  }
+});

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- In the panel, the number beside a slider now follows the slider. In rc.16
+  the slider moved and the number kept showing the old value until the form
+  was saved or redrawn; the value that was saved was the slider's.
+
 ## [0.6.0-rc.16] - 2026-10-04
 
 ### Changed
