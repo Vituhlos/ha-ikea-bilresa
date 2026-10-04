@@ -57,6 +57,25 @@ const DEFAULT_BUTTON_BINDING = {
   ramp_direction: "alternate",
 };
 
+// The server sends these in the panel config (panel_schema.py), from the same
+// table it validates against. This copy only serves a backend older than that.
+const FALLBACK_SCHEMA = {
+  binding_numbers: {
+    step: { min: 1, max: 25, step: 1, unit: "%" },
+    acceleration: { min: 0, max: 100, step: 5, unit: "%" },
+    min_brightness: { min: 0, max: 50, step: 1, unit: "%" },
+    max_brightness: { min: 1, max: 100, step: 1, unit: "%" },
+    transition: { min: 0, max: 5, step: 0.1, unit: "s" },
+  },
+  settings_numbers: {
+    step: { min: 1, max: 25, step: 1, unit: null },
+    acceleration: { min: 0, max: 100, step: 5, unit: "%" },
+  },
+  mode_domains: MODE_DOMAINS,
+  press_target_domains: ["light", "switch"],
+  ramp_target_domains: ["light"],
+};
+
 // Material Design Icons remain the standard chrome. Product identity and
 // gestures use the separately approved BILRESA / Material Rounded geometry.
 const ICON = {
@@ -66,6 +85,11 @@ const ICON = {
   check: "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z",
   alert:
     "M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z",
+  arrowUp: "M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z",
+  arrowDown:
+    "M11,4H13V16L18.5,10.5L19.92,11.92L12,19.84L4.08,11.92L5.5,10.5L11,16V4Z",
+  remove:
+    "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z",
   refresh:
     "M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z",
 };
@@ -199,8 +223,15 @@ const STYLES = `
     /* The icon colour clears the 3:1 non-text bar where a word would not. */
     --_accent: var(--state-icon-color, #44739e);
 
-    min-block-size: 100vh;
-    min-block-size: 100dvh;
+    /* A theme may inset the whole panel (padding on the element that hosts
+       it). Measured in _fitFrame, so the header sticks where it already sits
+       instead of travelling across the inset first. */
+    --_frame-start: 0px;
+    --_frame-end: 0px;
+    --_frame-bg: var(--_bg);
+    --_top: calc(56px + env(safe-area-inset-top, 0px) + var(--_frame-start));
+    min-block-size: calc(100vh - var(--_frame-start) - var(--_frame-end));
+    min-block-size: calc(100dvh - var(--_frame-start) - var(--_frame-end));
     background: var(--_bg);
     color: var(--_ink);
     font-family: var(--_font);
@@ -212,7 +243,7 @@ const STYLES = `
      consume the inset and put the exit control under an iPhone notch. */
   header {
     position: sticky;
-    inset-block-start: 0;
+    inset-block-start: var(--_frame-start);
     z-index: 2;
     display: flex;
     align-items: center;
@@ -225,6 +256,16 @@ const STYLES = `
       max(var(--_space-4), env(safe-area-inset-right, 0px));
     background: var(--app-header-background-color, var(--primary-color, #03a9f4));
     color: var(--app-header-text-color, var(--text-primary-color, #fff));
+  }
+  /* Covers the theme's inset above the bar, or the page would scroll through
+     that strip. Zero height when the panel is not inset. */
+  header::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 100%;
+    block-size: var(--_frame-start);
+    background: var(--_frame-bg);
   }
   header h1 {
     margin: 0;
@@ -488,6 +529,7 @@ const STYLES = `
     block-size: 20px;
     fill: var(--_ink);
   }
+  .channel-warn { fill: var(--error-color, var(--_ink)); }
 
   .detail-shell {
     display: grid;
@@ -498,8 +540,8 @@ const STYLES = `
      against the content, no radius, flush with the header. */
   .rail {
     position: sticky;
-    inset-block-start: calc(56px + env(safe-area-inset-top, 0px));
-    block-size: calc(100dvh - 56px - env(safe-area-inset-top, 0px));
+    inset-block-start: var(--_top);
+    block-size: calc(100dvh - var(--_top) - var(--_frame-end));
     overflow: auto;
     padding: var(--_space-4) var(--_space-3)
       max(var(--_space-4), env(safe-area-inset-bottom, 0px));
@@ -626,6 +668,7 @@ const STYLES = `
     color: var(--_ink-dim);
     font-size: var(--ha-font-size-m, 14px);
   }
+  .detail-meta-part + .detail-meta-part::before { content: " · "; }
   .detail-top .status { align-self: center; }
 
   /* overflow-x: auto keeps a long translation from pushing the page sideways,
@@ -757,27 +800,32 @@ const STYLES = `
      background. Same tokens as .channel-workbench so the two read as one
      surface; PANEL_DESIGN.md forbids nesting one inside the other. */
   .settings-section {
-    margin-block-start: var(--_space-6);
-    padding: var(--_space-8);
+    margin-block-start: var(--_space-4);
+    padding: var(--_space-6);
     border: var(--ha-card-border-width, 1px) solid var(--_border);
     border-radius: var(--_radius);
     background: var(--_card);
     box-shadow: var(--ha-card-box-shadow, none);
   }
+  .settings-title {
+    margin: 0;
+    font-size: var(--ha-font-size-l, 16px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    line-height: var(--ha-line-height-condensed, 1.2);
+  }
   .settings-intro {
-    margin: var(--_space-2) 0 var(--_space-6);
+    max-inline-size: 70ch;
+    margin: var(--_space-2) 0 var(--_space-4);
     color: var(--_ink-dim);
-    font-size: var(--ha-font-size-s, 13px);
-    line-height: 1.5;
+    font-size: var(--ha-font-size-m, 14px);
+    line-height: var(--ha-line-height-normal, 1.6);
   }
   .settings-toggles {
     display: flex;
     flex-wrap: wrap;
     gap: 0 var(--_space-8);
-    margin-block-end: var(--_space-6);
-    padding-block-end: var(--_space-6);
-    border-block-end: 1px solid var(--_border);
   }
+  .settings-toggles ha-selector { min-inline-size: 200px; }
   .settings-toggle {
     display: flex;
     align-items: center;
@@ -805,13 +853,14 @@ const STYLES = `
   }
   .settings-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--_space-6);
-    margin-block-start: var(--_space-8);
+    gap: var(--_space-4);
+    margin-block-start: var(--_space-6);
   }
   .settings-message {
     color: var(--_ink-dim);
-    font-size: var(--ha-font-size-s, 13px);
+    font-size: var(--ha-font-size-m, 14px);
   }
   .channel-surface {
     min-inline-size: 0;
@@ -896,18 +945,7 @@ const STYLES = `
     align-items: center;
     gap: var(--_space-1);
   }
-  /* Hold and release are one gesture with a beginning and an end, so they read
-     as one horizontal sequence rather than two unrelated rows. */
-  .gesture-sequence-rail {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-  }
-  .gesture-sequence-line {
-    inline-size: 16px;
-    block-size: 1px;
-    background: var(--_accent);
-  }
+  /* The mark for a release: where a hold ends. */
   .gesture-sequence-end {
     flex: 0 0 auto;
     inline-size: 8px;
@@ -927,10 +965,29 @@ const STYLES = `
     color: var(--_ink-dim);
     font-weight: var(--ha-font-weight-normal, 400);
   }
+  .channel-action-add {
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-block-size: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    /* Ink, not the theme's primary colour: the default light blue is 2.6:1 on
+       a white card. The underline is what says "this is the way in". */
+    color: var(--_ink);
+    font-size: var(--ha-font-size-m, 14px);
+    font-weight: var(--ha-font-weight-medium, 500);
+    text-align: start;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .channel-action[data-state="warning"] .channel-action-value {
+    color: var(--error-color, var(--_ink));
+  }
   .channel-detail .binding-form {
-    margin-block-start: var(--_space-8);
-    padding: var(--_space-6) 0 0;
-    border-block-start: 1px solid var(--_ink);
+    padding: var(--_space-4) 0 0;
+    border-block-start: 1px solid var(--_divider);
   }
   .detail-card {
     min-inline-size: 0;
@@ -1028,6 +1085,10 @@ const STYLES = `
     border-color: var(--error-color, var(--_ink));
     color: var(--error-color, var(--_ink));
   }
+  .action-button[data-apart="true"] {
+    margin-inline-start: auto;
+    border-color: transparent;
+  }
   .action-button:disabled { cursor: wait; opacity: 0.65; }
   .action-button:disabled:active { transform: none; }
 
@@ -1068,9 +1129,60 @@ const STYLES = `
   .field label,
   .field-label {
     color: var(--_ink);
-    font-size: var(--ha-font-size-s, 12px);
+    font-size: var(--ha-font-size-m, 14px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
+  .field ha-selector { display: block; }
+  .number-input {
+    display: flex;
+    align-items: center;
+    gap: var(--_space-2);
+  }
+  .number-unit {
+    flex: 0 0 auto;
+    min-inline-size: 2ch;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .scene-list {
+    margin: var(--_space-1) 0 var(--_space-2);
+    padding: 0;
+    border-block-start: 1px solid var(--_divider);
+    list-style: none;
+  }
+  .scene-item {
+    display: flex;
+    align-items: center;
+    gap: var(--_space-3);
+    min-block-size: 48px;
+    border-block-end: 1px solid var(--_divider);
+  }
+  .scene-order {
+    flex: 0 0 auto;
+    min-inline-size: 2ch;
+    color: var(--_ink-dim);
+    font-size: var(--ha-font-size-m, 14px);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+  .scene-name {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--ha-font-size-m, 14px);
+  }
+  .scene-controls { display: inline-flex; flex: 0 0 auto; }
+  .scene-button {
+    inline-size: 44px;
+    block-size: 44px;
+    color: var(--_ink-dim);
+  }
+  @media (hover: hover) {
+    .scene-button:not(:disabled):hover { background: var(--_selected); }
+  }
+  .scene-button svg { inline-size: 20px; block-size: 20px; fill: currentColor; }
+  .scene-button:disabled { opacity: 0.35; cursor: default; }
+  .scene-add { display: grid; gap: var(--_space-1); }
   .field input,
   .field select {
     min-inline-size: 0;
@@ -1083,7 +1195,6 @@ const STYLES = `
     color: var(--_ink);
     font: inherit;
   }
-  .field select[multiple] { min-block-size: 132px; }
   .field input:focus-visible,
   .field select:focus-visible {
     outline: 2px solid var(--_ink);
@@ -1096,7 +1207,10 @@ const STYLES = `
     line-height: var(--ha-line-height-normal, 1.6);
   }
   .field-help { color: var(--_ink-dim); }
-  .field-error { color: var(--_ink); font-weight: var(--ha-font-weight-medium, 500); }
+  .field-error {
+    color: var(--error-color, var(--_ink));
+    font-weight: var(--ha-font-weight-medium, 500);
+  }
   .form-message {
     margin: 0;
     padding: var(--_space-3);
@@ -1412,8 +1526,14 @@ const STYLES = `
         max(var(--_space-8), env(safe-area-inset-bottom, 0px));
     }
     .back-button { display: inline-flex; margin-block-end: var(--_space-4); }
-    .detail-top { gap: var(--_space-3); }
+    .detail-top { flex-wrap: wrap; gap: var(--_space-2) var(--_space-3); }
     .detail-glyph { inline-size: 40px; block-size: 40px; }
+    .detail-meta-part { display: block; }
+    .detail-meta-part + .detail-meta-part::before { content: none; }
+    .detail-top .status {
+      flex: 0 0 100%;
+      padding-inline-start: calc(40px + var(--_space-3));
+    }
     .detail-heading h2 { font-size: var(--ha-font-size-2xl, 24px); }
     .wheel-head { padding-inline: var(--_space-4); }
     .channel { padding-inline: var(--_space-4); }
@@ -1535,6 +1655,12 @@ class IkeaBilresaPanel extends HTMLElement {
     this._settingsMessage = null;
     this._editorMessage = null;
     this._deleteConfirm = false;
+    // A re-render builds a new <details>; without this it would close itself
+    // every time a field inside it changed.
+    this._advancedOpen = false;
+    // A snapshot that arrived while a form control held focus.
+    this._renderDeferred = false;
+    this._settingsMessageScope = null;
     this._testBusy = false;
     this._testMessage = null;
   }
@@ -1612,6 +1738,10 @@ class IkeaBilresaPanel extends HTMLElement {
           ) {
             this._stopActivity();
           }
+          if (this._editingChannel !== null && this._formHasFocus()) {
+            this._renderDeferred = true;
+            return;
+          }
           this._render();
         },
         { type: OVERVIEW_SUBSCRIBE },
@@ -1643,6 +1773,26 @@ class IkeaBilresaPanel extends HTMLElement {
     this._error = null;
     this._render();
     await this._connect();
+  }
+
+  connectedCallback() {
+    this._fitFrame();
+  }
+
+  // Read the inset a theme put around the panel. Home Assistant itself adds
+  // none; without a browser (tests) or a parent there is nothing to measure.
+  _fitFrame() {
+    const frame = this.parentElement;
+    if (!frame || typeof getComputedStyle !== "function") return;
+    const style = getComputedStyle(frame);
+    const start = Number.parseFloat(style.paddingTop) || 0;
+    const end = Number.parseFloat(style.paddingBottom) || 0;
+    this.style.setProperty("--_frame-start", `${start}px`);
+    this.style.setProperty("--_frame-end", `${end}px`);
+    const background = style.backgroundColor;
+    if (start && background && background !== "rgba(0, 0, 0, 0)") {
+      this.style.setProperty("--_frame-bg", background);
+    }
   }
 
   disconnectedCallback() {
@@ -2094,7 +2244,10 @@ class IkeaBilresaPanel extends HTMLElement {
       wheel.area || this._t("detail_area_none"),
       this._activityLabel(wheel),
     ].filter(Boolean);
-    const metaNode = el("div", "detail-meta", meta.join(" · "));
+    // Separate parts, so a phone puts the room and the activity on a line each
+    // by design instead of breaking one long line wherever it happens to fit.
+    const metaNode = el("div", "detail-meta");
+    for (const part of meta) metaNode.appendChild(el("span", "detail-meta-part", part));
     if (wheel.last_activity) metaNode.title = this._formatDate(wheel.last_activity);
     heading.appendChild(metaNode);
     top.appendChild(heading);
@@ -2161,7 +2314,16 @@ class IkeaBilresaPanel extends HTMLElement {
     return row;
   }
 
+  // Turning the wheel pushes a snapshot. Rebuilding the form at that moment
+  // would close an open entity picker and drop the caret from a number field.
+  _formHasFocus() {
+    const active = this.shadowRoot?.activeElement;
+    return Boolean(active?.closest?.(".binding-form"));
+  }
+
   _closeEditor() {
+    this._advancedOpen = false;
+    this._renderDeferred = false;
     this._editingChannel = null;
     this._editingKind = null;
     this._editorData = null;
@@ -2214,30 +2376,92 @@ class IkeaBilresaPanel extends HTMLElement {
     return code ? this._t(`validation_${code}`) : null;
   }
 
-  _fieldShell(name, label, help, wide = false) {
+  _schema() {
+    return this._panel?.config?.schema || FALLBACK_SCHEMA;
+  }
+
+  _numberRange(group, name) {
+    return this._schema()[group]?.[name] || FALLBACK_SCHEMA[group][name];
+  }
+
+  _fieldId(name) {
+    return `binding-${this._open}-${this._editingChannel}-${name}`;
+  }
+
+  _editorChanged(name) {
+    delete this._editorErrors[name];
+    this._editorMessage = null;
+  }
+
+  // Home Assistant's own control for a selector: the same entity picker,
+  // slider and dropdown its settings pages use. The frontend offers no loader
+  // a custom panel may rely on, so this returns null when the element is not
+  // registered and every caller falls back to the panel's own control.
+  _haSelector({ id, selector, value, label, helper, required, onChange }) {
+    if (!customElements.get("ha-selector")) return null;
+    const node = document.createElement("ha-selector");
+    node.id = id;
+    node.hass = this._hass;
+    node.selector = selector;
+    node.value = value;
+    node.label = label;
+    if (helper) node.helper = helper;
+    node.required = Boolean(required);
+    node.addEventListener("value-changed", (event) => {
+      event.stopPropagation();
+      onChange(event.detail?.value);
+    });
+    return node;
+  }
+
+  _selectSelector(options) {
+    return { select: { options, mode: "dropdown" } };
+  }
+
+  _entitySelector(domains, exclude) {
+    const entity = { domain: [...domains] };
+    if (exclude?.length) entity.exclude_entities = [...exclude];
+    return { entity };
+  }
+
+  _numberSelector(range) {
+    const number = {
+      min: range.min,
+      max: range.max,
+      step: range.step,
+      mode: "slider",
+    };
+    if (range.unit) number.unit_of_measurement = range.unit;
+    return { number };
+  }
+
+  _field(wide) {
     const wrap = el("div", "field");
     if (wide) wrap.dataset.wide = "true";
-    const labelNode = el("label", null, label);
-    labelNode.htmlFor = `binding-${this._open}-${this._editingChannel}-${name}`;
-    wrap.appendChild(labelNode);
-    if (help) wrap.appendChild(el("span", "field-help", help));
     return wrap;
   }
 
-  _selectField(
-    name,
-    label,
-    options,
-    { optional = false, help, wide = false, emptyLabel } = {},
-  ) {
-    const wrap = this._fieldShell(name, label, help, wide);
+  _fieldErrorNode(wrap, name, control) {
+    const error = this._fieldError(name);
+    if (!error) return;
+    const node = el("span", "field-error", error);
+    node.id = `${this._fieldId(name)}-error`;
+    if (control?.setAttribute) control.setAttribute("aria-describedby", node.id);
+    wrap.appendChild(node);
+  }
+
+  // The panel's own dropdown, used when Home Assistant's is not available.
+  _nativeSelect(wrap, id, label, help, options, { emptyLabel, value, onChange }) {
+    const labelNode = el("label", null, label);
+    labelNode.htmlFor = id;
+    wrap.appendChild(labelNode);
+    if (help) wrap.appendChild(el("span", "field-help", help));
     const select = el("select");
-    select.id = `binding-${this._open}-${this._editingChannel}-${name}`;
-    select.name = name;
-    if (optional) {
+    select.id = id;
+    if (emptyLabel !== undefined) {
       // An empty optional target does not always mean "nothing happens", so the
       // placeholder must say what leaving it empty actually does.
-      const empty = el("option", null, emptyLabel || this._t("target_none"));
+      const empty = el("option", null, emptyLabel);
       empty.value = "";
       select.appendChild(empty);
     } else {
@@ -2248,70 +2472,133 @@ class IkeaBilresaPanel extends HTMLElement {
       item.value = option.value;
       select.appendChild(item);
     }
-    select.value = this._editorData[name] ?? "";
-    select.addEventListener("change", () => {
-      this._editorData[name] = select.value || undefined;
-      delete this._editorErrors[name];
-      this._editorMessage = null;
-      this._render();
-    });
+    select.value = value ?? "";
+    select.addEventListener("change", () => onChange(select.value));
     wrap.appendChild(select);
-    const error = this._fieldError(name);
-    if (error) {
-      const errorNode = el("span", "field-error", error);
-      errorNode.id = `${select.id}-error`;
-      select.setAttribute("aria-describedby", errorNode.id);
-      wrap.appendChild(errorNode);
-    }
+    return select;
+  }
+
+  _selectField(name, label, options, { help, wide = false } = {}) {
+    const wrap = this._field(wide);
+    const id = this._fieldId(name);
+    const value = this._editorData[name] ?? "";
+    const onChange = (next) => {
+      this._editorData[name] = next || undefined;
+      this._editorChanged(name);
+      this._render();
+    };
+    let control = this._haSelector({
+      id,
+      selector: this._selectSelector(options),
+      value,
+      label,
+      helper: help,
+      required: true,
+      onChange,
+    });
+    if (control) wrap.appendChild(control);
+    else control = this._nativeSelect(wrap, id, label, help, options, { value, onChange });
+    this._fieldErrorNode(wrap, name, control);
     return wrap;
   }
 
+  // emptyLabel names what an empty optional target does. The native dropdown
+  // shows it as its empty option; Home Assistant's picker has no such option,
+  // so there the same fact goes under the field as emptyHelp.
   _entityField(
     name,
     label,
     domains,
-    { optional = false, help, wide = false, emptyLabel } = {},
+    { optional = false, help, wide = false, emptyLabel, emptyHelp } = {},
   ) {
+    const wrap = this._field(wide);
+    const id = this._fieldId(name);
     const current = this._editorData[name];
-    const records = this._entityRecords(domains);
-    const options = records.map((state) => ({
-      value: state.entity_id,
-      label: `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
-    }));
-    if (current && !options.some((option) => option.value === current)) {
-      options.unshift({ value: current, label: current });
-    }
-    return this._selectField(name, label, options, {
-      optional,
-      help,
-      wide,
-      emptyLabel,
+    const onChange = (next) => {
+      this._editorData[name] = next || undefined;
+      this._editorChanged(name);
+      this._render();
+    };
+    let control = this._haSelector({
+      id,
+      selector: this._entitySelector(domains),
+      value: current,
+      label,
+      helper: help || (optional ? emptyHelp : undefined),
+      required: !optional,
+      onChange,
     });
+    if (control) {
+      wrap.appendChild(control);
+    } else {
+      const options = this._entityRecords(domains).map((state) => ({
+        value: state.entity_id,
+        label: `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
+      }));
+      if (current && !options.some((option) => option.value === current)) {
+        options.unshift({ value: current, label: current });
+      }
+      control = this._nativeSelect(wrap, id, label, help, options, {
+        emptyLabel: optional ? emptyLabel || this._t("target_none") : undefined,
+        value: current,
+        onChange,
+      });
+    }
+    this._fieldErrorNode(wrap, name, control);
+    return wrap;
   }
 
-  _numberField(name, label, min, max, step, unit) {
-    const wrap = this._fieldShell(
-      name,
+  // One number control for both forms. The caller owns what a change does:
+  // a binding field updates the draft quietly, so typing keeps the caret.
+  _numberControl({ id, label, help, range, value, onChange }) {
+    const wrap = this._field(false);
+    let control = this._haSelector({
+      id,
+      selector: this._numberSelector(range),
+      value,
       label,
-      unit ? this._t("field_unit", { unit }) : null,
-    );
-    const input = el("input");
-    input.id = `binding-${this._open}-${this._editingChannel}-${name}`;
-    input.name = name;
-    input.type = "number";
-    input.required = true;
-    input.min = String(min);
-    input.max = String(max);
-    input.step = String(step);
-    input.value = String(this._editorData[name] ?? "");
-    input.addEventListener("input", () => {
-      this._editorData[name] = Number(input.value);
-      delete this._editorErrors[name];
-      this._editorMessage = null;
+      helper: help,
+      required: true,
+      onChange: (next) => onChange(Number(next)),
     });
-    wrap.appendChild(input);
-    const error = this._fieldError(name);
-    if (error) wrap.appendChild(el("span", "field-error", error));
+    if (control) {
+      wrap.appendChild(control);
+      return { wrap, control };
+    }
+    const labelNode = el("label", null, label);
+    labelNode.htmlFor = id;
+    wrap.appendChild(labelNode);
+    if (help) wrap.appendChild(el("span", "field-help", help));
+    const row = el("div", "number-input");
+    control = el("input");
+    control.id = id;
+    control.type = "number";
+    control.required = true;
+    control.min = String(range.min);
+    control.max = String(range.max);
+    control.step = String(range.step);
+    control.value = String(value ?? "");
+    control.addEventListener("input", () => onChange(Number(control.value)));
+    row.appendChild(control);
+    // The unit sits beside the value it qualifies, not in a line of help text.
+    if (range.unit) row.appendChild(el("span", "number-unit", range.unit));
+    wrap.appendChild(row);
+    return { wrap, control };
+  }
+
+  _numberField(name, label, { help } = {}) {
+    const { wrap, control } = this._numberControl({
+      id: this._fieldId(name),
+      label,
+      help,
+      range: this._numberRange("binding_numbers", name),
+      value: this._editorData[name],
+      onChange: (next) => {
+        this._editorData[name] = next;
+        this._editorChanged(name);
+      },
+    });
+    this._fieldErrorNode(wrap, name, control);
     return wrap;
   }
 
@@ -2326,34 +2613,121 @@ class IkeaBilresaPanel extends HTMLElement {
     return grid;
   }
 
-  _scenesField() {
-    const wrap = this._fieldShell(
-      "scenes",
-      this._t("field_scenes"),
-      this._t("field_scenes_help"),
-      true,
+  _sceneName(entityId) {
+    return this._hass?.states?.[entityId]?.attributes?.friendly_name || entityId;
+  }
+
+  _sceneAdd(entityId) {
+    const scenes = this._editorData.scenes || [];
+    if (!entityId || scenes.includes(entityId)) return;
+    this._editorData.scenes = [...scenes, entityId];
+    this._editorChanged("scenes");
+  }
+
+  _sceneRemove(index) {
+    this._editorData.scenes = (this._editorData.scenes || []).filter(
+      (_scene, position) => position !== index,
     );
-    const select = el("select");
-    select.id = `binding-${this._open}-${this._editingChannel}-scenes`;
-    select.multiple = true;
-    const selected = new Set(this._editorData.scenes || []);
-    for (const state of this._entityRecords(["scene"])) {
-      const option = el(
-        "option",
-        null,
-        `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
-      );
-      option.value = state.entity_id;
-      option.selected = selected.has(state.entity_id);
-      select.appendChild(option);
-    }
-    select.addEventListener("change", () => {
-      this._editorData.scenes = [...select.selectedOptions].map(
-        (option) => option.value,
-      );
-      this._editorMessage = null;
+    this._editorChanged("scenes");
+  }
+
+  _sceneMove(index, delta) {
+    const scenes = [...(this._editorData.scenes || [])];
+    const to = index + delta;
+    if (to < 0 || to >= scenes.length) return;
+    [scenes[index], scenes[to]] = [scenes[to], scenes[index]];
+    this._editorData.scenes = scenes;
+    this._editorChanged("scenes");
+  }
+
+  _sceneButton(kind, path, labelKey, entityId, disabled, handler) {
+    const button = el("button", "icon-button scene-button");
+    button.type = "button";
+    // Keyed by the scene, not its position, so focus follows the scene when
+    // it moves and repeated presses keep moving the same one.
+    button.id = `${this._fieldId("scenes")}-${kind}-${entityId}`;
+    const label = this._t(labelKey, { scene: this._sceneName(entityId) });
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.disabled = disabled;
+    button.appendChild(svg(path));
+    button.addEventListener("click", () => {
+      handler();
+      this._render();
     });
-    wrap.appendChild(select);
+    return button;
+  }
+
+  // Scene cycling follows the order of this list, so the list has to show an
+  // order and let it be changed. A multi-select can do neither.
+  _scenesField() {
+    const wrap = this._field(true);
+    wrap.appendChild(el("span", "field-label", this._t("field_scenes")));
+    wrap.appendChild(el("span", "field-help", this._t("field_scenes_help")));
+    const scenes = this._editorData.scenes || [];
+    if (scenes.length) {
+      const list = el("ol", "scene-list");
+      scenes.forEach((entityId, index) => {
+        const item = el("li", "scene-item");
+        item.appendChild(el("span", "scene-order", String(index + 1)));
+        item.appendChild(el("span", "scene-name", this._sceneName(entityId)));
+        const controls = el("span", "scene-controls");
+        controls.appendChild(
+          this._sceneButton("up", ICON.arrowUp, "scene_move_up", entityId, index === 0, () =>
+            this._sceneMove(index, -1),
+          ),
+        );
+        controls.appendChild(
+          this._sceneButton(
+            "down",
+            ICON.arrowDown,
+            "scene_move_down",
+            entityId,
+            index === scenes.length - 1,
+            () => this._sceneMove(index, 1),
+          ),
+        );
+        controls.appendChild(
+          this._sceneButton("remove", ICON.remove, "scene_remove", entityId, false, () =>
+            this._sceneRemove(index),
+          ),
+        );
+        item.appendChild(controls);
+        list.appendChild(item);
+      });
+      wrap.appendChild(list);
+    }
+    const id = `${this._fieldId("scenes")}-add`;
+    const onChange = (next) => {
+      this._sceneAdd(next);
+      this._render();
+    };
+    const add = this._haSelector({
+      id,
+      selector: this._entitySelector(["scene"], scenes),
+      value: undefined,
+      label: this._t("scene_add"),
+      required: false,
+      onChange,
+    });
+    if (add) {
+      wrap.appendChild(add);
+    } else {
+      const options = this._entityRecords(["scene"])
+        .filter((state) => !scenes.includes(state.entity_id))
+        .map((state) => ({
+          value: state.entity_id,
+          label: `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
+        }));
+      const shell = el("div", "scene-add");
+      this._nativeSelect(shell, id, this._t("scene_add"), null, options, {
+        emptyLabel: this._t("scene_add_placeholder"),
+        value: "",
+        onChange,
+      });
+      wrap.appendChild(shell);
+    }
+    this._fieldErrorNode(wrap, "scenes", null);
     return wrap;
   }
 
@@ -2469,6 +2843,14 @@ class IkeaBilresaPanel extends HTMLElement {
       event.preventDefault();
       this._saveBinding(wheel, control);
     });
+    form.addEventListener("focusout", () => {
+      if (!this._renderDeferred) return;
+      setTimeout(() => {
+        if (!this._renderDeferred || this._formHasFocus()) return;
+        this._renderDeferred = false;
+        this._render();
+      }, 0);
+    });
 
     if (this._editorMessage) {
       const message = el("p", "form-message", this._editorMessage);
@@ -2482,6 +2864,7 @@ class IkeaBilresaPanel extends HTMLElement {
     // what they belong to, never by how advanced they are — a double press is
     // no more advanced than a short press.
     const sections = el("div", "form-sections");
+    const pressDomains = this._schema().press_target_domains;
 
     if (!isButton) {
       const rotation = this._formSection(sections, this._t("section_rotation"));
@@ -2489,7 +2872,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._selectField(
           "mode",
           this._t("field_mode"),
-          Object.keys(MODE_DOMAINS).map((mode) => ({
+          Object.keys(this._schema().mode_domains).map((mode) => ({
             value: mode,
             label: this._t(`mode_${mode}`),
           })),
@@ -2499,21 +2882,18 @@ class IkeaBilresaPanel extends HTMLElement {
         this._entityField(
           "target",
           this._t("field_target"),
-          MODE_DOMAINS[this._editorData.mode] || [],
+          this._schema().mode_domains[this._editorData.mode] || [],
         ),
       );
       rotation.appendChild(
-        this._numberField("step", this._t("field_step"), 1, 25, 1, "%"),
+        this._numberField("step", this._t("field_step"), {
+          help: this._t("field_step_help"),
+        }),
       );
       rotation.appendChild(
-        this._numberField(
-          "transition",
-          this._t("field_transition"),
-          0,
-          5,
-          0.1,
-          "s",
-        ),
+        this._numberField("transition", this._t("field_transition"), {
+          help: this._t("field_transition_help"),
+        }),
       );
     }
 
@@ -2536,13 +2916,14 @@ class IkeaBilresaPanel extends HTMLElement {
         this._entityField(
           "click_target",
           this._t("field_click_target"),
-          ["light", "switch"],
+          pressDomains,
           {
             optional: !isButton,
             // A wheel with no explicit short-press target falls back to the
             // rotation target, which the gesture ledger already reports. Saying
             // "no target" here contradicted that on the same screen.
             emptyLabel: isButton ? undefined : this._t("target_same_as_rotation"),
+            emptyHelp: isButton ? undefined : this._t("target_empty_is_rotation"),
           },
         ),
       );
@@ -2554,7 +2935,7 @@ class IkeaBilresaPanel extends HTMLElement {
       this._entityField(
         "double_press_target",
         this._t("field_double_target"),
-        ["light", "switch"],
+        pressDomains,
         { optional: true, wide: true },
       ),
     );
@@ -2563,7 +2944,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._entityField(
           "triple_press_target",
           this._t("field_triple_target"),
-          ["light", "switch"],
+          pressDomains,
           { optional: true, wide: true },
         ),
       );
@@ -2584,8 +2965,8 @@ class IkeaBilresaPanel extends HTMLElement {
           "hold_target",
           this._t("field_hold_target"),
           this._editorData.hold_action === "ramp"
-            ? ["light"]
-            : ["light", "switch"],
+            ? this._schema().ramp_target_domains
+            : pressDomains,
           { optional: !isButton },
         ),
       );
@@ -2609,6 +2990,10 @@ class IkeaBilresaPanel extends HTMLElement {
     // of the rotation range. Minimum and maximum stay adjacent because they
     // are one pair, which the old flat ordering split across two rows.
     const advanced = el("details", "advanced");
+    advanced.open = this._advancedOpen;
+    advanced.addEventListener("toggle", () => {
+      this._advancedOpen = advanced.open;
+    });
     const summary = el("summary", null, this._t("advanced_options"));
     advanced.appendChild(summary);
     const advancedGrid = el("div", "form-grid");
@@ -2641,34 +3026,15 @@ class IkeaBilresaPanel extends HTMLElement {
         ),
       );
       advancedGrid.appendChild(
-        this._numberField(
-          "min_brightness",
-          this._t("field_min_brightness"),
-          0,
-          50,
-          1,
-          "%",
-        ),
+        this._numberField("min_brightness", this._t("field_min_brightness")),
       );
       advancedGrid.appendChild(
-        this._numberField(
-          "max_brightness",
-          this._t("field_max_brightness"),
-          1,
-          100,
-          1,
-          "%",
-        ),
+        this._numberField("max_brightness", this._t("field_max_brightness")),
       );
       advancedGrid.appendChild(
-        this._numberField(
-          "acceleration",
-          this._t("field_acceleration"),
-          0,
-          100,
-          5,
-          "%",
-        ),
+        this._numberField("acceleration", this._t("field_acceleration"), {
+          help: this._t("field_acceleration_help"),
+        }),
       );
     }
     advanced.appendChild(advancedGrid);
@@ -2692,6 +3058,9 @@ class IkeaBilresaPanel extends HTMLElement {
       const remove = el("button", "action-button", this._t("delete_binding"));
       remove.type = "button";
       remove.dataset.danger = "true";
+      // Pushed to the far end of the row: a slip next to Save must not land on
+      // the one action that throws the binding away.
+      remove.dataset.apart = "true";
       remove.disabled = this._editorBusy;
       remove.addEventListener("click", () => {
         this._deleteConfirm = true;
@@ -2811,7 +3180,13 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     card.appendChild(head);
 
-    if (configured && (channel.actions || []).length) {
+    // Editing replaces the ledger: the form states the same facts, and keeping
+    // both made a phone scroll past the summary to reach the fields.
+    if (
+      configured &&
+      this._editingChannel !== number &&
+      (channel.actions || []).length
+    ) {
       const actions = el("ul", "channel-action-list");
       const actionValue = (action) => {
         let value = action.action_label;
@@ -2820,66 +3195,36 @@ class IkeaBilresaPanel extends HTMLElement {
         }
         return value;
       };
-      const summaries = channel.actions || [];
-      for (let index = 0; index < summaries.length; index += 1) {
-        const action = summaries[index];
-        const release = summaries[index + 1];
-
-        // Hold and release are one gesture with a start and an end, so they
-        // share one row and one glyph sequence rather than reading as two
-        // unrelated actions.
-        if (action.gesture === "hold" && release?.gesture === "release") {
-          const item = el("li", "channel-action");
-          if (
-            targetState(action) === "missing" ||
-            targetState(release) === "missing"
-          ) {
-            item.dataset.state = "warning";
-          } else if (this._isNoAction(action) && this._isNoAction(release)) {
-            item.dataset.state = "empty";
-          }
-
-          const label = el("span", "channel-action-label");
-          const rail = el("span", "gesture-sequence-rail");
-          rail.setAttribute("aria-hidden", "true");
-          rail.appendChild(svg(GESTURE_ICON.hold, "gesture-glyph"));
-          rail.appendChild(el("span", "gesture-sequence-line"));
-          rail.appendChild(el("span", "gesture-sequence-end"));
-          label.appendChild(rail);
-          label.appendChild(
-            el(
-              "span",
-              null,
-              `${action.gesture_label} → ${release.gesture_label.toLocaleLowerCase(
-                this._hass?.language || undefined,
-              )}`,
-            ),
-          );
-          item.appendChild(label);
-          item.appendChild(
-            el(
-              "span",
-              "channel-action-value",
-              this._isNoAction(action) && this._isNoAction(release)
-                ? actionValue(action)
-                : [action, release].map(actionValue).join(" → "),
-            ),
-          );
-          actions.appendChild(item);
-          index += 1;
-          continue;
-        }
-
+      const { rows, unset } = this._ledgerRows(channel.actions || [], actionValue);
+      for (const row of rows) {
         const item = el("li", "channel-action");
-        if (targetState(action) === "missing") item.dataset.state = "warning";
-        else if (this._isNoAction(action)) item.dataset.state = "empty";
+        if (row.warning) item.dataset.state = "warning";
         const label = el("span", "channel-action-label");
-        label.appendChild(gestureGlyph(action.gesture));
-        label.appendChild(el("span", null, action.gesture_label));
+        label.appendChild(gestureGlyph(row.gesture));
+        label.appendChild(el("span", null, row.label));
         item.appendChild(label);
-        item.appendChild(
-          el("span", "channel-action-value", actionValue(action)),
+        item.appendChild(el("span", "channel-action-value", row.value));
+        actions.appendChild(item);
+      }
+      if (unset.length) {
+        // One row for everything that does nothing yet, and it is the way in:
+        // three "No action" rows said the same thing three times.
+        const item = el("li", "channel-action");
+        item.dataset.state = "empty";
+        const add = el(
+          "button",
+          "channel-action-add",
+          this._t("ledger_unset", {
+            gestures: unset
+              .map((name) =>
+                name.toLocaleLowerCase(this._hass?.language || undefined),
+              )
+              .join(", "),
+          }),
         );
+        add.type = "button";
+        add.addEventListener("click", () => this._startEditor(wheel, channel));
+        item.appendChild(add);
         actions.appendChild(item);
       }
       card.appendChild(actions);
@@ -2895,11 +3240,50 @@ class IkeaBilresaPanel extends HTMLElement {
     return !action.target_label && action.action_label === this._t("action_none");
   }
 
+  // Turn the read model's gesture list into ledger rows. Hold and release are
+  // one gesture: the row states the hold, and mentions the release only when
+  // the release does something. Gestures with no action are returned by name.
+  _ledgerRows(summaries, actionValue) {
+    const rows = [];
+    const unset = [];
+    for (let index = 0; index < summaries.length; index += 1) {
+      const action = summaries[index];
+      const next = summaries[index + 1];
+      const release =
+        action.gesture === "hold" && next?.gesture === "release" ? next : null;
+      if (release) index += 1;
+      if (this._isNoAction(action) && (!release || this._isNoAction(release))) {
+        unset.push(action.gesture_label);
+        continue;
+      }
+      let value = actionValue(action);
+      if (release && !this._isNoAction(release)) {
+        value = this._t("ledger_then_release", {
+          hold: value,
+          release: actionValue(release),
+        });
+      }
+      rows.push({
+        gesture: action.gesture,
+        label: action.gesture_label,
+        value,
+        warning:
+          targetState(action) === "missing" ||
+          (release !== null && targetState(release) === "missing"),
+      });
+    }
+    return { rows, unset };
+  }
+
 
   _settingsStateFor(wheel) {
     if (this._settingsDraftKey === wheel.key && this._settingsDraft) {
       return this._settingsDraft;
     }
+    return this._storedSettings(wheel);
+  }
+
+  _storedSettings(wheel) {
     const stored = wheel.settings || {};
     const enabled = {};
     (wheel.channels || []).forEach((channel) => {
@@ -2912,26 +3296,34 @@ class IkeaBilresaPanel extends HTMLElement {
     };
   }
 
+  // Quiet on purpose: a re-render here would take a slider out of the hand
+  // that is dragging it.
   _updateSettingsDraft(wheel, patch) {
     this._settingsDraft = { ...this._settingsStateFor(wheel), ...patch };
     this._settingsDraftKey = wheel.key;
     this._settingsMessage = null;
-    this._render();
   }
 
-  async _saveSettings(wheel) {
+  // The two cards save separately. "channels" sends the switches with the
+  // stored dial values, "dial" the reverse, so one card's Save never carries
+  // the other card's unsaved edits. No scope sends the whole draft.
+  async _saveSettings(wheel, scope) {
     if (this._settingsBusy) return;
     this._settingsBusy = true;
     this._settingsMessage = null;
+    this._settingsMessageScope = scope || null;
     this._render();
     try {
       const draft = this._settingsStateFor(wheel);
+      const stored = this._storedSettings(wheel);
+      const channels = scope === "dial" ? stored : draft;
+      const dial = scope === "channels" ? stored : draft;
       const payload = {
         type: SETTINGS_SAVE,
         wheel: wheel.key,
-        channel_enabled: draft.channel_enabled,
-        step: Number(draft.step),
-        acceleration: Number(draft.acceleration),
+        channel_enabled: channels.channel_enabled,
+        step: Number(dial.step),
+        acceleration: Number(dial.acceleration),
       };
       // Omitted, never null: a wheel saving for the first time has no stored
       // revision, and the command's schema takes a string or nothing. The
@@ -2955,10 +3347,26 @@ class IkeaBilresaPanel extends HTMLElement {
         }
         return;
       }
+      // The part that was not saved stays a draft.
+      const kept =
+        scope === "channels"
+          ? { step: draft.step, acceleration: draft.acceleration }
+          : scope === "dial"
+            ? { channel_enabled: draft.channel_enabled }
+            : null;
       this._settingsDraft = null;
       this._settingsDraftKey = null;
       await this._refreshSnapshot();
-      this._settingsMessage = this._t("settings_saved");
+      const refreshed = this._snapshot?.wheels?.find(
+        (item) => item.key === wheel.key,
+      );
+      if (kept && refreshed) {
+        this._settingsDraft = { ...this._storedSettings(refreshed), ...kept };
+        this._settingsDraftKey = refreshed.key;
+      }
+      this._settingsMessage = this._t(
+        scope === "channels" ? "settings_channels_saved" : "settings_saved",
+      );
     } catch (err) {
       this._settingsMessage = this._t("settings_error_generic");
     } finally {
@@ -2967,63 +3375,102 @@ class IkeaBilresaPanel extends HTMLElement {
     }
   }
 
-  _settingsSection(wheel) {
-    const draft = this._settingsStateFor(wheel);
+  _settingsCard(title, intro) {
     const section = el("section", "settings-section");
-    section.appendChild(el("h4", "form-section-title", this._t("settings_title")));
-    section.appendChild(el("p", "settings-intro", this._t("settings_intro")));
+    section.appendChild(el("h4", "settings-title", title));
+    section.appendChild(el("p", "settings-intro", intro));
+    return section;
+  }
 
+  _settingsStatus(scope) {
+    if (!this._settingsMessage || this._settingsMessageScope !== scope) return null;
+    const message = el("span", "settings-message", this._settingsMessage);
+    message.setAttribute("role", "status");
+    return message;
+  }
+
+  // Which selector positions exist at all. A switch applies at once, like
+  // every other switch in Home Assistant, so this card needs no Save.
+  _activeChannelsSection(wheel) {
+    const draft = this._settingsStateFor(wheel);
+    const section = this._settingsCard(
+      this._t("settings_channels_title"),
+      this._t("settings_intro"),
+    );
     const toggles = el("div", "settings-toggles");
     (wheel.channels || []).forEach((channel) => {
       const key = String(channel.channel);
-      const row = el("label", "settings-toggle");
-      const box = el("input");
-      box.type = "checkbox";
-      box.checked = draft.channel_enabled[key] !== false;
-      box.addEventListener("change", () =>
+      const label = this._t("settings_channel_enabled", {
+        channel: channel.channel,
+      });
+      const apply = (checked) => {
         this._updateSettingsDraft(wheel, {
           channel_enabled: {
-            ...draft.channel_enabled,
-            [key]: box.checked,
+            ...this._settingsStateFor(wheel).channel_enabled,
+            [key]: Boolean(checked),
           },
-        }),
-      );
+        });
+        this._saveSettings(wheel, "channels");
+      };
+      const id = `settings-${wheel.key}-channel-${key}`;
+      const control = this._haSelector({
+        id,
+        selector: { boolean: {} },
+        value: draft.channel_enabled[key] !== false,
+        label,
+        required: false,
+        onChange: apply,
+      });
+      if (control) {
+        control.disabled = this._settingsBusy;
+        toggles.appendChild(control);
+        return;
+      }
+      const row = el("label", "settings-toggle");
+      const box = el("input");
+      box.id = id;
+      box.type = "checkbox";
+      box.checked = draft.channel_enabled[key] !== false;
+      box.disabled = this._settingsBusy;
+      box.addEventListener("change", () => apply(box.checked));
       row.appendChild(box);
-      row.appendChild(
-        el(
-          "span",
-          null,
-          this._t("settings_channel_enabled", { channel: channel.channel }),
-        ),
-      );
+      row.appendChild(el("span", null, label));
       toggles.appendChild(row);
     });
     section.appendChild(toggles);
+    const status = this._settingsStatus("channels");
+    if (status) section.appendChild(status);
+    return section;
+  }
 
-    const grid = el("div", "settings-grid");
-    grid.appendChild(
-      this._settingsNumber(
-        wheel,
-        "step",
-        this._t("settings_step"),
-        draft.step,
-        1,
-        25,
-        1,
-      ),
+  // The dial is the number entity each channel carries. It is not the binding,
+  // and its step and acceleration are not the binding's: the card says so.
+  _dialSection(wheel) {
+    const draft = this._settingsStateFor(wheel);
+    const section = this._settingsCard(
+      this._t("settings_dial_title"),
+      this._t("settings_dial_intro"),
     );
-    grid.appendChild(
-      this._settingsNumber(
-        wheel,
+    const grid = el("div", "settings-grid");
+    for (const [name, label, help] of [
+      ["step", this._t("settings_step"), this._t("settings_step_help")],
+      [
         "acceleration",
         this._t("settings_acceleration"),
-        draft.acceleration,
-        0,
-        100,
-        5,
         this._t("settings_acceleration_help"),
-      ),
-    );
+      ],
+    ]) {
+      grid.appendChild(
+        this._numberControl({
+          id: `settings-${wheel.key}-${name}`,
+          label,
+          help,
+          range: this._numberRange("settings_numbers", name),
+          value: draft[name],
+          onChange: (next) => this._updateSettingsDraft(wheel, { [name]: next }),
+        }).wrap,
+      );
+    }
     section.appendChild(grid);
 
     const actions = el("div", "settings-actions");
@@ -3031,34 +3478,12 @@ class IkeaBilresaPanel extends HTMLElement {
     save.type = "button";
     save.dataset.primary = "true";
     save.disabled = this._settingsBusy;
-    save.addEventListener("click", () => this._saveSettings(wheel));
+    save.addEventListener("click", () => this._saveSettings(wheel, "dial"));
     actions.appendChild(save);
-    if (this._settingsMessage) {
-      actions.appendChild(el("span", "settings-message", this._settingsMessage));
-    }
+    const status = this._settingsStatus("dial");
+    if (status) actions.appendChild(status);
     section.appendChild(actions);
     return section;
-  }
-
-  _settingsNumber(wheel, name, label, value, min, max, step, help) {
-    const shell = el("div", "field");
-    const labelNode = el("label", null, label);
-    labelNode.htmlFor = `settings-${wheel.key}-${name}`;
-    shell.appendChild(labelNode);
-    const input = el("input");
-    input.id = `settings-${wheel.key}-${name}`;
-    input.name = name;
-    input.type = "number";
-    input.min = String(min);
-    input.max = String(max);
-    input.step = String(step);
-    input.value = String(value);
-    input.addEventListener("change", () =>
-      this._updateSettingsDraft(wheel, { [name]: Number(input.value) }),
-    );
-    shell.appendChild(input);
-    if (help) shell.appendChild(el("span", "field-help", help));
-    return shell;
   }
 
   _channelsView(wheel) {
@@ -3133,7 +3558,8 @@ class IkeaBilresaPanel extends HTMLElement {
     workbench.appendChild(surface);
 
     wrap.appendChild(workbench);
-    wrap.appendChild(this._settingsSection(wheel));
+    wrap.appendChild(this._activeChannelsSection(wheel));
+    wrap.appendChild(this._dialSection(wheel));
     return wrap;
   }
 

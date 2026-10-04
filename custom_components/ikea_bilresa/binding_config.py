@@ -58,6 +58,7 @@ from .const import (
     STEP_CURVES,
     mode_supports_target,
 )
+from .panel_schema import BINDING_NUMBERS
 
 BINDING_OPTIONAL_FIELDS = (
     CONF_CLICK_TARGET,
@@ -104,22 +105,22 @@ _WHEEL_SCHEMA = vol.Schema(
         vol.Required(CONF_CHANNEL): vol.In(("1", "2", "3")),
         vol.Required(CONF_TARGET): _ENTITY_ID,
         vol.Required(CONF_MODE, default=DEFAULT_MODE): vol.In(MODES),
-        vol.Required(CONF_STEP, default=DEFAULT_STEP): vol.All(
-            vol.Coerce(float), vol.Range(min=1, max=25)
-        ),
+        vol.Required(CONF_STEP, default=DEFAULT_STEP): BINDING_NUMBERS[
+            CONF_STEP
+        ].validator(),
         vol.Required(CONF_STEP_CURVE, default=DEFAULT_STEP_CURVE): vol.In(STEP_CURVES),
-        vol.Required(CONF_ACCELERATION, default=DEFAULT_ACCELERATION): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100)
-        ),
-        vol.Required(CONF_MIN_BRIGHTNESS, default=DEFAULT_MIN_BRIGHTNESS): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=50)
-        ),
-        vol.Required(CONF_MAX_BRIGHTNESS, default=DEFAULT_MAX_BRIGHTNESS): vol.All(
-            vol.Coerce(float), vol.Range(min=1, max=100)
-        ),
-        vol.Required(CONF_TRANSITION, default=DEFAULT_TRANSITION): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=5)
-        ),
+        vol.Required(CONF_ACCELERATION, default=DEFAULT_ACCELERATION): BINDING_NUMBERS[
+            CONF_ACCELERATION
+        ].validator(),
+        vol.Required(
+            CONF_MIN_BRIGHTNESS, default=DEFAULT_MIN_BRIGHTNESS
+        ): BINDING_NUMBERS[CONF_MIN_BRIGHTNESS].validator(),
+        vol.Required(
+            CONF_MAX_BRIGHTNESS, default=DEFAULT_MAX_BRIGHTNESS
+        ): BINDING_NUMBERS[CONF_MAX_BRIGHTNESS].validator(),
+        vol.Required(CONF_TRANSITION, default=DEFAULT_TRANSITION): BINDING_NUMBERS[
+            CONF_TRANSITION
+        ].validator(),
         vol.Required(CONF_CLICK_ACTION, default=DEFAULT_CLICK_ACTION): vol.In(
             CLICK_ACTIONS
         ),

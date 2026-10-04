@@ -235,9 +235,8 @@ def test_panel_uses_distinct_material_rounded_gestures() -> None:
         "hold",
     ):
         assert f"{gesture}: {{" in asset
-    assert 'el("span", "gesture-sequence-rail")' in asset
     assert 'el("span", "gesture-sequence-end")' in asset
-    assert "gestureGlyph(action.gesture)" in asset
+    assert "gestureGlyph(row.gesture)" in asset
 
 
 def test_panel_header_clears_the_notch() -> None:
@@ -853,7 +852,7 @@ def test_channel_detail_uses_the_versioned_read_model_actions() -> None:
     """Gesture rows come from panel_models, never from frontend guesses."""
     asset = _asset()
 
-    assert "const summaries = channel.actions || [];" in asset
+    assert "this._ledgerRows(channel.actions || [], actionValue)" in asset
     assert "const action = summaries[index];" in asset
     assert "action.gesture_label" in asset
     assert "action.action_label" in asset

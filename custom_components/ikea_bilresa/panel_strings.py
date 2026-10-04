@@ -114,7 +114,16 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "step_curve_linear": "Linear (default)",
         "step_curve_perceptual": "Perceptual (even to the eye)",
-        "settings_title": "Channel behaviour",
+        "settings_channels_title": "Active channels",
+        "settings_channels_saved": "Saved",
+        "settings_dial_title": "Dial",
+        "settings_dial_intro": (
+            "Besides its binding, every channel has a dial in Home Assistant: a "
+            "number entity from 1 to 100 that turning the wheel moves. "
+            "Automations can read it. These two values shape the dial only; a "
+            "binding has its own step and acceleration."
+        ),
+        "settings_step_help": "In the dial's own units, 1 to 100.",
         "settings_intro": (
             "Switch a selector position off and it is ignored entirely — no "
             "dial, no toggle, no events, nothing. Useful when the selector "
@@ -122,12 +131,12 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "settings_channel_enabled": "Channel {channel} active",
         "settings_step": "Dial change per notch",
-        "settings_acceleration": "Acceleration",
+        "settings_acceleration": "Dial acceleration",
         "settings_acceleration_help": (
-            "Turning faster moves the dial further per notch."
+            "Turning faster moves the dial further per notch. 0 % switches it off."
         ),
-        "settings_save": "Save",
-        "settings_saved": "Settings saved",
+        "settings_save": "Save dial",
+        "settings_saved": "Dial saved",
         "settings_disabled_badge": "Off",
         "settings_error_conflict": (
             "These settings were changed elsewhere. Reopen the wheel and try again."
@@ -175,8 +184,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_editor_button_title": "Edit button {button} binding",
         "field_mode": "Rotation mode",
         "field_target": "Rotation target",
-        "field_step": "Step per notch",
-        "field_acceleration": "Acceleration",
+        "field_step": "Target change per notch",
+        "field_step_help": "How far one notch moves the target.",
+        "field_acceleration": "Rotation acceleration",
+        "field_acceleration_help": (
+            "Turning faster moves the target further per notch. 0 % switches it off."
+        ),
+        "field_transition_help": (
+            "Fast rotation arrives in batches of notches. A larger batch is "
+            "spread over up to this long; 0 s turns smoothing off."
+        ),
+        "target_empty_is_rotation": "Leave empty to use the rotation target.",
+        "scene_add": "Add a scene",
+        "scene_add_placeholder": "Choose a scene…",
+        "scene_move_up": "Move {scene} up",
+        "scene_move_down": "Move {scene} down",
+        "scene_remove": "Remove {scene}",
+        "ledger_unset": "Add an action: {gestures}",
+        "ledger_then_release": "{hold}; on release: {release}",
         "field_transition": "Smoothing of large jumps",
         "field_min_brightness": "Minimum brightness",
         "field_max_brightness": "Maximum brightness",
@@ -193,9 +218,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "field_ramp_direction": "Hold ramp direction",
         "field_scenes": "Scenes",
         "field_scenes_help": (
-            "Select multiple scenes to cycle through them on each short press."
+            "Each short press activates the next scene, in this order."
         ),
-        "field_unit": "Range unit: {unit}",
         "section_rotation": "Rotation",
         "section_button": "Button",
         "advanced_options": "Advanced options",
@@ -510,7 +534,16 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "step_curve_linear": "Lineární (výchozí)",
         "step_curve_perceptual": "Percepční (rovnoměrné pro oko)",
-        "settings_title": "Chování kanálů",
+        "settings_channels_title": "Aktivní kanály",
+        "settings_channels_saved": "Uloženo",
+        "settings_dial_title": "Číselník",
+        "settings_dial_intro": (
+            "Každý kanál má v Home Assistantu vedle propojení i číselník: "
+            "číselnou entitu od 1 do 100, kterou otáčení kolečka mění. Mohou "
+            "ji číst automatizace. Tyto dvě hodnoty se týkají jen číselníku; "
+            "propojení má vlastní krok a zrychlení."
+        ),
+        "settings_step_help": "V jednotkách číselníku, 1 až 100.",
         "settings_intro": (
             "Vypnutý kanál je zcela ignorován — žádný číselník, žádné "
             "přepínání, žádné události. Hodí se, když přepínač někdo cvakne "
@@ -518,12 +551,13 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "settings_channel_enabled": "Kanál {channel} aktivní",
         "settings_step": "Změna číselníku na jedno cvaknutí",
-        "settings_acceleration": "Zrychlení",
+        "settings_acceleration": "Zrychlení číselníku",
         "settings_acceleration_help": (
-            "Čím rychleji otáčíte, tím větší skok na jedno cvaknutí."
+            "Čím rychleji otáčíte, tím větší skok číselníku na jedno "
+            "cvaknutí. 0 % znamená vypnuto."
         ),
-        "settings_save": "Uložit",
-        "settings_saved": "Nastavení uloženo",
+        "settings_save": "Uložit číselník",
+        "settings_saved": "Číselník uložen",
         "settings_disabled_badge": "Vypnuto",
         "settings_error_conflict": (
             "Nastavení mezitím změnil někdo jiný. Otevřete kolečko znovu a "
@@ -569,8 +603,27 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_editor_button_title": "Upravit propojení tlačítka {button}",
         "field_mode": "Režim otáčení",
         "field_target": "Cíl otáčení",
-        "field_step": "Krok na jedno cvaknutí",
-        "field_acceleration": "Zrychlení",
+        "field_step": "Změna cíle na jedno cvaknutí",
+        "field_step_help": "O kolik jedno cvaknutí posune cíl.",
+        "field_acceleration": "Zrychlení otáčení",
+        "field_acceleration_help": (
+            "Čím rychleji otáčíte, tím větší změna cíle na jedno cvaknutí. "
+            "0 % znamená vypnuto."
+        ),
+        "field_transition_help": (
+            "Rychlé otáčení přichází po dávkách cvaknutí. Větší dávka se "
+            "rozloží nejvýše na tuto dobu; 0 s vyhlazení vypne."
+        ),
+        "target_empty_is_rotation": (
+            "Když pole necháte prázdné, použije se cíl otáčení."
+        ),
+        "scene_add": "Přidat scénu",
+        "scene_add_placeholder": "Vyberte scénu…",
+        "scene_move_up": "Posunout scénu {scene} výš",
+        "scene_move_down": "Posunout scénu {scene} níž",
+        "scene_remove": "Odebrat scénu {scene}",
+        "ledger_unset": "Přidat akci: {gestures}",
+        "ledger_then_release": "{hold}; po uvolnění: {release}",
         "field_transition": "Vyhlazení velkých skoků",
         "field_min_brightness": "Minimální jas",
         "field_max_brightness": "Maximální jas",
@@ -583,8 +636,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "field_hold_target": "Cíl podržení",
         "field_ramp_direction": "Směr plynulé změny při podržení",
         "field_scenes": "Scény",
-        "field_scenes_help": ("Vyberte více scén; každý krátký stisk přejde na další."),
-        "field_unit": "Jednotka rozsahu: {unit}",
+        "field_scenes_help": (
+            "Každý krátký stisk aktivuje další scénu v tomto pořadí."
+        ),
         "section_rotation": "Otáčení",
         "section_button": "Tlačítko",
         "advanced_options": "Pokročilé možnosti",

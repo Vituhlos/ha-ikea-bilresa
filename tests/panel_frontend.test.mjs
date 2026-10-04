@@ -660,3 +660,225 @@ test("a control names the target its state belongs to, not its summary label", (
     "Bulb — unavailable",
   );
 });
+
+const ledgerPanel = () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        action_none: "No action",
+        ledger_then_release: "{hold}; on release: {release}",
+      },
+    },
+  };
+  return panel;
+};
+const value = (action) =>
+  action.target_label
+    ? `${action.action_label} · ${action.target_label}`
+    : action.action_label;
+
+test("gestures with no action collapse into names, not rows", () => {
+  const panel = ledgerPanel();
+  const { rows, unset } = panel._ledgerRows(
+    [
+      { gesture: "rotation", gesture_label: "Rotate", action_label: "Brightness", target_label: "Bulb" },
+      { gesture: "double_press", gesture_label: "Double press", action_label: "No action", target_label: null },
+      { gesture: "hold", gesture_label: "Hold", action_label: "No action", target_label: null },
+      { gesture: "release", gesture_label: "Release", action_label: "No action", target_label: null },
+    ],
+    value,
+  );
+
+  assert.deepEqual(rows.map((row) => row.label), ["Rotate"]);
+  // Hold and release are one gesture: one name, not two.
+  assert.deepEqual(unset, ["Double press", "Hold"]);
+});
+
+test("a hold row mentions the release only when the release does something", () => {
+  const panel = ledgerPanel();
+  const hold = { gesture: "hold", gesture_label: "Hold", action_label: "Ramp", target_label: "Bulb" };
+
+  const quiet = panel._ledgerRows(
+    [hold, { gesture: "release", gesture_label: "Release", action_label: "No action", target_label: null }],
+    value,
+  );
+  assert.equal(quiet.rows[0].value, "Ramp · Bulb");
+
+  const stopping = panel._ledgerRows(
+    [hold, { gesture: "release", gesture_label: "Release", action_label: "Stop ramp", target_label: null }],
+    value,
+  );
+  assert.equal(stopping.rows[0].value, "Ramp · Bulb; on release: Stop ramp");
+  assert.equal(stopping.rows.length, 1);
+});
+
+test("a ledger row warns for a missing target, not an unavailable one", () => {
+  const panel = ledgerPanel();
+  const { rows } = panel._ledgerRows(
+    [
+      { gesture: "rotation", gesture_label: "Rotate", action_label: "Brightness", target_label: "Bulb", target_state: "unavailable" },
+      { gesture: "short_press", gesture_label: "Press", action_label: "Toggle", target_label: "light.gone", target_state: "missing" },
+    ],
+    value,
+  );
+
+  assert.deepEqual(rows.map((row) => row.warning), [false, true]);
+});
+
+test("scenes keep an order that can be changed", () => {
+  const panel = newPanel();
+  panel._editorData = { scenes: ["scene.a", "scene.b", "scene.c"] };
+  panel._editorErrors = { scenes: "invalid" };
+
+  panel._sceneMove(2, -1);
+  assert.deepEqual(panel._editorData.scenes, ["scene.a", "scene.c", "scene.b"]);
+  assert.deepEqual(panel._editorErrors, {});
+
+  // Past either end is a no-op, not a wrap-around.
+  panel._sceneMove(0, -1);
+  panel._sceneMove(2, 1);
+  assert.deepEqual(panel._editorData.scenes, ["scene.a", "scene.c", "scene.b"]);
+
+  panel._sceneRemove(0);
+  assert.deepEqual(panel._editorData.scenes, ["scene.c", "scene.b"]);
+
+  panel._sceneAdd("scene.d");
+  panel._sceneAdd("scene.c");
+  panel._sceneAdd("");
+  assert.deepEqual(panel._editorData.scenes, ["scene.c", "scene.b", "scene.d"]);
+});
+
+test("without Home Assistant's components the panel builds no ha-selector", () => {
+  const panel = newPanel();
+
+  // The registry here holds only the panel itself: this is the fallback path,
+  // and it must be a clean "not available", never an exception.
+  assert.equal(
+    panel._haSelector({
+      id: "x",
+      selector: { boolean: {} },
+      value: true,
+      label: "x",
+      onChange: () => undefined,
+    }),
+    null,
+  );
+});
+
+test("selectors describe the same ranges and domains the server validates", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      schema: {
+        binding_numbers: { step: { min: 1, max: 25, step: 1, unit: "%" } },
+        settings_numbers: { step: { min: 1, max: 25, step: 1, unit: null } },
+        mode_domains: { volume: ["media_player"] },
+        press_target_domains: ["light", "switch"],
+        ramp_target_domains: ["light"],
+      },
+    },
+  };
+
+  assert.deepEqual(
+    panel._numberSelector(panel._numberRange("binding_numbers", "step")),
+    { number: { min: 1, max: 25, step: 1, mode: "slider", unit_of_measurement: "%" } },
+  );
+  // No unit: the key is left out rather than sent as null.
+  assert.deepEqual(
+    panel._numberSelector(panel._numberRange("settings_numbers", "step")),
+    { number: { min: 1, max: 25, step: 1, mode: "slider" } },
+  );
+  assert.deepEqual(panel._entitySelector(["scene"], ["scene.a"]), {
+    entity: { domain: ["scene"], exclude_entities: ["scene.a"] },
+  });
+  assert.deepEqual(panel._entitySelector(["light"]), {
+    entity: { domain: ["light"] },
+  });
+  // A field the server's schema does not list falls back to the built-in copy.
+  assert.equal(panel._numberRange("binding_numbers", "transition").unit, "s");
+});
+
+test("a panel config without a schema uses the built-in copy", () => {
+  const panel = newPanel();
+  panel._panel = { config: { labels: {} } };
+
+  assert.deepEqual(panel._schema().mode_domains.number, ["number", "input_number"]);
+  assert.equal(panel._numberRange("binding_numbers", "step").max, 25);
+});
+
+const settingsWheel = () => ({
+  key: "wheel-a",
+  channels: [
+    { channel: 1, enabled: true },
+    { channel: 2, enabled: true },
+  ],
+  settings: { revision: "r1", step: 2, acceleration: 0 },
+});
+
+test("a channel switch saves the switches and leaves a dial draft alone", async () => {
+  const panel = newPanel();
+  const wheel = settingsWheel();
+  const calls = [];
+  panel._snapshot = { wheels: [wheel] };
+  panel._hass = {
+    callWS: async (message) => {
+      calls.push(message);
+      return message.type.endsWith("overview") ? panel._snapshot : { ok: true };
+    },
+  };
+  panel._updateSettingsDraft(wheel, { step: 9 });
+  panel._updateSettingsDraft(wheel, { channel_enabled: { 1: true, 2: false } });
+
+  await panel._saveSettings(wheel, "channels");
+
+  const sent = calls[0];
+  assert.deepEqual(sent.channel_enabled, { 1: true, 2: false });
+  // The dial's unsaved 9 is not smuggled in with the switch.
+  assert.equal(sent.step, 2);
+  assert.equal(panel._settingsStateFor(wheel).step, 9);
+});
+
+test("saving the dial does not carry an unsaved channel switch", async () => {
+  const panel = newPanel();
+  const wheel = settingsWheel();
+  const calls = [];
+  panel._snapshot = { wheels: [wheel] };
+  panel._hass = {
+    callWS: async (message) => {
+      calls.push(message);
+      return message.type.endsWith("overview") ? panel._snapshot : { ok: true };
+    },
+  };
+  panel._updateSettingsDraft(wheel, {
+    step: 5,
+    acceleration: 20,
+    channel_enabled: { 1: false, 2: true },
+  });
+
+  await panel._saveSettings(wheel, "dial");
+
+  assert.equal(calls[0].step, 5);
+  assert.equal(calls[0].acceleration, 20);
+  assert.deepEqual(calls[0].channel_enabled, { 1: true, 2: true });
+  assert.equal(calls[0].expected_revision, "r1");
+});
+
+test("the editor replaces the ledger instead of sitting under it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const detail = source.slice(
+    source.indexOf("  _channelDetail(wheel, channel) {"),
+    source.indexOf("  _isNoAction(action) {"),
+  );
+
+  assert.ok(detail.includes("this._editingChannel !== number &&"));
+  // No native multi-select anywhere: it cannot express the order of scenes.
+  assert.ok(!source.includes("select.multiple"));
+});

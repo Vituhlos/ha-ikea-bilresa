@@ -72,6 +72,7 @@ from .panel_models import (
     settings_subentry,
     wheel_key,
 )
+from .panel_schema import SETTINGS_NUMBERS
 from .presentation import generated_binding_title, generated_button_binding_title
 
 TYPE_OVERVIEW = f"{DOMAIN}/overview"
@@ -629,10 +630,8 @@ def ws_binding_test(
         vol.Required("type"): TYPE_SETTINGS_SAVE,
         vol.Required("wheel"): str,
         vol.Required("channel_enabled"): {vol.Coerce(str): bool},
-        vol.Required("step"): vol.All(vol.Coerce(float), vol.Range(min=1, max=25)),
-        vol.Required("acceleration"): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=100)
-        ),
+        vol.Required("step"): SETTINGS_NUMBERS["step"].validator(),
+        vol.Required("acceleration"): SETTINGS_NUMBERS["acceleration"].validator(),
         vol.Optional("expected_revision"): str,
     }
 )

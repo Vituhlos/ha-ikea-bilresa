@@ -18,3 +18,6 @@ Thumbs.db
 # Test coverage artifacts
 .coverage
 coverage.xml
+
+# Local panel preview output
+tools/panel_preview/out/
