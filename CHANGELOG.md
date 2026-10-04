@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.0-rc.15] - 2026-10-04
+
 ### Fixed
 - **The panel no longer raises a false alarm for a target that is only
   unavailable.** A bulb switched off at the wall used to put a permanent
