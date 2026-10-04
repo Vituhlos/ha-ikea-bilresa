@@ -25,7 +25,11 @@ a time and say so; by the owner's rule nothing was closed or merged.
   have the equivalent ("Fast release"). Two questions are open with him:
   whether the dual button should emit it, and whether `initial_press` on the
   bus would be useful. No answer yet.
-- Issues #3 and #4 are still unanswered.
+- **Issue #3 (double press in the UI).** Updated with the rc.14 state: the
+  binding's double-press field is a toggle only, other actions go through the
+  new `ikea_bilresa.double_pressed` trigger, and what changes on upgrade. Asked
+  whether a toggle is enough. Open until the stable release ships.
+- **Issue #4 (brand icon).** Left unanswered by the owner's decision.
 
 ## Czech wording unified after rc.14 (2026-10-03)
 
