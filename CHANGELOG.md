@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **The binding editor in the panel uses Home Assistant's own controls.**
+  Entities are chosen with the entity picker (search, icon, area), numbers
+  with a slider that shows the unit, choices with Home Assistant's dropdown.
+  When a frontend does not provide these, the panel falls back to its own
+  controls.
+- **Scenes are an ordered list.** Add, remove and move scenes up or down; a
+  short press cycles through them in that order. The previous multi-select
+  could not show or change the order.
+- **Editing replaces the summary** instead of opening below it. Gestures with
+  no action are one "add an action" row, and hold and release are one row.
+- **"Channel behaviour" is now two cards.** "Active channels": a switch
+  applies at once. "Dial": explains what the dial is and has its own Save.
+- The binding's and the dial's step and acceleration have different names,
+  and acceleration says what 0 % means.
+- "Delete binding" sits apart from Save and Cancel.
+
+### Fixed
+- The panel header no longer moves on scroll in a theme that adds padding
+  around the panel.
+- The advanced options no longer close each time a field in them changes.
+- Turning a wheel while a field is in use no longer rebuilds the form under
+  it.
+
 ## [0.6.0-rc.15] - 2026-10-04
 
 ### Fixed

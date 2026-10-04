@@ -2,6 +2,66 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## Panel polish Phases 2 to 5 implemented (2026-10-04)
+
+Status: **Code + local tests + one read-only look in the owner's Home
+Assistant. Not released, not deployed; the instance still runs
+`v0.6.0-rc.15`.** The owner asked for Phases 2 to 5 before the stable 0.6.0
+and allowed the use of his signed-in browser session.
+
+Commit `a406280`. What changed is listed in `CHANGELOG.md` under Unreleased
+and, per phase, in `docs/PANEL_POLISH_PLAN.md`.
+
+### The header that moved (finding 8)
+
+Measured in the owner's browser: his theme puts `padding: 16px` on
+`ha-panel-custom`. The header's natural position was therefore 16 px down, and
+`position: sticky; top: 0` let it travel those 16 px before it stuck. The
+panel now measures the padding of the element that hosts it (`_fitFrame`) and
+sticks the header and the rail at that offset; a strip in the host's
+background colour covers the inset above the header. With no padding nothing
+changes.
+
+### How it was checked
+
+- `ruff format`, `ruff check`, `mypy`, 489 Python tests, 41 frontend tests.
+- `tools/panel_preview` (new, synthetic fixture): fallback controls, scene
+  reordering, edit in place, the two settings cards, a 16 px inset, 390 px
+  width with no horizontal overflow and no control under 44 px. Contrast with
+  Home Assistant's default tokens: help text 6.5:1 light and 6.1:1 dark.
+  Screenshots could not be taken from the preview during this session, so
+  that check is by measurement, not by eye.
+- **In the owner's Home Assistant 2026.9.4, without deploying:** the new panel
+  script was fetched from the pushed commit and mounted beside the installed
+  panel under another element name, fed the live `hass` object. All 21
+  controls of an open editor and both settings cards rendered as
+  `ha-selector` (select, entity, number, boolean); no native control was left;
+  nothing overflowed the form; the header stayed at 16 px while the page
+  scrolled 300 px. Seen on screenshots, in his theme. The element was removed
+  afterwards and nothing was saved.
+
+### Not done, and deviations from the plan
+
+- **No save was made through the new controls on a real instance.** The save
+  path is covered by frontend tests against a stubbed `callWS` only.
+- **A Home Assistant without third-party frontend modules is still unproven**
+  (see Phase 0). The fallback path is tested, the component path is not
+  proven there.
+- The fallback entity control is still a plain dropdown; the plan asked for a
+  searchable list. It is only shown when Home Assistant's picker is missing.
+- `config_flow.py` still carries its own copy of the numeric ranges. The
+  binding validation, the settings command and the panel share
+  `panel_schema.py`; a test pins the frontend's fallback copy to it.
+- A missing target uses the theme's error colour, not the warning colour the
+  plan named: the default warning orange is 1.9:1 on a white card.
+- Keyboard order and screen reader output were not walked through. Contrast
+  was measured for the default tokens only, not for the owner's theme.
+- When scenes are set, the "short press" action and target fields are still
+  shown although the scenes take the short press. Not in the plan; noted.
+
+**Single best next action:** release and deploy (with a backup), then the
+owner saves one binding and one dial change through the new controls.
+
 ## `v0.6.0-rc.15` published and deployed (2026-10-04)
 
 Status: **Released (pre-release) + CI + deployed. Not observed on hardware and

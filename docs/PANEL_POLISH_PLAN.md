@@ -1,7 +1,8 @@
 # Panel polish plan: make the editor a Home Assistant editor
 
-Status: **approved by the owner 2026-10-04. Phase 0 answered, Phase 1
-implemented (not released); Phases 2 to 5 not started.**
+Status: **approved by the owner 2026-10-04. All phases implemented; Phase 1
+is released in `v0.6.0-rc.15`, Phases 2 to 5 are not released yet.** What
+was and was not verified is in `PROJECT_STATUS.md`.
 `PANEL_DESIGN.md` stays the product design; this file is the plan to close the
 gap between that design and what the panel ships today. `PROJECT_STATUS.md`
 remains the canonical handoff.
@@ -51,9 +52,9 @@ Lovelace dashboards only and rejects a custom panel path.
    wraps to three lines at 390 px.
 
 8. **The header moves on scroll** (reported by the owner on 2026-10-04 from
-   his own instance, theme Fluvy). The header is `position: sticky`, so this
-   should not happen; the cause is not established. To be diagnosed and fixed
-   in Phase 5.
+   his own instance, theme Fluvy). Cause: the theme pads the element that
+   hosts the panel by 16 px, and a header sticking at `top: 0` travels that
+   distance first. Fixed in Phase 5.
 
 Not measured: contrast ratios, keyboard order, screen reader output.
 
@@ -194,6 +195,12 @@ Scope depends on Phase 0. The intended end state:
   The panel asks the integration for the form description instead of keeping
   its own copy, so the config flow and the panel cannot drift apart.
 
+**Implemented 2026-10-04.** `ha-selector` is used directly (one per field)
+rather than `ha-form`, so each field keeps the panel's own grid, grouping
+and error line. The schema is `panel_schema.py`, sent in the panel config.
+Two deviations: the fallback entity control stayed a plain dropdown, and
+the config flow still has its own copy of the ranges.
+
 ## Phase 3 — edit in place
 
 - "Edit binding" turns the ledger into the form; the read-only summary is not
@@ -203,6 +210,8 @@ Scope depends on Phase 0. The intended end state:
 - "Hold → release" becomes one row that states the hold action plainly; the
   release half is mentioned only when it does something.
 - Field order and grouping keep the 2026-07-29 rules above.
+
+**Implemented 2026-10-04.**
 
 ## Phase 4 — the channel behaviour card
 
@@ -214,6 +223,10 @@ Scope depends on Phase 0. The intended end state:
 - Give acceleration a scale and say what 0 means.
 - One Save per card, labelled with what it saves.
 
+**Implemented 2026-10-04.** A channel switch applies at once, as switches do
+elsewhere in Home Assistant, so that card has no Save; the dial card has
+its own. Each sends only its own half of the settings.
+
 ## Phase 5 — actions and polish
 
 - Move "Delete binding" away from Save and Cancel; keep its confirmation.
@@ -224,6 +237,12 @@ Scope depends on Phase 0. The intended end state:
 - Measure contrast for secondary text in light and dark; keyboard and screen
   reader pass. This closes the part of `V0.6.0_CHECKLIST.md` item 4 that is
   still owed.
+
+**Implemented 2026-10-04**, with these limits: the error colour is used for
+a missing target (the default warning colour fails 3:1 on a white card);
+the header cause was a theme's padding on the hosting element, now
+measured; contrast was measured for the default tokens only; the keyboard
+and screen reader pass is still owed.
 
 ## Verification
 
