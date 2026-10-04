@@ -2,6 +2,26 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## `v0.6.0-rc.17` published and deployed (2026-10-04)
+
+Status: **Released (pre-release) + CI + deployed. A save through the new
+editor controls is still not observed on the instance.**
+
+- CI run `37198045458` passed for exact commit `5d6953c`.
+- Annotated tag `v0.6.0-rc.17` on `5d6953c`; pre-release at
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.17.
+  Contents: the slider display fix below.
+- Home Assistant backup `pred-bilresa-rc17-2026-10-04` (`9f4626aa`) taken
+  first. HACS installed exactly `v0.6.0-rc.17`; Home Assistant restarted.
+- Read back in the owner's browser on the installed panel: panel config
+  version `0.6.0-rc.17`; moving the dial's real `ha-slider` from 2 to 7 moved
+  the number box to 7. The draft was discarded, nothing was saved. No system
+  log entry from the integration.
+
+**Single best next action:** the owner saves one binding and one dial change
+through the new controls; then the stable-release mechanics in
+`docs/V0.6.0_CHECKLIST.md` item 5.
+
 ## rc.16 bug found by the owner: number box does not follow the slider (2026-10-04)
 
 Status: **Fixed in code (`12f9a26`) + tests + checked on the owner's instance
