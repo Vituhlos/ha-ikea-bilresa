@@ -2,6 +2,39 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## `v0.6.0-rc.15` published and deployed (2026-10-04)
+
+Status: **Released (pre-release) + CI + deployed. Not observed on hardware and
+not looked at in the owner's browser.**
+
+- CI run `37192409544` passed for exact commit `68366d4`.
+- Tag `v0.6.0-rc.15` (lightweight) on `68366d4`; pre-release at
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.15.
+  Contents: the Phase 1 panel fix below and the unified Czech wording.
+- Home Assistant backup `pred-bilresa-rc15-2026-10-04` (`82ee72a5`) taken
+  first. HACS installed exactly `v0.6.0-rc.15`; Home Assistant restarted.
+- Read back afterwards: manifest `0.6.0-rc.15`; config entry `loaded`;
+  `ikea_bilresa/overview` reports contract 6, with `Žárovka Lustr` and
+  `Žárovka Technická` as `unavailable` and `target_missing: false`, so the
+  false banner has no source any more; no system log entry from the
+  integration.
+
+### Owner's feedback on the panel, same day (screenshots of rc.14)
+
+He asked whether the panel can be made clearer and better looking. Two points:
+
+1. The "IKEA BILRESA" header moves when the page is scrolled, and the two
+   cards on the wheel page (the channel and "Channel behaviour") are hard to
+   tell apart. The header is `position: sticky` in the panel's CSS, so the
+   movement is unexplained; his theme (Fluvy) draws the page in an inset
+   rounded frame, which is the first thing to check. **Cause not established.**
+   Recorded as finding 8 in `docs/PANEL_POLISH_PLAN.md`.
+2. The binding editor with the advanced options open is harder still to read.
+   This is findings 1, 3 and 5 of the plan (Phases 2 to 4).
+
+**Single best next action:** the owner's decision on whether Phases 2 to 5 go
+before or after the stable 0.6.0.
+
 ## Panel polish: Phase 0 answered, Phase 1 implemented (2026-10-04)
 
 Status: **Code + local tests. Not released, not deployed; the owner's Home

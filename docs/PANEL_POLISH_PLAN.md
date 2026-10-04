@@ -50,6 +50,11 @@ Lovelace dashboards only and rejects a custom panel path.
    channel is a black exclamation mark with no colour; the wheel's subtitle
    wraps to three lines at 390 px.
 
+8. **The header moves on scroll** (reported by the owner on 2026-10-04 from
+   his own instance, theme Fluvy). The header is `position: sticky`, so this
+   should not happen; the cause is not established. To be diagnosed and fixed
+   in Phase 5.
+
 Not measured: contrast ratios, keyboard order, screen reader output.
 
 ## What "fits Home Assistant's design" means here
@@ -212,6 +217,7 @@ Scope depends on Phase 0. The intended end state:
 ## Phase 5 — actions and polish
 
 - Move "Delete binding" away from Save and Cancel; keep its confirmation.
+- Find out why the header moves on scroll in the owner's theme and fix it.
 - Warning state uses the theme's warning colour and an icon, not a black mark.
 - Wheel subtitle at 390 px: one line, with the rest on a second line by
   design, not by overflow.
