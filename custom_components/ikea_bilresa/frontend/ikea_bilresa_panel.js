@@ -1490,6 +1490,12 @@ const gestureGlyph = (gesture) => {
   return svg(GESTURE_ICON[gesture] || GESTURE_ICON.short_press, "gesture-glyph");
 };
 
+// "unavailable" is a bulb switched off at the wall; "missing" is an entity
+// Home Assistant no longer has. Only the second is a fault to repair. A
+// backend from before contract 6 sends target_missing alone, and meant both.
+const targetState = (item) =>
+  item?.target_state || (item?.target_missing ? "missing" : "ok");
+
 const el = (tag, cls, text) => {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
@@ -1563,6 +1569,28 @@ class IkeaBilresaPanel extends HTMLElement {
       }
     }
     return value;
+  }
+
+  // The target's name, with its state appended when it is not simply there.
+  _targetText(item) {
+    const state = targetState(item);
+    if (state === "ok" || !item.target_label) return item.target_label || null;
+    return this._t(
+      state === "missing" ? "target_missing" : "target_unavailable",
+      { target: item.target_label },
+    );
+  }
+
+  // A channel or button carries the worst state of all its targets, while its
+  // label names one of them (or "2 targets"). Appending the state to that label
+  // would blame the wrong entity, so name the target the state belongs to.
+  _controlTargetText(control) {
+    const state = targetState(control);
+    if (state === "ok") return control.target_label || null;
+    const culprit = (control.actions || []).find(
+      (action) => action.target_label && targetState(action) === state,
+    );
+    return this._targetText(culprit || control);
   }
 
   async _connect() {
@@ -1896,15 +1924,13 @@ class IkeaBilresaPanel extends HTMLElement {
       el(
         "span",
         "channel-target",
-        control.target_missing
-          ? this._t("target_unavailable", {
-              target: control.target_label || this._t("target_none"),
-            })
-          : control.target_label || this._t("add_binding"),
+        this._controlTargetText(control) || this._t("add_binding"),
       ),
     );
     row.appendChild(text);
-    if (control.target_missing) row.appendChild(svg(ICON.alert, "channel-warn"));
+    if (targetState(control) === "missing") {
+      row.appendChild(svg(ICON.alert, "channel-warn"));
+    }
     return row;
   }
 
@@ -2715,8 +2741,10 @@ class IkeaBilresaPanel extends HTMLElement {
     const number = this._controlNumber(wheel, channel);
     const configured = this._isConfigured(channel);
     const missingTarget =
-      channel.target_missing ||
-      (channel.actions || []).some((action) => action.target_missing);
+      targetState(channel) === "missing" ||
+      (channel.actions || []).some(
+        (action) => targetState(action) === "missing",
+      );
     const card = el("div", "channel-detail");
     card.dataset.state = missingTarget ? "warning" : configured ? "ready" : "empty";
 
@@ -2762,11 +2790,8 @@ class IkeaBilresaPanel extends HTMLElement {
     );
     let summary = this._t("not_configured");
     if (configured) {
-      const target = channel.target_missing
-        ? this._t("target_unavailable", {
-            target: channel.target_label || this._t("target_none"),
-          })
-        : channel.target_label || this._t("target_none");
+      const target =
+        this._controlTargetText(channel) || this._t("target_none");
       summary = [
         channel.behaviour || channel.profile,
         target,
@@ -2791,10 +2816,7 @@ class IkeaBilresaPanel extends HTMLElement {
       const actionValue = (action) => {
         let value = action.action_label;
         if (action.target_label) {
-          const target = action.target_missing
-            ? this._t("target_unavailable", { target: action.target_label })
-            : action.target_label;
-          value = `${value} · ${target}`;
+          value = `${value} · ${this._targetText(action)}`;
         }
         return value;
       };
@@ -2808,7 +2830,10 @@ class IkeaBilresaPanel extends HTMLElement {
         // unrelated actions.
         if (action.gesture === "hold" && release?.gesture === "release") {
           const item = el("li", "channel-action");
-          if (action.target_missing || release.target_missing) {
+          if (
+            targetState(action) === "missing" ||
+            targetState(release) === "missing"
+          ) {
             item.dataset.state = "warning";
           } else if (this._isNoAction(action) && this._isNoAction(release)) {
             item.dataset.state = "empty";
@@ -2846,7 +2871,7 @@ class IkeaBilresaPanel extends HTMLElement {
         }
 
         const item = el("li", "channel-action");
-        if (action.target_missing) item.dataset.state = "warning";
+        if (targetState(action) === "missing") item.dataset.state = "warning";
         else if (this._isNoAction(action)) item.dataset.state = "empty";
         const label = el("span", "channel-action-label");
         label.appendChild(gestureGlyph(action.gesture));
@@ -3508,11 +3533,7 @@ class IkeaBilresaPanel extends HTMLElement {
         ),
       );
       const configured = this._isConfigured(control);
-      const target = control.target_missing
-        ? this._t("target_unavailable", {
-            target: control.target_label || this._t("target_none"),
-          })
-        : control.target_label;
+      const target = this._controlTargetText(control);
       copy.appendChild(
         el(
           "div",
@@ -3914,13 +3935,15 @@ class IkeaBilresaPanel extends HTMLElement {
       wrap.appendChild(this._banner(this._t("banner_updates_stopped")));
     }
     const missing = this._snapshot.wheels.filter((wheel) =>
-      this._controlsFor(wheel).some((control) => control.target_missing),
+      this._controlsFor(wheel).some(
+        (control) => targetState(control) === "missing",
+      ),
     );
     if (missing.length === 1) {
       // The backend knows the exact device and control, so the banner says so.
       const wheel = missing[0];
       const control = this._controlsFor(wheel).find(
-        (item) => item.target_missing,
+        (item) => targetState(item) === "missing",
       );
       const isButton = wheel.variant === "dual_button";
       wrap.appendChild(

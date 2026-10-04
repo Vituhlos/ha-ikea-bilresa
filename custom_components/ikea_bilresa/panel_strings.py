@@ -37,6 +37,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "add_binding": "Add a control binding",
         "edit_binding": "Edit binding",
         "target_unavailable": "{target} — unavailable",
+        "target_missing": "{target} — no longer exists",
         "configured": "Configured",
         "button_actions": "Button actions",
         "multiple_targets": "{count} targets",
@@ -77,16 +78,18 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "banner_updates_stopped": "Live updates stopped. This view may be out of date.",
         "banner_target_missing": (
-            "Bindings on {count} devices point to targets Home Assistant can no "
-            "longer find. Open a marked control to repair it."
+            "Bindings on {count} devices point to entities that no longer exist "
+            "in Home Assistant. Open a marked control and choose another target."
         ),
         "banner_target_missing_named": (
-            "{wheel} has an unavailable binding target on channel {channel}. "
-            "Open the channel and repair the binding."
+            "The binding on channel {channel} of {wheel} points to an entity "
+            "that no longer exists in Home Assistant. Open the channel and "
+            "choose another target."
         ),
         "banner_target_missing_button_named": (
-            "{wheel} has an unavailable binding target on button {button}. "
-            "Open the button and repair the binding."
+            "The binding on button {button} of {wheel} points to an entity "
+            "that no longer exists in Home Assistant. Open the button and "
+            "choose another target."
         ),
         # states
         "empty_title": "No BILRESA devices found",
@@ -438,6 +441,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "add_binding": "Přidat propojení",
         "edit_binding": "Upravit propojení",
         "target_unavailable": "{target} — nedostupné",
+        "target_missing": "{target} — už neexistuje",
         "configured": "Nastaveno",
         "button_actions": "Akce tlačítka",
         "multiple_targets": "{count} cíle",
@@ -474,16 +478,18 @@ STRINGS: dict[str, dict[str, str]] = {
             "Živé aktualizace se zastavily. Tento pohled může být zastaralý."
         ),
         "banner_target_missing": (
-            "{count} zařízení má nedostupný cíl propojení. Otevřete označený "
-            "ovládací prvek a propojení opravte."
+            "Propojení na {count} zařízeních míří na entity, které v Home "
+            "Assistantu už neexistují. Otevřete označený ovládací prvek a "
+            "vyberte jiný cíl."
         ),
         "banner_target_missing_named": (
-            "{wheel} má na kanálu {channel} nedostupný cíl propojení. "
-            "Otevřete kanál a propojení opravte."
+            "{wheel}: propojení na kanálu {channel} míří na entitu, která "
+            "v Home Assistantu už neexistuje. Otevřete kanál a vyberte jiný cíl."
         ),
         "banner_target_missing_button_named": (
-            "{wheel} má na tlačítku {button} nedostupný cíl propojení. "
-            "Otevřete tlačítko a propojení opravte."
+            "{wheel}: propojení na tlačítku {button} míří na entitu, která "
+            "v Home Assistantu už neexistuje. Otevřete tlačítko a vyberte "
+            "jiný cíl."
         ),
         "empty_title": "Nenalezeno žádné zařízení BILRESA",
         "empty_connected": "Integrace je připojená, ale zatím nenašla žádné zařízení.",

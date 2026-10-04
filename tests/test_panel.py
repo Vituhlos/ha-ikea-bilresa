@@ -857,4 +857,5 @@ def test_channel_detail_uses_the_versioned_read_model_actions() -> None:
     assert "const action = summaries[index];" in asset
     assert "action.gesture_label" in asset
     assert "action.action_label" in asset
-    assert "action.target_missing" in asset
+    assert "this._targetText(action)" in asset
+    assert 'targetState(action) === "missing"' in asset

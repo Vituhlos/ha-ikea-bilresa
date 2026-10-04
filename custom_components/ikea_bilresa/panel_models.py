@@ -20,6 +20,7 @@ two in step, or the panel will render fields nobody produces.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from typing import Any
@@ -72,7 +73,17 @@ from .device_link import WheelAvailability, resolve_matter_device, wheel_availab
 from .model import BilresaWheel
 from .panel_strings import localize
 
-CONTRACT_VERSION = 5
+CONTRACT_VERSION = 6
+
+# What the panel may say about a configured target, least to most severe.
+TARGET_OK = "ok"
+# The entity exists and cannot be reached right now: a bulb switched off at
+# the wall, a device that is rebooting. Nothing in the binding is wrong.
+TARGET_UNAVAILABLE = "unavailable"
+# Home Assistant no longer knows the entity at all. Only this one is a
+# problem the owner can fix by editing the binding.
+TARGET_MISSING = "missing"
+_TARGET_SEVERITY = (TARGET_OK, TARGET_UNAVAILABLE, TARGET_MISSING)
 
 # Deliberately short: this is an addressing token, not a secret. Long enough not
 # to collide across a household, short enough to read in a bug report.
@@ -103,6 +114,9 @@ class GestureSummary:
     gesture_label: str
     action_label: str
     target_label: str | None = None
+    target_state: str = TARGET_OK
+    # True only for TARGET_MISSING. Kept beside target_state so a panel
+    # script cached from before contract 6 still marks the right rows.
     target_missing: bool = False
 
 
@@ -127,6 +141,9 @@ class ChannelSummary:
     profile: str | None = None
     behaviour: str | None = None
     target_label: str | None = None
+    target_state: str = TARGET_OK
+    # True only for TARGET_MISSING. Kept beside target_state so a panel
+    # script cached from before contract 6 still marks the right rows.
     target_missing: bool = False
     actions: list[GestureSummary] = field(default_factory=list)
     binding: BindingEditor | None = None
@@ -140,6 +157,9 @@ class ButtonSummary:
     configured: bool = False
     behaviour: str | None = None
     target_label: str | None = None
+    target_state: str = TARGET_OK
+    # True only for TARGET_MISSING. Kept beside target_state so a panel
+    # script cached from before contract 6 still marks the right rows.
     target_missing: bool = False
     actions: list[GestureSummary] = field(default_factory=list)
     binding: BindingEditor | None = None
@@ -206,16 +226,32 @@ def _entity_label(hass: HomeAssistant, entity_id: str | None) -> str | None:
     return entity_id
 
 
-def _target_missing(hass: HomeAssistant, entity_id: str | None) -> bool:
-    """Whether a configured target can no longer be acted on.
+def _target_state(hass: HomeAssistant, entity_id: str | None) -> str:
+    """Tell a target that is gone from one that is only out of reach.
+
+    ``unknown`` is not a fault: a scene that was never activated and an idle
+    media player both report it and both work. An entity with no state that
+    the registry still knows (disabled, or its integration is not loaded) is
+    out of reach, not gone.
 
     Detection only. The binding's own fail-closed behaviour is untouched — this
     must never be the thing that decides whether a command is sent.
     """
     if not entity_id:
-        return False
+        return TARGET_OK
     state = hass.states.get(entity_id)
-    return state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+    if state is None:
+        if er.async_get(hass).async_get(entity_id) is not None:
+            return TARGET_UNAVAILABLE
+        return TARGET_MISSING
+    if state.state == STATE_UNAVAILABLE:
+        return TARGET_UNAVAILABLE
+    return TARGET_OK
+
+
+def _worst_target_state(states: Iterable[str]) -> str:
+    """Return the most severe of several target states."""
+    return max(states, key=_TARGET_SEVERITY.index, default=TARGET_OK)
 
 
 def _as_int(value: Any) -> int | None:
@@ -366,12 +402,14 @@ def _gesture_summary(
     target: str | None = None,
 ) -> GestureSummary:
     """Build one localized read-only gesture row."""
+    state = _target_state(hass, target)
     return GestureSummary(
         gesture=gesture,
         gesture_label=localize(language, f"binding_gesture_{gesture}"),
         action_label=localize(language, action_key),
         target_label=_entity_label(hass, target),
-        target_missing=_target_missing(hass, target),
+        target_state=state,
+        target_missing=state == TARGET_MISSING,
     )
 
 
@@ -413,13 +451,17 @@ def _wheel_gesture_summaries(
         scene_labels = [
             label for scene in scenes if (label := _entity_label(hass, scene))
         ]
+        scenes_state = _worst_target_state(
+            _target_state(hass, scene) for scene in scenes
+        )
         summaries.append(
             GestureSummary(
                 gesture="short_press",
                 gesture_label=localize(language, "binding_gesture_short_press"),
                 action_label=localize(language, "action_cycle_scenes"),
                 target_label=" / ".join(scene_labels) or None,
-                target_missing=any(_target_missing(hass, scene) for scene in scenes),
+                target_state=scenes_state,
+                target_missing=scenes_state == TARGET_MISSING,
             )
         )
     else:
@@ -583,6 +625,13 @@ def _channel_summaries(
         # The click target defaults to the scroll target, mirroring binding.py.
         click_target = data.get(CONF_CLICK_TARGET) or target
         actions = _wheel_gesture_summaries(hass, data, language)
+        state = _worst_target_state(
+            [
+                _target_state(hass, target),
+                _target_state(hass, click_target),
+                *(action.target_state for action in actions),
+            ]
+        )
         summaries.append(
             ChannelSummary(
                 channel=channel,
@@ -592,11 +641,8 @@ def _channel_summaries(
                 profile=data.get(CONF_MODE),
                 behaviour=_behaviour_label(data, language),
                 target_label=_entity_label(hass, target),
-                target_missing=(
-                    _target_missing(hass, target)
-                    or _target_missing(hass, click_target)
-                    or any(action.target_missing for action in actions)
-                ),
+                target_state=state,
+                target_missing=state == TARGET_MISSING,
                 actions=actions,
                 binding=(
                     BindingEditor(
@@ -641,13 +687,15 @@ def _button_summaries(
             language,
             multi_press_max=endpoint.multi_press_max or 1,
         )
+        state = _worst_target_state(action.target_state for action in actions)
         summaries.append(
             ButtonSummary(
                 button=button,
                 configured=True,
                 behaviour=localize(language, "button_actions"),
                 target_label=_button_target_label(hass, data, language),
-                target_missing=any(action.target_missing for action in actions),
+                target_state=state,
+                target_missing=state == TARGET_MISSING,
                 actions=actions,
                 binding=(
                     BindingEditor(

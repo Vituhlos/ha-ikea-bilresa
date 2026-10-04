@@ -151,6 +151,7 @@ def _patch(
     availability="connected",
     area="Living room",
     entity_ids=None,
+    registered=(),
 ) -> None:
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.panel_models.resolve_matter_device",
@@ -164,7 +165,12 @@ def _patch(
     registry.async_get_entity_id.side_effect = lambda _d, _p, unique: (
         entity_ids or {}
     ).get(unique)
-    registry.async_get.return_value = None
+    # Entities the registry knows, whether or not they have a state.
+    registry.async_get.side_effect = lambda entity_id: (
+        SimpleNamespace(name=None, original_name=None)
+        if entity_id in registered
+        else None
+    )
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.panel_models.er.async_get",
         lambda _hass: registry,
@@ -387,7 +393,84 @@ def test_missing_target_is_flagged(monkeypatch) -> None:
 
     channels = async_overview_snapshot(_hass(), entry)["wheels"][0]["channels"]
 
+    assert channels[0]["target_state"] == "missing"
     assert channels[0]["target_missing"] is True
+
+
+def _brightness_channel(monkeypatch, hass, *, registered=()) -> dict:
+    """Return the summary of one channel dimming ``light.bulb``."""
+    _patch(
+        monkeypatch,
+        device=SimpleNamespace(id="d", name_by_user="A", area_id=None),
+        registered=registered,
+    )
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(
+                NODE_A, 1, **{CONF_MODE: MODE_BRIGHTNESS, CONF_TARGET: "light.bulb"}
+            )
+        ],
+    )
+    return async_overview_snapshot(hass, entry)["wheels"][0]["channels"][0]
+
+
+def test_an_unavailable_target_is_not_reported_as_missing(monkeypatch) -> None:
+    """A bulb switched off at the wall is not a binding to repair."""
+    hass = _hass({"light.bulb": _state("unavailable", "Bulb")})
+
+    channel = _brightness_channel(monkeypatch, hass)
+
+    assert channel["target_state"] == "unavailable"
+    assert channel["target_missing"] is False
+    assert channel["target_label"] == "Bulb"
+    rotation = channel["actions"][0]
+    assert rotation["target_state"] == "unavailable"
+    assert rotation["target_missing"] is False
+
+
+def test_a_target_with_an_unknown_state_is_fine(monkeypatch) -> None:
+    """A scene never activated and an idle player report unknown and work."""
+    hass = _hass({"light.bulb": _state("unknown", "Bulb")})
+
+    channel = _brightness_channel(monkeypatch, hass)
+
+    assert channel["target_state"] == "ok"
+    assert channel["target_missing"] is False
+
+
+def test_a_registered_target_without_a_state_is_unavailable(monkeypatch) -> None:
+    """Disabled, or its integration is not loaded: out of reach, not gone."""
+    channel = _brightness_channel(monkeypatch, _hass(), registered=("light.bulb",))
+
+    assert channel["target_state"] == "unavailable"
+    assert channel["target_missing"] is False
+
+
+def test_a_missing_target_outranks_an_unavailable_one(monkeypatch) -> None:
+    """The channel reports the worst of its targets, not the first."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_MODE: MODE_BRIGHTNESS,
+                    CONF_TARGET: "light.bulb",
+                    CONF_DOUBLE_TARGET: "switch.gone",
+                },
+            )
+        ],
+    )
+    hass = _hass({"light.bulb": _state("unavailable", "Bulb")})
+
+    channel = async_overview_snapshot(hass, entry)["wheels"][0]["channels"][0]
+
+    assert channel["target_state"] == "missing"
+    assert channel["target_missing"] is True
+    assert channel["actions"][0]["target_state"] == "unavailable"
 
 
 def test_a_dead_click_target_flags_the_channel(monkeypatch) -> None:

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- **The panel no longer raises a false alarm for a target that is only
+  unavailable.** A bulb switched off at the wall used to put a permanent
+  "repair the binding" banner on the overview. The panel now tells an entity
+  that is unavailable (shown as plain text beside its name) from one that no
+  longer exists in Home Assistant (banner and warning, as before). A target
+  whose state is `unknown`, such as a scene that was never activated, is no
+  longer flagged at all.
+- A channel or button with several targets now names the target that has
+  the problem instead of marking its first target or "2 targets".
+
 ### Changed
 - **Czech wording is unified.** Every Czech text now addresses the reader
   formally, as Home Assistant's own Czech translation mostly does; the

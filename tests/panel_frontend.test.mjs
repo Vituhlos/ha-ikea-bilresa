@@ -563,3 +563,100 @@ test("the step curve is a set-once option, not a rotation field", async () => {
   // Not among the rotation fields, where it would read as a per-use setting.
   assert.ok(!source.slice(rotation, split).includes("step_curve"));
 });
+
+test("an unavailable target is named plainly; only a missing one is a fault", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        target_unavailable: "{target} — unavailable",
+        target_missing: "{target} — no longer exists",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_state: "ok" }),
+    "Bulb",
+  );
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_state: "unavailable" }),
+    "Bulb — unavailable",
+  );
+  assert.equal(
+    panel._targetText({
+      target_label: "light.gone",
+      target_state: "missing",
+      target_missing: true,
+    }),
+    "light.gone — no longer exists",
+  );
+  assert.equal(panel._targetText({ target_label: null }), null);
+});
+
+test("a backend from before contract 6 still marks its missing targets", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: { labels: { target_missing: "{target} — no longer exists" } },
+  };
+
+  // No target_state at all: the old boolean is all the panel has to go on.
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_missing: true }),
+    "Bulb — no longer exists",
+  );
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_missing: false }),
+    "Bulb",
+  );
+});
+
+test("the overview banner counts missing targets, never unavailable ones", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const banner = source.slice(
+    source.indexOf("const missing = this._snapshot.wheels.filter"),
+    source.indexOf("wrap.appendChild(this._overviewHead())"),
+  );
+
+  assert.ok(banner.includes('targetState(control) === "missing"'));
+  assert.ok(!banner.includes(".target_missing"));
+});
+
+test("a control names the target its state belongs to, not its summary label", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        target_unavailable: "{target} — unavailable",
+        target_missing: "{target} — no longer exists",
+      },
+    },
+  };
+  const button = {
+    target_label: "2 targets",
+    target_state: "missing",
+    target_missing: true,
+    actions: [
+      { target_label: "Hall", target_state: "unavailable" },
+      { target_label: "light.gone", target_state: "missing", target_missing: true },
+    ],
+  };
+
+  assert.equal(panel._controlTargetText(button), "light.gone — no longer exists");
+  assert.equal(
+    panel._controlTargetText({ target_label: "2 targets", target_state: "ok" }),
+    "2 targets",
+  );
+  // Nothing to point at: fall back to the control's own label.
+  assert.equal(
+    panel._controlTargetText({ target_label: "Bulb", target_state: "unavailable" }),
+    "Bulb — unavailable",
+  );
+});

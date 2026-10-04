@@ -2,10 +2,71 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## Panel polish: Phase 0 answered, Phase 1 implemented (2026-10-04)
+
+Status: **Code + local tests. Not released, not deployed; the owner's Home
+Assistant still runs `v0.6.0-rc.14`.** The owner approved
+`docs/PANEL_POLISH_PLAN.md` and asked for Phase 0 first.
+
+### Phase 0 (spike, nothing shipped)
+
+Done once, read-only, in the owner's signed-in browser session on Home
+Assistant 2026.9.4, on a cold load of `/ikea-bilresa`:
+
+- `ha-form`, `ha-selector`, `ha-entity-picker`, `ha-slider`, `ha-select`,
+  `ha-switch`, `ha-button`, `ha-icon-button`, `ha-alert`, `ha-card`,
+  `ha-expansion-panel`, `ha-sortable`, `ha-dialog` and more were already
+  registered. `window.loadCardHelpers` was undefined, as expected.
+- The concrete selectors (`ha-selector-entity`, `-number`, `-select`,
+  `-boolean`) were not registered, and loaded by themselves when an `ha-form`
+  with those selectors was rendered. That form took the theme and emitted
+  `value-changed`.
+- Not registered: `ha-entities-picker`, `ha-target-picker`, `ha-combo-box`,
+  `ha-textfield`, `ha-md-list`, `hass-subpage`.
+
+**Not proven:** a clean Home Assistant. This instance loads several third-party
+frontend modules, and any of them may be what registered the components. Step 4
+of the spike (arriving from a dashboard) was not run. The plan's rule therefore
+stands unchanged: use the components when present, keep a tested fallback.
+The full list is in `docs/PANEL_POLISH_PLAN.md`.
+
+The owner does not want to approve browser actions on his instance one by one,
+so further work avoids his browser session; the local preview is used instead.
+
+### Phase 1 (the false alarm)
+
+- `panel_models.py`: every target now has `target_state`: `ok`, `unavailable`
+  or `missing`. `unavailable` is an entity whose state is `unavailable`, or one
+  with no state that the entity registry still knows. `missing` is an entity
+  Home Assistant no longer knows. A state of `unknown` is `ok` (a scene never
+  activated, an idle media player). A channel or button reports the worst state
+  among its targets.
+- `target_missing` stays in the snapshot and is now true only for `missing`.
+  `CONTRACT_VERSION` is 6. The panel falls back to `target_missing` when
+  `target_state` is absent, so either side may be one version behind.
+- Panel: the banner, the warning icon and the warning row state apply to
+  `missing` only. `unavailable` is plain text after the target's name.
+- A channel or button row used to append the state to its own label, which
+  could blame the wrong entity (the rotation target for a dead click target,
+  or "2 targets"). It now names the target the state belongs to.
+- Copy, English and Czech: the banner says the entity no longer exists and
+  asks for another target; new label `target_missing`.
+- The binding runtime is untouched.
+
+Verified locally only: `ruff format`, `ruff check`, `mypy`, 479 Python tests,
+31 frontend tests, and the local preview render (the two switched-off bulbs
+read "— nedostupné" with no banner; a synthetic missing target raises the
+banner and the icon). **Not verified in real Home Assistant.**
+
+### Next
+
+Phases 2 to 5 are recommended for after the stable 0.6.0. The owner has not yet
+said which phases the stable release must contain.
+
 ## Panel reviewed; polish plan written, nothing implemented (2026-10-04)
 
-Status: **Analysis + plan only. Awaiting the owner's approval of
-`docs/PANEL_POLISH_PLAN.md`.**
+Status: **Analysis + plan only.** Superseded by the section above: the plan was
+approved the same day.
 
 The owner called the settings panel "not 100 % yet". The panel's real script
 was rendered locally with the repository's Czech labels and an overview

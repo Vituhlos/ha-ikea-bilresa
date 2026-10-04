@@ -1,6 +1,7 @@
 # Panel polish plan: make the editor a Home Assistant editor
 
-Status: **proposal, not approved, nothing implemented** (2026-10-04).
+Status: **approved by the owner 2026-10-04. Phase 0 answered, Phase 1
+implemented (not released); Phases 2 to 5 not started.**
 `PANEL_DESIGN.md` stays the product design; this file is the plan to close the
 gap between that design and what the panel ships today. `PROJECT_STATUS.md`
 remains the canonical handoff.
@@ -107,6 +108,44 @@ Exit: a written answer in `PROJECT_STATUS.md` to "which components are there on
 a cold load, and how reliably can the missing ones be loaded". Phase 2's scope
 is fixed only after that.
 
+### Result (2026-10-04, Home Assistant 2026.9.4, owner's instance)
+
+Steps 1 and 2 were run on a cold load of `/ikea-bilresa`. Step 3 was not
+needed. Step 4 was not run.
+
+- **Registered on the cold load:** `ha-form`, `ha-selector`,
+  `ha-entity-picker`, `ha-generic-picker`, `ha-picker-field`, `ha-slider`,
+  `ha-control-slider`, `ha-select`, `ha-input`, `ha-button`, `ha-icon`,
+  `ha-svg-icon`, `ha-icon-button`, `ha-card`, `ha-alert`, `ha-switch`,
+  `ha-checkbox`, `ha-formfield`, `ha-expansion-panel`, `ha-settings-row`,
+  `ha-sortable`, `ha-list`, `ha-list-item`, `ha-md-list-item`,
+  `ha-state-icon`, `ha-domain-icon`, `ha-tab-group`, `hass-tabs-subpage`,
+  `ha-top-app-bar-fixed`, `ha-menu-button`, `ha-dialog`, `ha-spinner`,
+  `ha-tooltip`, `ha-dropdown`, `ha-code-editor`, `ha-yaml-editor`.
+- **Not registered:** `ha-selector-entity`, `-number`, `-select`,
+  `-boolean` (these loaded on demand as soon as an `ha-form` using them was
+  rendered), `ha-entities-picker`, `ha-target-picker`, `ha-combo-box`,
+  `ha-textfield`, `ha-md-list`, `hass-subpage`, `ha-header-bar`,
+  `ha-md-dialog`, `ha-wa-dialog`, `ha-radio-group`,
+  `ha-button-toggle-group`, `ha-fab`, `ha-button-menu`,
+  `ha-labeled-slider`. `window.loadCardHelpers` was undefined.
+- **`ha-form` works inside the panel:** a form with entity, number (slider),
+  select and boolean selectors rendered, followed the theme and emitted
+  `value-changed`.
+
+What this does and does not settle:
+
+- Phase 2 can be built on `ha-form` with a selector schema; no loading
+  workaround that reaches into frontend internals is needed on this instance.
+- Scene ordering has no ready component: `ha-entities-picker` is absent. The
+  ordered list stays the panel's own control (`ha-sortable` is available for
+  drag and drop; move up/down buttons remain the fallback).
+- **A clean Home Assistant is unproven.** This instance loads several
+  third-party frontend modules, and one of them may be what registered
+  `ha-form`. The fallback path is therefore still required, and Phase 2 must
+  be checked once on an instance without custom frontend modules before the
+  dual path is trusted.
+
 ## Phase 1 — tell "unavailable" from "gone" (backend, independent of Phase 0)
 
 - `panel_models.py`: replace the boolean with a three-way state per target:
@@ -122,6 +161,16 @@ is fixed only after that.
 - English and Czech copy; tests in `test_panel_models.py` for all three states.
 
 This is the only finding that misinforms the user, so it comes first.
+
+**Implemented 2026-10-04** as described, with three decisions made on the
+way:
+
+- `unknown` counts as `ok`, not `unavailable`: a scene that was never
+  activated and an idle media player report it and work.
+- An entity with no state that the entity registry still knows (disabled, or
+  its integration is not loaded) is `unavailable`, not `missing`.
+- A channel or button row names the target its state belongs to instead of
+  appending the state to its own label, which could blame the wrong entity.
 
 ## Phase 2 — the editor's controls
 
@@ -202,7 +251,7 @@ versus "single press" wording, which waits for the owner's decision.
 
 ## Decisions needed from the owner
 
-1. Sign in to the instance in the in-app browser for Phase 0.
+1. ~~Sign in to the instance in the in-app browser for Phase 0.~~ Done.
 2. Which phases must be in the stable 0.6.0. Recommendation: Phase 0 and
    Phase 1 before it, Phases 2 to 5 after it, because rc.14 already carries a
    large change that has to reach stable first.
