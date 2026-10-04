@@ -1,6 +1,31 @@
 # Project status and agent handoff
 
-Last updated: **2026-10-03 by Claude Code**
+Last updated: **2026-10-04 by Claude Code**
+
+## External pull requests answered; one commitment made (2026-10-04)
+
+No code changed. Replies were written by Claude, approved by the owner one at
+a time and say so; by the owner's rule nothing was closed or merged.
+
+- **PR #6 (SeoFood, deprecated registry lookup).** Told that rc.14 supersedes
+  it and why. He answered: he reran rc.14 at `1eb2387` in a clean Linux
+  container on Home Assistant 2026.9.4, **475 Python and 27 frontend tests
+  pass**, and he considers his patch superseded. He no longer has this
+  integration installed (moved to core Matter event entities and
+  `event.received`), so he could not test the migration. Asked why he moved
+  away; closing is left to him.
+- **PR #8 (cassus, first notch on `InitialPress`).** Told that it has been in
+  the 0.6 branch since rc.5, how the two implementations differ, and asked
+  whether his measurement (median 0.53 s over 180 gestures, firmware 1.9.15)
+  may go into `docs/DEVICE_REFERENCE.md` with credit. No answer yet.
+- **PR #5 (amodig, `short_release` on the bus).** **Commitment: adopt it after
+  the stable 0.6.0; we port it to the 0.6 branch ourselves and keep him as the
+  author.** The port also has to name or hide the action in the panel's Live
+  test, respect a disabled channel, and document that direct bindings already
+  have the equivalent ("Fast release"). Two questions are open with him:
+  whether the dual button should emit it, and whether `initial_press` on the
+  bus would be useful. No answer yet.
+- Issues #3 and #4 are still unanswered.
 
 ## Czech wording unified after rc.14 (2026-10-03)
 
