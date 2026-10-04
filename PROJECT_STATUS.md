@@ -2,6 +2,46 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## Panel reviewed; polish plan written, nothing implemented (2026-10-04)
+
+Status: **Analysis + plan only. Awaiting the owner's approval of
+`docs/PANEL_POLISH_PLAN.md`.**
+
+The owner called the settings panel "not 100 % yet". The panel's real script
+was rendered locally with the repository's Czech labels and an overview
+snapshot read from his instance, and every view was inspected at desktop and
+390 px width, light and dark. He confirmed the findings match what bothered
+him. Seven findings, the top two:
+
+- the binding editor uses bare browser controls (a `<select>` with no search
+  for entities, a native multi-select for scenes that cannot express order);
+- `_target_missing()` in `panel_models.py` treats an entity that is merely
+  `unavailable` (a bulb switched off at the wall) like one that no longer
+  exists, so the overview permanently shows a "fix the binding" banner on his
+  instance.
+
+Facts that shape the plan, verified in the frontend source `20260826.7` and
+the developer documentation: Home Assistant allows custom authors to use its
+frontend components and says internal UI APIs may change; **there is no
+supported way for a custom panel to load `ha-form` / `ha-selector`**
+(`window.loadCardHelpers` exists only after the Lovelace panel has loaded).
+Hence the plan's rule: use Home Assistant's components when present, never
+depend on them, keep a tested fallback.
+
+Tooling notes:
+
+- `ha_get_dashboard_screenshot` (Puppet) renders Lovelace dashboards only; a
+  custom panel path fails with `Unknown config specified: ikea-bilresa`, also
+  after the Puppet URL fix of 2026-10-03.
+- The panel has no URL routing; a view is reached by setting `_open` and
+  `_view` before `hass`, as `tests/panel_frontend.test.mjs` does.
+- The local preview lives outside the repository in a scratch folder and uses
+  the owner's real entity names. **It must not be committed as is**; the plan
+  asks for a committed preview tool with a synthetic fixture.
+
+**Single best next action:** the owner's decision on the plan; then Phase 0
+needs him to sign in to his instance in the in-app browser.
+
 ## External pull requests answered; one commitment made (2026-10-04)
 
 No code changed. Replies were written by Claude, approved by the owner one at
