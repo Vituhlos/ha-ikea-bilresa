@@ -2,6 +2,30 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## `v0.6.0-rc.16` published and deployed (2026-10-04)
+
+Status: **Released (pre-release) + CI + deployed. Saving through the new
+editor controls is not yet observed on the instance.**
+
+- CI run `37196821047` passed for exact commit `363d29f`.
+- Annotated tag `v0.6.0-rc.16` on `363d29f`; pre-release at
+  https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0-rc.16.
+  Contents: panel polish Phases 2 to 5 (section below).
+- Home Assistant backup `pred-bilresa-rc16-2026-10-04` (`b988c7ba`) taken
+  first. HACS installed exactly `v0.6.0-rc.16`; Home Assistant restarted.
+- Read back afterwards: manifest `0.6.0-rc.16`; config entry `loaded`;
+  overview contract 6 with three devices; no system log entry from the
+  integration.
+- Seen in the owner's browser on the installed panel: panel config version
+  `0.6.0-rc.16` with the `schema` key and the new labels; the wheel page shows
+  the ledger with the "add an action" row, the two cards "Aktivní kanály" and
+  "Číselník", `ha-selector` controls, and the header at its 16 px offset.
+  Nothing was clicked that saves.
+
+**Single best next action:** the owner saves one binding and one dial change
+through the new controls and reports; then the stable-release mechanics in
+`docs/V0.6.0_CHECKLIST.md` item 5.
+
 ## Panel polish Phases 2 to 5 implemented (2026-10-04)
 
 Status: **Code + local tests + one read-only look in the owner's Home
