@@ -15,8 +15,13 @@ from custom_components.ikea_bilresa.const import SUBENTRY_BINDING
 
 
 def test_only_physical_device_platform_is_forwarded() -> None:
-    """The integration overview must not gain an integration service device."""
-    assert PLATFORMS == [Platform.EVENT]
+    """The integration overview must not gain an integration service device.
+
+    Every forwarded platform attaches its entities to a wheel's own reconciled
+    device identifiers. A platform that needed a device of its own would be the
+    regression this guards against.
+    """
+    assert PLATFORMS == [Platform.EVENT, Platform.NUMBER, Platform.SWITCH]
 
 
 @pytest.mark.asyncio
@@ -30,7 +35,7 @@ async def test_migration_removes_connection_service_device(monkeypatch) -> None:
         id="service-device-id", entry_type=DeviceEntryType.SERVICE
     )
     device_registry = MagicMock()
-    device_registry.async_get_device.return_value = service_device
+    device_registry.async_get_device_by_identifier.return_value = service_device
     monkeypatch.setattr(
         integration, "async_get_entity_registry", lambda hass: entity_registry
     )
@@ -71,6 +76,9 @@ async def test_migration_removes_connection_service_device(monkeypatch) -> None:
     )
     entity_registry.async_remove.assert_called_once_with(
         "binary_sensor.ikea_bilresa_connection"
+    )
+    device_registry.async_get_device_by_identifier.assert_called_once_with(
+        ("ikea_bilresa", "entry-id"), "entry-id"
     )
     device_registry.async_remove_device.assert_called_once_with("service-device-id")
     hass.config_entries.async_update_subentry.assert_called_once_with(

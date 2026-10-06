@@ -1,4 +1,4 @@
-# IKEA BILRESA (plynulý scroll) pro Home Assistant
+# IKEA BILRESA pro Home Assistant
 
 > **Předávání vývoje:** aktuální stav implementace, úroveň ověření a prioritní
 > backlog jsou v [PROJECT_STATUS.md](PROJECT_STATUS.md). Společný postup vývoje
@@ -10,19 +10,31 @@
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
 [![license](https://img.shields.io/github/license/Vituhlos/ha-ikea-bilresa)](LICENSE)
 
-Vrátí **kolečku IKEA BILRESA** (Matter přes Thread) plynulé ovládání — takové,
-jaké má na originálním IKEA hubu DIRIGERA — tím, že reaguje na **`MultiPressOngoing`
-události v reálném čase**, které vestavěná Matter integrace v Home Assistantu
-zahazuje.
+Přidává ovládání pro **kolečko i dvoutlačítko IKEA BILRESA** (Matter přes
+Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, takže
+je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
+propojení, spouštěče automatizací a stejný panel BILRESA.
 
-> **Stav:** poslední stabilní vydání je v0.5.0; prerelease v0.5.9-rc.12
-> přepracovává vizuální hierarchii panelu -- páteř kanálů zrcadlící tři fyzické
-> polohy kolečka, živý test vedený výsledkem, lehčí nenastavené kanály a
-> opravený přepínací rail -- nad schválenou V2 ikonou BILRESA a Material Rounded
-> gesty. Jen vizuál; Matter, propojení a gesta se nemění.
+> **Stav:** poslední stabilní vydání je v0.5.0; prerelease **v0.6.0-rc.6**
+> přidává dvoutlačítko BILRESA v rozsahu B0–B3. Obě tlačítka mají nezávislé
+> eventy, triggery a propojení; existující panel mění pracovní plochu kolečka
+> `1 / 2 / 3` na tlačítka `1 / 2` a zachovává přizpůsobený Živý test. RC.3
+> zachovává opravené rozpoznání reálného zařízení, podporuje Matter Server
+> 9.1.0/schema 12 přes kompatibilní profil schématu 11 a opravuje reálný overflow
+> E2489, při kterém se `MultiPressComplete(0)` chybně vyhodnotil jako jednoduchý
+> stisk. Řízený restart Matter Serveru v RC.3 odhalil předčasné přepnutí na
+> záložní zdroj. RC.4 zachovává hlavní Matter klient i během této dočasné mezery;
+> přesně nainstalovaný kandidát prošel návratem bez fallbacku a první fyzický
+> stisk doručil právě jednou; následně prošel i cílenou simulací poruch B4.
+> RC.5 provede každý potvrzený rotační `InitialPress` okamžitě, přesně jej
+> odečte od pozdějších kumulativních počtů a na mezích cíle neopakuje totožné
+> volání služby. RC.6 navíc brání opožděnému hlášení stavu cíle, aby během
+> aktivního otáčení nesmazalo potvrzené kroky, a to ani při rychlé změně směru.
+> Automatické ověření je hotové; řízené ladění sekce G používá uživatelem
+> vybrané `Kolečko Obývák`.
 >
-> Malý patch release train `0.5.1`–`0.5.7` je v
-> [docs/ROADMAP.md](docs/ROADMAP.md).
+> Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
+> [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ---
 
@@ -50,8 +62,8 @@ zahazuje.
 
 BILRESA se přes Matter hlásí jako **generický spínač (Generic Switch)** s multi-press
 událostmi. Matter integrace v HA zveřejňuje jen `MultiPressComplete` — počká, až
-otáčení *ukončíš*, a pak pošle jednu dávku „N stisků", navíc omezenou na 8. Výsledek
-je laglé, skákavé stmívání a rychlé zatočení nad 8 zářezů se úplně ztratí.
+otáčení *ukončíte*, a pak pošle jednu dávku „N stisků", navíc omezenou na 8. Výsledek
+je laglé, skákavé stmívání a rychlé otočení o víc než 8 cvaknutí se úplně ztratí.
 
 Zařízení přitom posílá i **`MultiPressOngoing`** — průběžný čítač v reálném čase,
 zatímco točíš — což je přesně to, co dělá hub DIRIGERA plynulým. Tato integrace
@@ -67,13 +79,17 @@ Navazující práce v HA:
 
 - ⚡ **Reakce v reálném čase** — reaguje na `MultiPressOngoing` už během otáčení,
   ne až po zastavení.
-- 🔢 **Správné počítání zářezů** — gesture engine převádí kumulativní, dávkovaný
+- 🔢 **Správné počítání cvaknutí** — gesture engine převádí kumulativní, dávkovaný
   čítač kolečka na **delty za jednotlivé události** (až 18 na gesto), takže se jas
   posune o správnou hodnotu.
-- 🧭 **Automatické nalezení libovolného počtu koleček** — kanály a směry se čtou
-  z Matter deskriptorů každého kolečka; nic není napevno.
+- 🧭 **Automatické nalezení libovolného počtu zařízení BILRESA** — kolečka a
+  dvoutlačítka se rozlišují podle Matter endpointů, ne podle názvu produktu
+  nebo konkrétní instalace.
 - 🎛️ **Čisté události** — `rotate_up` / `rotate_down` (s počtem `notches`),
-  `press` / `double_press` / `triple_press`, `hold`, `release`.
+  `press` / `double_press` / `triple_press`, `hold`, `release` pro kolečko;
+  tlačítko 1/2 nabízí `press`, `double_press`, `hold`, `release`.
+- 🔘 **Nezávislá propojení dvoutlačítka** — každé tlačítko může přepínat jiný
+  cíl, nebo mohou na společném světle používat pevný směr zesílit/zeslabit.
 - 🪶 **Žádné závislosti navíc** — drobný WebSocket klient nad `aiohttp`, nic se
   neinstaluje ani nerozbíjí při aktualizacích.
 - 🛡️ **Bezpečné a pasivní** — jen *poslouchá*; nikdy neposílá příkazy zařízením,
@@ -82,8 +98,9 @@ Navazující práce v HA:
 ## Jak to funguje
 
 ```
-kolečko BILRESA ──Matter/Thread──▶ Matter Server ──WS──▶ tato integrace ──▶ event entity
-                                                                          └▶ ikea_bilresa_event
+kolečko / dvoutlačítko BILRESA ──Matter/Thread──▶ Matter Server ──WS──▶ tato integrace
+                                                                       ├▶ event entity
+                                                                       └▶ ikea_bilresa_event
 ```
 
 Integrace běžně znovu použije existující subscription klienta `MatterClient` z
@@ -96,12 +113,16 @@ Každé kolečko má **3 kanály**, každý = 3 Matter Switch endpointy:
 
 | Role | Matter schopnosti |
 |------|-------------------|
-| Scroll ↑ / ↓ (rotary) | MomentarySwitch + Release + MultiPress, `MultiPressMax = 18` |
+| Otáčení ↑ / ↓ | MomentarySwitch + Release + MultiPress, `MultiPressMax = 18` |
 | Tlačítko (stisk) | navíc LongPress, `MultiPressMax = 3` |
+
+Dvoutlačítko E2489 má dva samostatné tlačítkové endpointy bez označení kanálu.
+Každý vytvoří vlastní event entitu Tlačítko 1/2 a podporuje jednoduchý stisk,
+dvojitý stisk, podržení a uvolnění (`MultiPressMax = 2`).
 
 ## Požadavky
 
-- Home Assistant **2026.6** nebo novější.
+- Home Assistant **2026.8** nebo novější.
 - Add-on **Matter Server** (nebo externí Matter Server) s BILRESA kolečky už
   spárovanými do Matteru a funkčními.
 - Nakonfigurovaná jádrová integrace **Matter** (slouží k automatickému zjištění
@@ -111,53 +132,55 @@ Každé kolečko má **3 kanály**, každý = 3 Matter Switch endpointy:
 
 ### HACS (doporučeno)
 
-1. HACS → ⋮ → **Vlastní repozitáře** → přidej
+1. HACS → ⋮ → **Vlastní repozitáře** → přidejte
    `https://github.com/Vituhlos/ha-ikea-bilresa`, kategorie **Integration**.
-2. Nainstaluj **IKEA BILRESA**.
-3. **Restartuj Home Assistant.**
+2. Nainstalujte **IKEA BILRESA**.
+3. **Restartujte Home Assistant.**
 
 ### Ručně
 
-Zkopíruj složku `custom_components/ikea_bilresa/` do
-`config/custom_components/` v Home Assistantu a restartuj.
+Zkopírujte složku `custom_components/ikea_bilresa/` do
+`config/custom_components/` v Home Assistantu a restartujte.
 
 ## Nastavení
 
 **Nastavení → Zařízení a služby → Přidat integraci → IKEA BILRESA.**
-Potvrď předvyplněnou URL Matter Serveru (měň ji jen pokud běží jinde). Integrace
-najde všechna kolečka automaticky a vytvoří jedno zařízení na kolečko s jednou
-event entitou na kanál.
+Potvrďte předvyplněnou URL Matter Serveru (měňte ji, jen pokud běží jinde). Integrace
+najde všechna podporovaná zařízení BILRESA automaticky. Kolečko dostane event
+entitu na každý kanál, dvoutlačítko na každé fyzické tlačítko.
 
 ### GUI ovládací propojení (ovládání bez YAML)
 
-Nechceš psát automatizace? U položky **IKEA BILRESA**
-(Nastavení → Zařízení a služby) klikni na **＋ Přidat → Ovládací propojení** a vyber:
+Nechcete psát automatizace? U položky **IKEA BILRESA**
+(Nastavení → Zařízení a služby) klikněte na **＋ Přidat → Ovládací propojení** a vyberte:
 
-- výchozí profil (světlo, média, roleta, klima, scény nebo vlastní), případně
-  zkopíruj existující propojení jako výchozí nastavení,
+- výchozí profil (světlo, média, kryt, klimatizace, scény nebo vlastní), případně
+  zkopírujte existující propojení jako výchozí nastavení,
 - **Kolečko** a **Kanál**,
-- **cílovou entitu**, kterou scroll ovládá,
-- **Změnu jasu na zářez** (%), **Minimální jas** (%, `0` = otočením dolů lze
+- **cílovou entitu**, kterou otáčení ovládá,
+- **Změnu jasu na jedno cvaknutí** (%), **Minimální jas** (%, `0` = otočením dolů lze
   světlo vypnout) a **Přechod** (s),
 - **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
   **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
   (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači),
-- **odezvu tlačítka**: rychlý jednoduchý stisk pro okamžité přímé ovládání,
+- **odezvu tlačítka**: okamžitě při prvním stisku, rychle po krátkém uvolnění,
   nebo přesné rozpoznání jednoho, dvou či tří stisků,
 - volitelný seřazený seznam **scén**, které jednoduché stisky postupně aktivují
   (má přednost před běžnou akcí jednoduchého stisku),
-- **akci při podržení**: přepnout entitu, plynule měnit cíl scrollu, nebo nic.
+- **akci při podržení**: přepnout entitu, plynule měnit cíl otáčení, nebo nic.
   Rampování začne nahoru a po každém dokončeném podržení obrátí směr, protože
   událost dlouhého stisku BILRESY sama žádný směr nenese.
 
-Pro rychlou odezvu zvol **Rychlý jednoduchý stisk**; akce tohoto propojení se
-provede hned po uvolnění tlačítka. Pokud propojení používá cíle pro dvojstisk či
-trojstisk, zvol rozpoznání více stisků, které počká na dokončovací událost
-BILRESY. Existující propojení bez uložené volby zachovají dosavadní čekání,
-dokud režim výslovně nezměníš. Veřejné event entity a device triggery přesně
-rozlišují jeden, dva a tři stisky v obou režimech.
+Pro nejnižší latenci přímého ovládání zvolte **Okamžitě při stisku**. Protože při
+prvním eventu ještě nelze poznat, zda vznikne dvojitý stisk nebo podržení, lze tento
+režim uložit jen tehdy, když jsou tyto samostatné akce vypnuté. **Rychle po
+uvolnění** reaguje po prvním krátkém uvolnění a zůstává bezpečné pro běžné
+podržení; rozpoznání více stisků čeká na dokončovací událost BILRESY. Existující
+propojení bez uložené volby zachovají dosavadní čekání, dokud režim výslovně
+nezměníte. Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
+tři stisky ve všech režimech.
 
-Integrace pak to světlo stmívá v reálném čase. Přidej si klidně víc propojení —
+Integrace pak to světlo stmívá v reálném čase. Přidejte si klidně víc propojení —
 jedno na kanál kolečka — takže to škáluje na libovolný počet koleček bez YAML.
 Když cíl chybí nebo je `unknown` či `unavailable`, propojení neposílá žádný
 příkaz; rampování se bezpečně zastaví a další akce po návratu vyjde ze skutečného
@@ -166,7 +189,13 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
 
-Zapnutá akcelerace vychází z počtu dekódovaných zářezů za uplynulý čas, ne z
+U dvoutlačítka stejný průvodce nejdřív vybere Tlačítko 1 nebo Tlačítko 2 a pak
+zobrazí jen podporované akce: nezávislý cíl jednoduchého/dvojitého stisku a
+podržení/uvolnění. Nejsou tam pole pro otáčení, scény ani trojitý stisk. Podržení
+může směr jasu střídat nebo ho držet pevně nahoru/dolů, takže dvě tlačítka mohou
+pro jedno světlo vytvořit softwarový pár ve stylu DIRIGERA.
+
+Zapnuté zrychlení vychází z počtu dekódovaných cvaknutí za uplynulý čas, ne z
 velikosti jedné Matter dávky. Resetuje se po pauze, změně směru, dokončení gesta
 a reconnectu; výchozí hodnota zůstává vypnutá do fyzického doladění. Ochrana po
 stisku sleduje hranice gest, takže stará dobíhající dávka nevrátí akci tlačítka,
@@ -181,7 +210,7 @@ vydání jsou označené v [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 Každý kanál kolečka se stane `event` entitou, např.
 `event.bilresa_scroll_wheel_channel_1`. Její stav je časové razítko poslední
-akce; atribut `event_type` (a `notches` / `presses`) říká, co se stalo. Používej ji
+akce; atribut `event_type` (a `notches` / `presses`) říká, co se stalo. Používejte ji
 jako hlavní spouštěč automatizace. Entity používají nativní button event device
 class Home Assistantu; kompatibilní doménová událost navíc obsahuje registry
 `device_id`, pokud je dostupné.
@@ -190,17 +219,60 @@ class Home Assistantu; kompatibilní doménová událost navíc obsahuje registr
 
 | `event_type` | Význam | Atribut navíc |
 |--------------|--------|---------------|
-| `rotate_up` | Zatočeno nahoru o *N* zářezů | `notches` |
-| `rotate_down` | Zatočeno dolů o *N* zářezů | `notches` |
+| `rotate_up` | Otočeno nahoru o *N* cvaknutí | `notches` |
+| `rotate_down` | Otočeno dolů o *N* cvaknutí | `notches` |
 | `press` | Jednoduchý stisk | `presses` = 1 |
-| `double_press` | Dvojstisk | `presses` = 2 |
-| `triple_press` | Trojstisk | `presses` = 3 |
+| `double_press` | Dvojitý stisk | `presses` = 2 |
+| `triple_press` | Trojitý stisk | `presses` = 3 |
 | `hold` | Podržení tlačítka | — |
 | `release` | Uvolnění po podržení | — |
 
+### Spouštěče
+
+Integrace nabízí jeden spouštěč automatizace na každé gesto. V editoru
+automatizací vyberte jako cíl kolečko (nebo některou z jeho entit `Kanál`) a zvolte
+spouštěč:
+
+| Spouštěč | Spustí se, když |
+|----------|-----------------|
+| `ikea_bilresa.rotated_up` | je kanál otočen nahoru |
+| `ikea_bilresa.rotated_down` | je kanál otočen dolů |
+| `ikea_bilresa.pressed` | je tlačítko stisknuto jednou |
+| `ikea_bilresa.double_pressed` | je tlačítko stisknuto dvakrát |
+| `ikea_bilresa.triple_pressed` | je tlačítko kolečka stisknuto třikrát |
+| `ikea_bilresa.held` | je tlačítko dlouze drženo |
+| `ikea_bilresa.released` | je tlačítko uvolněno po dlouhém stisknutí |
+
+```yaml
+triggers:
+  - trigger: ikea_bilresa.rotated_up
+    target:
+      entity_id: event.bilresa_scroll_wheel_channel_1
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.priklad
+    data:
+      brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
+      transition: 1
+mode: parallel
+max: 20
+```
+
+Cíl, který pojmenuje celé zařízení, pokrývá všechny kanály daného kolečka.
+Dvoutlačítko nemá otáčení ani trojité stisknutí, takže tyto dva spouštěče se
+pro něj nikdy nespustí.
+
+> **Přechod z 0.5.x nebo dřívějšího prerelease 0.6.0:** dřívější *spouštěče
+> zařízení* („Kanál 1 otočeno nahoru" na stránce zařízení) byly odstraněny. Od
+> Home Assistantu 2026.8 patří zařízení jediné integraci a spouštěč zařízení
+> funguje jen na zařízení, které jeho integrace vlastní. Automatizace, které
+> nějaký stále používají, najdete v **Nastavení → Systém → Opravy**; nahraďte
+> v nich spouštěč odpovídajícím spouštěčem z tabulky výše.
+
 ### Příklady automatizací
 
-**Plynulé stmívání** — posuň jas o počet zářezů, s `transition`, aby světlo mezi
+**Plynulé stmívání** — posuňte jas o počet cvaknutí, s `transition`, aby světlo mezi
 ~1s dávkami kolečka plynule najíždělo:
 
 ```yaml
@@ -223,7 +295,7 @@ mode: parallel
 max: 20
 ```
 
-Zduplikuj s `rotate_down` a záporným krokem pro ztlumení a přidej spouštěč
+Zduplikujte s `rotate_down` a záporným krokem pro ztlumení a přidejte spouštěč
 `press` volající `light.toggle` pro tlačítko.
 
 ### Sběrnicová událost `ikea_bilresa_event`
@@ -250,7 +322,7 @@ rozliší.
 
 ## Řešení potíží
 
-**Zapni debug logování** (Nastavení → Systém → Logy, nebo):
+**Zapněte debug logování** (Nastavení → Systém → Logy, nebo):
 
 ```yaml
 logger:
@@ -258,10 +330,10 @@ logger:
     custom_components.ikea_bilresa: debug
 ```
 
-- **Nenašla se kolečka** — ověř, že kolečko funguje v jádrové Matter integraci a
+- **Nenašla se kolečka** — ověřte, že kolečko funguje v jádrové Matter integraci a
   že URL Matter Serveru je správná. Log při startu vypíše
   `Discovered BILRESA wheel: node …`.
-- **Při otáčení nechodí události** — zkontroluj baterii kolečka a že se jádrové
+- **Při otáčení nechodí události** — zkontrolujte baterii kolečka a že se jádrové
   Matter `event.*` entity při otáčení aktualizují.
 - **Špatný kanál** — kolečko má fyzický přepínač 3 kanálů; posílá ten aktivní.
 
@@ -275,9 +347,9 @@ logger:
 - [x] CI, unit testy a diagnostics. *(0.5)*
 - [x] Hot add/remove koleček, stav připojení/Repairs a in-place bindingy.
       *(další)*
-- [x] Režimy scrollu (jas / teplota bílé / barva), akcelerace, max jas,
+- [x] Režimy otáčení (jas / teplota bílé / barva), zrychlení, max jas,
       akce double/triple/hold. *(další)*
-- [x] **Device triggers** a **blueprint na plynulé stmívání**. *(další)*
+- [x] **Spouštěče automatizací** a **blueprint na plynulé stmívání**. *(další)*
 - [x] Cyklení scén, hold-to-ramp a informace System Health. *(další)*
 - [x] Změna URL Matter Serveru přes parent reconfigure flow. *(další)*
 - [x] Prověřené discovery — HA nemá podporovaný discovery zdroj pro závislost na
@@ -293,7 +365,7 @@ logger:
 
 ## Omezení
 
-- Kolečko má vestavěnou ~500ms–1s anti-flood brzdu mezi dávkami zářezů, takže se
+- Kolečko má vestavěnou ~500ms–1s anti-flood brzdu mezi dávkami cvaknutí, takže se
   to *blíží* pocitu DIRIGERA, ale není to úplně analogově spojité. Odpovídající
   `transition` na světle dávky přemostí do plynulého náběhu.
 - Cílová světla jdou přes Home Assistant (ne přímý Matter/Zigbee bind), což přidá
@@ -301,8 +373,8 @@ logger:
 
 ## Přispívání
 
-Issues a pull requesty jsou vítány. Při hlášení problému prosím uveď firmware
-kolečka a verze Home Assistantu / Matter Serveru a u problémů se scrollem přilož
+Issues a pull requesty jsou vítány. Při hlášení problému prosím uveďte firmware
+kolečka a verze Home Assistantu / Matter Serveru a u problémů s otáčením přiložte
 debug log událostí. Postup vývoje a hardwarového ověření je v
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) a
 [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).

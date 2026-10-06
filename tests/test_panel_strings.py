@@ -90,6 +90,23 @@ def test_panel_strings_returns_a_copy() -> None:
     assert STRINGS["cs"]["connected"] == "Připojeno"
 
 
+def test_unconfigured_live_test_uses_human_copy() -> None:
+    """A recognized press is not presented as a missing runtime calculation."""
+    assert STRINGS["cs"]["result_gesture_press"] == "Stisk rozpoznán"
+    assert (
+        STRINGS["cs"]["dispatch_not_configured_button"]
+        == "Toto tlačítko zatím nic neovládá"
+    )
+    assert "vypočtený výsledek" not in STRINGS["cs"]["result_unavailable"].lower()
+    assert STRINGS["cs"]["live_buttons_heading"] == "Tlačítka"
+
+
+def test_response_copy_distinguishes_press_release_and_completion() -> None:
+    assert "initial press" in STRINGS["en"]["button_response_instant"].lower()
+    assert "short release" in STRINGS["en"]["button_response_fast"].lower()
+    assert "počkat" in STRINGS["cs"]["button_response_multi_press"].lower()
+
+
 def test_the_frontend_does_not_hard_code_user_facing_english() -> None:
     """Strings live in Python so the two languages cannot drift.
 
@@ -117,7 +134,8 @@ def test_the_frontend_does_not_hard_code_user_facing_english() -> None:
         "Try again",
         "Open Home Assistant sidebar",
         "Live test",
-        "Calculated result not reported",
+        "Latest gesture",
+        "Gesture recognized",
         "Dispatch outcome not reported",
         "Recommended action",
     ):

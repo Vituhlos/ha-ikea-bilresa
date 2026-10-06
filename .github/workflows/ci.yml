@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Mondays 05:17 UTC: early warning for upcoming Home Assistant changes.
+    - cron: "17 5 * * 1"
 
 jobs:
   hassfest:
@@ -67,3 +70,21 @@ jobs:
           --cov=custom_components/ikea_bilresa
           --cov-report=term-missing
           --cov-report=xml
+
+  prerelease:
+    name: Unit tests (newest Home Assistant pre-release)
+    # Reports only. A failure here means a future Home Assistant release will
+    # break something; it must not block a pull request against today's pins.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # Each release of the test helper pins the Home Assistant version it was
+      # built for, betas included, so its newest release brings the newest
+      # Home Assistant pre-release together with matching pytest plugins.
+      - run: pip install --upgrade pytest-homeassistant-custom-component
+      - run: pip list | grep -i -E "^homeassistant |pytest-homeassistant"
+      - run: pytest -q

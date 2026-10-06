@@ -23,13 +23,14 @@ from homeassistant.helpers.entity_registry import async_get as async_get_entity_
 
 from .const import CONF_URL, DEFAULT_MATTER_URL, DOMAIN, SUBENTRY_BINDING
 from .coordinator import BilresaCoordinator
+from .legacy_triggers import async_setup_legacy_trigger_notice
 from .panel import async_remove_panel, async_setup_panel
 from .panel_api import async_register_commands
 from .presentation import migrate_generated_binding_title
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.EVENT]
+PLATFORMS: list[Platform] = [Platform.EVENT, Platform.NUMBER, Platform.SWITCH]
 
 type BilresaConfigEntry = ConfigEntry[BilresaCoordinator]
 
@@ -55,8 +56,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: BilresaConfigEntry) ->
             entity_registry.async_remove(entity_id)
 
         device_registry = async_get_device_registry(hass)
-        service_device = device_registry.async_get_device(
-            identifiers={(DOMAIN, entry.entry_id)}
+        service_device = device_registry.async_get_device_by_identifier(
+            (DOMAIN, entry.entry_id), entry.entry_id
         )
         if (
             service_device is not None
@@ -94,8 +95,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: BilresaConfigEntry) -> b
     _LOGGER.info("Connecting IKEA BILRESA listener to Matter Server at %s", url)
     await coordinator.async_start()
 
+    # Settings before the platforms: a dial or switch must know on its first
+    # state write whether its channel is disabled, rather than appearing
+    # available for a moment and then correcting itself.
+    coordinator.async_setup_settings(entry)
+    coordinator.async_setup_device_links(entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_setup_bindings(entry)
+    async_setup_legacy_trigger_notice(hass, entry)
 
     # Panel last, and never fatal: a panel that cannot be served must degrade to
     # "no panel", not to a failed setup. Wheels, bindings and events do not
@@ -115,6 +122,7 @@ async def _async_update_listener(
     if configured_url != entry.runtime_data.url:
         await hass.config_entries.async_reload(entry.entry_id)
         return
+    entry.runtime_data.async_setup_settings(entry)
     entry.runtime_data.async_setup_bindings(entry)
 
 

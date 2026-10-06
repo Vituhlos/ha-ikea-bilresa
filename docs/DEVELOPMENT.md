@@ -49,6 +49,9 @@ ruff check custom_components tests
 mypy custom_components/ikea_bilresa
 node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js
 node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs
+# Optional: look at the panel without a Home Assistant instance.
+# See the docstring of tools/panel_preview/build.py for what it cannot show.
+python tools/panel_preview/build.py
 git diff --check
 ```
 
@@ -61,6 +64,34 @@ python -m pytest -q
 Run coverage through the repository CI command and keep integration-module
 coverage above 95% before closing work package `0.5.3`. A missing local
 dependency or incompatible interpreter is a recorded limitation, not a pass.
+
+#### Running the suite on Windows
+
+Home Assistant does not import on Windows as shipped: `homeassistant.runner`
+needs the POSIX-only `fcntl` and `resource` modules, and the test helper blocks
+the localhost socket pair a Windows event loop is built from. The suite does
+run with three small files placed in the **ignored** virtualenv, never in the
+repository:
+
+```powershell
+uv pip install --system-certs --python .venv\Scripts\python.exe -r requirements-test.txt
+```
+
+- `.venv/Lib/site-packages/fcntl.py`: `LOCK_EX = 2`, `LOCK_NB = 4`,
+  `LOCK_UN = 8`, and no-op `flock(fd, operation)` and `fcntl(fd, cmd, arg=0)`;
+- `.venv/Lib/site-packages/resource.py`: `RLIMIT_NOFILE = 7`, a
+  `getrlimit()` returning `(4096, 4096)` and a no-op `setrlimit()`;
+- `.venv/Lib/site-packages/bilresa_windows_local.py`: a pytest plugin whose
+  only statement replaces `pytest_socket.disable_socket` with a no-op. The
+  helper's localhost-only host restriction stays in force.
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -p bilresa_windows_local
+```
+
+Record such a run as **Unit (local, Windows stand-ins)**. It is evidence, not
+the gate: Linux CI stays canonical, and nothing here may be copied into the
+repository or into CI.
 
 ### Gate C: Home Assistant validation
 

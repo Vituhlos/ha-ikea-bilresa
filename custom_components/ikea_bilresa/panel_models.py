@@ -20,6 +20,7 @@ two in step, or the panel will render fields nobody produces.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from typing import Any
@@ -40,16 +41,20 @@ from .const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
     CONF_MODE,
     CONF_NODE_ID,
+    CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_TARGET,
     CONF_TRIPLE_TARGET,
     DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
+    DEFAULT_MODE,
     DOMAIN,
+    HOLD_NONE,
     HOLD_RAMP,
     HOLD_TOGGLE,
     MODE_BRIGHTNESS,
@@ -60,13 +65,25 @@ from .const import (
     MODE_NUMBER,
     MODE_TEMPERATURE,
     MODE_VOLUME,
+    ROLE_BUTTON,
     SUBENTRY_BINDING,
+    SUBENTRY_WHEEL,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
 from .model import BilresaWheel
 from .panel_strings import localize
 
-CONTRACT_VERSION = 3
+CONTRACT_VERSION = 6
+
+# What the panel may say about a configured target, least to most severe.
+TARGET_OK = "ok"
+# The entity exists and cannot be reached right now: a bulb switched off at
+# the wall, a device that is rebooting. Nothing in the binding is wrong.
+TARGET_UNAVAILABLE = "unavailable"
+# Home Assistant no longer knows the entity at all. Only this one is a
+# problem the owner can fix by editing the binding.
+TARGET_MISSING = "missing"
+_TARGET_SEVERITY = (TARGET_OK, TARGET_UNAVAILABLE, TARGET_MISSING)
 
 # Deliberately short: this is an addressing token, not a secret. Long enough not
 # to collide across a household, short enough to read in a bug report.
@@ -97,6 +114,9 @@ class GestureSummary:
     gesture_label: str
     action_label: str
     target_label: str | None = None
+    target_state: str = TARGET_OK
+    # True only for TARGET_MISSING. Kept beside target_state so a panel
+    # script cached from before contract 6 still marks the right rows.
     target_missing: bool = False
 
 
@@ -114,26 +134,68 @@ class ChannelSummary:
     """One channel of one wheel, as a human reads it."""
 
     channel: int
+    # False means the owner switched this selector position off entirely: the
+    # coordinator drops its actions before anything else sees them.
+    enabled: bool = True
+    configured: bool = False
     profile: str | None = None
     behaviour: str | None = None
     target_label: str | None = None
+    target_state: str = TARGET_OK
+    # True only for TARGET_MISSING. Kept beside target_state so a panel
+    # script cached from before contract 6 still marks the right rows.
     target_missing: bool = False
     actions: list[GestureSummary] = field(default_factory=list)
     binding: BindingEditor | None = None
 
 
 @dataclass(slots=True)
+class ButtonSummary:
+    """One physical button, addressed by its safe 1-based display index."""
+
+    button: int
+    configured: bool = False
+    behaviour: str | None = None
+    target_label: str | None = None
+    target_state: str = TARGET_OK
+    # True only for TARGET_MISSING. Kept beside target_state so a panel
+    # script cached from before contract 6 still marks the right rows.
+    target_missing: bool = False
+    actions: list[GestureSummary] = field(default_factory=list)
+    binding: BindingEditor | None = None
+
+
+@dataclass(slots=True)
+class WheelSettingsEditor:
+    """The editable per-wheel settings, with a concurrency token.
+
+    `subentry_id` is None until the owner saves for the first time: a wheel
+    without stored settings still renders its defaults, and the first save
+    creates the subentry.
+    """
+
+    subentry_id: str | None
+    revision: str | None
+    step: float
+    acceleration: float
+
+
+@dataclass(slots=True)
 class WheelOverview:
-    """One physical wheel. No node ID, no serial, no product name."""
+    """One physical BILRESA device. No node ID, endpoint, serial or product."""
 
     key: str
+    variant: str
     name: str
     area: str | None
     availability: WheelAvailability
     linked_to_matter: bool
     last_activity: str | None
     last_active_channel: int | None
+    last_active_button: int | None
     channels: list[ChannelSummary] = field(default_factory=list)
+    buttons: list[ButtonSummary] = field(default_factory=list)
+    settings: WheelSettingsEditor | None = None
 
 
 @dataclass(slots=True)
@@ -164,16 +226,32 @@ def _entity_label(hass: HomeAssistant, entity_id: str | None) -> str | None:
     return entity_id
 
 
-def _target_missing(hass: HomeAssistant, entity_id: str | None) -> bool:
-    """Whether a configured target can no longer be acted on.
+def _target_state(hass: HomeAssistant, entity_id: str | None) -> str:
+    """Tell a target that is gone from one that is only out of reach.
+
+    ``unknown`` is not a fault: a scene that was never activated and an idle
+    media player both report it and both work. An entity with no state that
+    the registry still knows (disabled, or its integration is not loaded) is
+    out of reach, not gone.
 
     Detection only. The binding's own fail-closed behaviour is untouched — this
     must never be the thing that decides whether a command is sent.
     """
     if not entity_id:
-        return False
+        return TARGET_OK
     state = hass.states.get(entity_id)
-    return state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+    if state is None:
+        if er.async_get(hass).async_get(entity_id) is not None:
+            return TARGET_UNAVAILABLE
+        return TARGET_MISSING
+    if state.state == STATE_UNAVAILABLE:
+        return TARGET_UNAVAILABLE
+    return TARGET_OK
+
+
+def _worst_target_state(states: Iterable[str]) -> str:
+    """Return the most severe of several target states."""
+    return max(states, key=_TARGET_SEVERITY.index, default=TARGET_OK)
 
 
 def _as_int(value: Any) -> int | None:
@@ -215,6 +293,47 @@ def _binding_by_channel(entry: Any, node_id: int) -> dict[int, Any]:
     return bindings
 
 
+@callback
+def settings_subentry(entry: Any, node_id: int) -> Any | None:
+    """This wheel's `wheel_settings` subentry, if it has been saved yet."""
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_WHEEL:
+            continue
+        if _as_int(dict(subentry.data).get(CONF_NODE_ID)) == node_id:
+            return subentry
+    return None
+
+
+@callback
+def _settings_editor(entry: Any, node_id: int, settings: Any) -> WheelSettingsEditor:
+    """Serialize a wheel's settings with a token for conflict detection."""
+    subentry = settings_subentry(entry, node_id)
+    return WheelSettingsEditor(
+        subentry_id=subentry.subentry_id if subentry else None,
+        # `binding_revision` is generic over subentries despite its name; the
+        # token has to change whenever the stored data does, nothing more.
+        revision=binding_revision(subentry) if subentry else None,
+        step=settings.step,
+        acceleration=settings.acceleration,
+    )
+
+
+@callback
+def _binding_by_endpoint(entry: Any, node_id: int) -> dict[int, Any]:
+    """Index this dual button's binding subentries by Matter endpoint."""
+    bindings: dict[int, Any] = {}
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_BINDING:
+            continue
+        data = dict(subentry.data)
+        if _as_int(data.get(CONF_NODE_ID)) != node_id:
+            continue
+        endpoint = _as_int(data.get(CONF_ENDPOINT))
+        if endpoint is not None:
+            bindings[endpoint] = subentry
+    return bindings
+
+
 # The `panel_strings` key for each stored scroll mode.
 #
 # NOT keyed by CONF_BINDING_PROFILE: that is a config-flow-only field used to
@@ -230,6 +349,20 @@ _MODE_KEYS = {
     MODE_TEMPERATURE: "mode_temperature",
     MODE_FAN: "mode_fan_speed",
     MODE_NUMBER: "mode_number",
+}
+
+# The same modes, named as the quantity a rotation moves rather than as the
+# behavior of the binding. Kept beside `_MODE_KEYS` so a new mode cannot be
+# added to one map and forgotten in the other.
+_QUANTITY_KEYS = {
+    MODE_BRIGHTNESS: "quantity_brightness",
+    MODE_COLOR_TEMP: "quantity_color_temp",
+    MODE_COLOR: "quantity_color",
+    MODE_VOLUME: "quantity_volume",
+    MODE_COVER: "quantity_cover_position",
+    MODE_TEMPERATURE: "quantity_temperature",
+    MODE_FAN: "quantity_fan_speed",
+    MODE_NUMBER: "quantity_number",
 }
 
 
@@ -269,16 +402,18 @@ def _gesture_summary(
     target: str | None = None,
 ) -> GestureSummary:
     """Build one localized read-only gesture row."""
+    state = _target_state(hass, target)
     return GestureSummary(
         gesture=gesture,
         gesture_label=localize(language, f"binding_gesture_{gesture}"),
         action_label=localize(language, action_key),
         target_label=_entity_label(hass, target),
-        target_missing=_target_missing(hass, target),
+        target_state=state,
+        target_missing=state == TARGET_MISSING,
     )
 
 
-def _gesture_summaries(
+def _wheel_gesture_summaries(
     hass: HomeAssistant, data: dict[str, Any], language: str | None
 ) -> list[GestureSummary]:
     """Describe binding behavior without importing or executing binding.py.
@@ -294,12 +429,20 @@ def _gesture_summaries(
     hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
     scenes = list(data.get(CONF_SCENES) or [])
 
+    # Name the quantity the rotation changes, not the act of changing it. The
+    # channel subtitle directly above already names the mode, so repeating it
+    # here would say the same thing twice, and an infinitive ("Adjust target")
+    # reads as a button rather than a description of what the gesture does.
+    # A stored binding may predate the mode field, and BindingRuntime falls back
+    # to the same default, so the ledger must not claim a different quantity
+    # from the one the binding would actually move.
+    mode = str(data.get(CONF_MODE) or DEFAULT_MODE)
     summaries = [
         _gesture_summary(
             hass,
             language,
             "rotation",
-            "action_adjust",
+            _QUANTITY_KEYS.get(mode, "quantity_brightness"),
             target,
         )
     ]
@@ -308,13 +451,17 @@ def _gesture_summaries(
         scene_labels = [
             label for scene in scenes if (label := _entity_label(hass, scene))
         ]
+        scenes_state = _worst_target_state(
+            _target_state(hass, scene) for scene in scenes
+        )
         summaries.append(
             GestureSummary(
                 gesture="short_press",
                 gesture_label=localize(language, "binding_gesture_short_press"),
                 action_label=localize(language, "action_cycle_scenes"),
                 target_label=" / ".join(scene_labels) or None,
-                target_missing=any(_target_missing(hass, scene) for scene in scenes),
+                target_state=scenes_state,
+                target_missing=scenes_state == TARGET_MISSING,
             )
         )
     else:
@@ -367,12 +514,94 @@ def _gesture_summaries(
     return summaries
 
 
+def _button_gesture_summaries(
+    hass: HomeAssistant,
+    data: dict[str, Any],
+    language: str | None,
+    *,
+    multi_press_max: int,
+) -> list[GestureSummary]:
+    """Describe only gestures the dual-button endpoint can actually emit."""
+    click_action = data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION)
+    click_target = data.get(CONF_CLICK_TARGET)
+    summaries = [
+        _gesture_summary(
+            hass,
+            language,
+            "short_press",
+            _CLICK_KEYS.get(click_action, "action_toggle"),
+            None if click_action == CLICK_NONE else click_target,
+        )
+    ]
+    if multi_press_max >= 2:
+        double_target = data.get(CONF_DOUBLE_TARGET)
+        summaries.append(
+            _gesture_summary(
+                hass,
+                language,
+                "double_press",
+                "action_toggle" if double_target else "action_none",
+                double_target,
+            )
+        )
+
+    hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
+    hold_target = data.get(CONF_HOLD_TARGET)
+    if hold_action == HOLD_RAMP:
+        direction = str(data.get(CONF_RAMP_DIRECTION, "alternate"))
+        summaries.append(
+            _gesture_summary(
+                hass,
+                language,
+                "hold",
+                f"action_ramp_{direction}",
+                hold_target,
+            )
+        )
+        summaries.append(
+            _gesture_summary(hass, language, "release", "action_stop_ramp", hold_target)
+        )
+    elif hold_action == HOLD_TOGGLE and hold_target:
+        summaries.append(
+            _gesture_summary(hass, language, "hold", "action_toggle", hold_target)
+        )
+        summaries.append(_gesture_summary(hass, language, "release", "action_none"))
+    else:
+        summaries.append(_gesture_summary(hass, language, "hold", "action_none"))
+        summaries.append(_gesture_summary(hass, language, "release", "action_none"))
+    return summaries
+
+
+def _button_target_label(
+    hass: HomeAssistant, data: dict[str, Any], language: str | None
+) -> str | None:
+    """Summarize one or several configured button targets without hiding either."""
+    targets: list[str] = []
+    if data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION) != CLICK_NONE and (
+        target := data.get(CONF_CLICK_TARGET)
+    ):
+        targets.append(str(target))
+    if target := data.get(CONF_DOUBLE_TARGET):
+        targets.append(str(target))
+    if data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION) != HOLD_NONE and (
+        target := data.get(CONF_HOLD_TARGET)
+    ):
+        targets.append(str(target))
+    unique = list(dict.fromkeys(targets))
+    if not unique:
+        return None
+    if len(unique) > 1:
+        return localize(language, "multiple_targets", count=len(unique))
+    return _entity_label(hass, unique[0])
+
+
 @callback
 def _channel_summaries(
     hass: HomeAssistant,
     wheel: BilresaWheel,
     bindings: dict[int, Any],
     language: str | None,
+    settings: Any,
 ) -> list[ChannelSummary]:
     """One summary per channel the device itself reports.
 
@@ -386,27 +615,87 @@ def _channel_summaries(
     )
     summaries: list[ChannelSummary] = []
     for channel in channels:
+        enabled = settings.channel_enabled(channel)
         subentry = bindings.get(channel)
         if subentry is None:
-            summaries.append(ChannelSummary(channel=channel))
+            summaries.append(ChannelSummary(channel=channel, enabled=enabled))
             continue
         data = dict(subentry.data)
         target = data.get(CONF_TARGET)
         # The click target defaults to the scroll target, mirroring binding.py.
         click_target = data.get(CONF_CLICK_TARGET) or target
-        actions = _gesture_summaries(hass, data, language)
+        actions = _wheel_gesture_summaries(hass, data, language)
+        state = _worst_target_state(
+            [
+                _target_state(hass, target),
+                _target_state(hass, click_target),
+                *(action.target_state for action in actions),
+            ]
+        )
         summaries.append(
             ChannelSummary(
                 channel=channel,
+                enabled=enabled,
+                configured=True,
                 # The stored scroll mode. CONF_BINDING_PROFILE is not persisted.
                 profile=data.get(CONF_MODE),
                 behaviour=_behaviour_label(data, language),
                 target_label=_entity_label(hass, target),
-                target_missing=(
-                    _target_missing(hass, target)
-                    or _target_missing(hass, click_target)
-                    or any(action.target_missing for action in actions)
+                target_state=state,
+                target_missing=state == TARGET_MISSING,
+                actions=actions,
+                binding=(
+                    BindingEditor(
+                        id=subentry.subentry_id,
+                        revision=binding_revision(subentry),
+                        data=editor_data(data),
+                    )
+                    if hasattr(subentry, "subentry_id") and hasattr(subentry, "title")
+                    else None
                 ),
+            )
+        )
+    return summaries
+
+
+@callback
+def _button_summaries(
+    hass: HomeAssistant,
+    wheel: BilresaWheel,
+    bindings: dict[int, Any],
+    language: str | None,
+) -> list[ButtonSummary]:
+    """Return the two physical buttons without exposing their Matter endpoints."""
+    endpoints = sorted(
+        (
+            endpoint
+            for endpoint in wheel.endpoints.values()
+            if endpoint.role == ROLE_BUTTON
+        ),
+        key=lambda endpoint: endpoint.endpoint_id,
+    )
+    summaries: list[ButtonSummary] = []
+    for button, endpoint in enumerate(endpoints, start=1):
+        subentry = bindings.get(endpoint.endpoint_id)
+        if subentry is None:
+            summaries.append(ButtonSummary(button=button))
+            continue
+        data = dict(subentry.data)
+        actions = _button_gesture_summaries(
+            hass,
+            data,
+            language,
+            multi_press_max=endpoint.multi_press_max or 1,
+        )
+        state = _worst_target_state(action.target_state for action in actions)
+        summaries.append(
+            ButtonSummary(
+                button=button,
+                configured=True,
+                behaviour=localize(language, "button_actions"),
+                target_label=_button_target_label(hass, data, language),
+                target_state=state,
+                target_missing=state == TARGET_MISSING,
                 actions=actions,
                 binding=(
                     BindingEditor(
@@ -425,8 +714,8 @@ def _channel_summaries(
 @callback
 def _last_activity(
     hass: HomeAssistant, wheel: BilresaWheel
-) -> tuple[str | None, int | None]:
-    """Return (ISO timestamp, channel) of this wheel's most recent event.
+) -> tuple[str | None, int | None, int | None]:
+    """Return (ISO timestamp, channel, button) for the newest device event.
 
     Read from this integration's own `event` entities, whose state IS the
     timestamp of the last event (`event.py`). The coordinator cannot answer this:
@@ -438,13 +727,31 @@ def _last_activity(
     yet" and the UI must render it as such — never as a fault.
     """
     registry = er.async_get(hass)
-    newest: tuple[str, int] | None = None
-    for channel in sorted(
-        {ep.channel for ep in wheel.endpoints.values() if ep.channel is not None}
-    ):
-        entity_id = registry.async_get_entity_id(
-            "event", DOMAIN, f"{wheel.node_id}_ch{channel}"
+    candidates: list[tuple[str, int | None, int | None]] = []
+    if wheel.is_dual_button:
+        endpoints = sorted(
+            (ep for ep in wheel.endpoints.values() if ep.role == ROLE_BUTTON),
+            key=lambda endpoint: endpoint.endpoint_id,
         )
+        candidates.extend(
+            (f"{wheel.node_id}_ep{endpoint.endpoint_id}", None, button)
+            for button, endpoint in enumerate(endpoints, start=1)
+        )
+    else:
+        candidates.extend(
+            (f"{wheel.node_id}_ch{channel}", channel, None)
+            for channel in sorted(
+                {
+                    ep.channel
+                    for ep in wheel.endpoints.values()
+                    if ep.channel is not None
+                }
+            )
+        )
+
+    newest: tuple[str, int | None, int | None] | None = None
+    for unique_id, channel, button in candidates:
+        entity_id = registry.async_get_entity_id("event", DOMAIN, unique_id)
         if entity_id is None:
             continue
         state = hass.states.get(entity_id)
@@ -452,8 +759,8 @@ def _last_activity(
             continue
         # States are ISO 8601 UTC timestamps, so lexical order is chronological.
         if newest is None or state.state > newest[0]:
-            newest = (state.state, channel)
-    return newest if newest is not None else (None, None)
+            newest = (state.state, channel, button)
+    return newest if newest is not None else (None, None, None)
 
 
 @callback
@@ -498,10 +805,26 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
             wheel=wheel,
         )
         name, area = _wheel_name_and_area(hass, link.device, wheel)
-        last_activity, last_channel = _last_activity(hass, wheel)
+        last_activity, last_channel, last_button = _last_activity(hass, wheel)
+        settings = coordinator.settings_for(node_id)
+        channels = (
+            []
+            if wheel.is_dual_button
+            else _channel_summaries(
+                hass, wheel, _binding_by_channel(entry, node_id), language, settings
+            )
+        )
+        buttons = (
+            _button_summaries(
+                hass, wheel, _binding_by_endpoint(entry, node_id), language
+            )
+            if wheel.is_dual_button
+            else []
+        )
         wheels.append(
             WheelOverview(
                 key=wheel_key(node_id),
+                variant=wheel.variant,
                 name=name,
                 area=area,
                 # Per-wheel reachability, not the server connection. See
@@ -510,8 +833,15 @@ def async_overview_snapshot(hass: HomeAssistant, entry: Any) -> dict[str, Any]:
                 linked_to_matter=link.device is not None,
                 last_activity=last_activity,
                 last_active_channel=last_channel,
-                channels=_channel_summaries(
-                    hass, wheel, _binding_by_channel(entry, node_id), language
+                last_active_button=last_button,
+                channels=channels,
+                buttons=buttons,
+                # A dual button has no channels to disable and no dials, so it
+                # gets no settings editor at all.
+                settings=(
+                    None
+                    if wheel.is_dual_button
+                    else _settings_editor(entry, node_id, settings)
                 ),
             )
         )

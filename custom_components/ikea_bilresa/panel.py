@@ -23,6 +23,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
+from .panel_schema import panel_schema
 from .panel_strings import panel_strings, resolve_language
 
 _LOGGER = logging.getLogger(__name__)
@@ -127,6 +128,10 @@ async def async_setup_panel(hass: HomeAssistant) -> bool:
                 "version": str(integration.version),
                 "language": language,
                 "labels": panel_strings(language),
+                # Ranges, units and target domains, from the same source the
+                # server validates against. The panel keeps a fallback copy
+                # only for a script cached from before this key existed.
+                "schema": panel_schema(),
             },
         )
     except Exception:  # noqa: BLE001 - a panel must never break setup

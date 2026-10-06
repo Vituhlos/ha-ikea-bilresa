@@ -64,6 +64,15 @@ baseline is stable. They take precedence over starting new panel runtime code;
 panel design work may continue independently because it does not alter the
 integration runtime.
 
+## BILRESA dual button (E2489) program
+
+Support for the button-only BILRESA variant is specified in its own
+`ROADMAP_BUTTON.md`, kept separate from this wheel roadmap because it is a
+different device class. It is scoped to a `0.6.x` minor train and does not change
+or close any `0.5.1`-`0.5.7` wheel gate. The integration already half-discovers
+the device today (see that file's "current defect"), so its first package is a
+discovery-correctness fix, not a feature.
+
 ## Future BILRESA panel program
 
 The optional first-party panel is specified in `PANEL_DESIGN.md` and governed

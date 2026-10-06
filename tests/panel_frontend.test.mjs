@@ -202,3 +202,720 @@ test("structured results lead with the human-readable outcome", () => {
     "Jas 42 → 58 %",
   );
 });
+
+test("an unconfigured button leads with recognized hardware, not a missing result", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        live_event_label: "Poslední gesto",
+        result_gesture_press: "Stisk rozpoznán",
+        result_not_configured_button_detail:
+          "Gesto dorazilo do Home Assistantu.",
+      },
+    },
+  };
+  const activity = {
+    button: 1,
+    gesture: "press",
+    presses: 1,
+    dispatch_status: "not_configured",
+    result: null,
+  };
+
+  assert.equal(panel._liveResultLabel(activity), "Poslední gesto");
+  assert.equal(panel._liveResult(activity), "Stisk rozpoznán");
+  assert.equal(
+    panel._liveExplanation(activity),
+    "Gesto dorazilo do Home Assistantu.",
+  );
+  assert.deepEqual(panel._dispatchLabel(activity), [
+    "unknown",
+    "dispatch_not_configured_button",
+  ]);
+});
+
+test("recognized multi-press copy keeps the physical gesture specific", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        result_gesture_double_press: "Dvojitý stisk rozpoznán",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._recognizedResult({ gesture: "press", presses: 2 }),
+    "Dvojitý stisk rozpoznán",
+  );
+});
+
+test("live setup opens the matching dual-button editor", () => {
+  const panel = newPanel();
+  const wheel = {
+    variant: "dual_button",
+    buttons: [
+      { button: 1, configured: false, binding: null },
+      { button: 2, configured: false, binding: null },
+    ],
+  };
+
+  panel._configureFromLive(wheel, {
+    button: 2,
+    gesture: "press",
+    dispatch_status: "not_configured",
+  });
+
+  assert.equal(panel._view, "buttons");
+  assert.equal(panel._openButton, 2);
+  assert.equal(panel._editingChannel, 2);
+  assert.equal(panel._editingKind, "button");
+});
+
+test("dual button keeps the existing detail shell and adapted live test", () => {
+  const panel = newPanel();
+
+  assert.deepEqual(
+    panel._viewsFor({ variant: "dual_button" }),
+    ["buttons", "live", "diagnostics"],
+  );
+  assert.deepEqual(
+    panel._viewsFor({ variant: "wheel" }),
+    ["channels", "live", "diagnostics"],
+  );
+});
+
+test("dual-button live activity names its safe button number", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        gesture_button_press_double: "Tlačítko {button} · dvojitý stisk",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._gestureLabel({
+      button: 2,
+      channel: null,
+      gesture: "press",
+      presses: 2,
+    }),
+    "Tlačítko 2 · dvojitý stisk",
+  );
+});
+
+test("hold activity labels integration-observed duration honestly", () => {
+  const panel = newPanel();
+  panel._language = "cs";
+  panel._panel = {
+    config: {
+      labels: {
+        gesture_button_release: "Tlačítko {button} · uvolnění",
+        gesture_observed_duration: "zachyceno {duration} s",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._gestureLabel({
+      button: 1,
+      gesture: "release",
+      observed_duration_ms: 2250,
+    }),
+    "Tlačítko 1 · uvolnění · zachyceno 2,25 s",
+  );
+});
+
+test("dual-button panel test sends button and no rotary address", async () => {
+  const panel = newPanel();
+  let message;
+  panel._hass = {
+    callWS: async (payload) => {
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  await panel._testBinding(
+    { key: "button-device", variant: "dual_button" },
+    1,
+    "press",
+    { presses: 1 },
+  );
+
+  assert.deepEqual(message, {
+    type: "ikea_bilresa/binding/test",
+    wheel: "button-device",
+    button: 1,
+    gesture: "press",
+    presses: 1,
+  });
+  assert.equal("channel" in message, false);
+});
+
+test("dual button selection changes only the open physical button", () => {
+  const panel = newPanel();
+  panel._openButton = 1;
+  panel._editingChannel = 1;
+  panel._editingKind = "button";
+  panel._editorData = {};
+
+  panel._openButtonAt(2);
+
+  assert.equal(panel._openButton, 2);
+  assert.equal(panel._editingChannel, null);
+  assert.equal(panel._editingKind, null);
+  assert.equal(panel._editorData, null);
+});
+
+test("dual-button editor starts without rotary or triple-press fields", () => {
+  const panel = newPanel();
+  const device = { variant: "dual_button" };
+  const button = { button: 1, binding: null };
+
+  panel._startEditor(device, button);
+
+  assert.equal(panel._editingKind, "button");
+  assert.equal(panel._editingChannel, 1);
+  assert.deepEqual(panel._editorData, {
+    click_action: "toggle",
+    button_response: "multi_press",
+    hold_action: "toggle",
+    ramp_direction: "alternate",
+  });
+  assert.equal("mode" in panel._editorData, false);
+  assert.equal("triple_press_target" in panel._editorData, false);
+});
+
+test("dual-button save sends only its safe display number", async () => {
+  const panel = newPanel();
+  const messages = [];
+  const binding = {
+    id: "binding-button-2",
+    revision: "rev-2",
+    data: {
+      click_action: "toggle",
+      click_target: "light.second",
+      hold_action: "none",
+      button_response: "multi_press",
+      ramp_direction: "alternate",
+    },
+  };
+  const device = {
+    key: "button-device-a",
+    variant: "dual_button",
+    buttons: [{ button: 1 }, { button: 2, binding }],
+    channels: [],
+  };
+  panel._snapshot = { wheels: [device] };
+  panel._editorData = { ...binding.data };
+  panel._editorBinding = binding;
+  panel._editingChannel = 2;
+  panel._editingKind = "button";
+  panel._hass = {
+    callWS: async (payload) => {
+      messages.push(payload);
+      if (payload.type === "ikea_bilresa/overview") {
+        return panel._snapshot;
+      }
+      return { ok: true, binding };
+    },
+  };
+
+  await panel._saveBinding(device, device.buttons[1]);
+
+  assert.deepEqual(messages[0], {
+    type: "ikea_bilresa/binding/save",
+    wheel: "button-device-a",
+    button: 2,
+    data: binding.data,
+    binding_id: "binding-button-2",
+    expected_revision: "rev-2",
+  });
+  assert.equal("channel" in messages[0], false);
+  assert.equal("endpoint" in messages[0], false);
+});
+
+test("saving wheel settings sends the disabled channel and its revision", async () => {
+  let message;
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [
+      { channel: 1, enabled: true },
+      { channel: 2, enabled: true },
+    ],
+    settings: { subentry_id: "s1", revision: "rev-1", step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  panel._updateSettingsDraft(wheel, {
+    channel_enabled: { 1: true, 2: false },
+  });
+  await panel._saveSettings(wheel);
+
+  assert.equal(message.type, "ikea_bilresa/settings/save");
+  assert.equal(message.wheel, "wheel-a");
+  assert.deepEqual(message.channel_enabled, { 1: true, 2: false });
+  assert.equal(message.expected_revision, "rev-1");
+});
+
+test("a settings conflict drops the draft instead of resending it", async () => {
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [{ channel: 1, enabled: true }],
+    settings: { subentry_id: "s1", revision: "stale", step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      return { ok: false, error: "conflict" };
+    },
+  };
+
+  panel._updateSettingsDraft(wheel, { channel_enabled: { 1: false } });
+  await panel._saveSettings(wheel);
+
+  // Losing the draft is the point: the stored value is the truth now, and
+  // silently keeping the rejected edit would let the next save clobber it.
+  assert.equal(panel._settingsDraft, null);
+  assert.equal(panel._settingsDraftKey, null);
+});
+
+test("a wheel without stored settings still offers the defaults", () => {
+  const panel = newPanel();
+  const state = panel._settingsStateFor({
+    key: "wheel-b",
+    channels: [{ channel: 1, enabled: true }, { channel: 2, enabled: false }],
+  });
+
+  assert.deepEqual(state.channel_enabled, { 1: true, 2: false });
+  assert.equal(state.step, 2);
+  assert.equal(state.acceleration, 0);
+});
+
+test("one wheel's unsaved draft never leaks onto another", () => {
+  const panel = newPanel();
+  const first = { key: "wheel-a", channels: [{ channel: 1, enabled: true }] };
+  const second = { key: "wheel-b", channels: [{ channel: 1, enabled: true }] };
+
+  panel._updateSettingsDraft(first, { channel_enabled: { 1: false } });
+
+  assert.deepEqual(panel._settingsStateFor(second).channel_enabled, { 1: true });
+});
+
+test("a wheel saving for the first time omits the revision instead of sending null", async () => {
+  // The deployed rc.12 sent expected_revision: null here, and the command's
+  // schema rejected it — so the very first save of any wheel always failed.
+  let message;
+  const panel = newPanel();
+  const wheel = {
+    key: "wheel-a",
+    channels: [{ channel: 1, enabled: true }],
+    settings: { subentry_id: null, revision: null, step: 2, acceleration: 0 },
+  };
+  panel._hass = {
+    callWS: async (payload) => {
+      if (payload.type === "ikea_bilresa/overview") return { wheels: [wheel] };
+      message = payload;
+      return { ok: true };
+    },
+  };
+
+  await panel._saveSettings(wheel);
+
+  assert.ok(!("expected_revision" in message));
+});
+
+test("a new binding defaults to the linear step curve", () => {
+  // Turning the perceptual curve on by default would break every lamp that
+  // already corrects its own dimming curve, and nothing can tell which.
+  const panel = newPanel();
+  panel._startEditor({ variant: "wheel", key: "w" }, { channel: 1 });
+
+  assert.equal(panel._editorData.step_curve, "linear");
+});
+
+test("the step curve is a set-once option, not a rotation field", async () => {
+  // PANEL_DESIGN.md: the disclosure keeps genuinely set-once options only.
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const rotation = source.indexOf("const rotation = this._formSection");
+  const split = source.indexOf("const advancedGrid");
+
+  assert.ok(source.slice(split).includes('"step_curve"'));
+  // Not among the rotation fields, where it would read as a per-use setting.
+  assert.ok(!source.slice(rotation, split).includes("step_curve"));
+});
+
+test("an unavailable target is named plainly; only a missing one is a fault", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        target_unavailable: "{target} — unavailable",
+        target_missing: "{target} — no longer exists",
+      },
+    },
+  };
+
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_state: "ok" }),
+    "Bulb",
+  );
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_state: "unavailable" }),
+    "Bulb — unavailable",
+  );
+  assert.equal(
+    panel._targetText({
+      target_label: "light.gone",
+      target_state: "missing",
+      target_missing: true,
+    }),
+    "light.gone — no longer exists",
+  );
+  assert.equal(panel._targetText({ target_label: null }), null);
+});
+
+test("a backend from before contract 6 still marks its missing targets", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: { labels: { target_missing: "{target} — no longer exists" } },
+  };
+
+  // No target_state at all: the old boolean is all the panel has to go on.
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_missing: true }),
+    "Bulb — no longer exists",
+  );
+  assert.equal(
+    panel._targetText({ target_label: "Bulb", target_missing: false }),
+    "Bulb",
+  );
+});
+
+test("the overview banner counts missing targets, never unavailable ones", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const banner = source.slice(
+    source.indexOf("const missing = this._snapshot.wheels.filter"),
+    source.indexOf("wrap.appendChild(this._overviewHead())"),
+  );
+
+  assert.ok(banner.includes('targetState(control) === "missing"'));
+  assert.ok(!banner.includes(".target_missing"));
+});
+
+test("a control names the target its state belongs to, not its summary label", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        target_unavailable: "{target} — unavailable",
+        target_missing: "{target} — no longer exists",
+      },
+    },
+  };
+  const button = {
+    target_label: "2 targets",
+    target_state: "missing",
+    target_missing: true,
+    actions: [
+      { target_label: "Hall", target_state: "unavailable" },
+      { target_label: "light.gone", target_state: "missing", target_missing: true },
+    ],
+  };
+
+  assert.equal(panel._controlTargetText(button), "light.gone — no longer exists");
+  assert.equal(
+    panel._controlTargetText({ target_label: "2 targets", target_state: "ok" }),
+    "2 targets",
+  );
+  // Nothing to point at: fall back to the control's own label.
+  assert.equal(
+    panel._controlTargetText({ target_label: "Bulb", target_state: "unavailable" }),
+    "Bulb — unavailable",
+  );
+});
+
+const ledgerPanel = () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      labels: {
+        action_none: "No action",
+        ledger_then_release: "{hold}; on release: {release}",
+      },
+    },
+  };
+  return panel;
+};
+const value = (action) =>
+  action.target_label
+    ? `${action.action_label} · ${action.target_label}`
+    : action.action_label;
+
+test("gestures with no action collapse into names, not rows", () => {
+  const panel = ledgerPanel();
+  const { rows, unset } = panel._ledgerRows(
+    [
+      { gesture: "rotation", gesture_label: "Rotate", action_label: "Brightness", target_label: "Bulb" },
+      { gesture: "double_press", gesture_label: "Double press", action_label: "No action", target_label: null },
+      { gesture: "hold", gesture_label: "Hold", action_label: "No action", target_label: null },
+      { gesture: "release", gesture_label: "Release", action_label: "No action", target_label: null },
+    ],
+    value,
+  );
+
+  assert.deepEqual(rows.map((row) => row.label), ["Rotate"]);
+  // Hold and release are one gesture: one name, not two.
+  assert.deepEqual(unset, ["Double press", "Hold"]);
+});
+
+test("a hold row mentions the release only when the release does something", () => {
+  const panel = ledgerPanel();
+  const hold = { gesture: "hold", gesture_label: "Hold", action_label: "Ramp", target_label: "Bulb" };
+
+  const quiet = panel._ledgerRows(
+    [hold, { gesture: "release", gesture_label: "Release", action_label: "No action", target_label: null }],
+    value,
+  );
+  assert.equal(quiet.rows[0].value, "Ramp · Bulb");
+
+  const stopping = panel._ledgerRows(
+    [hold, { gesture: "release", gesture_label: "Release", action_label: "Stop ramp", target_label: null }],
+    value,
+  );
+  assert.equal(stopping.rows[0].value, "Ramp · Bulb; on release: Stop ramp");
+  assert.equal(stopping.rows.length, 1);
+});
+
+test("a ledger row warns for a missing target, not an unavailable one", () => {
+  const panel = ledgerPanel();
+  const { rows } = panel._ledgerRows(
+    [
+      { gesture: "rotation", gesture_label: "Rotate", action_label: "Brightness", target_label: "Bulb", target_state: "unavailable" },
+      { gesture: "short_press", gesture_label: "Press", action_label: "Toggle", target_label: "light.gone", target_state: "missing" },
+    ],
+    value,
+  );
+
+  assert.deepEqual(rows.map((row) => row.warning), [false, true]);
+});
+
+test("scenes keep an order that can be changed", () => {
+  const panel = newPanel();
+  panel._editorData = { scenes: ["scene.a", "scene.b", "scene.c"] };
+  panel._editorErrors = { scenes: "invalid" };
+
+  panel._sceneMove(2, -1);
+  assert.deepEqual(panel._editorData.scenes, ["scene.a", "scene.c", "scene.b"]);
+  assert.deepEqual(panel._editorErrors, {});
+
+  // Past either end is a no-op, not a wrap-around.
+  panel._sceneMove(0, -1);
+  panel._sceneMove(2, 1);
+  assert.deepEqual(panel._editorData.scenes, ["scene.a", "scene.c", "scene.b"]);
+
+  panel._sceneRemove(0);
+  assert.deepEqual(panel._editorData.scenes, ["scene.c", "scene.b"]);
+
+  panel._sceneAdd("scene.d");
+  panel._sceneAdd("scene.c");
+  panel._sceneAdd("");
+  assert.deepEqual(panel._editorData.scenes, ["scene.c", "scene.b", "scene.d"]);
+});
+
+test("without Home Assistant's components the panel builds no ha-selector", () => {
+  const panel = newPanel();
+
+  // The registry here holds only the panel itself: this is the fallback path,
+  // and it must be a clean "not available", never an exception.
+  assert.equal(
+    panel._haSelector({
+      id: "x",
+      selector: { boolean: {} },
+      value: true,
+      label: "x",
+      onChange: () => undefined,
+    }),
+    null,
+  );
+});
+
+test("selectors describe the same ranges and domains the server validates", () => {
+  const panel = newPanel();
+  panel._panel = {
+    config: {
+      schema: {
+        binding_numbers: { step: { min: 1, max: 25, step: 1, unit: "%" } },
+        settings_numbers: { step: { min: 1, max: 25, step: 1, unit: null } },
+        mode_domains: { volume: ["media_player"] },
+        press_target_domains: ["light", "switch"],
+        ramp_target_domains: ["light"],
+      },
+    },
+  };
+
+  assert.deepEqual(
+    panel._numberSelector(panel._numberRange("binding_numbers", "step")),
+    { number: { min: 1, max: 25, step: 1, mode: "slider", unit_of_measurement: "%" } },
+  );
+  // No unit: the key is left out rather than sent as null.
+  assert.deepEqual(
+    panel._numberSelector(panel._numberRange("settings_numbers", "step")),
+    { number: { min: 1, max: 25, step: 1, mode: "slider" } },
+  );
+  assert.deepEqual(panel._entitySelector(["scene"], ["scene.a"]), {
+    entity: { domain: ["scene"], exclude_entities: ["scene.a"] },
+  });
+  assert.deepEqual(panel._entitySelector(["light"]), {
+    entity: { domain: ["light"] },
+  });
+  // A field the server's schema does not list falls back to the built-in copy.
+  assert.equal(panel._numberRange("binding_numbers", "transition").unit, "s");
+});
+
+test("a panel config without a schema uses the built-in copy", () => {
+  const panel = newPanel();
+  panel._panel = { config: { labels: {} } };
+
+  assert.deepEqual(panel._schema().mode_domains.number, ["number", "input_number"]);
+  assert.equal(panel._numberRange("binding_numbers", "step").max, 25);
+});
+
+const settingsWheel = () => ({
+  key: "wheel-a",
+  channels: [
+    { channel: 1, enabled: true },
+    { channel: 2, enabled: true },
+  ],
+  settings: { revision: "r1", step: 2, acceleration: 0 },
+});
+
+test("a channel switch saves the switches and leaves a dial draft alone", async () => {
+  const panel = newPanel();
+  const wheel = settingsWheel();
+  const calls = [];
+  panel._snapshot = { wheels: [wheel] };
+  panel._hass = {
+    callWS: async (message) => {
+      calls.push(message);
+      return message.type.endsWith("overview") ? panel._snapshot : { ok: true };
+    },
+  };
+  panel._updateSettingsDraft(wheel, { step: 9 });
+  panel._updateSettingsDraft(wheel, { channel_enabled: { 1: true, 2: false } });
+
+  await panel._saveSettings(wheel, "channels");
+
+  const sent = calls[0];
+  assert.deepEqual(sent.channel_enabled, { 1: true, 2: false });
+  // The dial's unsaved 9 is not smuggled in with the switch.
+  assert.equal(sent.step, 2);
+  assert.equal(panel._settingsStateFor(wheel).step, 9);
+});
+
+test("saving the dial does not carry an unsaved channel switch", async () => {
+  const panel = newPanel();
+  const wheel = settingsWheel();
+  const calls = [];
+  panel._snapshot = { wheels: [wheel] };
+  panel._hass = {
+    callWS: async (message) => {
+      calls.push(message);
+      return message.type.endsWith("overview") ? panel._snapshot : { ok: true };
+    },
+  };
+  panel._updateSettingsDraft(wheel, {
+    step: 5,
+    acceleration: 20,
+    channel_enabled: { 1: false, 2: true },
+  });
+
+  await panel._saveSettings(wheel, "dial");
+
+  assert.equal(calls[0].step, 5);
+  assert.equal(calls[0].acceleration, 20);
+  assert.deepEqual(calls[0].channel_enabled, { 1: true, 2: true });
+  assert.equal(calls[0].expected_revision, "r1");
+});
+
+test("the editor replaces the ledger instead of sitting under it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const detail = source.slice(
+    source.indexOf("  _channelDetail(wheel, channel) {"),
+    source.indexOf("  _isNoAction(action) {"),
+  );
+
+  assert.ok(detail.includes("this._editingChannel !== number &&"));
+  // No native multi-select anywhere: it cannot express the order of scenes.
+  assert.ok(!source.includes("select.multiple"));
+});
+
+test("a Home Assistant selector is handed its new value back", () => {
+  // ha-selector draws the value it was given. Number fields change without a
+  // re-render, so without this the slider moved and the number box did not.
+  const panel = newPanel();
+  const listeners = {};
+  class FakeSelector {
+    addEventListener(name, handler) {
+      listeners[name] = handler;
+    }
+  }
+  registry.set("ha-selector", FakeSelector);
+  const previous = globalThis.document;
+  globalThis.document = { createElement: () => new FakeSelector() };
+  try {
+    const seen = [];
+    const node = panel._haSelector({
+      id: "x",
+      selector: { number: { min: 1, max: 25 } },
+      value: 2,
+      label: "Step",
+      onChange: (value) => seen.push(value),
+    });
+    assert.equal(node.value, 2);
+
+    listeners["value-changed"]({
+      stopPropagation: () => undefined,
+      detail: { value: 7 },
+    });
+
+    assert.equal(node.value, 7);
+    assert.deepEqual(seen, [7]);
+  } finally {
+    registry.delete("ha-selector");
+    globalThis.document = previous;
+  }
+});
