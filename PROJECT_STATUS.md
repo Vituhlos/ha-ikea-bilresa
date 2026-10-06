@@ -2,6 +2,15 @@
 
 Last updated: **2026-10-04 by Claude Code**
 
+## Pull request 8: contributor answered; measurement recorded (2026-10-06)
+
+Status: **Docs only.** cassus replied twice on pull request 8 (2026-10-05 and
+2026-10-06): he allows anything in the PR to be reused, gave the method behind
+his timing numbers, and may test a release candidate on his Hue room but
+promises nothing. His measurement is now in `docs/DEVICE_REFERENCE.md`,
+credited and marked as one home on firmware 1.9.15. The PR is still open and
+has not been answered again; a reply needs the owner's approval first.
+
 ## `v0.6.0-rc.17` published and deployed (2026-10-04)
 
 Status: **Released (pre-release) + CI + deployed. A save through the new

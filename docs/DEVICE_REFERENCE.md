@@ -102,6 +102,23 @@ multi_press_complete count=18
   emitted from the gesture's InitialPress.
 - Firmware 1.9.15 batches fast rotation in the device. Ongoing events were
   observed roughly every 0.5–1 second, often advancing by 6–8 counts.
+- **How long the first count takes to arrive.** Measured by
+  [@cassus](https://github.com/cassus) on firmware 1.9.15 and contributed in
+  [pull request 8](https://github.com/Vituhlos/ha-ikea-bilresa/pull/8): over
+  180 rotary gestures (about two hours, 1027 Switch events on the rotary
+  endpoints 1 and 2), the time from a gesture's first InitialPress to its
+  first MultiPressOngoing or MultiPressComplete had a median of 0.534 s
+  (25th percentile 0.488 s, 75th percentile 0.681 s, maximum 5.3 s). In 11 of
+  the 180 gestures both arrived within 50 ms, in the same report. The
+  timestamps are Matter Server's receive times from its log, not the event's
+  own timestamp field, so this is the delay as a user feels it, including the
+  device's batching and the Thread hop; it is not device-side event timing.
+  It is one home and one firmware, not this project's own measurement. It is
+  the reason the first notch is applied on InitialPress.
+- The same pull request reads the Matter specification as starting
+  MultiPressOngoing at a count of 2, so that a count of 1 is only ever
+  reported by MultiPressComplete. That matches the single-notch stream below;
+  the specification text was not re-checked for this note.
 - One notch may contain only InitialPress, ShortRelease and
   MultiPressComplete with count 1.
 - Matter's Switch contract generates InitialPress for every detected press and,
