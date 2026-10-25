@@ -861,7 +861,7 @@ def test_channel_detail_uses_the_versioned_read_model_actions() -> None:
 
 
 def test_the_community_tool_is_linked_in_one_place_without_data() -> None:
-    """BILRESA-5: a plain external link under the controls, nothing embedded.
+    """BILRESA-5: a plain external link in the info row, nothing embedded.
 
     The address is one constant used once, so it cannot be assembled from
     anything about the installation; the link leaves in a new tab without
@@ -881,22 +881,37 @@ def test_the_community_tool_is_linked_in_one_place_without_data() -> None:
     assert "<iframe" not in asset
     assert 'createElement("iframe")' not in asset
     assert 'el("iframe"' not in asset
-    # It closes both device pages: the wheel's and the dual button's.
+    # It sits in the info row above the tabs, which both device pages share
+    # (the wheel's and the dual button's), and no longer at the foot of either.
     channels = asset.split("_channelsView(wheel) {", 1)[1].split("_buttonsView", 1)[0]
     buttons = asset.split("_buttonsView(wheel) {", 1)[1].split("_gestureLabel", 1)[0]
-    assert "this._communityLink()" in channels
-    assert "this._communityLink()" in buttons
-    assert channels.index("_dialSection") < channels.index("_communityLink")
+    assert "_communityLink" not in channels
+    assert "_communityLink" not in buttons
+    detail = asset.split("_subpageDetail(wheel) {", 1)[1].split("_detail(wheel) {", 1)[
+        0
+    ]
+    assert "meta.appendChild(this._communityLink());" in detail
+    assert detail.index("_communityLink") < detail.index("this._tabs(wheel)")
+    assert asset.count("this._communityLink()") == 1
 
 
 def test_the_community_card_is_outlined_and_has_hover_and_focus() -> None:
-    """It must not read as one more control: outlined, set apart, and visible
-    to the keyboard and the pointer."""
+    """It must not read as one more control: outlined, slim in a narrow pane,
+    and visible to the keyboard and the pointer."""
     asset = _asset()
     card = asset.split(".resource-link {", 1)[1].split("}", 1)[0]
 
     assert "background: transparent;" in card
-    assert "margin-block-start: var(--_space-8);" in card
+    # At the right end of the info row, and a slim full-width row under the
+    # info text in a narrow pane, where the second part of the note is not drawn
+    # but stays for a screen reader.
+    assert "flex: 0 1 auto;" in card
+    narrow = asset.split("@container (max-width: 560px) {", 1)[1].split("\n  }\n", 1)[0]
+    assert ".subpage-meta { flex-wrap: wrap; }" in narrow
+    assert ".resource-link { flex: 1 1 100%; max-inline-size: none; }" in narrow
+    assert ".resource-new {" in narrow
+    assert "clip-path: inset(50%);" in narrow
+    assert "display: none" not in narrow
     # A tinted round icon, with the words in the link rather than hidden.
     assert ".resource-badge {" in asset
     assert (

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **The link card for the community label tool moved to the top.** It was at
+  the foot of a device's page; it is now in the info row under the title, above
+  the tabs, on both the wheel's and the dual button's page. On a wide pane it
+  sits at the right end of that row; on a narrow one, such as a phone, it is a
+  slim full-width row under the info text, and "opens in a new window" is no
+  longer drawn there but is still read by a screen reader. The bottom of the
+  page has no card any more.
+
 ## [0.7.0-rc.3] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It changes two things

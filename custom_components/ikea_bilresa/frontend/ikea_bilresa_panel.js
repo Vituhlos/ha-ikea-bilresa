@@ -540,17 +540,18 @@ const STYLES = `
   }
   .subpage-meta-copy { flex: 1 1 auto; min-inline-size: 0; }
   .control-stack { display: grid; gap: var(--_space-4); }
-  /* A link to a tool by someone else, at the foot of the page. Outlined, not
-     filled, and set apart from the cards above it, so it does not read as one
-     more control beside the channels: a tinted round icon, two lines and an
-     arrow out, all one link. */
+  /* A link to a tool by someone else, in the device's info row above the tabs.
+     Outlined, not filled, so it does not read as one more control: a tinted
+     round icon, two lines and an arrow out, all one link. It sits at the right
+     end of the row and drops under the info text, full width, in a narrow pane. */
   .resource-link {
     display: grid;
+    flex: 0 1 auto;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--_space-4);
-    margin-block-start: var(--_space-8);
-    padding: var(--_space-3) var(--_space-6);
+    gap: var(--_space-3);
+    max-inline-size: 380px;
+    padding: var(--_space-2) var(--_space-4);
     border: var(--ha-card-border-width, 1px) solid
       color-mix(in srgb, var(--_ink) 18%, transparent);
     border-radius: var(--_radius);
@@ -562,14 +563,14 @@ const STYLES = `
       border-color var(--_fast) var(--_ease-out);
   }
   .resource-badge {
-    inline-size: 40px;
-    block-size: 40px;
+    inline-size: 32px;
+    block-size: 32px;
     display: grid;
     place-items: center;
     border-radius: 50%;
     background: color-mix(in srgb, var(--_accent) 14%, transparent);
   }
-  .resource-icon { inline-size: 24px; block-size: 24px; fill: var(--_accent); }
+  .resource-icon { inline-size: 20px; block-size: 20px; fill: var(--_accent); }
   .resource-open { inline-size: 20px; block-size: 20px; fill: var(--_ink-dim); }
   .resource-copy { display: grid; gap: 2px; min-inline-size: 0; }
   .resource-title { font-weight: var(--ha-font-weight-medium, 500); }
@@ -585,6 +586,21 @@ const STYLES = `
   }
   @media (prefers-reduced-motion: reduce) {
     .resource-link { transition: none; }
+  }
+  /* A narrow pane: the info text keeps its line and the card becomes a slim row
+     under it. "Opens in a new window" stays for a screen reader but is not
+     drawn, so the row is one title and one short line. */
+  @container (max-width: 560px) {
+    .subpage-meta { flex-wrap: wrap; }
+    .resource-link { flex: 1 1 100%; max-inline-size: none; }
+    .resource-new {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
   .control-card {
     --_card-pad: var(--_space-6);
@@ -3727,10 +3743,10 @@ class IkeaBilresaPanel extends HTMLElement {
     return stack;
   }
 
-  // An outlined card at the foot of the page: one plain link to a tool by
+  // An outlined card in the device's info row: one plain link to a tool by
   // someone else, saying whose it is and that it opens in a new window. It
   // carries no data. The words are in the link itself, so a screen reader reads
-  // the same thing a sighted user sees; the icons are decoration.
+  // them even where they are not drawn; the icons are decoration.
   _communityLink() {
     const link = el("a", "resource-link");
     link.href = COMMUNITY_TOOL_URL;
@@ -3742,13 +3758,12 @@ class IkeaBilresaPanel extends HTMLElement {
     link.appendChild(badge);
     const copy = el("span", "resource-copy");
     copy.appendChild(el("span", "resource-title", this._t("community_tool_link")));
-    copy.appendChild(
-      el(
-        "span",
-        "resource-note",
-        `${this._t("community_tool_note")} · ${this._t("community_tool_new_window")}`,
-      ),
+    const note = el("span", "resource-note");
+    note.appendChild(el("span", "resource-by", this._t("community_tool_note")));
+    note.appendChild(
+      el("span", "resource-new", ` · ${this._t("community_tool_new_window")}`),
     );
+    copy.appendChild(note);
     link.appendChild(copy);
     link.appendChild(svg(ICON.external, "resource-open"));
     return link;
@@ -3758,14 +3773,12 @@ class IkeaBilresaPanel extends HTMLElement {
     const wrap = el("div");
     wrap.appendChild(this._stackedControls(wheel));
     wrap.appendChild(this._dialSection(wheel));
-    wrap.appendChild(this._communityLink());
     return wrap;
   }
 
   _buttonsView(wheel) {
     const wrap = el("div");
     wrap.appendChild(this._stackedControls(wheel));
-    wrap.appendChild(this._communityLink());
     return wrap;
   }
 
@@ -4436,6 +4449,7 @@ class IkeaBilresaPanel extends HTMLElement {
     if (wheel.availability !== "connected") {
       meta.appendChild(this._status(wheel.availability));
     }
+    meta.appendChild(this._communityLink());
     inner.appendChild(meta);
     inner.appendChild(this._tabs(wheel));
     inner.appendChild(this._detailPanel(wheel));

@@ -998,11 +998,13 @@ test("the community tool is one plain external link, and it carries no data", ()
     assert.equal(part("resource-title").textContent, "Design labels for your switches");
     // It says whose tool it is.
     // It says whose tool it is and that it opens in a new window, in words
-    // that are part of the link, so a screen reader reads them too.
-    assert.equal(
-      part("resource-note").textContent,
-      "Community tool by Liquidmasl · opens in a new window",
-    );
+    // that are part of the link, so a screen reader reads them even where
+    // a narrow pane does not draw the second part.
+    const note = part("resource-note");
+    const byText = note.children.find((child) => child.className === "resource-by");
+    const newText = note.children.find((child) => child.className === "resource-new");
+    assert.equal(byText.textContent, "Community tool by Liquidmasl");
+    assert.equal(newText.textContent, " · opens in a new window");
     // Both icons, the tinted round one and the arrow out, are decoration.
     const icons = link.children.filter((child) => child.attributes["aria-hidden"] === "true");
     assert.equal(icons.length, 2);
