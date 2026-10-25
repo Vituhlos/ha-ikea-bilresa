@@ -9,7 +9,9 @@ from unittest.mock import Mock
 import pytest
 
 from custom_components.ikea_bilresa.binding import (
+    _ACTIVE_SCROLL_TIMEOUT,
     _RAMP_NOTCHES,
+    _SCROLL_AUTHORITY_GRACE,
     _SMOOTHING_FULL_BATCH,
     LightBinding,
 )
@@ -43,6 +45,7 @@ from custom_components.ikea_bilresa.const import (
     HOLD_NONE,
     HOLD_RAMP,
     MODE_COLOR_TEMP,
+    MODE_COVER,
     MODE_VOLUME,
     RAMP_DIRECTION_DOWN,
     RAMP_DIRECTION_UP,
@@ -1079,6 +1082,93 @@ def test_hold_to_ramp_steps_are_never_smoothed(monkeypatch) -> None:
     assert _dispatched_transition(binding) == 0.0
 
 
+def test_follow_up_batches_in_one_scroll_get_the_full_transition(
+    monkeypatch,
+) -> None:
+    """After the eager first batch, small batches fade instead of stepping.
+
+    Issue #9: a slow scroll arrives as one-to-three notch batches. Scaling
+    the transition by batch size shrank each of them to a fraction of the
+    configured value, so every step landed as a visible jump. Everything
+    after the first dispatched batch of a continuous scroll travels the
+    whole configured transition instead.
+    """
+    binding = _smoothing_binding(monkeypatch)
+    binding._min_command_interval = 0.0  # every batch dispatches at once
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+
+    binding._rotate_brightness(1, up=False)
+    assert _dispatched_transition(binding) == 0.0
+
+    binding._rotate_brightness(1, up=False)
+    assert _dispatched_transition(binding) == 0.4
+
+    binding._rotate_brightness(3, up=False)
+    assert _dispatched_transition(binding) == 0.4
+
+
+def test_a_later_matter_gesture_in_the_same_scroll_stays_smoothed(
+    monkeypatch,
+) -> None:
+    """The firmware splits one physical rotation into several gestures.
+
+    A gesture completed only a fraction of a second ago is still inside the
+    same scroll, so its first batch is not a fresh eager notch — smoothing
+    applies the moment the scroll has already taken a command.
+    """
+    binding = _smoothing_binding(monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._min_command_interval = 0.0  # every batch dispatches at once
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+    assert _dispatched_transition(binding) == 0.0
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
+    now[0] = 0.5
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    assert _dispatched_transition(binding) == 0.4
+
+
+def test_a_fresh_scroll_after_quiet_gets_its_eager_first_batch_back(
+    monkeypatch,
+) -> None:
+    """Once the scroll has been quiet, the next rotation is a new gesture."""
+    binding = _smoothing_binding(monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
+
+    now[0] = _ACTIVE_SCROLL_TIMEOUT + _SCROLL_AUTHORITY_GRACE + 0.1
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    assert _dispatched_transition(binding) == 0.0
+
+
+def test_a_ramp_started_right_after_a_scroll_stays_immediate(monkeypatch) -> None:
+    """Ramp ticks keep their own cadence even when a scroll already commanded."""
+    binding = _smoothing_binding(monkeypatch)
+    del binding._rotate_by  # the shared helper mocks it; this needs the real one
+    binding._min_command_interval = 0.0  # every batch dispatches at once
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    binding._handle_action(_action(ACTION_HOLD))
+    assert _dispatched_transition(binding) == 0.0
+
+    binding._ramp_tick(None)
+    assert _dispatched_transition(binding) == 0.0
+
+
 def test_color_temperature_batches_are_smoothed_too(monkeypatch) -> None:
     binding = _smoothing_binding(monkeypatch, **{CONF_MODE: MODE_COLOR_TEMP})
 
@@ -1241,8 +1331,45 @@ def test_quantized_echo_of_our_own_value_is_recognized(monkeypatch) -> None:
     assert binding._tracked == dispatched
 
 
-def test_third_party_change_during_a_scroll_rebases_immediately(monkeypatch) -> None:
-    """A value we never sent is a real external change, even mid-gesture."""
+def test_off_path_report_mid_scroll_cannot_rebase_the_tracked_target(
+    monkeypatch,
+) -> None:
+    """Issue #9: a wandering mid-scroll report is ignored, not trusted.
+
+    A Zigbee2MQTT group republishes whichever member bulb answered last, so
+    during a fade the entity's brightness wanders to values nobody sent.
+    Each of those reports used to drop the tracked target, and the next
+    notch restarted from a stale member level — the jumps to an unrelated
+    brightness reported while scrolling. The scroll now finishes on its own
+    arithmetic.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    now[0] = 0.4
+    stray = SimpleNamespace(state="on", attributes={"brightness": 12})
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": stray}))
+
+    assert binding._tracked == pytest.approx(255 - 7.65)
+
+    now[0] = 0.6
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": stray}))
+
+    assert binding._tracked == pytest.approx(255 - 7.65)
+
+
+def test_the_first_report_after_a_scroll_ends_still_rebases(monkeypatch) -> None:
+    """The mid-scroll window is bounded: a real external change lands after it."""
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3}
     )
@@ -1259,8 +1386,289 @@ def test_third_party_change_during_a_scroll_rebases_immediately(monkeypatch) -> 
     now[0] = 0.4
     external = SimpleNamespace(state="on", attributes={"brightness": 12})
     binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
+    assert binding._tracked is not None
 
+    # Once the scroll has been quiet, the same value is a real external
+    # change: the next rotation resyncs onto it.
+    now[0] = _ACTIVE_SCROLL_TIMEOUT + _SCROLL_AUTHORITY_GRACE + 0.1
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
+    binding.hass.states.get.return_value = external
+    binding._rotate_brightness(1, up=False)
+
+    assert binding._tracked == pytest.approx(12 - 7.65)
+
+
+def test_wandering_group_reports_do_not_move_a_scroll_in_progress(
+    monkeypatch,
+) -> None:
+    """Regression test for the stale-level jumps reported in issue #9.
+
+    Modelled on the report: a Zigbee2MQTT group republishes whichever member
+    bulb answered last, so its brightness wanders off the commanded path
+    while a fade is running. Member reports below and above the path must
+    all be ignored mid-gesture, and the scroll's arithmetic must land
+    exactly where the notches put it.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    def _member_reported(value: int) -> None:
+        binding._handle_target_state_change(
+            SimpleNamespace(
+                data={
+                    "new_state": SimpleNamespace(
+                        state="on", attributes={"brightness": value}
+                    )
+                }
+            )
+        )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+    now[0] = 0.2
+    binding._rotate_brightness(2, up=False)
+
+    # One member still sits near the top, another is deep into its fade:
+    # both levels lie off the path between the last report and our commands.
+    now[0] = 0.3
+    _member_reported(190)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 190}
+    )
+    now[0] = 0.5
+    _member_reported(254)
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
+    now[0] = 0.6
+    binding._rotate_brightness(1, up=False)
+
+    # Four notches of 3 % from 255: the group chatter must not have moved it.
+    assert binding._tracked == pytest.approx(255 - 4 * 7.65)
+    assert binding.hass.services.async_call.call_args.args[2]["brightness"] == round(
+        255 - 4 * 7.65
+    )
+
+
+def test_a_lingering_off_path_group_state_does_not_reset_the_next_scroll(
+    monkeypatch,
+) -> None:
+    """A stale member level must not rebase even the scroll after next.
+
+    A Zigbee2MQTT group's entity state is whichever member bulb reported
+    last; when that report is a stray member level it lingers after the
+    scroll ends. The next scroll must continue from the tracked target it
+    calculated — rebasing onto the lingering state would recreate the
+    stale-level jump one gesture later.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+    binding._rotate_brightness(1, up=False)
+
+    # One member reports 190 mid-scroll — off the commanded path, ignored.
+    # It stays as the group's entity state: no further reports arrive.
+    now[0] = 0.3
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 190})
+            }
+        )
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 190}
+    )
+
+    # The authority window has expired (1.6 > 0.3 + grace) while _resync's
+    # freshness window has not (1.6 < 0 + 3): the tracked target — two
+    # notches from 255 — must still win over the lingering member level.
+    now[0] = 1.6
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    assert binding._tracked == pytest.approx(255 - 3 * 7.65)
+    assert binding.hass.services.async_call.call_args.args[2]["brightness"] == round(
+        255 - 3 * 7.65
+    )
+
+
+def test_a_mid_scroll_echo_does_not_force_a_later_resync(monkeypatch) -> None:
+    """Own echoes ignored mid-scroll must not disturb the next scroll.
+
+    The cumulative accounting the authority window protects has to carry
+    straight into a quick successive scroll.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 255}
+    )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    # A report travelling along the commanded path is an own echo: ignored
+    # without parking anything for reconciliation.
+    now[0] = 0.3
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 253})
+            }
+        )
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on", attributes={"brightness": 253}
+    )
+
+    now[0] = 1.6
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_brightness(1, up=False)
+
+    # Nothing external was seen, so the tracked target carries straight on.
+    assert binding._tracked == pytest.approx(255 - 2 * 7.65)
+
+
+def test_an_off_path_report_mid_scroll_is_ignored_for_a_color_temp_light(
+    monkeypatch,
+) -> None:
+    """The light-group distrust covers every mode that targets a light.
+
+    A group bound in color-temperature mode produces the same last-member-
+    wins state wanderings as a brightness group, so its off-path reports
+    must be ignored mid-scroll too.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_COLOR_TEMP,
+            CONF_TARGET: "light.kelvin_group",
+            CONF_TRANSITION: 0.0,
+            CONF_STEP: 3,
+            CONF_ACCELERATION: 0,
+        },
+    )
+    binding._min_command_interval = 0.0
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on",
+        attributes={
+            "color_temp_kelvin": 4000,
+            "min_color_temp_kelvin": 2000,
+            "max_color_temp_kelvin": 6535,
+        },
+    )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_color_temp(1, up=False)
+
+    # 3 % of the 4535 K span per notch, one notch down: tracked lands at
+    # 4000 - 136.05. A member report far outside the commanded path must
+    # not move it.
+    now[0] = 0.3
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(
+                    state="on", attributes={"color_temp_kelvin": 6000}
+                )
+            }
+        )
+    )
+
+    now[0] = 0.5
+    binding._rotate_color_temp(1, up=False)
+
+    notch = 0.03 * 4535
+    assert binding._tracked == pytest.approx(4000 - 2 * notch)
+    assert binding.hass.services.async_call.call_args.args[2][
+        "color_temp_kelvin"
+    ] == round(4000 - 2 * notch)
+
+
+def test_a_non_light_target_still_rebases_on_a_mid_scroll_external_change(
+    monkeypatch,
+) -> None:
+    """Outside the light modes the established rebase stays.
+
+    A cover, climate, media or number target has no aggregated state to
+    distrust, so an off-path report mid-scroll is a real external change
+    and must keep winning immediately, exactly as before this fix.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_COVER,
+            CONF_TARGET: "cover.test",
+            CONF_TRANSITION: 0.0,
+            CONF_STEP: 3,
+            CONF_ACCELERATION: 0,
+        },
+    )
+    binding._min_command_interval = 0.0
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="open", attributes={"current_position": 80}
+    )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_cover(1, up=False)
+    assert binding._tracked == 77
+
+    # A wall switch or another controller moves the cover mid-scroll: the
+    # off-path report forgets the tracked target and the next notch
+    # resyncs from the real position instead of fighting the change.
+    now[0] = 0.3
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(
+                    state="open", attributes={"current_position": 30}
+                )
+            }
+        )
+    )
     assert binding._tracked is None
+
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="open", attributes={"current_position": 30}
+    )
+    now[0] = 0.5
+    binding._rotate_cover(1, up=False)
+
+    assert binding._tracked == 27
+    assert binding.hass.services.async_call.call_args.args[2]["position"] == 27
 
 
 def test_missing_scroll_completion_expires_target_authority(monkeypatch) -> None:

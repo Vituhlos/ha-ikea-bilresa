@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- **Brightness no longer jumps to a stale level while scrolling a light
+  group.** A group entity has no single true brightness — a Zigbee2MQTT
+  group republishes whichever member bulb answered last, so during a fade
+  its state wanders to values nobody sent. Each of those reports used to
+  reset the tracked target mid-scroll, and the next notch restarted from a
+  stale member level. Mid-scroll reports are now recorded and ignored
+  instead; the first report after the scroll ends re-syncs as before, so a
+  genuine external change is only delayed by a couple of seconds, never
+  lost. (Issue #9)
+- **Slow scrolling fades smoothly again.** The configured transition was
+  scaled by batch size, so the one-to-three notch batches a slow scroll
+  produces were spread over a fraction of the configured value and each
+  step landed as a visible jump. Batches after the first of a continuous
+  scroll now travel the whole configured transition; the first batch of a
+  scroll stays immediate. (Issue #9)
+
 ## [0.6.1] - 2026-10-24
 
 A fix release on top of 0.6.0. The redesigned panel that was published as
