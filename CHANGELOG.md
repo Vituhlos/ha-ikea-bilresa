@@ -58,6 +58,15 @@ and the new editor adds these:
   the dots line up across every card. A switched-off channel fades and says
   so in its header without growing. Wheel channels show the three channel
   LEDs; dual-button cards show which half of the button they are.
+- **Three things are gone from a channel card.** The "Active" label beside
+  the on/off switch, the "Saved" text that appeared next to it, and the
+  "Add an action" row under the gesture rows. The switch shows its own
+  state, and Edit is the way to add an action.
+- **Czech wording of the editor.** "Procházet scény" for cycling scenes, as
+  the channel summary already says; "Pro plynulou změnu musí být cílem
+  podržení světlo." for the ramp error; and "Počkat, jestli nepřijde další
+  stisk" for the response that waits for a second press, so the short-press
+  section no longer offers a "jednoduchý stisk".
 
 Stored bindings and runtime behaviour are unchanged.
 
@@ -66,7 +75,12 @@ Stored bindings and runtime behaviour are unchanged.
   a dual button's page has one card, "Design labels for your switches",
   naming a web tool by Liquidmasl (<https://bilresa.marcel1.com/>). It
   opens in a new tab and nothing is sent to it: no query string, nothing about
-  your devices or entities, and nothing is embedded in the panel.
+  your devices or entities, and nothing is embedded in the panel. Both
+  READMEs have a short "Community tools" section with the same link.
+- **An optional way to support the project.** The READMEs have a short note
+  with a Buy Me a Coffee button, and `.github/FUNDING.yml` lets GitHub show
+  its Sponsor button once Sponsorships is enabled for the repository. It is
+  entirely optional and the integration is not affected.
 
 ### Fixed
 - **A short-press target that nothing uses no longer shows as missing.** A
@@ -79,6 +93,9 @@ Stored bindings and runtime behaviour are unchanged.
   settings"**, so the field named in the message can be seen.
 - **Keyboard focus stays on the Discard button** when the editor redraws after
   the first press.
+- **Internal keys in error messages.** The editor showed
+  `validation_target_required` and `validation_ramp_requires_light` instead
+  of their messages; it now shows the texts, in English and Czech.
 
 ## [0.7.0-rc.1] - 2026-10-25
 
