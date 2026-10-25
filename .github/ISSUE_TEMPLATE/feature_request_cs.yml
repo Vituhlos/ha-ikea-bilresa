@@ -1,0 +1,53 @@
+name: Návrh funkce
+description: Navrhněte vylepšení nebo novou možnost
+title: "[Funkce]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Napište nám, co by integrace měla umět. Mějte na paměti, že projekt je
+        záměrně pasivní (BILRESU poslouchá; neposílá jí Matter příkazy).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problém nebo use case
+      description: Čeho chcete dosáhnout? Jaké omezení to dnes ztěžuje?
+      placeholder: Chci, aby kolečko měnilo hlasitost na více přehrávačích najednou...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Očekávané chování
+      description: Jak by se integrace měla z vašeho pohledu chovat?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Návrh řešení
+      description: Máte-li konkrétní představu (UI, volba propojení, podoba automatizace), popište ji tady.
+    validations:
+      required: false
+  - type: dropdown
+    id: controller
+    attributes:
+      label: Související typ ovladače
+      options:
+        - BILRESA kolečko
+        - BILRESA dvoutlačítko (E2489)
+        - Obojí
+        - Nevztahuje se k ovladači
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Hardwarová omezení
+      description: |
+        Cokoli specifického pro zařízení, co bychom měli vědět — verze
+        firmwaru, nastavení Matter sítě, gesta, která hardware posílá či
+        neposílá.
+    validations:
+      required: false

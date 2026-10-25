@@ -13,6 +13,68 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## Repository professionalization: READMEs, contributor docs, GitHub templates (2026-10-25)
+
+Status: **Docs-only PR on `devin/20261025-project-professionalization`; no
+runtime code touched.**
+
+A documentation/repository-hygiene pass aimed at a more professional public
+presentation (the goal: a README a visitor understands in ~30 s and a clear
+contributor path):
+
+- `README.md` / `README.cs.md`: badge row now shows release, CI status
+  (`ci.yml` on `main`), stars, license, HACS-custom and minimum HA 2026.8.0;
+  HACS badge links to the custom-repository docs. The developer-handoff
+  blockquote moved from the landing area to the *Contributing* section. The
+  HACS section gains the `my.home-assistant.io` repository redirect button and
+  an explicit note that the integration is not in the default HACS store and
+  that upgrading from 0.5.x has breaking changes. No Downloads badge: `v0.6.1`
+  publishes no release assets, so there are no meaningful download stats.
+- New `CONTRIBUTING.md`: bug/feature reporting via the issue forms, the
+  feature-branch workflow, the Gate A/B check commands, the CI ≠ hardware
+  rule, the English+Czech pairing rule, changelog and `PROJECT_STATUS.md`
+  handoff expectations. Details stay in `docs/DEVELOPMENT.md` — no duplicated
+  guide.
+- New `SECURITY.md`: latest-release-only support and an honest reporting path
+  — GitHub private vulnerability reporting is **disabled** on this repo
+  (verified via API), so sensitive reports ask for a private contact through a
+  minimal public issue instead.
+- New `.github/ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml` plus
+  their Czech twins `bug_report_cs.yml`, `feature_request_cs.yml` (GitHub does
+  not localize forms, so each language is its own form), `config.yml`
+  (contact links to DEVELOPMENT.md and HARDWARE_TEST.md) and
+  `.github/PULL_REQUEST_TEMPLATE.md` (checks, hardware validation, EN/CS,
+  changelog, no-secrets checklist).
+- The four `docs/images/panel/*.png` screenshots show the superseded rc-panel
+  layout and were deliberately **not** added to the READMEs; current-panel
+  screenshots would be a good future addition.
+
+Validated with:
+
+- `git diff --check` — clean.
+- `python3 -c "import yaml; yaml.safe_load(...)"` over
+  `.github/ISSUE_TEMPLATE/*.yml` and `.github/workflows/ci.yml` — all parse.
+- A small Python link-check script over the changed Markdown files:
+  every `[text](relative/path)` target exists on disk, and every TOC anchor in
+  `README.md` / `README.cs.md` resolves to a heading — no broken links.
+- `git status --short` — only documentation and `.github` template files
+  changed; nothing under `custom_components/` or `tests/`.
+
+Not run: pytest, mypy, ruff, frontend tests — the diff contains no Python or
+JavaScript, so they cannot be affected; GitHub Actions runs them on the PR
+anyway. Hardware validation: **not applicable** (documentation-only change;
+no device-facing behavior touched).
+
+Assumptions: the `my.home-assistant.io` `hacs_repository` redirect works for
+custom repositories (standard pattern used by non-default-store projects);
+GitHub issue forms are English with Czech twins (`*_cs.yml`) because GitHub
+does not localize forms.
+
+**Single best next action:** owner reviews the PR and merges; afterwards
+consider enabling GitHub private vulnerability reporting so SECURITY.md can
+name a confidential channel, and add real screenshots of the stable panel.
+
+
 ## Fix release 0.6.1: the panel follows the user's language (2026-10-24)
 
 Status: **Code + tests + preview; released as stable 0.6.1 from `main` via PR #10.**

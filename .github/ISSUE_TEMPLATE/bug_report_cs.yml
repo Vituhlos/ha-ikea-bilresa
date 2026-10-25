@@ -1,0 +1,89 @@
+name: Hlášení chyby
+description: Nahlaste problém s integrací IKEA BILRESA
+title: "[Chyba]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Díky za hlášení! Čím přesněji formulář vyplníte, tím rychleji půjde
+        problém reprodukovat. Neuvádějte prosím přihlašovací údaje, tokeny,
+        úplné zálohy konfigurace ani sériová čísla zařízení.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Co se stalo?
+      description: Jasně popište pozorované chování.
+      placeholder: Otáčení nahoru světlo ztlumuje místo zesilování...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Očekávané chování
+      description: Co mělo stát místo toho?
+    validations:
+      required: true
+  - type: input
+    id: integration-version
+    attributes:
+      label: Verze integrace
+      description: Z kartičky integrace nebo manifestu (např. 0.6.1).
+      placeholder: "0.6.1"
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Verze Home Assistant Core
+      description: Nastavení → O aplikaci (např. 2026.8.0).
+      placeholder: "2026.8.0"
+    validations:
+      required: true
+  - type: input
+    id: matter-server-version
+    attributes:
+      label: Verze Matter Serveru
+      description: Ze stránky add-onu Matter Server, pokud se problém týká objevování nebo událostí.
+      placeholder: "např. 8.x"
+    validations:
+      required: false
+  - type: dropdown
+    id: controller
+    attributes:
+      label: Typ ovladače
+      options:
+        - BILRESA kolečko
+        - BILRESA dvoutlačítko (E2489)
+        - Obojí
+        - Nevím jistě
+    validations:
+      required: true
+  - type: input
+    id: gesture
+    attributes:
+      label: Dotčená akce nebo gesto
+      description: např. rotate_up, stisk, podržení, cyklení scén, uložení propojení — pokud nějaké souvisí.
+      placeholder: "rotate_up na kanálu 2"
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Kroky k reprodukci
+      description: Číslované kroky, podle kterých to zvládne kdokoli.
+      placeholder: |
+        1. Otevřu Nastavení → Zařízení a služby → IKEA BILRESA
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevantní logy
+      description: |
+        Zapněte debug logování pro `custom_components.ikea_bilresa`, reprodukujte
+        problém a vložte příslušné řádky s vymazanými tajnými údaji.
+      render: text
+    validations:
+      required: false

@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose an improvement or a new capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us what you'd like the integration to do. Keep in mind the
+        project is intentionally passive (it listens to the BILRESA; it does
+        not send Matter commands).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to achieve? What limitation makes it hard today?
+      placeholder: I want the wheel to change volume on more than one media player...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: How should the integration behave from your point of view?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: If you have a concrete idea (UI, binding option, automation shape), describe it here.
+    validations:
+      required: false
+  - type: dropdown
+    id: controller
+    attributes:
+      label: Relevant controller type
+      options:
+        - BILRESA scroll wheel
+        - BILRESA dual button (E2489)
+        - Both
+        - Not controller-specific
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Hardware constraints
+      description: |
+        Anything device-specific we should know — firmware version, Matter
+        network setup, gestures the hardware does or does not emit.
+    validations:
+      required: false

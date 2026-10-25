@@ -1,0 +1,89 @@
+name: Bug report
+description: Report a problem with the IKEA BILRESA integration
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The more precisely you fill this in, the faster
+        the problem can be reproduced. Please do not include credentials,
+        tokens, full configuration backups or device serial numbers.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the observed behavior.
+      placeholder: Scrolling up dims the light instead of brightening it...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration version
+      description: From the integration card or manifest (e.g. 0.6.1).
+      placeholder: "0.6.1"
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant Core version
+      description: Settings → About (e.g. 2026.8.0).
+      placeholder: "2026.8.0"
+    validations:
+      required: true
+  - type: input
+    id: matter-server-version
+    attributes:
+      label: Matter Server version
+      description: From the Matter Server add-on page, if the problem involves discovery or events.
+      placeholder: "e.g. 8.x"
+    validations:
+      required: false
+  - type: dropdown
+    id: controller
+    attributes:
+      label: Controller type
+      options:
+        - BILRESA scroll wheel
+        - BILRESA dual button (E2489)
+        - Both
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: gesture
+    attributes:
+      label: Affected action or gesture
+      description: e.g. rotate_up, press, hold, scene cycling, binding save — if one is involved.
+      placeholder: "rotate_up on channel 2"
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps anyone can follow.
+      placeholder: |
+        1. Open Settings → Devices & Services → IKEA BILRESA
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Enable debug logging for `custom_components.ikea_bilresa`, reproduce
+        the problem, and paste the relevant lines with secrets removed.
+      render: text
+    validations:
+      required: false
