@@ -28,8 +28,8 @@ If this integration saves you time, you can support its development. It is entir
 > and replaces the old device triggers; read the upgrade notes in
 > [CHANGELOG.md](CHANGELOG.md) and take a backup before upgrading from 0.5.x.
 >
-> **Testing status:** the pre-release `v0.7.0-rc.1` carries a redesigned panel
-> layout that is not in the stable release, together with the fixes of
+> **Testing status:** the pre-release `v0.7.0-rc.2` carries a redesigned panel
+> layout and binding editor that are not in the stable release, together with the fixes of
 > `v0.6.2-rc.2` (Zigbee2MQTT light groups, the `short_release` event, disabled
 > channels). It is a test candidate, not hardware-validated. Hardware validation is incomplete for some
 > device/gesture combinations; see [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)

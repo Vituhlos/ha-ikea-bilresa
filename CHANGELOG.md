@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.2] - 2026-10-25
+
+Pre-release candidate for testing, not a stable release. It adds to
+`0.7.0-rc.1` the binding editor rework by Liquidmasl (pull request #11), three
+fixes to it that review turned up, Czech wording fixes and a link to a
+community tool for labels. Everything else is as in `0.7.0-rc.1`, which in turn
+is the redesigned panel together with everything in `0.6.2-rc.2`.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware, or in more than
+the offline panel preview. The checks of `0.7.0-rc.1` remain open (the
+redesigned panel, `short_release`, disabled channels, the Issue #9 light group),
+and the new editor adds these:
+
+- **Binding editor:** save a binding for a wheel channel and for a dual-button
+  button through the new editor and confirm it applies; choose "Cycle scenes",
+  then another short-press action, and confirm the scene list goes with it;
+  choose the Fast and Instant responses and confirm the gestures they rule out
+  are dimmed and cleared; reject a save on purpose (a rotation limit out of
+  range) and confirm "More rotation settings" opens.
+- **Discard:** an untouched editor closes at once, one with changes asks for a
+  second press, and keyboard focus stays on the button.
+- **Phone width and themes:** the editor and the new card at about 400 px, in a
+  light, a dark and a custom theme.
+- **Czech wording:** read the new editor texts as a native speaker.
+- **Community link:** the card at the bottom of a device page opens the tool in
+  a new tab.
+
 ### Changed
 - **The binding editor shows what will run.** Rotation and every press
   gesture are their own section, in the order and with the icons of the
@@ -1083,7 +1112,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.1...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.2...HEAD
+[0.7.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.1...v0.7.0-rc.2
 [0.7.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...v0.7.0-rc.1
 [0.6.2-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...v0.6.2-rc.2
 [0.6.2-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1...v0.6.2-rc.1

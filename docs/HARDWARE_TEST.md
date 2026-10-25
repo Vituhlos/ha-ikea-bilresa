@@ -286,6 +286,14 @@ controls. Record the Home Assistant version, browser, theme and language.
       live test feed keeps running.
 - [ ] Save a binding and a dial setting from the panel and confirm they apply
       (new revision, no integration entry in the system log).
+- [ ] Binding editor (0.7.0-rc.2): "Cycle scenes" and back to another
+      short-press action drops the scene list; the Fast and Instant responses
+      dim and clear the gestures they rule out; a save rejected for a rotation
+      limit opens "More rotation settings".
+- [ ] Discard: an untouched editor closes at once, one with changes asks for a
+      second press, and keyboard focus stays on the button.
+- [ ] The link card at the bottom of a device page opens the community label
+      tool in a new tab.
 
 ## Recorded runs
 

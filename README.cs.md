@@ -27,8 +27,8 @@ Pokud vám tato integrace šetří čas, můžete podpořit její vývoj. Je to 
 > nahrazuje dřívější spouštěče zařízení; před přechodem z 0.5.x si přečtěte
 > poznámky k přechodu v [CHANGELOG.md](CHANGELOG.md) a udělejte zálohu.
 >
-> **Stav ověření:** předběžné vydání `v0.7.0-rc.1` obsahuje přepracované
-> rozložení panelu, které ve stabilním vydání není, spolu s opravami z
+> **Stav ověření:** předběžné vydání `v0.7.0-rc.2` obsahuje přepracované
+> rozložení panelu a editor propojení, které ve stabilním vydání nejsou, spolu s opravami z
 > `v0.6.2-rc.2` (světelné skupiny Zigbee2MQTT, událost `short_release`, vypnuté
 > kanály). Je to testovací kandidát bez ověření na hardwaru. Některé kombinace zařízení a gest stále čekají na
 > hardwarové ověření; aktuální checklist je v
