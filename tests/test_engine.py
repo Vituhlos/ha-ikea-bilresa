@@ -9,6 +9,7 @@ from custom_components.ikea_bilresa.const import (
     ACTION_PRESS,
     ACTION_RELEASE,
     ACTION_ROTATE,
+    ACTION_SHORT_RELEASE,
     DIRECTION_DOWN,
     DIRECTION_UP,
     ROLE_BUTTON,
@@ -360,6 +361,30 @@ def test_button_hold_and_release(wheel: BilresaWheel) -> None:
     assert hold.type == ACTION_HOLD
     assert release.type == ACTION_RELEASE
 
+
+
+@pytest.mark.parametrize("count", [1, 2, 3])
+def test_short_release_precedes_completed_click(
+    wheel: BilresaWheel, count: int
+) -> None:
+    engine = GestureEngine()
+    for _ in range(count):
+        assert engine.process(wheel, _decoded(3, ROLE_BUTTON, "initial_press")) is None
+        action = engine.process(wheel, _decoded(3, ROLE_BUTTON, "short_release"))
+        assert action is not None
+        assert action.type == ACTION_SHORT_RELEASE
+        assert (action.node_id, action.channel, action.endpoint_id) == (NODE, 1, 3)
+    complete = engine.process(
+        wheel, _decoded(3, ROLE_BUTTON, "multi_press_complete", count)
+    )
+    assert complete is not None
+    assert (complete.type, complete.presses) == (ACTION_PRESS, count)
+    # Holding still produces only hold and long-release actions.
+    assert engine.process(wheel, _decoded(3, ROLE_BUTTON, "initial_press")) is None
+    hold = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_press"))
+    release = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_release"))
+    assert hold is not None and hold.type == ACTION_HOLD
+    assert release is not None and release.type == ACTION_RELEASE
 
 def test_hold_duration_uses_one_uninterrupted_monotonic_press(
     wheel: BilresaWheel,
