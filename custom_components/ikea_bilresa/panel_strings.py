@@ -251,8 +251,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_invalid_value": "Choose or enter a valid value.",
         "validation_target_required": "Choose a target.",
         "validation_ramp_requires_light": "Ramping needs a light as the hold target.",
-        "validation_run_target_cannot_turn_off": (
-            "A scene or a script can only be run, not turned off. "
+        "validation_scene_cannot_turn_off": (
+            "A scene can only be run, not turned off. "
             "Choose Toggle target or Turn target on."
         ),
         "validation_scenes_required": "Add at least one scene.",
@@ -652,9 +652,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_ramp_requires_light": (
             "Pro plynulou změnu musí být cílem podržení světlo."
         ),
-        "validation_run_target_cannot_turn_off": (
-            "Scénu nebo skript lze jen spustit, ne vypnout. "
-            "Zvolte Přepnout cíl nebo Zapnout cíl."
+        "validation_scene_cannot_turn_off": (
+            "Scénu lze jen spustit, ne vypnout. Zvolte Přepnout cíl nebo Zapnout cíl."
         ),
         "validation_scenes_required": "Přidejte alespoň jednu scénu.",
         "validation_mode_target_mismatch": (

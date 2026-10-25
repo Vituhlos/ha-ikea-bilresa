@@ -104,6 +104,7 @@ from .const import (
     STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
     is_run_target,
+    is_scene_target,
     mode_supports_target,
     signal_channel,
     signal_raw_button,
@@ -128,13 +129,15 @@ _UNAVAILABLE = (None, "unknown", "unavailable")
 def _entity_service(entity_id: str, service: str) -> tuple[str, str]:
     """The service that carries out a press on this entity.
 
-    A scene or a script is run, whatever the gesture asked for: ``toggle`` on a
-    scene is not a service, and on a script it would stop one that is running.
-    Everything else goes through ``homeassistant``, which fits any switchable
-    domain.
+    A scene is run, whatever the gesture asked for: it has no ``toggle`` and no
+    ``turn_off``. A script keeps what was asked, so a second press can stop it
+    and "turn off" does. Everything else goes through ``homeassistant``, which
+    fits any switchable domain.
     """
+    if is_scene_target(entity_id):
+        return "scene", "turn_on"
     if is_run_target(entity_id):
-        return entity_id.split(".", 1)[0], "turn_on"
+        return "script", service
     return "homeassistant", service
 
 

@@ -57,7 +57,7 @@ from .const import (
     MODES,
     RAMP_DIRECTIONS,
     STEP_CURVES,
-    is_run_target,
+    is_scene_target,
     mode_supports_target,
 )
 from .panel_schema import BINDING_NUMBERS
@@ -222,9 +222,9 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
     if (
         data.get(CONF_CLICK_ACTION) == CLICK_OFF
         and not data.get(CONF_SCENES)
-        and is_run_target(click_target)
+        and is_scene_target(click_target)
     ):
-        errors[CONF_CLICK_ACTION] = "run_target_cannot_turn_off"
+        errors[CONF_CLICK_ACTION] = "scene_cannot_turn_off"
     if is_button:
         if data[CONF_CLICK_ACTION] != CLICK_NONE and not data.get(CONF_CLICK_TARGET):
             errors[CONF_CLICK_TARGET] = "target_required"

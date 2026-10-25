@@ -192,8 +192,8 @@ Nechcete psát automatizace? U položky **IKEA BILRESA**
   **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
   (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači). Cílem stisku,
   dvojitého či trojitého stisku nebo podržení může být i **scéna** nebo
-  **skript**: gesto ho pak spustí (scéna ani skript se nikdy nepřepíná ani
-  nevypíná),
+  **skript**: scéna se spustí; skript se přepne, zapne nebo vypne jako každá jiná
+  entita (druhý stisk ho tedy může zastavit),
 - **odezvu tlačítka**: okamžitě při prvním stisku, rychle po krátkém uvolnění,
   nebo přesné rozpoznání jednoho, dvou či tří stisků,
 - volitelný seřazený seznam **scén**, které jednoduché stisky postupně aktivují

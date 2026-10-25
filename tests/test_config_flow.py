@@ -461,26 +461,35 @@ def test_mode_rejects_incompatible_target() -> None:
     ) == {CONF_TARGET: "mode_target_mismatch"}
 
 
-@pytest.mark.parametrize("target", ["scene.evening", "script.go"])
-def test_a_scene_or_script_cannot_be_turned_off(target: str) -> None:
-    """Both are only ever run; "off" would need a service that does not exist."""
+def test_a_scene_cannot_be_turned_off() -> None:
+    """A scene is only ever run; "off" would need a service that does not exist."""
     assert BindingSubentryFlowHandler._validate_binding(
         {
             CONF_CLICK_ACTION: "off",
-            CONF_CLICK_TARGET: target,
+            CONF_CLICK_TARGET: "scene.evening",
             CONF_MODE: MODE_BRIGHTNESS,
             CONF_TARGET: "light.test",
         }
-    ) == {CONF_CLICK_ACTION: "run_target_cannot_turn_off"}
+    ) == {CONF_CLICK_ACTION: "scene_cannot_turn_off"}
 
 
-@pytest.mark.parametrize("click", ["toggle", "on", "none"])
-def test_a_scene_or_script_may_be_toggled_or_turned_on(click: str) -> None:
+@pytest.mark.parametrize(
+    ("click", "target"),
+    [
+        ("toggle", "scene.evening"),
+        ("on", "scene.evening"),
+        ("none", "scene.evening"),
+        ("toggle", "script.go"),
+        ("on", "script.go"),
+        ("off", "script.go"),
+    ],
+)
+def test_what_a_scene_or_script_can_do_is_accepted(click: str, target: str) -> None:
     assert (
         BindingSubentryFlowHandler._validate_binding(
             {
                 CONF_CLICK_ACTION: click,
-                CONF_CLICK_TARGET: "script.go",
+                CONF_CLICK_TARGET: target,
                 CONF_MODE: MODE_BRIGHTNESS,
                 CONF_TARGET: "light.test",
             }

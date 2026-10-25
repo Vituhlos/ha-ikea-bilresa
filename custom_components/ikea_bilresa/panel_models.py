@@ -68,7 +68,7 @@ from .const import (
     ROLE_BUTTON,
     SUBENTRY_BINDING,
     SUBENTRY_WHEEL,
-    is_run_target,
+    is_scene_target,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
 from .model import BilresaWheel
@@ -396,8 +396,8 @@ _CLICK_KEYS = {
 
 
 def _click_key(click_action: str, target: str | None) -> str:
-    """The label key for a short press: a scene or a script is run, not toggled."""
-    if click_action in (CLICK_TOGGLE, CLICK_ON) and is_run_target(target):
+    """The label key for a short press: a scene is run, not toggled."""
+    if click_action in (CLICK_TOGGLE, CLICK_ON) and is_scene_target(target):
         return "action_run"
     return _CLICK_KEYS.get(click_action, "action_toggle")
 
@@ -406,7 +406,7 @@ def _press_key(target: str | None) -> str:
     """The label key for a multi-press or a hold that switches its target."""
     if not target:
         return "action_none"
-    return "action_run" if is_run_target(target) else "action_toggle"
+    return "action_run" if is_scene_target(target) else "action_toggle"
 
 
 def _gesture_summary(

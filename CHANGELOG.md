@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 - **A scene or a script can be the target of a press, double press, triple
-  press or hold.** The gesture runs it with `scene.turn_on` or
-  `script.turn_on`; they are never toggled, because a scene has no `toggle`
-  service and toggling a running script would stop it. For the same reason a
-  short press set to "Turn target off" is refused for a scene or a script, in
-  the panel and in the native flow. The gesture ledger says "Run" for them.
+  press or hold.** A scene is run with `scene.turn_on`, whatever the gesture
+  asked for, because it has no `toggle` or `turn_off` service; a short press set
+  to "Turn target off" is therefore refused for a scene, in the panel and in the
+  native flow, and the gesture ledger says "Run". A script is toggled, turned on
+  or turned off like any other target, so a second press can stop one that is
+  still running.
 - **A compatibility table in both READMEs.** It says, path by path, what is
   Supported, Unsupported or Not verified, with the evidence for each: the
   remote works through Home Assistant's Matter integration; ZHA and

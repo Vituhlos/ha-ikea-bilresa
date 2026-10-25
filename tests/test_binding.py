@@ -1865,7 +1865,9 @@ def _service_calls(binding) -> list[tuple[str, str, dict]]:
     ]
 
 
-@pytest.mark.parametrize("domain", ["script", "scene"])
+@pytest.mark.parametrize(
+    ("domain", "service"), [("script", "toggle"), ("scene", "turn_on")]
+)
 @pytest.mark.parametrize(
     ("gesture", "overrides"),
     [
@@ -1874,10 +1876,10 @@ def _service_calls(binding) -> list[tuple[str, str, dict]]:
         ("hold", {CONF_HOLD_ACTION: HOLD_TOGGLE, CONF_HOLD_TARGET: "{entity}"}),
     ],
 )
-def test_a_scene_or_script_is_run_not_toggled(
-    monkeypatch, domain: str, gesture: str, overrides: dict
+def test_a_scene_is_run_and_a_script_is_toggled(
+    monkeypatch, domain: str, service: str, gesture: str, overrides: dict
 ) -> None:
-    """``toggle`` is no scene service and would stop a running script."""
+    """A scene has no ``toggle``; a script is toggled, so a second press stops it."""
     entity = f"{domain}.evening"
     binding, _i, _w = _binding(
         monkeypatch,
@@ -1892,12 +1894,15 @@ def test_a_scene_or_script_is_run_not_toggled(
 
     binding._handle_action(action)
 
-    assert _service_calls(binding) == [(domain, "turn_on", {"entity_id": entity})]
+    assert _service_calls(binding) == [(domain, service, {"entity_id": entity})]
 
 
-@pytest.mark.parametrize("click", ["toggle", "on"])
-def test_a_script_short_press_runs_it_whichever_click_action_is_stored(
-    monkeypatch, click: str
+@pytest.mark.parametrize(
+    ("click", "service"),
+    [("toggle", "toggle"), ("on", "turn_on"), ("off", "turn_off")],
+)
+def test_a_script_short_press_follows_the_stored_click_action(
+    monkeypatch, click: str, service: str
 ) -> None:
     binding, _i, _w = _binding(
         monkeypatch, click_action=click, **{CONF_CLICK_TARGET: "script.go"}
@@ -1905,9 +1910,18 @@ def test_a_script_short_press_runs_it_whichever_click_action_is_stored(
 
     binding._handle_action(_action(ACTION_PRESS, presses=1))
 
-    assert _service_calls(binding) == [
-        ("script", "turn_on", {"entity_id": "script.go"})
-    ]
+    assert _service_calls(binding) == [("script", service, {"entity_id": "script.go"})]
+
+
+@pytest.mark.parametrize("click", ["toggle", "on"])
+def test_a_scene_short_press_is_always_run(monkeypatch, click: str) -> None:
+    binding, _i, _w = _binding(
+        monkeypatch, click_action=click, **{CONF_CLICK_TARGET: "scene.go"}
+    )
+
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(binding) == [("scene", "turn_on", {"entity_id": "scene.go"})]
 
 
 def test_a_light_target_still_goes_through_homeassistant(monkeypatch) -> None:
