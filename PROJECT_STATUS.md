@@ -30,9 +30,13 @@ runtime code from merged PR #14.
   passed **Ruff, HACS validation, unit tests, frontend checks, mypy, and
   Hassfest**. The optional unit-test job for the newest Home Assistant
   pre-release was **skipped by the workflow**.
-- Those results are for the initial PR #15 revision, before the current
-  follow-up edits to this changelog and handoff. The updated PR head must pass
-  CI again before merge; do not attribute the earlier results to the new head.
+- The later PR #15 head `d8e41f62bcb0fdafe13d12ded17558ad92da572c`
+  also passed the same required GitHub Actions jobs in run
+  [40200362672](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40200362672).
+  The optional newest-Home-Assistant-pre-release unit-test job was skipped.
+  This entry's current change adding the changelog comparison links is newer
+  than that run, so its CI must finish before merge. Do not attribute the
+  runtime PR #14's 503 tests to release-preparation PR #15.
 - Hardware validation was **not performed by PR #15**. The underlying fix from
   PR #14 still needs an owner-side BILRESA sanity check and, especially, the
   reporter's original Zigbee2MQTT group test (3–4 bulbs, step 3, transition
