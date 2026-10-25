@@ -13,7 +13,99 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
-## Repository professionalization: READMEs, contributor docs, GitHub templates (2026-10-25)
+## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
+
+Status: **Focused runtime fix + tests on `devin/…-issue-9-brightness`, PR
+open against `main`. Static + unit/replay verified; NOT hardware-validated.**
+
+User report ([issue
+#9](https://github.com/Vituhlos/ha-ikea-bilresa/issues/9), BILRESA E2490 over
+Thread, Zigbee2MQTT 2.7.2 groups of 3–4 bulbs): brightness occasionally jumps
+to a stale level while scrolling, and single-notch batches dim steppy even
+with `transition` configured.
+
+**Root cause of the jumps, confirmed in code** (the reporter's
+`_forget_target` hypothesis was right in substance): while
+`_scroll_authoritative` is true, any state report that is not an own echo
+called `_forget_target("unrecognized_value_during_scroll")`. A Z2M group
+republishes whichever member bulb answered last — not an average — so during
+a fade it reports levels off the commanded path, each dropping the tracked
+target; the next notch then resynced from a stale member level.
+
+**Fix (smallest safe, cumulative accounting preserved):** no state report
+rebases while a scroll is authoritative. Off-path reports mid-scroll are
+recorded as a new `scroll_report_ignored` trace row instead of a `forget`.
+External changes are still honoured, bounded: the first report after the
+scroll goes quiet forgets via the existing `outside_scroll_authority` path,
+and `_resync`'s 3 s freshness window picks up reality on the next gesture.
+Worst-case delay for a genuine mid-scroll external change is the
+`_ACTIVE_SCROLL_TIMEOUT` + `_SCROLL_AUTHORITY_GRACE` window (≈2–3 s) — an
+accepted trade-off since the two cases are indistinguishable mid-gesture.
+
+**Steppy dimming, also confirmed:** `_smoothing_transition` returned 0 for
+`notches <= 1` and scaled every batch by `notches/_SMOOTHING_FULL_BATCH`, so
+slow-scroll 1–3 notch batches got ~0–0.2 s of the configured 0.8 s and landed
+as visible jumps. New rule: the *first dispatched batch of a continuous
+scroll* keeps the old behaviour (1 notch → 0, larger first batches scaled) —
+eager response preserved; every following batch gets the full configured
+transition. "Continuous scroll" is delimited by the authority window going
+quiet (`_scroll_epoch`, bumped in `_handle_raw_input`), **not** by Matter
+gesture boundaries — the firmware emits `initial_press` before every batch
+(`_scroll_gesture` increments per batch, making it unusable here).
+`_dispatch_call` records which epoch it served (`_commanded_epoch`);
+hold-to-ramp ticks stay immediate via the existing `_ramp_active` flag. No
+new settings, no config migration; `transition` semantics are unchanged —
+it is still the fade duration per batch.
+
+**Tests** (written first; all 8 failed on the old code before the fix):
+`test_wandering_group_reports_do_not_move_a_scroll_in_progress` (interleaved
+off-path member reports, arithmetic lands exactly),
+`test_off_path_report_mid_scroll_cannot_rebase_the_tracked_target` +
+`test_the_first_report_after_a_scroll_ends_still_rebases` (bounded, not
+permanent), smoothing: first-batch-eager / follow-up-full-transition /
+same-scroll later Matter gesture / fresh scroll after quiet / ramp stays
+immediate. Repurposed tests that pinned the old mid-scroll rebase:
+`test_third_party_change_during_a_scroll_rebases_immediately` (split into
+the two tests above), `test_discarding_the_target_records_why_and_what_
+caused_it` (forget record now driven post-quiet), the two `test_replay.py`
+scenario tests (`from_source`/`forgets` expectations; the outside-change
+capture gained post-quiet rows and still lands on the external value).
+
+Validated with (`.venv` = uv-managed CPython 3.14.9, matching CI):
+
+- `python -m pytest -q` — **499 passed** (was 491 on main; +8 new tests).
+- `ruff format --check custom_components tests` — clean.
+- `ruff check custom_components tests` — clean.
+- `mypy custom_components/ikea_bilresa` — 2 errors, both pre-existing on
+  unmodified `main` (verified via `git stash`): `device_link.py:256`
+  arg-type, `legacy_triggers.py:68` misc. Not regressions.
+- `python -m compileall -q custom_components tests`, `python -m json.tool`
+  on `translations/en.json`+`cs.json`, `git diff --check` — all clean.
+
+Not run: node/frontend checks — `docs/DEVELOPMENT.md` Gate A includes them
+but no `.js`/`.mjs` file changed, so they cannot be affected; CI runs them
+on the PR anyway. Hardware validation: **none** — unit/replay only. The
+Z2M-group timing itself was modelled, not reproduced on physical hardware.
+
+Files changed: `custom_components/ikea_bilresa/binding.py` (scroll-authority
+report handling, `_scroll_epoch`/`_commanded_epoch`, `_smoothing_transition`,
+comments/docstrings), `tests/test_binding.py`, `tests/test_trace.py`,
+`tests/test_replay.py`, `CHANGELOG.md` (`[Unreleased]` Fixed entries), this
+file. No Matter decoding, endpoint discovery, protocol, event-entity, stored
+config or panel changes.
+
+Risks/assumptions: (a) a genuine external change *during* an active scroll
+is honoured only after the gesture — bounded ≈3 s, documented as deliberate;
+(b) repeated mid-scroll `initial_press` batches now ramp with the full
+transition — intended per the issue discussion, worth an owner A/B feel
+check; (c) `test_action` (panel live-test) dispatches count towards the
+epoch, so a second live-test click shows the full transition — matching real
+scroll behaviour.
+
+**Single best next action:** owner reviews the PR; after merge, physical
+verification on the Z2M group setup from issue #9 (long down-scroll at step
+3, transition 0.8, watching for stale-level jumps and for the
+first-batch-eager/follow-up-fade feel).
 
 Status: **Docs-only PR on `devin/20261025-project-professionalization`; no
 runtime code touched.**

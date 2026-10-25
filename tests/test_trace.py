@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from custom_components.ikea_bilresa.binding import (
+    _ACTIVE_SCROLL_TIMEOUT,
+    _SCROLL_AUTHORITY_GRACE,
+)
 from custom_components.ikea_bilresa.const import (
     ACTION_ROTATE,
     CONF_ACCELERATION,
@@ -87,8 +91,13 @@ def test_a_step_records_where_its_starting_value_came_from(monkeypatch) -> None:
     assert all(row["dispatched"] for row in rows)
 
 
-def test_discarding_the_target_records_why_and_what_caused_it(monkeypatch) -> None:
-    """Steps go missing here, so the reason and the trigger must both be kept."""
+def test_an_ignored_mid_scroll_report_records_what_caused_it(monkeypatch) -> None:
+    """Off-path reports inside a scroll are dropped, so keep the evidence.
+
+    A Zigbee2MQTT group republishes whichever member answered last; a report
+    of 12 while the scroll is tracking 247 is that chatter, not a third-party
+    change. The row proves it was seen, weighed and ignored.
+    """
     binding, trace = _traced(monkeypatch)
     now = [0.0]
     monkeypatch.setattr(
@@ -101,9 +110,31 @@ def test_discarding_the_target_records_why_and_what_caused_it(monkeypatch) -> No
     external = SimpleNamespace(state="on", attributes={"brightness": 12})
     binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
 
+    ignored = [row for row in trace.dump() if row["kind"] == "scroll_report_ignored"]
+    assert len(ignored) == 1
+    assert ignored[0]["reported"] == 12
+    assert ignored[0]["tracked"] == 247.35
+    assert binding._tracked == 247.35
+
+
+def test_discarding_the_target_records_why_and_what_caused_it(monkeypatch) -> None:
+    """Steps go missing here, so the reason and the trigger must both be kept."""
+    binding, trace = _traced(monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_by(1, False)
+
+    # Past the active-scroll timeout and grace the same value is authoritative.
+    now[0] = _ACTIVE_SCROLL_TIMEOUT + _SCROLL_AUTHORITY_GRACE + 0.1
+    external = SimpleNamespace(state="on", attributes={"brightness": 12})
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
+
     forget = [row for row in trace.dump() if row["kind"] == "forget"]
     assert len(forget) == 1
-    assert forget[0]["reason"] == "unrecognized_value_during_scroll"
+    assert forget[0]["reason"] == "outside_scroll_authority"
     assert forget[0]["reported"] == 12
     assert forget[0]["had_tracked"] == 247.35
     assert forget[0]["recent_commands"] == [247.35]

@@ -268,6 +268,13 @@ class LightBinding:
         self._saturation = 100.0
         self._last = 0.0
         self._scroll_gesture = 0
+        # One continuous physical rotation, delimited by the scroll authority
+        # window going quiet rather than by Matter gesture boundaries — the
+        # firmware splits one rotation into many initial_press groups. The
+        # first dispatched batch of an epoch stays eager; smoothing applies to
+        # everything after it.
+        self._scroll_epoch = 0
+        self._commanded_epoch: int | None = None
         self._active_scrolls: dict[int | None, float] = {}
         self._last_scroll_seen: float | None = None
         # Where the target last said it was. One end of the path it is on.
@@ -526,8 +533,16 @@ class LightBinding:
         # target reports older absolute values between decoded deltas. Keep the
         # newest calculated target authoritative for as long as that scroll is
         # under way; otherwise a delayed zero-transition echo erases confirmed
-        # notches. A report that is not one of our own recent values is a real
-        # third-party change and still rebases immediately, even mid-scroll.
+        # notches.
+        #
+        # No report rebases inside that window, including a value nobody sent.
+        # A light *group* has no single true value to report: a Zigbee2MQTT
+        # group republishes whichever member bulb answered last, so mid-fade
+        # its state wanders to levels no command asked for. Rebasing onto one
+        # of those produced the stale-level jumps of issue #9. The window is
+        # bounded, not permanent — the first report after the scroll goes quiet
+        # still takes over below, so a genuine external change is only delayed
+        # a couple of seconds, never lost.
         now = time.monotonic()
         self._active_scrolls = {
             endpoint_id: last_seen
@@ -541,17 +556,14 @@ class LightBinding:
         if observed is not None:
             self._last_reported = observed
         if self._scroll_authoritative(now):
-            if not own_echo:
-                self._forget_target("unrecognized_value_during_scroll", observed)
-            else:
-                self._trace.record(
-                    "echo_ignored",
-                    node_id=self._node_id,
-                    channel=self._channel,
-                    endpoint=self._endpoint_id,
-                    reported=observed,
-                    tracked=None if self._tracked is None else round(self._tracked, 2),
-                )
+            self._trace.record(
+                "echo_ignored" if own_echo else "scroll_report_ignored",
+                node_id=self._node_id,
+                channel=self._channel,
+                endpoint=self._endpoint_id,
+                reported=observed,
+                tracked=None if self._tracked is None else round(self._tracked, 2),
+            )
             return
         # Outside a scroll, ignore only state echoes covered by the configured
         # service transition. A later external update invalidates the desired
@@ -582,11 +594,15 @@ class LightBinding:
         What identifies our own movement is the trajectory, not the value: the
         target travels from where it last reported towards the newest value we
         gave it, so anything along that path — widened by the mode's own
-        quantization — is us. A report off that path is a third-party change.
+        quantization — is us. A report off that path is either a third-party
+        change or group chatter; mid-scroll the two cannot be told apart.
 
-        Deliberately unaddressed: a light *group* reports the average of its
-        members, so no path we describe can contain it. See the group caveat in
-        PROJECT_STATUS.
+        Deliberately unaddressed inside this function: a light *group*
+        republishes whichever member answered last — a Zigbee2MQTT group does
+        not average — so no path we describe can contain its mid-scroll
+        wanderings. `_handle_target_state_change` covers that by never
+        rebasing while a scroll is authoritative; the report after the scroll
+        ends is where a group reasserts its real level.
         """
         observed = self._observed_value(state)
         if observed is None or not self._commanded:
@@ -692,6 +708,17 @@ class LightBinding:
             )
         if role in (ROLE_SCROLL_UP, ROLE_SCROLL_DOWN):
             now = time.monotonic()
+            # A scroll event arriving after the authority window went quiet is
+            # a new physical rotation: its first dispatched batch gets the
+            # eager, unsmoothed response again. Checked before updating
+            # `_last_scroll_seen`, which is what the window is measured from.
+            self._active_scrolls = {
+                endpoint: last_seen
+                for endpoint, last_seen in self._active_scrolls.items()
+                if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
+            }
+            if not self._scroll_authoritative(now):
+                self._scroll_epoch += 1
             # Every raw scroll event extends the window in which our own
             # calculated target outranks a lagging absolute state report,
             # including the completion that ends one Matter gesture of a
@@ -1108,19 +1135,31 @@ class LightBinding:
     def _smoothing_transition(self, notches: int) -> float:
         """Return the service transition for one batch of decoded notches.
 
-        A single notch is never smoothed. The eager first notch of a gesture
-        is the whole point of the RC.5 optimization, and hold-to-ramp steps
-        one notch at a time, so both stay immediate however this is
-        configured. Larger batches are the firmware bundling a fast rotation
-        into one jump; they are spread proportionally to their size, up to
-        the configured transition. Zero disables smoothing entirely.
+        The first dispatched batch of a scroll is never smoothed: the eager
+        first notch is the whole point of the RC.5 optimization. A first
+        batch that already bundles several notches is the firmware compressing
+        a fast flick into one jump, so it is spread proportionally to its
+        size, up to the configured transition.
 
-        The configured value is used as given. A transition longer than the
-        roughly 0.5-second spacing between batches will be interrupted by the
-        next batch, which is a real effect the owner can hear out during the
-        Hardware A/B rather than something to clamp away silently.
+        Every batch after the first of the same continuous scroll receives
+        the whole configured transition. A slow scroll arrives as
+        one-to-three notch batches; scaling those by batch size shrank the
+        transition to a fraction of the configured value and made each step
+        land as a visible jump — the steppy dimming of issue #9. Repeating
+        the full duration fades each step into the next instead.
+
+        Hold-to-ramp ticks are never smoothed; the ramp keeps its own
+        cadence. The configured value is otherwise used as given: a
+        transition longer than the roughly 0.5-second spacing between
+        batches is interrupted by the next batch, which is a real effect the
+        owner can hear out during the Hardware A/B rather than something to
+        clamp away silently. Zero disables smoothing entirely.
         """
-        if notches <= 1 or self._transition <= 0:
+        if self._transition <= 0 or self._ramp_active:
+            return 0.0
+        if self._commanded_epoch == self._scroll_epoch:
+            return self._transition
+        if notches <= 1:
             return 0.0
         return self._transition * min(1.0, notches / _SMOOTHING_FULL_BATCH)
 
@@ -1514,6 +1553,9 @@ class LightBinding:
         result: dict[str, Any],
     ) -> None:
         transition = _as_float(data.get(ATTR_TRANSITION)) or 0.0
+        # The scroll epoch this command belongs to. The next batch of the
+        # same scroll is a follow-up, so smoothing treats it accordingly.
+        self._commanded_epoch = self._scroll_epoch
         self._command_authoritative_until = (
             time.monotonic() + transition + _STATE_ECHO_MARGIN
         )
