@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 Stored bindings and runtime behaviour are unchanged.
 
+### Added
+- **A quiet link to a community tool for labels.** The bottom of a wheel's or
+  a dual button's page has one card, "Design labels for your switches",
+  naming a web tool by Liquidmasl (<https://bilresa.marcel1.com/>). It
+  opens in a new tab and nothing is sent to it: no query string, nothing about
+  your devices or entities, and nothing is embedded in the panel.
+
 ### Fixed
 - **A short-press target that nothing uses no longer shows as missing.** A
   channel that cycles scenes, or whose short press does nothing, ignores its

@@ -847,3 +847,48 @@ def test_channel_detail_uses_the_versioned_read_model_actions() -> None:
     assert "action.action_label" in asset
     assert "this._targetText(action)" in asset
     assert 'targetState(action) === "missing"' in asset
+
+
+def test_the_community_tool_is_linked_in_one_place_without_data() -> None:
+    """BILRESA-5: a plain external link under the controls, nothing embedded.
+
+    The address is one constant used once, so it cannot be assembled from
+    anything about the installation; the link leaves in a new tab without
+    handing the panel's window to the other site.
+    """
+    asset = _asset()
+
+    assert 'const COMMUNITY_TOOL_URL = "https://bilresa.marcel1.com/";' in asset
+    assert asset.count("COMMUNITY_TOOL_URL") == 2  # declaration and one use
+    assert "link.href = COMMUNITY_TOOL_URL;" in asset
+    assert 'link.target = "_blank";' in asset
+    assert 'link.rel = "noopener noreferrer";' in asset
+    # No query string or fragment is ever appended.
+    assert "COMMUNITY_TOOL_URL +" not in asset
+    assert "${COMMUNITY_TOOL_URL" not in asset
+    # Nothing is embedded or fetched from the other site.
+    assert "<iframe" not in asset
+    assert 'createElement("iframe")' not in asset
+    assert 'el("iframe"' not in asset
+    # It closes both device pages: the wheel's and the dual button's.
+    channels = asset.split("_channelsView(wheel) {", 1)[1].split("_buttonsView", 1)[0]
+    buttons = asset.split("_buttonsView(wheel) {", 1)[1].split("_gestureLabel", 1)[0]
+    assert "this._communityLink()" in channels
+    assert "this._communityLink()" in buttons
+    assert channels.index("_dialSection") < channels.index("_communityLink")
+
+
+def test_the_community_tool_texts_exist_in_both_languages() -> None:
+    from custom_components.ikea_bilresa.panel_strings import STRINGS
+
+    for language in ("en", "cs"):
+        strings = STRINGS[language]
+        for key in (
+            "community_tool_link",
+            "community_tool_note",
+            "community_tool_new_tab",
+        ):
+            assert strings[key].strip(), (language, key)
+    # It must say whose tool it is, so it is not read as part of the integration.
+    assert "Liquidmasl" in STRINGS["en"]["community_tool_note"]
+    assert "Liquidmasl" in STRINGS["cs"]["community_tool_note"]

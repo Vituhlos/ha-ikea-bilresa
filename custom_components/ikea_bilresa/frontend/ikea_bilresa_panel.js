@@ -87,6 +87,10 @@ const ICON = {
     "M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z",
   arrowUp: "M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z",
   plus: "M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z",
+  label:
+    "M16,17H5V7H16L19.55,12M17.63,5.84C17.27,5.33 16.67,5 16,5H5A2,2 0 0,0 3,7V17A2,2 0 0,0 5,19H16C16.67,19 17.27,18.66 17.63,18.15L22,12L17.63,5.84Z",
+  external:
+    "M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z",
   arrowDown:
     "M11,4H13V16L18.5,10.5L19.92,11.92L12,19.84L4.08,11.92L5.5,10.5L11,16V4Z",
   remove:
@@ -533,6 +537,41 @@ const STYLES = `
   }
   .subpage-meta-copy { flex: 1 1 auto; min-inline-size: 0; }
   .control-stack { display: grid; gap: var(--_space-4); }
+  /* A resource row at the foot of the page: the same card as the channels,
+     a leading icon, two lines and the open-in-new-tab icon, all one link. */
+  .resource-link {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--_space-4);
+    margin-block-start: var(--_space-4);
+    padding: var(--_space-4) var(--_space-6);
+    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_card);
+    color: var(--_ink);
+    text-decoration: none;
+  }
+  .resource-icon,
+  .resource-open { inline-size: 24px; block-size: 24px; fill: var(--_ink-dim); }
+  .resource-copy { display: grid; gap: 2px; min-inline-size: 0; }
+  .resource-title { font-weight: var(--ha-font-weight-medium, 500); }
+  .resource-note { color: var(--_ink-dim); font-size: var(--ha-font-size-s, 13px); }
+  @media (hover: hover) {
+    .resource-link:hover { background: var(--_selected); }
+  }
+  .resource-link:focus-visible {
+    outline: 2px solid var(--_accent);
+    outline-offset: 2px;
+  }
+  .visually-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .control-card {
     --_card-pad: var(--_space-6);
     min-inline-size: 0;
@@ -1499,6 +1538,11 @@ const ROTATION_MORE_FIELDS = [
 
 const DISCARD_DOUBLE_CLICK_MS = 500;
 const DISCARD_ARMED_MS = 4000;
+
+// A community tool by another author (BILRESA-5). It is only ever linked, in
+// one place, with no query string: nothing about this installation, its
+// devices or its entities is passed to it, and nothing is embedded.
+const COMMUNITY_TOOL_URL = "https://bilresa.marcel1.com/";
 
 const channelLeds = (active, count) => {
   const leds = el("span", "channel-leds");
@@ -3673,16 +3717,36 @@ class IkeaBilresaPanel extends HTMLElement {
     return stack;
   }
 
+  // A quiet card at the foot of the page, like a row of Home Assistant's own
+  // resources: one plain link to a tool by someone else, saying whose it is.
+  // It opens in a new tab and carries no data.
+  _communityLink() {
+    const link = el("a", "resource-link");
+    link.href = COMMUNITY_TOOL_URL;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.appendChild(svg(ICON.label, "resource-icon"));
+    const copy = el("span", "resource-copy");
+    copy.appendChild(el("span", "resource-title", this._t("community_tool_link")));
+    copy.appendChild(el("span", "resource-note", this._t("community_tool_note")));
+    copy.appendChild(el("span", "visually-hidden", ` ${this._t("community_tool_new_tab")}`));
+    link.appendChild(copy);
+    link.appendChild(svg(ICON.external, "resource-open"));
+    return link;
+  }
+
   _channelsView(wheel) {
     const wrap = el("div");
     wrap.appendChild(this._stackedControls(wheel));
     wrap.appendChild(this._dialSection(wheel));
+    wrap.appendChild(this._communityLink());
     return wrap;
   }
 
   _buttonsView(wheel) {
     const wrap = el("div");
     wrap.appendChild(this._stackedControls(wheel));
+    wrap.appendChild(this._communityLink());
     return wrap;
   }
 

@@ -953,6 +953,61 @@ test("each Discard button has its own stable id, so focus survives a render", as
   assert.ok(source.includes('this._discardButton(this._editingChannel, "form")'));
 });
 
+test("the community tool is one plain external link, and it carries no data", () => {
+  const node = () => ({
+    className: "",
+    textContent: "",
+    dataset: {},
+    children: [],
+    attributes: {},
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    },
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    addEventListener() {},
+  });
+  const previous = globalThis.document;
+  globalThis.document = { createElement: node, createElementNS: () => node() };
+  try {
+    const panel = newPanel();
+    panel._panel = {
+      config: {
+        labels: {
+          community_tool_link: "Design labels for your switches",
+          community_tool_note: "Community tool by Liquidmasl",
+          community_tool_new_tab: "(opens in a new tab)",
+        },
+      },
+    };
+    const link = panel._communityLink();
+    const copy = link.children.find((child) => child.className === "resource-copy");
+    const part = (name) => copy.children.find((child) => child.className === name);
+
+    assert.equal(link.href, "https://bilresa.marcel1.com/");
+    assert.equal(link.target, "_blank");
+    assert.equal(link.rel, "noopener noreferrer");
+    // Nothing about the installation can travel with the address.
+    const url = new URL(link.href);
+    assert.equal(url.search, "");
+    assert.equal(url.hash, "");
+    assert.equal(url.username, "");
+
+    assert.equal(part("resource-title").textContent, "Design labels for your switches");
+    // It says whose tool it is.
+    assert.equal(part("resource-note").textContent, "Community tool by Liquidmasl");
+    // A screen reader is told the link leaves the panel.
+    assert.match(part("visually-hidden").textContent, /opens in a new tab/);
+    // Both icons, the tag and the open-in-new-tab one, are decoration.
+    const icons = link.children.filter((child) => child.attributes["aria-hidden"] === "true");
+    assert.equal(icons.length, 2);
+  } finally {
+    globalThis.document = previous;
+  }
+});
+
 test("without Home Assistant's components the panel builds no ha-selector", () => {
   const panel = newPanel();
 
