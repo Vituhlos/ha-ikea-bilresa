@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.2-rc.1] - 2026-10-25
+
+Pre-release candidate for hardware validation of Issue #9. This is not a stable release.
+
 ### Fixed
 - **Brightness no longer jumps to a stale level while scrolling a light
   group.** A group entity has no single true brightness — a Zigbee2MQTT
