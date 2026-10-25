@@ -17,7 +17,36 @@ The dated entries below are preserved as a historical implementation and testing
 
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 
-Status: **PR #14 merged into `main` on 2026-10-25. Static + unit/replay verified; NOT hardware-validated. A matching pre-release candidate is being prepared; Issue #9 remains open pending the reporter's real Zigbee2MQTT-group test.**
+Status: **PR #14 merged into `main` on 2026-10-25. Its runtime fix has static + unit/replay verification but is NOT hardware-validated. PR #15 prepares candidate `v0.6.2-rc.1`; Issue #9 remains open pending the reporter's real Zigbee2MQTT-group test.**
+
+### PR #15 — candidate preparation verification (2026-10-25)
+
+This PR changes release metadata and documentation only; it does not change the
+runtime code from merged PR #14.
+
+- On the initial candidate-preparation commit
+  `ec90259c78dcc653270577a50e7f2c1bcf4af017`, GitHub Actions run
+  [40199787876](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40199787876)
+  passed **Ruff, HACS validation, unit tests, frontend checks, mypy, and
+  Hassfest**. The optional unit-test job for the newest Home Assistant
+  pre-release was **skipped by the workflow**.
+- Those results are for the initial PR #15 revision, before the current
+  follow-up edits to this changelog and handoff. The updated PR head must pass
+  CI again before merge; do not attribute the earlier results to the new head.
+- Hardware validation was **not performed by PR #15**. The underlying fix from
+  PR #14 still needs an owner-side BILRESA sanity check and, especially, the
+  reporter's original Zigbee2MQTT group test (3–4 bulbs, step 3, transition
+  0.8). Unit/replay tests are not physical hardware evidence.
+- Known behavior trade-off: an external light change reported only during an
+  active scroll, with no later state report, can be ignored. This is an
+  acknowledged limitation of avoiding stale group-member reports; a subsequent
+  gesture inside the freshness window may briefly use the previously tracked
+  target.
+- **Next action:** review the corrected changelog wording and wait for all
+  required CI checks on the updated PR #15 head. Do not publish a pre-release
+  tag until the repo's owner-side hardware check is recorded; do not call the
+  candidate stable.
+
 
 User report ([issue
 #9](https://github.com/Vituhlos/ha-ikea-bilresa/issues/9), BILRESA E2490 over
