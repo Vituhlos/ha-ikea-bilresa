@@ -3,10 +3,13 @@
 **Current snapshot — reviewed 2026-10-25**
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.
-- **Issue #9 fix:** PR [#14](https://github.com/Vituhlos/ha-ikea-bilresa/pull/14) was merged into `main` on 2026-10-25. The code fix and regression tests are in `main`; physical validation on the reported Zigbee2MQTT group is still pending.
-- **Test-release preparation:** this branch proposes manifest version `0.6.2-rc.1` and moves the Issue #9 notes into a dated pre-release changelog section. No tag or GitHub release has been published. Keep `v0.6.1` as the latest stable release; the candidate is not stable.
+- **Issue #9 fix:** PR [#14](https://github.com/Vituhlos/ha-ikea-bilresa/pull/14) is merged. Its fixes are included in `v0.6.2-rc.1`; physical validation against the reporter's Zigbee2MQTT group is still pending.
+
+- **Pre-releases:** [`v0.6.2-rc.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.2-rc.1) is published for Issue #9 hardware validation. PR [#16](https://github.com/Vituhlos/ha-ikea-bilresa/pull/16) has now merged the `short_release` bus event and Fast/Instant disabled-channel fix. This branch prepares `v0.6.2-rc.2`; it is not yet published. Both candidates are pre-releases, not stable.
+
 - **Development line:** the redesigned panel published as the pre-releases [`v0.6.1-rc.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1-rc.1) and [`v0.6.1-rc.2`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1-rc.2) is **not** in 0.6.1; it continues as 0.7.0 on branch `agent/panel-0.6.1`, which also carries the language fix. The owner saw rc.1 in his Home Assistant; rc.2 is deployed there but not yet confirmed by him.
-- **Manifest/release distinction:** the stable release is still `v0.6.1`. A manifest version of `0.6.2-rc.1` only identifies a candidate build; it is not published until a matching pre-release tag exists. Never describe the candidate as stable.
+- **Manifest/release distinction:** the stable release remains `v0.6.1`. A manifest version `0.6.2-rc.2` on its own is not a published release; it becomes available as a candidate only when the matching pre-release tag/release is published. Do not describe either RC as stable.
+
 - **Minimum Home Assistant Core:** 2026.8.0. Upgrading from 0.5.x has breaking changes: old device triggers were removed, and first startup can remove duplicate BILRESA device-registry entries. Users should back up before upgrading and follow [CHANGELOG.md](CHANGELOG.md).
 - **Validation:** the project has automated tests and some real-device/real-Home-Assistant checks, but the hardware checklist still contains open items. Do not claim that every gesture, device variant, firmware or configuration has been fully validated. See [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md) for the authoritative checklist.
 
@@ -17,11 +20,7 @@ The dated entries below are preserved as a historical implementation and testing
 
 ## PR #16: `short_release` bus event (port of #5) + disabled-channel raw-signal fix (2026-10-25)
 
-Status: **maintainer-owned port of contributor PR #5 (@amodig) onto `main`
-(`0.6.2-rc.1`), widened at the owner's request to fix Fast/Instant bindings
-on disabled channels. Static + unit verified; GitHub CI reruns on every push
-(see PR #16). NOT hardware-validated; not merged. PR #5 itself is left open
-and untouched.**
+Status: **merged into `main` on 2026-10-25** in merge commit `76a68d5f722f136ad942a59ad970b78527ab2c02`. The merge adds the `short_release` bus event and fixes Fast/Instant bindings on disabled channels. PR #5 remains open and untouched pending follow-up with its author. Hardware validation is still pending.
 
 What changed:
 
@@ -78,6 +77,8 @@ Validation (`.venv` = uv-managed CPython 3.14.9):
   pre-release job is skipped by workflow condition. Later commits on PR #16
   are docs-only; their CI is on the PR.
 
+Post-merge CI: GitHub Actions run [40206752722](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40206752722) passed on merge commit `76a68d5f722f136ad942a59ad970b78527ab2c02` (hassfest, unit tests, frontend checks, Ruff, mypy and HACS validation); the newest-HA pre-release job was skipped by workflow condition.
+
 Hardware validation: **not performed.** The contributor reported a fork test
 on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
 build and is not recorded as a hardware pass.
@@ -86,9 +87,7 @@ Disabled-channel raw signal: **fixed in this PR (commit 5)**, see above.
 Earlier it was recorded here as a separate follow-up; the owner asked to
 include it because it shares the channel-enabled guard.
 
-Single best next action: owner review of PR #16; then a physical check of
-the new `HARDWARE_TEST.md` items (B/F `short_release`, C disabled-channel
-Fast/Instant) before any release notes call it verified.
+Single best next action: publish the clearly labelled `v0.6.2-rc.2` test candidate after this preparation PR is merged, install it on the owner's Home Assistant, then record hardware results for `short_release` (B/F) and disabled-channel Fast/Instant (C) in `docs/HARDWARE_TEST.md`.
 
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 
