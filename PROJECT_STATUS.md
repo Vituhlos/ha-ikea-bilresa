@@ -1,10 +1,12 @@
 # Project status and agent handoff
 
-**Current snapshot — reviewed 2026-10-24**
+**Current snapshot — reviewed 2026-10-25**
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.
+- **Issue #9 fix:** PR [#14](https://github.com/Vituhlos/ha-ikea-bilresa/pull/14) was merged into `main` on 2026-10-25. The code fix and regression tests are in `main`; physical validation on the reported Zigbee2MQTT group is still pending.
+- **Test-release preparation:** this branch proposes manifest version `0.6.2-rc.1` and moves the Issue #9 notes into a dated pre-release changelog section. No tag or GitHub release has been published. Keep `v0.6.1` as the latest stable release; the candidate is not stable.
 - **Development line:** the redesigned panel published as the pre-releases [`v0.6.1-rc.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1-rc.1) and [`v0.6.1-rc.2`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1-rc.2) is **not** in 0.6.1; it continues as 0.7.0 on branch `agent/panel-0.6.1`, which also carries the language fix. The owner saw rc.1 in his Home Assistant; rc.2 is deployed there but not yet confirmed by him.
-- **Default branch:** `main` declares version `0.6.1` in the integration manifest. Do not describe any `0.6.1-rc.*` pre-release as a stable release.
+- **Manifest/release distinction:** the stable release is still `v0.6.1`. A manifest version of `0.6.2-rc.1` only identifies a candidate build; it is not published until a matching pre-release tag exists. Never describe the candidate as stable.
 - **Minimum Home Assistant Core:** 2026.8.0. Upgrading from 0.5.x has breaking changes: old device triggers were removed, and first startup can remove duplicate BILRESA device-registry entries. Users should back up before upgrading and follow [CHANGELOG.md](CHANGELOG.md).
 - **Validation:** the project has automated tests and some real-device/real-Home-Assistant checks, but the hardware checklist still contains open items. Do not claim that every gesture, device variant, firmware or configuration has been fully validated. See [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md) for the authoritative checklist.
 
@@ -15,8 +17,40 @@ The dated entries below are preserved as a historical implementation and testing
 
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 
-Status: **Focused runtime fix + tests on `devin/…-issue-9-brightness`, PR
-open against `main`. Static + unit/replay verified; NOT hardware-validated.**
+Status: **PR #14 merged into `main` on 2026-10-25. Its runtime fix has static + unit/replay verification but is NOT hardware-validated. PR #15 prepares candidate `v0.6.2-rc.1`; Issue #9 remains open pending the reporter's real Zigbee2MQTT-group test.**
+
+### PR #15 — candidate preparation verification (2026-10-25)
+
+This PR changes release metadata and documentation only; it does not change the
+runtime code from merged PR #14.
+
+- On the initial candidate-preparation commit
+  `ec90259c78dcc653270577a50e7f2c1bcf4af017`, GitHub Actions run
+  [40199787876](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40199787876)
+  passed **Ruff, HACS validation, unit tests, frontend checks, mypy, and
+  Hassfest**. The optional unit-test job for the newest Home Assistant
+  pre-release was **skipped by the workflow**.
+- The later PR #15 head `d8e41f62bcb0fdafe13d12ded17558ad92da572c`
+  also passed the same required GitHub Actions jobs in run
+  [40200362672](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40200362672).
+  The optional newest-Home-Assistant-pre-release unit-test job was skipped.
+  This entry's current change adding the changelog comparison links is newer
+  than that run, so its CI must finish before merge. Do not attribute the
+  runtime PR #14's 503 tests to release-preparation PR #15.
+- Hardware validation was **not performed by PR #15**. The underlying fix from
+  PR #14 still needs an owner-side BILRESA sanity check and, especially, the
+  reporter's original Zigbee2MQTT group test (3–4 bulbs, step 3, transition
+  0.8). Unit/replay tests are not physical hardware evidence.
+- Known behavior trade-off: an external light change reported only during an
+  active scroll, with no later state report, can be ignored. This is an
+  acknowledged limitation of avoiding stale group-member reports; a subsequent
+  gesture inside the freshness window may briefly use the previously tracked
+  target.
+- **Next action:** review the corrected changelog wording and wait for all
+  required CI checks on the updated PR #15 head. Do not publish a pre-release
+  tag until the repo's owner-side hardware check is recorded; do not call the
+  candidate stable.
+
 
 User report ([issue
 #9](https://github.com/Vituhlos/ha-ikea-bilresa/issues/9), BILRESA E2490 over
@@ -144,13 +178,13 @@ check; (c) `test_action` (panel live-test) dispatches count towards the
 epoch, so a second live-test click shows the full transition — matching real
 scroll behaviour.
 
-**Single best next action:** owner reviews the PR; after merge, physical
-verification on the Z2M group setup from issue #9 (long down-scroll at step
-3, transition 0.8, watching for stale-level jumps and for the
-first-batch-eager/follow-up-fade feel).
+**Single best next action:** run the applicable owner-side BILRESA hardware sanity checks, then publish `v0.6.2-rc.1` as a pre-release for the Issue #9 reporter to verify on the original Z2M group setup (step 3, transition 0.8). Keep the issue open until the reporter confirms results; do not publish a stable release based on CI alone.
 
-Status: **Docs-only PR on `devin/20261025-project-professionalization`; no
-runtime code touched.**
+## Historical handoff: repository professionalization (PR #13, 2026-10-25)
+
+Archived record: PR [#13](https://github.com/Vituhlos/ha-ikea-bilresa/pull/13)
+was merged into `main`. The notes below describe that completed
+documentation-only work; they are not the current release status.
 
 A documentation/repository-hygiene pass aimed at a more professional public
 presentation (the goal: a README a visitor understands in ~30 s and a clear
@@ -204,9 +238,9 @@ custom repositories (standard pattern used by non-default-store projects);
 GitHub issue forms are English with Czech twins (`*_cs.yml`) because GitHub
 does not localize forms.
 
-**Single best next action:** owner reviews the PR and merges; afterwards
-consider enabling GitHub private vulnerability reporting so SECURITY.md can
-name a confidential channel, and add real screenshots of the stable panel.
+**Possible follow-up ideas recorded at the time:** consider enabling GitHub
+private vulnerability reporting so SECURITY.md can name a confidential
+channel, and add real screenshots of the stable panel.
 
 
 ## Fix release 0.6.1: the panel follows the user's language (2026-10-24)

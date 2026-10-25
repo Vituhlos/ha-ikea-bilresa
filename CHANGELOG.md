@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.2-rc.1] - 2026-10-25
+
+Pre-release candidate for hardware validation of Issue #9. This is not a stable release.
+
 ### Fixed
 - **Brightness no longer jumps to a stale level while scrolling a light
   group.** A group entity has no single true brightness — a Zigbee2MQTT
@@ -14,9 +18,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   its state wanders to values nobody sent. Each of those reports used to
   reset the tracked target mid-scroll, and the next notch restarted from a
   stale member level. Mid-scroll reports are now recorded and ignored
-  instead; the first report after the scroll ends re-syncs as before, so a
-  genuine external change is only delayed by a couple of seconds, never
-  lost. (Issue #9)
+  instead. A later report after the scroll quiets down re-syncs the
+  target, but there is a known limitation: if a real external change is
+  reported only during the active scroll and never reported again, it can
+  be ignored; a new gesture within the freshness window may briefly start
+  from the previous tracked target. (Issue #9)
 - **Slow scrolling fades smoothly again.** The configured transition was
   scaled by batch size, so the one-to-three notch batches a slow scroll
   produces were spread over a fraction of the configured value and each
@@ -931,7 +937,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...HEAD
+[0.6.2-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1...v0.6.2-rc.1
 [0.6.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...v0.6.0
 [0.6.0-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0-rc.5...v0.6.0-rc.6
