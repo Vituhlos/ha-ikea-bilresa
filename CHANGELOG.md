@@ -18,9 +18,11 @@ Pre-release candidate for hardware validation of Issue #9. This is not a stable 
   its state wanders to values nobody sent. Each of those reports used to
   reset the tracked target mid-scroll, and the next notch restarted from a
   stale member level. Mid-scroll reports are now recorded and ignored
-  instead; the first report after the scroll ends re-syncs as before, so a
-  genuine external change is only delayed by a couple of seconds, never
-  lost. (Issue #9)
+  instead. A later report after the scroll quiets down re-syncs the
+  target, but there is a known limitation: if a real external change is
+  reported only during the active scroll and never reported again, it can
+  be ignored; a new gesture within the freshness window may briefly start
+  from the previous tracked target. (Issue #9)
 - **Slow scrolling fades smoothly again.** The configured transition was
   scaled by batch size, so the one-to-three notch batches a slow scroll
   produces were spread over a fraction of the configured value and each
