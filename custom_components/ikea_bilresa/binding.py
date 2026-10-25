@@ -86,6 +86,7 @@ from .const import (
     HOLD_NONE,
     HOLD_RAMP,
     HOLD_TOGGLE,
+    MODE_BRIGHTNESS,
     MODE_COLOR,
     MODE_COLOR_TEMP,
     MODE_COVER,
@@ -143,6 +144,10 @@ _SCROLL_AUTHORITY_GRACE = 1.0
 # our own value within a fraction of the mode's full range instead of by
 # equality; anything further away is a genuine third-party change.
 _ECHO_MATCH_FRACTION = 0.01
+# Modes whose target is always a light entity — the only place an aggregated
+# target (a Zigbee2MQTT-style group) makes an off-path state report
+# indistinguishable from a real external change mid-scroll.
+_LIGHT_MODES = frozenset({MODE_BRIGHTNESS, MODE_COLOR_TEMP, MODE_COLOR})
 # Enough dispatched values to cover several delayed batches without keeping an
 # unbounded history.
 _COMMAND_HISTORY = 8
@@ -535,19 +540,23 @@ class LightBinding:
         # under way; otherwise a delayed zero-transition echo erases confirmed
         # notches.
         #
-        # No report rebases inside that window, including a value nobody sent.
-        # A light *group* has no single true value to report: a Zigbee2MQTT
-        # group republishes whichever member bulb answered last, so mid-fade
-        # its state wanders to levels no command asked for. Rebasing onto one
-        # of those produced the stale-level jumps of issue #9. The window is
-        # bounded, not permanent — the first report after the scroll goes quiet
-        # still takes over below, so a genuine external change is only delayed
-        # a couple of seconds, never lost. The one residual: a change reported
-        # only mid-scroll, with no report ever following it, cannot be told
-        # apart from a group member's stray level, so it is ignored as well —
-        # reconciling to the entity state afterwards would hand a lingering
-        # stale group report the next gesture, recreating the jump this fix
-        # removes.
+        # For a *light* target no report rebases inside that window, including
+        # a value nobody sent. A light *group* has no single true value to
+        # report: a Zigbee2MQTT group republishes whichever member bulb
+        # answered last, so mid-fade its state wanders to levels no command
+        # asked for. Rebasing onto one of those produced the stale-level
+        # jumps of issue #9. The window is bounded, not permanent — the first
+        # report after the scroll goes quiet still takes over below, so a
+        # genuine external change is only delayed a couple of seconds, never
+        # lost. The one residual: a change reported only mid-scroll, with no
+        # report ever following it, cannot be told apart from a group
+        # member's stray level, so it is ignored as well — reconciling to
+        # the entity state afterwards would hand a lingering stale group
+        # report the next gesture, recreating the jump this fix removes.
+        #
+        # Other modes keep the established rebase: a cover, climate or media
+        # target has no aggregated state to distrust, so an off-path report
+        # mid-scroll is a real external change and still wins immediately.
         now = time.monotonic()
         self._active_scrolls = {
             endpoint_id: last_seen
@@ -561,14 +570,19 @@ class LightBinding:
         if observed is not None:
             self._last_reported = observed
         if self._scroll_authoritative(now):
-            self._trace.record(
-                "echo_ignored" if own_echo else "scroll_report_ignored",
-                node_id=self._node_id,
-                channel=self._channel,
-                endpoint=self._endpoint_id,
-                reported=observed,
-                tracked=None if self._tracked is None else round(self._tracked, 2),
-            )
+            if not own_echo and self._mode not in _LIGHT_MODES:
+                self._forget_target("unrecognized_value_during_scroll", observed)
+            else:
+                self._trace.record(
+                    "echo_ignored" if own_echo else "scroll_report_ignored",
+                    node_id=self._node_id,
+                    channel=self._channel,
+                    endpoint=self._endpoint_id,
+                    reported=observed,
+                    tracked=(
+                        None if self._tracked is None else round(self._tracked, 2)
+                    ),
+                )
             return
         # Outside a scroll, ignore only state echoes covered by the configured
         # service transition. A later external update invalidates the desired

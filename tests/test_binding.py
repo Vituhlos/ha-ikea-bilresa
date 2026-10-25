@@ -45,6 +45,7 @@ from custom_components.ikea_bilresa.const import (
     HOLD_NONE,
     HOLD_RAMP,
     MODE_COLOR_TEMP,
+    MODE_COVER,
     MODE_VOLUME,
     RAMP_DIRECTION_DOWN,
     RAMP_DIRECTION_UP,
@@ -1551,6 +1552,123 @@ def test_a_mid_scroll_echo_does_not_force_a_later_resync(monkeypatch) -> None:
 
     # Nothing external was seen, so the tracked target carries straight on.
     assert binding._tracked == pytest.approx(255 - 2 * 7.65)
+
+
+def test_an_off_path_report_mid_scroll_is_ignored_for_a_color_temp_light(
+    monkeypatch,
+) -> None:
+    """The light-group distrust covers every mode that targets a light.
+
+    A group bound in color-temperature mode produces the same last-member-
+    wins state wanderings as a brightness group, so its off-path reports
+    must be ignored mid-scroll too.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_COLOR_TEMP,
+            CONF_TARGET: "light.kelvin_group",
+            CONF_TRANSITION: 0.0,
+            CONF_STEP: 3,
+            CONF_ACCELERATION: 0,
+        },
+    )
+    binding._min_command_interval = 0.0
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="on",
+        attributes={
+            "color_temp_kelvin": 4000,
+            "min_color_temp_kelvin": 2000,
+            "max_color_temp_kelvin": 6535,
+        },
+    )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_color_temp(1, up=False)
+
+    # 3 % of the 4535 K span per notch, one notch down: tracked lands at
+    # 4000 - 136.05. A member report far outside the commanded path must
+    # not move it.
+    now[0] = 0.3
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(
+                    state="on", attributes={"color_temp_kelvin": 6000}
+                )
+            }
+        )
+    )
+
+    now[0] = 0.5
+    binding._rotate_color_temp(1, up=False)
+
+    notch = 0.03 * 4535
+    assert binding._tracked == pytest.approx(4000 - 2 * notch)
+    assert binding.hass.services.async_call.call_args.args[2][
+        "color_temp_kelvin"
+    ] == round(4000 - 2 * notch)
+
+
+def test_a_non_light_target_still_rebases_on_a_mid_scroll_external_change(
+    monkeypatch,
+) -> None:
+    """Outside the light modes the established rebase stays.
+
+    A cover, climate, media or number target has no aggregated state to
+    distrust, so an off-path report mid-scroll is a real external change
+    and must keep winning immediately, exactly as before this fix.
+    """
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_COVER,
+            CONF_TARGET: "cover.test",
+            CONF_TRANSITION: 0.0,
+            CONF_STEP: 3,
+            CONF_ACCELERATION: 0,
+        },
+    )
+    binding._min_command_interval = 0.0
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="open", attributes={"current_position": 80}
+    )
+
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_cover(1, up=False)
+    assert binding._tracked == 77
+
+    # A wall switch or another controller moves the cover mid-scroll: the
+    # off-path report forgets the tracked target and the next notch
+    # resyncs from the real position instead of fighting the change.
+    now[0] = 0.3
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(
+                    state="open", attributes={"current_position": 30}
+                )
+            }
+        )
+    )
+    assert binding._tracked is None
+
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="open", attributes={"current_position": 30}
+    )
+    now[0] = 0.5
+    binding._rotate_cover(1, up=False)
+
+    assert binding._tracked == 27
+    assert binding.hass.services.async_call.call_args.args[2]["position"] == 27
 
 
 def test_missing_scroll_completion_expires_target_authority(monkeypatch) -> None:

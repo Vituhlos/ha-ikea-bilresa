@@ -32,15 +32,28 @@ republishes whichever member bulb answered last — not an average — so during
 a fade it reports levels off the commanded path, each dropping the tracked
 target; the next notch then resynced from a stale member level.
 
-**Fix (smallest safe, cumulative accounting preserved):** no state report
-rebases while a scroll is authoritative. Off-path reports mid-scroll are
-recorded as a new `scroll_report_ignored` trace row instead of a `forget`.
-External changes are still honoured, bounded: the first report after the
-scroll goes quiet forgets via the existing `outside_scroll_authority` path,
-and `_resync`'s 3 s freshness window picks up reality on the next gesture.
-Worst-case delay for a genuine mid-scroll external change is the
-`_ACTIVE_SCROLL_TIMEOUT` + `_SCROLL_AUTHORITY_GRACE` window (≈2–3 s) — an
-accepted trade-off since the two cases are indistinguishable mid-gesture.
+**Fix (smallest safe, cumulative accounting preserved):** for **light
+modes** (`brightness`, `color_temp`, `color` — always `light.*` targets)
+no state report rebases while a scroll is authoritative. Off-path reports
+mid-scroll are recorded as a new `scroll_report_ignored` trace row
+instead of a `forget`. External changes are still honoured, bounded: the
+first report after the scroll goes quiet forgets via the existing
+`outside_scroll_authority` path, and `_resync`'s 3 s freshness window
+picks up reality on the next gesture. Worst-case delay for a genuine
+mid-scroll external change is the `_ACTIVE_SCROLL_TIMEOUT` +
+`_SCROLL_AUTHORITY_GRACE` window (≈2–3 s) — an accepted trade-off since
+the two cases are indistinguishable mid-gesture.
+
+**Scope decision (review round 3):** the ignore-window applies to light
+modes only. The mid-scroll ambiguity exists solely because an aggregated
+light entity's state is not its physical truth; a cover, climate, media
+player, fan or number target has no such double meaning, so for those
+modes an off-path report mid-scroll remains a real external change and
+still rebases immediately (`unrecognized_value_during_scroll`) —
+preserving the established semantics outside the reported scenario. A
+group cannot be identified reliably (a Z2M group is an ordinary `light`
+entity with no distinguishing state attributes or registry data), so
+mode is the only defensible scope boundary.
 
 Review rounds 1–2 probed the residual hard: an external change reported
 *only* mid-scroll, with no report ever following it, is ignored too — a
@@ -76,7 +89,7 @@ new settings, no config migration; `transition` semantics are unchanged —
 it is still the fade duration per batch.
 
 **Tests** (written first; all 8 failed on the old code before the fix,
-then 2 more for the review round):
+then 4 more across the review rounds):
 `test_wandering_group_reports_do_not_move_a_scroll_in_progress` (interleaved
 off-path member reports, arithmetic lands exactly),
 `test_off_path_report_mid_scroll_cannot_rebase_the_tracked_target` +
@@ -85,9 +98,12 @@ permanent), smoothing: first-batch-eager / follow-up-full-transition /
 same-scroll later Matter gesture / fresh scroll after quiet / ramp stays
 immediate; `test_a_lingering_off_path_group_state_does_not_reset_the_
 next_scroll` (a stray member level lingering as the entity state must
-not rebase the next scroll either — the review-round-2 regression) and
+not rebase the next scroll either — the review-round-2 regression);
 `test_a_mid_scroll_echo_does_not_force_a_later_resync` (quick successive
-scrolls keep cumulative accounting).
+scrolls keep cumulative accounting); scope: `test_an_off_path_report_
+mid_scroll_is_ignored_for_a_color_temp_light` (the light scope covers
+color_temp/hue groups too) and `test_a_non_light_target_still_rebases_
+on_a_mid_scroll_external_change` (cover keeps the immediate rebase).
 Repurposed tests that pinned the old mid-scroll rebase:
 `test_third_party_change_during_a_scroll_rebases_immediately` (split into
 the two tests above), `test_discarding_the_target_records_why_and_what_
@@ -97,7 +113,7 @@ capture gained post-quiet rows and still lands on the external value).
 
 Validated with (`.venv` = uv-managed CPython 3.14.9, matching CI):
 
-- `python -m pytest -q` — **501 passed** (was 491 on main; +10 new tests).
+- `python -m pytest -q` — **503 passed** (was 491 on main; +12 new tests).
 - `ruff format --check custom_components tests` — clean.
 - `ruff check custom_components tests` — clean.
 - `mypy custom_components/ikea_bilresa` — 2 errors, both pre-existing on
