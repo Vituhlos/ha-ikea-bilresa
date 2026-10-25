@@ -45,6 +45,7 @@ triggers and the same BILRESA panel.
   - [Event reference](#event-reference)
   - [Example automations](#example-automations)
   - [The `ikea_bilresa_event` bus event](#the-ikea_bilresa_event-bus-event)
+  - [Immediate short-release actions](#immediate-short-release-actions)
 - [Multiple wheels](#multiple-wheels)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
@@ -182,7 +183,8 @@ press or hold, Instant is accepted only when those separate actions are
 disabled. **Fast release** runs after the first short release and remains safe
 for a normal hold; multi-press aware waits for the BILRESA completion event.
 Existing bindings without this setting retain the completion-aware behavior
-until explicitly changed. Public event entities and triggers keep exact
+until explicitly changed. A disabled channel runs no binding in any of these
+modes. Public event entities and triggers keep exact
 single/double/triple classification in every mode.
 
 The integration then dims that light in real time. Add as many bindings as you
@@ -309,7 +311,7 @@ Duplicate with `rotate_down` and a negative step for dimming down, and add a
 Every action is also fired on the event bus as `ikea_bilresa_event` — handy for a
 single automation that handles several wheels. Payload fields: `node_id`,
 `wheel_name`, `channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` /
-`release`), `direction` (`up` / `down`), `notches`, `presses`.
+`release` / `short_release`), `direction` (`up` / `down`), `notches`, `presses`.
 
 ```yaml
 triggers:
@@ -318,6 +320,39 @@ triggers:
     event_data:
       type: rotate
 ```
+
+### Immediate short-release actions
+
+For an automation that should react as soon as a short button press is released,
+listen to `ikea_bilresa_event` with `type: short_release`, filtered by your wheel's
+`node_id` and `channel`. Do not filter on `presses: 1`: the final click count is
+not yet known at release time.
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12  # Replace with your wheel's Matter node ID.
+      channel: 1
+      type: short_release
+```
+
+This bus-only event is emitted for each short release, including releases within
+a double or triple click. Completed `press` events still follow with the final
+count. Replace the automation's completed single-press trigger rather than
+adding a second trigger for the same action, or it will run twice. A separate
+double-click action can override the early action, but the interim effect will
+be visible. Long holds do not emit this event. Existing event entities,
+`ikea_bilresa.*` triggers and direct light bindings keep their completed-gesture
+behavior; a direct binding that should react on release uses its own
+**Button response → Fast release** setting instead. A disabled channel emits no
+`short_release` either.
+
+The E2489 dual button has no channel (`channel` is empty), so filter its two
+buttons by `endpoint_id` instead. Pressing it more than twice in a row still
+emits a `short_release` for each reported release, but no completed `press`
+follows (the device ends the sequence with a zero count).
 
 ## Multiple wheels
 

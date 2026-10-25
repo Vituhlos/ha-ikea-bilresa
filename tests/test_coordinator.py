@@ -15,13 +15,19 @@ from custom_components.ikea_bilresa.channel_controls import (
 from custom_components.ikea_bilresa.const import (
     ACTION_PRESS,
     ACTION_ROTATE,
+    ACTION_SHORT_RELEASE,
+    BUTTON_RESPONSE_FAST,
+    BUTTON_RESPONSE_INSTANT,
     CLUSTER_SWITCH,
+    CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
     CONF_CHANNEL_ENABLED,
     CONF_ENDPOINT,
+    CONF_HOLD_ACTION,
     CONF_NODE_ID,
     DIRECTION_UP,
     EVENT_BILRESA,
+    HOLD_NONE,
     SUBENTRY_BINDING,
     signal_raw_button,
 )
@@ -29,6 +35,7 @@ from custom_components.ikea_bilresa.coordinator import BilresaCoordinator
 from custom_components.ikea_bilresa.engine import WheelAction
 from custom_components.ikea_bilresa.matter_core import CoreMatterUnavailable
 from custom_components.ikea_bilresa.model import BilresaWheel
+from tests.test_binding import _binding
 
 
 class FailingCoreSource:
@@ -229,6 +236,102 @@ def test_raw_gesture_hint_is_dispatched_only_internally(monkeypatch) -> None:
     )
 
 
+def _raw_coordinator(monkeypatch, send, *, channel: int | None, event_type: str):
+    """A coordinator whose next node event decodes to one raw button phase."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.CoreMatterEventSource",
+        lambda *_args: SimpleNamespace(source="core", server_info=None),
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.async_dispatcher_send", send
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.coordinator.decode_event",
+        lambda *_args: {
+            "role": "button",
+            "channel": channel,
+            "endpoint_id": 3,
+            "event_type": event_type,
+        },
+    )
+    coordinator = BilresaCoordinator(SimpleNamespace(), "ws://matter/ws")
+    coordinator._engine.process = Mock(return_value=None)
+    coordinator.wheels[12] = BilresaWheel(
+        node_id=12,
+        name="Test wheel",
+        product_name="BILRESA scroll wheel",
+        serial=None,
+        endpoints={},
+    )
+    return coordinator
+
+
+@pytest.mark.parametrize(
+    ("response", "raw_event"),
+    [
+        (BUTTON_RESPONSE_FAST, "short_release"),
+        (BUTTON_RESPONSE_INSTANT, "initial_press"),
+    ],
+)
+@pytest.mark.parametrize("enabled", [True, False])
+def test_raw_button_runs_early_bindings_only_on_enabled_channels(
+    monkeypatch, response: str, raw_event: str, enabled: bool
+) -> None:
+    """Fast/Instant act on the raw signal, so a disabled channel must not send it."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_NODE_ID: 12,
+            CONF_CHANNEL: 2,
+            CONF_BUTTON_RESPONSE: response,
+            CONF_HOLD_ACTION: HOLD_NONE,
+        },
+    )
+    binding._single_press = Mock()
+    routes = {signal_raw_button(12, 2): binding._handle_raw_input}
+
+    def _send(_hass, signal, *args) -> None:
+        if (target := routes.get(signal)) is not None:
+            target(*args)
+
+    coordinator = _raw_coordinator(monkeypatch, _send, channel=2, event_type=raw_event)
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"2": enabled}}
+        )
+    }
+
+    coordinator._handle_node_event(
+        {"node_id": 12, "cluster_id": CLUSTER_SWITCH, "endpoint_id": 3}
+    )
+
+    assert binding._single_press.call_count == (1 if enabled else 0)
+    coordinator._engine.process.assert_called_once()
+
+
+def test_raw_button_on_dual_button_ignores_disabled_wheel_channels(
+    monkeypatch,
+) -> None:
+    """A dual button has no channel to disable; its raw signal always flows."""
+    dispatch = Mock()
+    coordinator = _raw_coordinator(
+        monkeypatch, dispatch, channel=None, event_type="short_release"
+    )
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"1": False, "2": False}}
+        )
+    }
+
+    coordinator._handle_node_event(
+        {"node_id": 12, "cluster_id": CLUSTER_SWITCH, "endpoint_id": 3}
+    )
+
+    dispatch.assert_called_once_with(
+        coordinator.hass, signal_raw_button(12, None), "button", "short_release", 3
+    )
+
+
 def test_button_binding_keys_separate_endpoints_and_multiple_devices(
     monkeypatch,
 ) -> None:
@@ -423,3 +526,63 @@ def test_a_wheel_without_settings_has_every_channel_enabled(monkeypatch) -> None
 
     fire.assert_called_once()
     assert coordinator.settings_for(12) is DEFAULT_SETTINGS
+
+
+def _short_release(
+    node_id: int, channel: int | None, endpoint_id: int = 3
+) -> WheelAction:
+    return WheelAction(
+        node_id=node_id,
+        wheel_name="Test wheel",
+        channel=channel,
+        endpoint_id=endpoint_id,
+        type=ACTION_SHORT_RELEASE,
+    )
+
+
+def test_short_release_reaches_only_the_public_bus(monkeypatch) -> None:
+    """Entities, triggers and bindings keep completed-gesture semantics.
+
+    Fast bindings already see ShortRelease on the internal raw signal; the
+    public action must not also reach the channel signal or the panel's
+    binding-activity feed, where every click would log a skipped gesture.
+    """
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+
+    coordinator._dispatch(_short_release(12, 2))
+
+    fire.assert_called_once()
+    event_type, event_data = fire.call_args.args
+    assert event_type == EVENT_BILRESA
+    assert (event_data["type"], event_data["channel"]) == (ACTION_SHORT_RELEASE, 2)
+    dispatch.assert_not_called()
+
+
+def test_disabled_channel_suppresses_short_release(monkeypatch) -> None:
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"2": False}}
+        )
+    }
+
+    coordinator._dispatch(_short_release(12, 2))
+
+    fire.assert_not_called()
+    dispatch.assert_not_called()
+    assert coordinator.telemetry["actions_suppressed"] == 1
+
+
+def test_dual_button_short_release_is_told_apart_by_endpoint(monkeypatch) -> None:
+    """The E2489 has no channel; its two buttons differ only by endpoint."""
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+
+    coordinator._dispatch(_short_release(12, None, endpoint_id=1))
+    coordinator._dispatch(_short_release(12, None, endpoint_id=2))
+
+    payloads = [call.args[1] for call in fire.call_args_list]
+    assert [(p["channel"], p["endpoint_id"]) for p in payloads] == [
+        (None, 1),
+        (None, 2),
+    ]
+    dispatch.assert_not_called()

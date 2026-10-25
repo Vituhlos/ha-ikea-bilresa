@@ -47,6 +47,7 @@ from .const import (
     ACTION_PRESS,
     ACTION_RELEASE,
     ACTION_ROTATE,
+    ACTION_SHORT_RELEASE,
     CONF_ACCELERATION,
     CONF_CHANNEL,
     CONF_CHANNEL_ENABLED,
@@ -412,6 +413,9 @@ def ws_activity_subscribe(
 
     @callback
     def _forward_event(event: Event) -> None:
+        # Intermediate phase of a click; the feed shows the completed gesture.
+        if event.data.get("type") == ACTION_SHORT_RELEASE:
+            return
         _send(dict(event.data))
 
     @callback

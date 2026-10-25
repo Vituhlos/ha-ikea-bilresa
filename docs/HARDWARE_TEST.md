@@ -94,6 +94,10 @@ Repeat on all three channels:
 - [ ] Single, double, and triple press are distinguished.
 - [ ] Long press emits `hold`; releasing it emits `release` exactly once.
 - [ ] Event entity, the `ikea_bilresa.*` trigger, and `ikea_bilresa_event` agree.
+- [ ] Each short button release emits one `ikea_bilresa_event` with
+      `type: short_release`, ahead of the completed `press` (none follows an
+      overflow ending in `MultiPressComplete(0)`); a long hold emits none; a
+      disabled channel emits none; the panel live feed does not list it.
 
 ## C. Binding behavior
 
@@ -121,6 +125,8 @@ Repeat on all three channels:
 - [ ] Single/double/triple/hold targets affect only their configured entities.
 - [ ] A binding explicitly set to fast response runs one single-press action on
       `ShortRelease` and does not repeat it on `MultiPressComplete`.
+- [ ] On a disabled channel, a Fast release or Instant binding does nothing;
+      re-enabling the channel restores its immediate response.
 - [ ] A binding set to multi-press recognition preserves completion-aware
       behavior and does not fire the single action early.
 - [ ] The config flow rejects fast response while a double/triple target is
@@ -184,6 +190,9 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       ignores it and accepts the next valid single exactly once.**
 - [ ] Event entity, the `ikea_bilresa.*` trigger and `ikea_bilresa_event`
       agree for each gesture on each button.
+- [ ] Each short release emits `short_release` with the pressed button's
+      `endpoint_id` and an empty `channel`, including the releases of a
+      three-tap overflow that completes with no `press`.
 
 ### F3. Button binding behaviour
 

@@ -242,6 +242,19 @@ def test_activity_listens_to_the_public_bus_event(monkeypatch) -> None:
     assert payload["notches"] == 6
 
 
+def test_activity_skips_the_intermediate_short_release(monkeypatch) -> None:
+    """short_release is a bus-only phase; the feed keeps completed gestures."""
+    hass, connection = _hass(), _connection()
+    _fire(
+        hass,
+        connection,
+        monkeypatch,
+        {"node_id": NODE_A, "channel": 1, "type": "short_release"},
+    )
+
+    connection.send_message.assert_not_called()
+
+
 def test_activity_forwards_only_safe_observed_duration(monkeypatch) -> None:
     hass, connection = _hass(), _connection()
     _fire(

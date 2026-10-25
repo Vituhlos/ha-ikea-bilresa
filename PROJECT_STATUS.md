@@ -15,6 +15,81 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## PR #16: `short_release` bus event (port of #5) + disabled-channel raw-signal fix (2026-10-25)
+
+Status: **maintainer-owned port of contributor PR #5 (@amodig) onto `main`
+(`0.6.2-rc.1`), widened at the owner's request to fix Fast/Instant bindings
+on disabled channels. Static + unit verified; GitHub CI reruns on every push
+(see PR #16). NOT hardware-validated; not merged. PR #5 itself is left open
+and untouched.**
+
+What changed:
+
+- Commit 1 keeps @amodig as author: `const.py` `ACTION_SHORT_RELEASE`,
+  `engine.py` button `ShortRelease` now returns a `short_release`
+  `WheelAction` (still clearing the press-duration start), his engine test and
+  README section. The original hunk no longer applied because `main` had
+  since added press-duration bookkeeping to the same branch.
+- Commit 2 (maintainer): `coordinator._dispatch` makes `short_release`
+  **bus-only**. It is fired on `ikea_bilresa_event` after the existing
+  channel-disabled check, then returns before `signal_channel` and the
+  `binding_not_configured` activity row. Without this, every click would have
+  reached bindings (`skipped`/`gesture_not_configured` activity rows). Event
+  entities, `ikea_bilresa.*` triggers and bindings are unchanged. Tests:
+  `tests/test_coordinator.py` (bus-only; a disabled channel suppresses it;
+  E2489 endpoints with `channel=None`) and `tests/test_engine.py` (E2489
+  three-tap overflow: two `short_release`, completion `0` ignored). README
+  EN/CS, CHANGELOG `[Unreleased]`, two open `docs/HARDWARE_TEST.md` items.
+- Commit 3 (review fix): the panel live feed (`ws_activity_subscribe`, which
+  listens to the bus) drops `short_release`. Otherwise every click added an
+  unlabeled, permanently pending row.
+- Commit 4: docs only (CI record, changelog wrap).
+- Commit 5 (owner asked to widen the scope): `_handle_node_event` now sends
+  the internal `signal_raw_button` only when `channel_enabled` allows the
+  decoded channel. Before, it was sent ahead of `_dispatch`'s check, so a
+  **Fast release** / **Instant** binding on a disabled channel still ran its
+  single action. The engine still processes the event, and a dual button's
+  `channel=None` always passes. The tests in `tests/test_coordinator.py`
+  route the coordinator's raw signal into a real `LightBinding`. Fast on
+  `short_release` and Instant on `initial_press` fire once when the channel
+  is enabled and never when it is disabled. Disabled wheel channels do not
+  affect the dual button. README EN/CS, CHANGELOG `Fixed`, one
+  `HARDWARE_TEST.md` C item.
+
+Validation (`.venv` = uv-managed CPython 3.14.9):
+
+- `.venv/bin/python -m pytest -q` — **516 passed** (503 on `main`; +13).
+  The two disabled-channel Fast/Instant cases fail with the commit 5
+  coordinator change reverted (checked with `git stash`).
+  The two bus-only coordinator tests failed before the `_dispatch` gate.
+- `.venv/bin/ruff format --check custom_components tests` — 57 files already
+  formatted; `.venv/bin/ruff check custom_components tests` — all passed.
+- `.venv/bin/mypy custom_components/ikea_bilresa` — the 2 pre-existing errors
+  only (`device_link.py:256`, `legacy_triggers.py:68`); none new.
+- `git diff --check` — clean.
+- **Not run:** `node --check` / `node --test` frontend gates — Node is not
+  installed on the agent box; no frontend file changed. CI must confirm.
+- GitHub CI on `d184b2d` (commits 1–3): hassfest, unit tests, frontend
+  checks, ruff, mypy, HACS validation all **success**; the newest-HA
+  pre-release job is skipped by workflow condition. Both Devin Review threads
+  are resolved.
+- GitHub CI on `ff6ab08` (commit 5, the code HEAD): hassfest, unit tests,
+  frontend checks, ruff, mypy, HACS validation all **success**; the newest-HA
+  pre-release job is skipped by workflow condition. Later commits on PR #16
+  are docs-only; their CI is on the PR.
+
+Hardware validation: **not performed.** The contributor reported a fork test
+on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
+build and is not recorded as a hardware pass.
+
+Disabled-channel raw signal: **fixed in this PR (commit 5)**, see above.
+Earlier it was recorded here as a separate follow-up; the owner asked to
+include it because it shares the channel-enabled guard.
+
+Single best next action: owner review of PR #16; then a physical check of
+the new `HARDWARE_TEST.md` items (B/F `short_release`, C disabled-channel
+Fast/Instant) before any release notes call it verified.
+
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 
 Status: **PR #14 merged into `main` on 2026-10-25. Its runtime fix has static + unit/replay verification but is NOT hardware-validated. PR #15 prepares candidate `v0.6.2-rc.1`; Issue #9 remains open pending the reporter's real Zigbee2MQTT-group test.**

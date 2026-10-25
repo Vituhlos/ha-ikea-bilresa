@@ -44,6 +44,7 @@ entity, propojení, spouštěče automatizací a stejný panel BILRESA.
   - [Přehled událostí](#přehled-událostí)
   - [Příklady automatizací](#příklady-automatizací)
   - [Sběrnicová událost `ikea_bilresa_event`](#sběrnicová-událost-ikea_bilresa_event)
+  - [Okamžité akce po krátkém uvolnění](#okamžité-akce-po-krátkém-uvolnění)
 - [Více koleček](#více-koleček)
 - [Řešení potíží](#řešení-potíží)
 - [Plán](#plán)
@@ -178,7 +179,8 @@ režim uložit jen tehdy, když jsou tyto samostatné akce vypnuté. **Rychle po
 uvolnění** reaguje po prvním krátkém uvolnění a zůstává bezpečné pro běžné
 podržení; rozpoznání více stisků čeká na dokončovací událost BILRESY. Existující
 propojení bez uložené volby zachovají dosavadní čekání, dokud režim výslovně
-nezměníte. Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
+nezměníte. Vypnutý kanál nespustí propojení v žádném z těchto režimů.
+Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
 tři stisky ve všech režimech.
 
 Integrace pak to světlo stmívá v reálném čase. Přidejte si klidně víc propojení —
@@ -303,8 +305,8 @@ Zduplikujte s `rotate_down` a záporným krokem pro ztlumení a přidejte spouš
 
 Každá akce se navíc vypálí na sběrnici jako `ikea_bilresa_event` — hodí se pro
 jednu automatizaci obsluhující víc koleček. Pole: `node_id`, `wheel_name`,
-`channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` / `release`),
-`direction` (`up` / `down`), `notches`, `presses`.
+`channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` / `release` /
+`short_release`), `direction` (`up` / `down`), `notches`, `presses`.
 
 ```yaml
 triggers:
@@ -313,6 +315,39 @@ triggers:
     event_data:
       type: rotate
 ```
+
+### Okamžité akce po krátkém uvolnění
+
+Automatizace, která má zareagovat hned po uvolnění krátkého stisku tlačítka,
+naslouchá `ikea_bilresa_event` s `type: short_release`, filtrované podle
+`node_id` a `channel` vašeho kolečka. Nefiltrujte podle `presses: 1`: konečný
+počet stisků v okamžiku uvolnění ještě není známý.
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12  # Nahraďte Matter node ID svého kolečka.
+      channel: 1
+      type: short_release
+```
+
+Tato událost existuje jen na sběrnici a přijde při každém krátkém uvolnění,
+včetně uvolnění uvnitř dvojitého nebo trojitého stisku. Dokončená událost
+`press` s konečným počtem přijde i nadále. Spouštěč dokončeného jednoduchého
+stisku v automatizaci nahraďte, nepřidávejte druhý spouštěč pro stejnou akci,
+jinak se spustí dvakrát. Samostatná akce na dvojitý stisk může tu časnou akci
+přebít, ale mezistav bude vidět. Dlouhé podržení tuto událost nevysílá. Event
+entity, spouštěče `ikea_bilresa.*` a přímé vazby na světla se chovají dál podle
+dokončeného gesta; přímá vazba, která má reagovat už při uvolnění, k tomu má
+vlastní nastavení **Odezva tlačítka → Rychle po uvolnění**. Vypnutý kanál
+nevysílá ani `short_release`.
+
+Dvoutlačítko E2489 nemá kanál (`channel` je prázdné), jeho dvě tlačítka proto
+rozlišujte podle `endpoint_id`. Při více než dvou stiscích za sebou přijde
+`short_release` pro každé nahlášené uvolnění, ale žádné dokončené `press` už
+nenásleduje (zařízení ukončí sekvenci s nulovým počtem).
 
 ## Více koleček
 
