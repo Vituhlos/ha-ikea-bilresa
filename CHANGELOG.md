@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- **No band of page colour above the header.** With a theme that pads the
+  panel (the usual case on a phone), the page colour showed above the white
+  header bar. The strip is now painted in the header's own colour, so the bar
+  reaches the top edge, and the space the theme's inset already leaves for the
+  status bar or notch is no longer added a second time.
+
 ## [0.7.0-rc.2] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It adds to

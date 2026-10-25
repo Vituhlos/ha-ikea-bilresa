@@ -278,11 +278,22 @@ def test_panel_header_clears_the_notch() -> None:
         / "ikea_bilresa_panel.js"
     ).read_text(encoding="utf-8")
 
-    assert "padding-block: env(safe-area-inset-top, 0px) 0;" in asset
+    # Only the part of the notch that the theme's inset does not already
+    # clear is added, or the bar sits a notch too low.
+    assert (
+        "padding-block: max(0px, calc(env(safe-area-inset-top, 0px)"
+        " - var(--_frame-start))) 0;"
+    ) in asset
+    assert "max(env(safe-area-inset-top, 0px), var(--_frame-start))" in asset
     assert "env(safe-area-inset-left, 0px)" in asset
     assert "env(safe-area-inset-right, 0px)" in asset
     # content-box keeps the inset additive; border-box would eat the 56px bar
     assert "box-sizing: content-box;" in asset
+    # The strip above the bar is the bar's colour, never the page's, so a
+    # padded theme does not show a band of page colour over the header.
+    strip = asset.split("header::before {", 1)[1].split("}", 1)[0]
+    assert "background: inherit;" in strip
+    assert "_frame-bg" not in asset
 
 
 def test_panel_asset_registration_is_browser_idempotent() -> None:

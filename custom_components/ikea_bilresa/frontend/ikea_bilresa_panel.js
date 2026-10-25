@@ -232,8 +232,8 @@ const STYLES = `
        instead of travelling across the inset first. */
     --_frame-start: 0px;
     --_frame-end: 0px;
-    --_frame-bg: var(--_bg);
-    --_top: calc(56px + env(safe-area-inset-top, 0px) + var(--_frame-start));
+    /* The bar starts below the larger of the theme's inset and the notch. */
+    --_top: calc(56px + max(env(safe-area-inset-top, 0px), var(--_frame-start)));
     min-block-size: calc(100vh - var(--_frame-start) - var(--_frame-end));
     min-block-size: calc(100dvh - var(--_frame-start) - var(--_frame-end));
     background: var(--_bg);
@@ -243,8 +243,10 @@ const STYLES = `
 
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* The safe-area inset is added to the 56px bar. A border-box header would
-     consume the inset and put the exit control under an iPhone notch. */
+  /* The 56px bar sits below the notch. The theme's inset above the panel
+     already clears part of it, so only the rest is added: summing both put
+     the bar a notch too low. A border-box header would consume the
+     clearance and put the exit control under the notch. */
   header {
     position: sticky;
     inset-block-start: var(--_frame-start);
@@ -254,22 +256,24 @@ const STYLES = `
     gap: var(--_space-2);
     box-sizing: content-box;
     block-size: 56px;
-    padding-block: env(safe-area-inset-top, 0px) 0;
+    padding-block: max(0px, calc(env(safe-area-inset-top, 0px) - var(--_frame-start))) 0;
     padding-inline:
       max(var(--_space-1), env(safe-area-inset-left, 0px))
       max(var(--_space-4), env(safe-area-inset-right, 0px));
     background: var(--app-header-background-color, var(--primary-color, #03a9f4));
     color: var(--app-header-text-color, var(--text-primary-color, #fff));
   }
-  /* Covers the theme's inset above the bar, or the page would scroll through
-     that strip. Zero height when the panel is not inset. */
+  /* Paints the theme's inset above the bar in the bar's own colour, so the
+     header reaches the top edge instead of showing the page colour above it,
+     and the page does not scroll through that strip. Zero height when the
+     panel is not inset. */
   header::before {
     content: "";
     position: absolute;
     inset-inline: 0;
     inset-block-end: 100%;
     block-size: var(--_frame-start);
-    background: var(--_frame-bg);
+    background: inherit;
   }
   header h1 {
     margin: 0;
@@ -1829,10 +1833,6 @@ class IkeaBilresaPanel extends HTMLElement {
     const end = Number.parseFloat(style.paddingBottom) || 0;
     this.style.setProperty("--_frame-start", `${start}px`);
     this.style.setProperty("--_frame-end", `${end}px`);
-    const background = style.backgroundColor;
-    if (start && background && background !== "rgba(0, 0, 0, 0)") {
-      this.style.setProperty("--_frame-bg", background);
-    }
   }
 
   disconnectedCallback() {
