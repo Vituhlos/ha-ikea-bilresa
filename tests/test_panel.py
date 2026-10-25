@@ -889,6 +889,31 @@ def test_the_community_tool_is_linked_in_one_place_without_data() -> None:
     assert channels.index("_dialSection") < channels.index("_communityLink")
 
 
+def test_the_community_card_is_outlined_and_has_hover_and_focus() -> None:
+    """It must not read as one more control: outlined, set apart, and visible
+    to the keyboard and the pointer."""
+    asset = _asset()
+    card = asset.split(".resource-link {", 1)[1].split("}", 1)[0]
+
+    assert "background: transparent;" in card
+    assert "margin-block-start: var(--_space-8);" in card
+    # A tinted round icon, with the words in the link rather than hidden.
+    assert ".resource-badge {" in asset
+    assert (
+        "border-radius: 50%;" in asset.split(".resource-badge {", 1)[1].split("}", 1)[0]
+    )
+    assert "visually-hidden" not in asset
+    assert 'aria-hidden", "true"' in asset
+    # Pointer, press and keyboard states, and no animation when it is not wanted.
+    assert ".resource-link:hover {" in asset
+    assert ".resource-link:active {" in asset
+    assert ".resource-link:focus-visible {" in asset
+    assert (
+        "prefers-reduced-motion: reduce"
+        in asset.split(".resource-link:focus-visible {", 1)[1]
+    )
+
+
 def test_the_community_tool_texts_exist_in_both_languages() -> None:
     from custom_components.ikea_bilresa.panel_strings import STRINGS
 
@@ -897,7 +922,7 @@ def test_the_community_tool_texts_exist_in_both_languages() -> None:
         for key in (
             "community_tool_link",
             "community_tool_note",
-            "community_tool_new_tab",
+            "community_tool_new_window",
         ):
             assert strings[key].strip(), (language, key)
     # It must say whose tool it is, so it is not read as part of the integration.

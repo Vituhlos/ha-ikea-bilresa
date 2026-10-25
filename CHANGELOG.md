@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **The link card for the community label tool is lighter.** It is only
+  outlined, so it no longer looks like one more control beside the channel
+  cards, and it sits further below them. A tinted round icon, an arrow out,
+  a clear hover, pressed and keyboard-focus state, and the words "opens in a
+  new window" in the link itself instead of hidden text.
+
 ### Fixed
 - **No band of page colour above the header.** With a theme that pads the
   panel (the usual case on a phone), the page colour showed above the white

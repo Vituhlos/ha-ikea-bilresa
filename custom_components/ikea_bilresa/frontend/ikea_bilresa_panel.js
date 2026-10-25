@@ -89,8 +89,7 @@ const ICON = {
   plus: "M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z",
   label:
     "M16,17H5V7H16L19.55,12M17.63,5.84C17.27,5.33 16.67,5 16,5H5A2,2 0 0,0 3,7V17A2,2 0 0,0 5,19H16C16.67,19 17.27,18.66 17.63,18.15L22,12L17.63,5.84Z",
-  external:
-    "M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z",
+  external: "M5,17.59L15.59,7H9V5H19V15H17V8.41L6.41,19L5,17.59Z",
   arrowDown:
     "M11,4H13V16L18.5,10.5L19.92,11.92L12,19.84L4.08,11.92L5.5,10.5L11,16V4Z",
   remove:
@@ -541,40 +540,51 @@ const STYLES = `
   }
   .subpage-meta-copy { flex: 1 1 auto; min-inline-size: 0; }
   .control-stack { display: grid; gap: var(--_space-4); }
-  /* A resource row at the foot of the page: the same card as the channels,
-     a leading icon, two lines and the open-in-new-tab icon, all one link. */
+  /* A link to a tool by someone else, at the foot of the page. Outlined, not
+     filled, and set apart from the cards above it, so it does not read as one
+     more control beside the channels: a tinted round icon, two lines and an
+     arrow out, all one link. */
   .resource-link {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--_space-4);
-    margin-block-start: var(--_space-4);
-    padding: var(--_space-4) var(--_space-6);
-    border: var(--ha-card-border-width, 1px) solid var(--_border);
+    margin-block-start: var(--_space-8);
+    padding: var(--_space-3) var(--_space-6);
+    border: var(--ha-card-border-width, 1px) solid
+      color-mix(in srgb, var(--_ink) 18%, transparent);
     border-radius: var(--_radius);
-    background: var(--_card);
+    background: transparent;
     color: var(--_ink);
     text-decoration: none;
+    transition:
+      background var(--_fast) var(--_ease-out),
+      border-color var(--_fast) var(--_ease-out);
   }
-  .resource-icon,
-  .resource-open { inline-size: 24px; block-size: 24px; fill: var(--_ink-dim); }
+  .resource-badge {
+    inline-size: 40px;
+    block-size: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--_accent) 14%, transparent);
+  }
+  .resource-icon { inline-size: 24px; block-size: 24px; fill: var(--_accent); }
+  .resource-open { inline-size: 20px; block-size: 20px; fill: var(--_ink-dim); }
   .resource-copy { display: grid; gap: 2px; min-inline-size: 0; }
   .resource-title { font-weight: var(--ha-font-weight-medium, 500); }
   .resource-note { color: var(--_ink-dim); font-size: var(--ha-font-size-s, 13px); }
   @media (hover: hover) {
-    .resource-link:hover { background: var(--_selected); }
+    .resource-link:hover { background: var(--_selected); border-color: var(--_ink-dim); }
+    .resource-link:hover .resource-open { fill: var(--_ink); }
   }
+  .resource-link:active { background: var(--_selected); }
   .resource-link:focus-visible {
-    outline: 2px solid var(--_accent);
+    outline: 2px solid var(--_ink);
     outline-offset: 2px;
   }
-  .visually-hidden {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  @media (prefers-reduced-motion: reduce) {
+    .resource-link { transition: none; }
   }
   .control-card {
     --_card-pad: var(--_space-6);
@@ -3717,19 +3727,28 @@ class IkeaBilresaPanel extends HTMLElement {
     return stack;
   }
 
-  // A quiet card at the foot of the page, like a row of Home Assistant's own
-  // resources: one plain link to a tool by someone else, saying whose it is.
-  // It opens in a new tab and carries no data.
+  // An outlined card at the foot of the page: one plain link to a tool by
+  // someone else, saying whose it is and that it opens in a new window. It
+  // carries no data. The words are in the link itself, so a screen reader reads
+  // the same thing a sighted user sees; the icons are decoration.
   _communityLink() {
     const link = el("a", "resource-link");
     link.href = COMMUNITY_TOOL_URL;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.appendChild(svg(ICON.label, "resource-icon"));
+    const badge = el("span", "resource-badge");
+    badge.setAttribute("aria-hidden", "true");
+    badge.appendChild(svg(ICON.label, "resource-icon"));
+    link.appendChild(badge);
     const copy = el("span", "resource-copy");
     copy.appendChild(el("span", "resource-title", this._t("community_tool_link")));
-    copy.appendChild(el("span", "resource-note", this._t("community_tool_note")));
-    copy.appendChild(el("span", "visually-hidden", ` ${this._t("community_tool_new_tab")}`));
+    copy.appendChild(
+      el(
+        "span",
+        "resource-note",
+        `${this._t("community_tool_note")} · ${this._t("community_tool_new_window")}`,
+      ),
+    );
     link.appendChild(copy);
     link.appendChild(svg(ICON.external, "resource-open"));
     return link;

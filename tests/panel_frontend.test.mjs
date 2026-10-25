@@ -978,7 +978,7 @@ test("the community tool is one plain external link, and it carries no data", ()
         labels: {
           community_tool_link: "Design labels for your switches",
           community_tool_note: "Community tool by Liquidmasl",
-          community_tool_new_tab: "(opens in a new tab)",
+          community_tool_new_window: "opens in a new window",
         },
       },
     };
@@ -997,10 +997,13 @@ test("the community tool is one plain external link, and it carries no data", ()
 
     assert.equal(part("resource-title").textContent, "Design labels for your switches");
     // It says whose tool it is.
-    assert.equal(part("resource-note").textContent, "Community tool by Liquidmasl");
-    // A screen reader is told the link leaves the panel.
-    assert.match(part("visually-hidden").textContent, /opens in a new tab/);
-    // Both icons, the tag and the open-in-new-tab one, are decoration.
+    // It says whose tool it is and that it opens in a new window, in words
+    // that are part of the link, so a screen reader reads them too.
+    assert.equal(
+      part("resource-note").textContent,
+      "Community tool by Liquidmasl · opens in a new window",
+    );
+    // Both icons, the tinted round one and the arrow out, are decoration.
     const icons = link.children.filter((child) => child.attributes["aria-hidden"] === "true");
     assert.equal(icons.length, 2);
   } finally {
