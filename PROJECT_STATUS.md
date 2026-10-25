@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-10-25 by Claude Code** (branch `agent/panel-0.6.1`, with `main` merged in, not yet pushed).
+Last updated: **2026-10-25 by Claude Code** (branch `agent/panel-0.6.1`, `main` merged in and pushed; `0.7.0-rc.1` prepared locally, not committed, tagged or published).
 The dated log up to the first handoff is in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
 The entries `main` wrote on 2026-10-25 (PR #16, Issue #9 / PRs #14 and #15, PR #13,
@@ -15,9 +15,8 @@ the 0.6.1 language release) were appended to the end of that file.
   validation of both is pending; Issue #9 stays open until its reporter confirms.
 - **Development line:** this branch carries the redesigned panel (detail is a Home
   Assistant subpage, compact channel cards), the language fix, and now everything
-  on `main`. It becomes **0.7.0**. The manifest still says `0.6.1-rc.2` and is set
-  by the release commit, not by the merge.
-- **Nearest step:** the owner decides on pushing this merge, then on `0.7.0-rc.1`.
+  on `main`. It becomes **0.7.0**. The manifest now says `0.7.0-rc.1` (prepared, uncommitted).
+- **Nearest step:** the owner reviews the prepared `0.7.0-rc.1` diff and says go for the commit, push, CI, tag and pre-release; deployment is a further approval, with a Synology backup first.
   His instance runs `0.6.1-rc.2`; HACS offers `0.6.2-rc.2` there, which has the old
   layout. Tell him not to take it.
 
@@ -28,7 +27,9 @@ the 0.6.1 language release) were appended to the end of that file.
 - 2026-10-25 (done on `main` by the owner and another agent, not by this branch): PR #13 repository professionalization, PR #14 Issue #9 fix, PR #15 `v0.6.2-rc.1`, PR #16 `short_release` port and disabled-channel fix, PR #18 `v0.6.2-rc.2`; Issue #9 answered with `v0.6.2-rc.2`.
 - 2026-10-25: handoff committed (`31d937d`). Then `origin/main` (`176cfc3`) was merged into this branch with a merge commit (local, unpushed). Conflicts resolved by hand in `CHANGELOG.md` (both histories kept: `main`'s `0.6.2-rc.*` and `0.6.1` sections, then this branch's `0.6.1-rc.2` and `rc.1`), `tools/panel_preview/build.py` (docstring keeps `theme=warm`), `manifest.json` (this branch's `0.6.1-rc.2` kept) and this file.
 
-- 2026-10-25: the merge was pushed (`a303ea3`); CI run `40212877477` passed all 7 jobs, including the newest-Home-Assistant job. Then step 1 of the agreed order (protection before releasing): `tests/test_version_consistency.py` (manifest version has a CHANGELOG section and link; both READMEs and this file name the latest stable release as the CHANGELOG does) and two rules in `AGENTS.md` (wait for CI and reviews before merging; a release changes all version places in one commit). Committed locally, not pushed. Agreed order after it: `0.7.0-rc.1` without PR #11 (Synology backup first), then CI for PRs to non-default bases and `.coderabbit.yaml`, then PR #11 into `0.7.0-rc.2`.
+- 2026-10-25: the merge was pushed (`a303ea3`); CI run `40212877477` passed all 7 jobs. Step 1: `tests/test_version_consistency.py` and two `AGENTS.md` rules, commit `f94f0f3`, CI run `40214428726` all 7 jobs success.
+- 2026-10-25: tracker in itsaplan, project `BILRESA` (HA IKEA BILRESA): initiative "0.7.0: redesigned panel on top of the 0.6.2 fixes" with BILRESA-9 (merge, Done), BILRESA-10 (version guard, Done), BILRESA-11 (release 0.7.0-rc.1, In Progress), BILRESA-12 (hardware validation), BILRESA-13 (CI and reviews for non-default bases), BILRESA-14 (review PR #11). The older BILRESA-1 to 8 (Reddit feedback audit) were not touched. Keep issue states in step with this file; a Done needs recorded evidence.
+- 2026-10-25, prepared and **not committed**: `0.7.0-rc.1` = `manifest.json` `0.7.0-rc.1`, `CHANGELOG.md` section and link references (pending hardware checks listed), both READMEs' testing status, new section H "Redesigned panel" in `docs/HARDWARE_TEST.md` (all open). PR #11 deliberately not included.
 
 ## Verified
 

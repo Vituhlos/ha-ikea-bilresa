@@ -24,9 +24,10 @@ triggers and the same BILRESA panel.
 > and replaces the old device triggers; read the upgrade notes in
 > [CHANGELOG.md](CHANGELOG.md) and take a backup before upgrading from 0.5.x.
 >
-> **Testing status:** the pre-releases `v0.6.1-rc.1` and `v0.6.1-rc.2` carry a
-> redesigned panel layout that is not in the stable release; that work
-> continues as 0.7.0. Hardware validation is incomplete for some
+> **Testing status:** the pre-release `v0.7.0-rc.1` carries a redesigned panel
+> layout that is not in the stable release, together with the fixes of
+> `v0.6.2-rc.2` (Zigbee2MQTT light groups, the `short_release` event, disabled
+> channels). It is a test candidate, not hardware-validated. Hardware validation is incomplete for some
 > device/gesture combinations; see [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)
 > for the current checklist.
 

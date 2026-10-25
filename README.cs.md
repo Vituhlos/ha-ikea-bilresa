@@ -23,9 +23,10 @@ entity, propojení, spouštěče automatizací a stejný panel BILRESA.
 > nahrazuje dřívější spouštěče zařízení; před přechodem z 0.5.x si přečtěte
 > poznámky k přechodu v [CHANGELOG.md](CHANGELOG.md) a udělejte zálohu.
 >
-> **Stav ověření:** předběžná vydání `v0.6.1-rc.1` a `v0.6.1-rc.2` obsahují
-> přepracované rozložení panelu, které ve stabilním vydání není; tato práce
-> pokračuje jako 0.7.0. Některé kombinace zařízení a gest stále čekají na
+> **Stav ověření:** předběžné vydání `v0.7.0-rc.1` obsahuje přepracované
+> rozložení panelu, které ve stabilním vydání není, spolu s opravami z
+> `v0.6.2-rc.2` (světelné skupiny Zigbee2MQTT, událost `short_release`, vypnuté
+> kanály). Je to testovací kandidát bez ověření na hardwaru. Některé kombinace zařízení a gest stále čekají na
 > hardwarové ověření; aktuální checklist je v
 > [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
 

@@ -267,6 +267,26 @@ candidate and must not be claimed as RC.5 hardware coverage.
       Record subjective onset separately from the Home Assistant target-state
       acknowledgement; neither is proof of physical photon timing.
 
+## H. Redesigned panel (0.7.0 candidates)
+
+Needs a real Home Assistant; the offline preview shows only the fallback
+controls. Record the Home Assistant version, browser, theme and language.
+
+- [ ] Overview and device page on desktop: a device opens as a Home Assistant
+      subpage with a back arrow, channels are compact cards, an unconfigured
+      channel is one line.
+- [ ] The same on a phone: no horizontal scroll, the channel switch sits on its
+      card, the dial fields do not overflow.
+- [ ] Light, dark and a custom theme: text is readable and no hard-coded colour
+      leaks.
+- [ ] Keyboard and screen-reader pass: every control reachable in order, names
+      announced, focus visible.
+- [ ] Switch the profile language between Czech and English with the panel
+      open: labels change at once, no word of the other language remains, the
+      live test feed keeps running.
+- [ ] Save a binding and a dial setting from the panel and confirm they apply
+      (new revision, no integration entry in the system log).
+
 ## Recorded runs
 
 A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections

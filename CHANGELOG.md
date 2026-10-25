@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.1] - 2026-10-25
+
+Pre-release candidate for testing, not a stable release. It joins the
+redesigned panel from `0.6.1-rc.1` and `0.6.1-rc.2` (not in any stable
+release) with everything in `0.6.2-rc.2`: the Issue #9 brightness-group fixes,
+the `short_release` bus event and the disabled-channel fix. The binding editor
+rework proposed in pull request #11 is **not** included.
+
+Anyone on `0.6.1-rc.2` who updates to `0.6.2-rc.2` goes back to the old panel
+layout; this candidate keeps the new one.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware. The checks of
+`0.6.2-rc.2` remain open, and the redesigned panel adds one:
+
+- **Redesigned panel:** open it on desktop and on a phone, in a light, a dark
+  and a custom theme, and switch the profile language (the layout is described
+  under `0.6.1-rc.1` and `0.6.1-rc.2`).
+- **B/F — short_release:** verify the bus event on the E2490 wheel and the
+  E2489 dual button, including normal short releases and releases within
+  multi-press sequences.
+- **C — disabled channels:** confirm Fast release and Instant bindings do
+  nothing while a wheel channel is disabled, then respond immediately again
+  after that channel is re-enabled.
+- **Issue #9 — Zigbee2MQTT light group:** reproduce the reporter's setup
+  (Home Assistant 2026.10.2, Zigbee2MQTT 2.7.2, 3–4 bulbs, step 3, perceptual
+  curve, minimum 1, transition 0.8) and check for stale-level jumps and
+  steppy dimming on small batches. Keep Issue #9 open until the reporter
+  confirms the result.
+
+### Changed
+- Panel layout, language handling and the compact cards: see `0.6.1-rc.1`,
+  `0.6.1-rc.2` and `0.6.1`.
+- Everything else from `0.6.2-rc.1` and `0.6.2-rc.2` is part of this candidate.
+
 ## [0.6.2-rc.2] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. Includes the Issue #9
@@ -1001,7 +1037,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.1...HEAD
+[0.7.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...v0.7.0-rc.1
 [0.6.2-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...v0.6.2-rc.2
 [0.6.2-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1...v0.6.2-rc.1
 [0.6.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0...v0.6.1
