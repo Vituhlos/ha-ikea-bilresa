@@ -27,10 +27,12 @@ from custom_components.ikea_bilresa.const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_COPY_FROM,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
@@ -40,6 +42,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_STEP,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     HOLD_NONE,
     HOLD_RAMP,
@@ -510,3 +513,31 @@ def test_a_light_may_still_be_turned_off() -> None:
         )
         == {}
     )
+
+
+def test_the_native_form_offers_an_action_per_gesture() -> None:
+    wheel = {
+        str(key)
+        for key in BindingSubentryFlowHandler._button_action_fields({}, wheel=True)
+    }
+    button = {
+        str(key)
+        for key in BindingSubentryFlowHandler._button_action_fields({}, wheel=False)
+    }
+
+    assert {CONF_DOUBLE_ACTION, CONF_TRIPLE_ACTION, CONF_HOLD_TARGET_ACTION} <= wheel
+    # A dual button has no triple press.
+    assert {CONF_DOUBLE_ACTION, CONF_HOLD_TARGET_ACTION} <= button
+    assert CONF_TRIPLE_ACTION not in button
+
+
+def test_the_form_keeps_the_stored_actions_as_its_defaults() -> None:
+    fields = BindingSubentryFlowHandler._button_action_fields(
+        {CONF_DOUBLE_ACTION: "on", CONF_TRIPLE_ACTION: "off"}, wheel=True
+    )
+    defaults = {str(key): key.default() for key in fields if callable(key.default)}
+
+    assert defaults[CONF_DOUBLE_ACTION] == "on"
+    assert defaults[CONF_TRIPLE_ACTION] == "off"
+    # Nothing stored: what a gesture always did.
+    assert defaults[CONF_HOLD_TARGET_ACTION] == "toggle"

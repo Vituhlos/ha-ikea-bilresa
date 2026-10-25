@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **Each press gesture has its own action on its target.** A double press, a
+  triple press and a hold can now toggle, turn on or turn off their target, as
+  the short press always could. For a script the choices are named *Run script*,
+  *Stop script* and *Toggle script*; for a scene only *Run scene* exists. The
+  panel pre-selects *Run* when a script or a scene is chosen, and the native flow
+  has the same three selects. A binding saved before this has no action stored
+  and keeps toggling.
+- **A script run by a gesture is told which gesture started it**, in the
+  variables `gesture`, `presses`, `channel`, `endpoint` and `device`. Toggle and
+  Stop cannot pass variables (`script.toggle` has none).
+- A README section "Scenes and scripts as targets" with the table of what each
+  action does and an example script.
+
+### Changed
+- The gesture ledger and the live activity say *Run*, *Stop* or *Toggle* for a
+  script, and *Run* for a scene. "Turn target off" is refused for a scene on
+  every gesture, not only the short press.
+
 ## [0.7.0-rc.4] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It adds scenes and

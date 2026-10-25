@@ -44,17 +44,17 @@ from .const import (
     BUTTON_RESPONSE_FAST,
     BUTTON_RESPONSE_INSTANT,
     CLICK_NONE,
-    CLICK_OFF,
-    CLICK_ON,
     CONF_ACCELERATION,
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
@@ -65,6 +65,7 @@ from .const import (
     CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     DEFAULT_ACCELERATION,
     DEFAULT_BUTTON_RESPONSE,
@@ -76,6 +77,7 @@ from .const import (
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_STEP_CURVE,
+    DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     DIRECTION_UP,
     EVT_INITIAL_PRESS,
@@ -104,12 +106,20 @@ from .const import (
     STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
     is_run_target,
-    is_scene_target,
     mode_supports_target,
     signal_channel,
     signal_raw_button,
 )
 from .engine import WheelAction
+from .gesture_actions import (
+    GESTURE_DOUBLE_PRESS,
+    GESTURE_HOLD,
+    GESTURE_SHORT_PRESS,
+    GESTURE_TRIPLE_PRESS,
+    passes_variables,
+    result_label,
+    target_service,
+)
 from .trace import RotationTrace
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,29 +131,7 @@ ATTR_HS_COLOR = "hs_color"
 ATTR_MIN_KELVIN = "min_color_temp_kelvin"
 ATTR_MAX_KELVIN = "max_color_temp_kelvin"
 
-_CLICK_SERVICE = {"toggle": "toggle", CLICK_ON: "turn_on", CLICK_OFF: "turn_off"}
-
 _UNAVAILABLE = (None, "unknown", "unavailable")
-
-
-def _entity_service(entity_id: str, service: str) -> tuple[str, str]:
-    """The service that carries out a press on this entity.
-
-    A scene is run, whatever the gesture asked for: it has no ``toggle`` and no
-    ``turn_off``. A script keeps what was asked, so a second press can stop it
-    and "turn off" does. Everything else goes through ``homeassistant``, which
-    fits any switchable domain.
-    """
-    if is_scene_target(entity_id):
-        return "scene", "turn_on"
-    if is_run_target(entity_id):
-        return "script", service
-    return "homeassistant", service
-
-
-def _result_action(domain: str, service: str) -> str:
-    """How the live activity names what a press did: a scene is run."""
-    return "run" if domain == "scene" else service
 
 
 # How long our tracked target stays authoritative before we resync from state.
@@ -283,6 +271,14 @@ class LightBinding:
         self._click_target: str | None = data.get(CONF_CLICK_TARGET) or self._target
         self._double_target = data.get(CONF_DOUBLE_TARGET)
         self._triple_target = data.get(CONF_TRIPLE_TARGET)
+        # What each of them does to its target. A binding saved before the
+        # choice existed has none, and toggled, which is what a missing value
+        # keeps meaning.
+        self._double_action = data.get(CONF_DOUBLE_ACTION, DEFAULT_TARGET_ACTION)
+        self._triple_action = data.get(CONF_TRIPLE_ACTION, DEFAULT_TARGET_ACTION)
+        self._hold_target_action = data.get(
+            CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION
+        )
         self._scenes: list[str] = list(data.get(CONF_SCENES) or [])
         self._scene_index = 0
         self._ramp_direction = data.get(CONF_RAMP_DIRECTION, DEFAULT_RAMP_DIRECTION)
@@ -489,9 +485,13 @@ class LightBinding:
                 if action.presses == 1:
                     self._single_press()
                 elif action.presses == 2:
-                    self._toggle(self._double_target)
+                    self._press_target(
+                        GESTURE_DOUBLE_PRESS, self._double_target, self._double_action
+                    )
                 elif action.presses == 3:
-                    self._toggle(self._triple_target)
+                    self._press_target(
+                        GESTURE_TRIPLE_PRESS, self._triple_target, self._triple_action
+                    )
                 else:
                     self._report_activity("skipped", reason="unsupported_press_count")
             elif action.type == ACTION_HOLD:
@@ -499,7 +499,9 @@ class LightBinding:
                 if self._hold_action == HOLD_RAMP:
                     self._start_ramp()
                 elif self._hold_action == HOLD_TOGGLE:
-                    self._toggle(self._hold_target)
+                    self._press_target(
+                        GESTURE_HOLD, self._hold_target, self._hold_target_action
+                    )
                 else:
                     self._report_activity("skipped", reason="hold_not_configured")
             elif action.type == ACTION_RELEASE and self._hold_action == HOLD_RAMP:
@@ -1487,39 +1489,54 @@ class LightBinding:
         if self._click == CLICK_NONE:
             self._report_activity("skipped", reason="short_press_not_configured")
             return
-        if self._click_target is None:
+        self._press_target(GESTURE_SHORT_PRESS, self._click_target, self._click)
+
+    @callback
+    def _press_target(self, gesture: str, target: str | None, action: str) -> None:
+        """Carry out ``action`` on the target of one press gesture.
+
+        What the action means for this kind of entity is decided in
+        ``gesture_actions``; this only runs it and tells the activity feed.
+        """
+        if not target:
             self._report_activity("skipped", reason="target_not_configured")
             return
-        domain, service = _entity_service(
-            self._click_target, _CLICK_SERVICE.get(self._click, "toggle")
+        call = target_service(target, action)
+        if call is None:
+            self._report_activity("skipped", reason="action_not_supported")
+            return
+        domain, service = call
+        data = (
+            {"variables": self._script_variables(gesture)}
+            if passes_variables(target, action)
+            else None
         )
         self._call_entity(
             domain,
             service,
-            self._click_target,
+            target,
+            data=data,
             result={
                 "kind": "entity_action",
-                "action": _result_action(domain, service),
-                "target": self._click_target,
+                "action": result_label(target, action),
+                "target": target,
             },
         )
 
-    @callback
-    def _toggle(self, target: str | None) -> None:
-        if target:
-            domain, service = _entity_service(target, "toggle")
-            self._call_entity(
-                domain,
-                service,
-                target,
-                result={
-                    "kind": "entity_action",
-                    "action": _result_action(domain, service),
-                    "target": target,
-                },
-            )
-            return
-        self._report_activity("skipped", reason="target_not_configured")
+    def _script_variables(self, gesture: str) -> dict[str, Any]:
+        """What a script started by a gesture is told about it.
+
+        Lets one script serve several buttons: it can branch on the gesture,
+        the press count or the channel.
+        """
+        active = self._active_action
+        return {
+            "gesture": gesture,
+            "presses": active.presses if active is not None else 0,
+            "channel": self._channel,
+            "endpoint": self._endpoint_id,
+            "device": active.wheel_name if active is not None else None,
+        }
 
     # -- service helpers --------------------------------------------------
 
@@ -1632,6 +1649,7 @@ class LightBinding:
         service: str,
         entity_id: str,
         *,
+        data: dict[str, Any] | None = None,
         result: dict[str, Any],
     ) -> bool:
         if self._available_state(entity_id) is None:
@@ -1642,7 +1660,10 @@ class LightBinding:
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
         service_call = self.hass.services.async_call(
-            domain, service, {ATTR_ENTITY_ID: entity_id}, blocking=False
+            domain,
+            service,
+            {ATTR_ENTITY_ID: entity_id, **(data or {})},
+            blocking=False,
         )
         self.hass.async_create_task(
             self._async_dispatch_service(

@@ -19,16 +19,17 @@ from .const import (
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
-    CLICK_OFF,
     CONF_ACCELERATION,
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
@@ -39,6 +40,7 @@ from .const import (
     CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     DEFAULT_ACCELERATION,
     DEFAULT_BUTTON_RESPONSE,
@@ -50,16 +52,19 @@ from .const import (
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_STEP_CURVE,
+    DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     HOLD_ACTIONS,
     HOLD_NONE,
     HOLD_RAMP,
+    HOLD_TOGGLE,
     MODES,
     RAMP_DIRECTIONS,
     STEP_CURVES,
-    is_scene_target,
+    TARGET_ACTIONS,
     mode_supports_target,
 )
+from .gesture_actions import action_is_supported
 from .panel_schema import BINDING_NUMBERS
 
 BINDING_OPTIONAL_FIELDS = (
@@ -83,8 +88,11 @@ BINDING_EDIT_FIELDS = (
     CONF_BUTTON_RESPONSE,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_DOUBLE_ACTION,
     CONF_TRIPLE_TARGET,
+    CONF_TRIPLE_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_HOLD_ACTION,
     CONF_SCENES,
 )
@@ -94,7 +102,9 @@ BUTTON_BINDING_EDIT_FIELDS = (
     CONF_BUTTON_RESPONSE,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
+    CONF_DOUBLE_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_HOLD_ACTION,
     CONF_RAMP_DIRECTION,
 )
@@ -131,8 +141,17 @@ _WHEEL_SCHEMA = vol.Schema(
         ),
         vol.Optional(CONF_CLICK_TARGET): _ENTITY_ID,
         vol.Optional(CONF_DOUBLE_TARGET): _ENTITY_ID,
+        vol.Required(CONF_DOUBLE_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
+            TARGET_ACTIONS
+        ),
         vol.Optional(CONF_TRIPLE_TARGET): _ENTITY_ID,
+        vol.Required(CONF_TRIPLE_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
+            TARGET_ACTIONS
+        ),
         vol.Optional(CONF_HOLD_TARGET): _ENTITY_ID,
+        vol.Required(CONF_HOLD_TARGET_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
+            TARGET_ACTIONS
+        ),
         vol.Required(CONF_HOLD_ACTION, default=DEFAULT_HOLD_ACTION): vol.In(
             HOLD_ACTIONS
         ),
@@ -153,7 +172,13 @@ _BUTTON_SCHEMA = vol.Schema(
         ),
         vol.Optional(CONF_CLICK_TARGET): _ENTITY_ID,
         vol.Optional(CONF_DOUBLE_TARGET): _ENTITY_ID,
+        vol.Required(CONF_DOUBLE_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
+            TARGET_ACTIONS
+        ),
         vol.Optional(CONF_HOLD_TARGET): _ENTITY_ID,
+        vol.Required(CONF_HOLD_TARGET_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
+            TARGET_ACTIONS
+        ),
         vol.Required(CONF_HOLD_ACTION, default=DEFAULT_HOLD_ACTION): vol.In(
             HOLD_ACTIONS
         ),
@@ -218,13 +243,39 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
     """Return field-addressable semantic errors for normalized binding data."""
     errors: dict[str, str] = {}
     is_button = CONF_ENDPOINT in data
-    click_target = data.get(CONF_CLICK_TARGET) or data.get(CONF_TARGET)
-    if (
-        data.get(CONF_CLICK_ACTION) == CLICK_OFF
-        and not data.get(CONF_SCENES)
-        and is_scene_target(click_target)
-    ):
-        errors[CONF_CLICK_ACTION] = "scene_cannot_turn_off"
+    # A scene can only be run: it has no off, whichever gesture asks for one.
+    # Scene cycling replaces the short press, so its stored action is unused.
+    gestures = [
+        (
+            CONF_DOUBLE_ACTION,
+            data.get(CONF_DOUBLE_TARGET),
+            data.get(CONF_DOUBLE_ACTION, DEFAULT_TARGET_ACTION),
+        ),
+        (
+            CONF_TRIPLE_ACTION,
+            data.get(CONF_TRIPLE_TARGET),
+            data.get(CONF_TRIPLE_ACTION, DEFAULT_TARGET_ACTION),
+        ),
+    ]
+    if not data.get(CONF_SCENES):
+        gestures.append(
+            (
+                CONF_CLICK_ACTION,
+                data.get(CONF_CLICK_TARGET) or data.get(CONF_TARGET),
+                data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION),
+            )
+        )
+    if data.get(CONF_HOLD_ACTION) == HOLD_TOGGLE:
+        gestures.append(
+            (
+                CONF_HOLD_TARGET_ACTION,
+                data.get(CONF_HOLD_TARGET),
+                data.get(CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION),
+            )
+        )
+    for field, target, action in gestures:
+        if target and not action_is_supported(target, action):
+            errors[field] = "scene_cannot_turn_off"
     if is_button:
         if data[CONF_CLICK_ACTION] != CLICK_NONE and not data.get(CONF_CLICK_TARGET):
             errors[CONF_CLICK_TARGET] = "target_required"

@@ -52,8 +52,11 @@
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
             "double_press_target": "Cíl dvojitého stisku (volitelné)",
+            "double_press_action": "Akce dvojitého stisku",
             "triple_press_target": "Cíl trojitého stisku (volitelné)",
+            "triple_press_action": "Akce trojitého stisku",
             "hold_target": "Cíl akce při podržení",
+            "hold_target_action": "Akce podržení na jeho cíli",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
             "scenes": "Scény střídané jednoduchým stiskem (volitelné, nahradí jeho akci)",
@@ -90,8 +93,11 @@
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
             "double_press_target": "Cíl dvojitého stisku (volitelné)",
+            "double_press_action": "Akce dvojitého stisku",
             "triple_press_target": "Cíl trojitého stisku (volitelné)",
+            "triple_press_action": "Akce trojitého stisku",
             "hold_target": "Cíl akce při podržení",
+            "hold_target_action": "Akce podržení na jeho cíli",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
             "scenes": "Scény střídané jednoduchým stiskem (volitelné, nahradí jeho akci)",
@@ -125,6 +131,13 @@
         "on": "Zapnout",
         "off": "Vypnout",
         "none": "Nedělat nic"
+      }
+    },
+    "target_action": {
+      "options": {
+        "toggle": "Přepnout (scéna se spustí)",
+        "on": "Zapnout (skript nebo scéna se spustí)",
+        "off": "Vypnout (skript se zastaví)"
       }
     },
     "scroll_mode": {

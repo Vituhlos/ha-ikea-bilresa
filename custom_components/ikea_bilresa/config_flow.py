@@ -41,10 +41,12 @@ from .const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_COPY_FROM,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
@@ -55,6 +57,7 @@ from .const import (
     CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     CONF_URL,
     DEFAULT_ACCELERATION,
@@ -68,6 +71,7 @@ from .const import (
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_STEP_CURVE,
+    DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     DOMAIN,
     HOLD_ACTIONS,
@@ -81,12 +85,24 @@ from .const import (
     ROLE_BUTTON,
     STEP_CURVES,
     SUBENTRY_BINDING,
+    TARGET_ACTIONS,
     TARGET_DOMAINS,
 )
 from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
 from .model import BilresaWheel
 from .presentation import generated_binding_title, generated_button_binding_title
+
+
+def _target_action_selector() -> selector.SelectSelector:
+    """What a gesture does to its target: toggle, turn on or turn off."""
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=TARGET_ACTIONS,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            translation_key="target_action",
+        )
+    )
 
 
 def _matter_server_url(hass: HomeAssistant) -> str:
@@ -635,12 +651,20 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
+            vol.Required(
+                CONF_DOUBLE_ACTION,
+                default=defaults.get(CONF_DOUBLE_ACTION, DEFAULT_TARGET_ACTION),
+            ): _target_action_selector(),
             vol.Optional(
                 CONF_HOLD_TARGET,
                 description={"suggested_value": defaults.get(CONF_HOLD_TARGET)},
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
+            vol.Required(
+                CONF_HOLD_TARGET_ACTION,
+                default=defaults.get(CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION),
+            ): _target_action_selector(),
             vol.Required(
                 CONF_HOLD_ACTION,
                 default=defaults.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION),
@@ -661,6 +685,12 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
             ] = selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             )
+            fields[
+                vol.Required(
+                    CONF_TRIPLE_ACTION,
+                    default=defaults.get(CONF_TRIPLE_ACTION, DEFAULT_TARGET_ACTION),
+                )
+            ] = _target_action_selector()
             fields[
                 vol.Optional(
                     CONF_SCENES,

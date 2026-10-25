@@ -198,7 +198,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_off": "Turn target off",
         "click_none": "No action",
         "click_scenes": "Cycle scenes",
-        "hold_toggle": "Toggle or run hold target",
+        "click_scene_on": "Run scene",
+        "click_script_on": "Run script",
+        "click_script_off": "Stop script",
+        "click_script_toggle": "Toggle script",
+        "script_run_help": (
+            "Starts the script and tells it which gesture started it, in the "
+            "variables gesture, presses, channel, endpoint and device."
+        ),
+        "script_toggle_help": (
+            "Starts the script, or stops it if it is running. A toggle cannot "
+            "pass the script any variables."
+        ),
+        "gesture_hold_effect": "Effect on the target",
+        "hold_toggle": "Act on the hold target",
         "hold_ramp": "Ramp rotation target",
         "hold_none": "No action",
         "ramp_direction_alternate": "Alternate up and down",
@@ -281,6 +294,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_turn_on": "Turn on",
         "action_turn_off": "Turn off",
         "action_run": "Run",
+        "action_stop": "Stop",
         "action_none": "No action",
         "action_cycle_scenes": "Cycle scenes",
         "action_ramp": "Ramp target",
@@ -358,6 +372,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "service_turn_on": "Turn on",
         "service_turn_off": "Turn off",
         "service_run": "Run",
+        "service_stop": "Stop",
         "source_panel_test": "Triggered from the panel test controls",
         "test_controls_heading": "Test configured actions",
         "test_controls_intro": (
@@ -599,7 +614,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_off": "Vypnout cíl",
         "click_none": "Bez akce",
         "click_scenes": "Procházet scény",
-        "hold_toggle": "Přepnout nebo spustit cíl podržení",
+        "click_scene_on": "Spustit scénu",
+        "click_script_on": "Spustit skript",
+        "click_script_off": "Zastavit skript",
+        "click_script_toggle": "Přepnout skript",
+        "script_run_help": (
+            "Spustí skript a předá mu, které gesto ho spustilo, v proměnných "
+            "gesture, presses, channel, endpoint a device."
+        ),
+        "script_toggle_help": (
+            "Spustí skript, nebo ho zastaví, pokud běží. Přepnutí skriptu "
+            "nemůže předat žádné proměnné."
+        ),
+        "gesture_hold_effect": "Účinek na cíl",
+        "hold_toggle": "Provést akci na cíli podržení",
         "hold_ramp": "Plynule měnit cíl otáčení",
         "hold_none": "Bez akce",
         "ramp_direction_alternate": "Střídat zesílení a zeslabení",
@@ -682,6 +710,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_turn_on": "Zapnout",
         "action_turn_off": "Vypnout",
         "action_run": "Spustit",
+        "action_stop": "Zastavit",
         "action_none": "Bez akce",
         "action_cycle_scenes": "Procházet scény",
         "action_ramp": "Plynule měnit cíl",
@@ -759,6 +788,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "service_turn_on": "Zapnout",
         "service_turn_off": "Vypnout",
         "service_run": "Spustit",
+        "service_stop": "Zastavit",
         "source_panel_test": "Spuštěno testovacími ovladači v panelu",
         "test_controls_heading": "Otestovat nastavené akce",
         "test_controls_intro": (

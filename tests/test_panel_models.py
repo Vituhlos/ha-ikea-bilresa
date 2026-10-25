@@ -14,17 +14,21 @@ from custom_components.ikea_bilresa.const import (
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_TARGET,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     HOLD_RAMP,
+    HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_VOLUME,
     SUBENTRY_BINDING,
@@ -960,3 +964,29 @@ def test_a_scene_is_described_as_run_and_a_script_as_toggled(monkeypatch) -> Non
     assert labels["short_press"] == "Toggle"
     assert labels["double_press"] == "Run"
     assert labels["triple_press"] == "Toggle"
+
+
+def test_the_ledger_names_each_gestures_action_in_its_own_words(monkeypatch) -> None:
+    channel = _click_target_channel(
+        monkeypatch,
+        **{
+            CONF_CLICK_TARGET: "script.go",
+            CONF_CLICK_ACTION: "on",
+            CONF_DOUBLE_TARGET: "script.go",
+            CONF_DOUBLE_ACTION: "off",
+            CONF_TRIPLE_TARGET: "switch.fan",
+            CONF_TRIPLE_ACTION: "off",
+            CONF_HOLD_ACTION: HOLD_TOGGLE,
+            CONF_HOLD_TARGET: "scene.a",
+            CONF_HOLD_TARGET_ACTION: "on",
+        },
+    )
+
+    labels = {
+        action["gesture"]: action["action_label"] for action in channel["actions"]
+    }
+
+    assert labels["short_press"] == "Run"
+    assert labels["double_press"] == "Stop"
+    assert labels["triple_press"] == "Turn off"
+    assert labels["hold"] == "Run"

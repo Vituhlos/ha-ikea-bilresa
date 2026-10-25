@@ -52,8 +52,11 @@
             "button_response": "Button response",
             "click_target": "Single-press target",
             "double_press_target": "Double-press target (optional)",
+            "double_press_action": "Double-press action",
             "triple_press_target": "Triple-press target (optional)",
+            "triple_press_action": "Triple-press action",
             "hold_target": "Hold-action target",
+            "hold_target_action": "Hold action on its target",
             "hold_action": "Button hold action",
             "ramp_direction": "Hold-ramp direction",
             "scenes": "Scenes cycled by single press (optional, overrides its action)",
@@ -90,8 +93,11 @@
             "button_response": "Button response",
             "click_target": "Single-press target",
             "double_press_target": "Double-press target (optional)",
+            "double_press_action": "Double-press action",
             "triple_press_target": "Triple-press target (optional)",
+            "triple_press_action": "Triple-press action",
             "hold_target": "Hold-action target",
+            "hold_target_action": "Hold action on its target",
             "hold_action": "Button hold action",
             "ramp_direction": "Hold-ramp direction",
             "scenes": "Scenes cycled by single press (optional, overrides its action)",
@@ -125,6 +131,13 @@
         "on": "Turn on",
         "off": "Turn off",
         "none": "Do nothing"
+      }
+    },
+    "target_action": {
+      "options": {
+        "toggle": "Toggle (a scene is run)",
+        "on": "Turn on (a script or a scene is run)",
+        "off": "Turn off (a script is stopped)"
       }
     },
     "scroll_mode": {
