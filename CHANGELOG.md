@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 Stored bindings and runtime behaviour are unchanged.
 
+### Fixed
+- **A short-press target that nothing uses no longer shows as missing.** A
+  channel that cycles scenes, or whose short press does nothing, ignores its
+  stored short-press target, and the editor shows no field for it. If that
+  entity was deleted, the channel still reported a missing target that could
+  not be seen or cleared. The channel's health now leaves such a target out,
+  and the editor drops it from the draft, so the next save removes it.
+- **A rejected save that marks a rotation limit opens "More rotation
+  settings"**, so the field named in the message can be seen.
+- **Keyboard focus stays on the Discard button** when the editor redraws after
+  the first press.
+
 ## [0.7.0-rc.1] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It joins the

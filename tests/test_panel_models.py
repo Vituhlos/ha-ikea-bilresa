@@ -498,6 +498,62 @@ def test_a_dead_click_target_flags_the_channel(monkeypatch) -> None:
     assert channels[0]["target_missing"] is True
 
 
+def _click_target_channel(monkeypatch, **extra) -> dict:
+    """Summary of a channel whose stored short-press target no longer exists."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_MODE: MODE_BRIGHTNESS,
+                    CONF_TARGET: "light.ok",
+                    CONF_CLICK_TARGET: "switch.gone",
+                    **extra,
+                },
+            )
+        ],
+    )
+    hass = _hass(
+        {
+            "light.ok": _state("on", "Main light"),
+            "scene.a": _state("scening", "Scene A"),
+        }
+    )
+    return async_overview_snapshot(hass, entry)["wheels"][0]["channels"][0]
+
+
+def test_a_dead_click_target_behind_scene_cycling_is_not_a_fault(
+    monkeypatch,
+) -> None:
+    """Scenes replace the short press, so its stored target is never used.
+
+    The editor shows no target picker for a scene cycle, so a fault reported
+    for it could not be seen or cleared by the user.
+    """
+    channel = _click_target_channel(monkeypatch, **{CONF_SCENES: ["scene.a"]})
+
+    assert channel["target_state"] == "ok"
+    assert channel["target_missing"] is False
+
+
+def test_a_dead_click_target_behind_no_action_is_not_a_fault(monkeypatch) -> None:
+    """Likewise for a short press set to do nothing."""
+    channel = _click_target_channel(monkeypatch, **{CONF_CLICK_ACTION: "none"})
+
+    assert channel["target_state"] == "ok"
+    assert channel["target_missing"] is False
+
+
+def test_a_dead_click_target_still_flags_an_active_short_press(monkeypatch) -> None:
+    """The fix only ignores a target nothing uses."""
+    channel = _click_target_channel(monkeypatch, **{CONF_CLICK_ACTION: "toggle"})
+
+    assert channel["target_missing"] is True
+
+
 def test_a_binding_without_a_stored_mode_names_the_default_quantity(
     monkeypatch,
 ) -> None:

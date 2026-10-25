@@ -1487,6 +1487,16 @@ const RESPONSE_EXCLUDES = {
   instant: ["double_press", "triple_press", "hold"],
 };
 
+// The fields behind "More rotation settings". A rejected save that marks
+// one of them opens the disclosure, or the message would point at nothing
+// the user can see.
+const ROTATION_MORE_FIELDS = [
+  "step_curve",
+  "min_brightness",
+  "max_brightness",
+  "acceleration",
+];
+
 const DISCARD_DOUBLE_CLICK_MS = 500;
 const DISCARD_ARMED_MS = 4000;
 
@@ -2271,6 +2281,12 @@ class IkeaBilresaPanel extends HTMLElement {
       double_press: this._editorData.double_press_target ? "toggle" : "none",
       triple_press: this._editorData.triple_press_target ? "toggle" : "none",
     };
+    // Scene cycling and "no action" show no short-press target. A binding that
+    // still stores one is shown without it, so the next save drops it and it
+    // can no longer count as a missing target nobody can see.
+    if (["scenes", "none"].includes(this._editorChoices.click_action)) {
+      delete this._editorData.click_target;
+    }
     this._editorBaseline = this._editorSnapshot();
   }
 
@@ -2337,8 +2353,11 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   // "Discard" and "Discard?" share one cell, so arming does not resize it.
-  _discardButton() {
+  // The id is what _render() uses to give keyboard focus back, so it names
+  // the device, the control and which of the two buttons this is.
+  _discardButton(number, where) {
     const button = el("button", "action-button discard-button");
+    button.id = `discard-${this._open}-${number}-${where}`;
     button.type = "button";
     button.disabled = this._editorBusy;
     const armed = Boolean(this._discardArmed);
@@ -2383,6 +2402,10 @@ class IkeaBilresaPanel extends HTMLElement {
     this._editorChoices[name] = next;
     if (name === "click_action") {
       this._editorChanged("scenes");
+      // Neither choice shows the target picker, so the target goes with it.
+      if (next === "scenes" || next === "none") {
+        delete this._editorData.click_target;
+      }
       if (next === "scenes") return;
       this._editorData.click_action = next;
       if (this._editorData.scenes) this._editorData.scenes = [];
@@ -2857,6 +2880,9 @@ class IkeaBilresaPanel extends HTMLElement {
       if (!response.ok) {
         if (response.error === "validation") {
           this._editorErrors = response.fields || {};
+          if (ROTATION_MORE_FIELDS.some((field) => field in this._editorErrors)) {
+            this._advancedOpen = true;
+          }
           this._editorMessage = this._t("binding_validation_failed");
         } else if (response.error === "conflict") {
           this._editorBinding = response.binding;
@@ -3158,7 +3184,7 @@ class IkeaBilresaPanel extends HTMLElement {
     save.dataset.primary = "true";
     save.disabled = this._editorBusy;
     actions.appendChild(save);
-    actions.appendChild(this._discardButton());
+    actions.appendChild(this._discardButton(this._editingChannel, "form"));
     if (this._editorBinding) {
       const remove = el("button", "action-button", this._t("delete_binding"));
       remove.type = "button";
@@ -3228,7 +3254,7 @@ class IkeaBilresaPanel extends HTMLElement {
     save.disabled = this._editorBusy;
     save.addEventListener("click", () => this._saveBinding(wheel, channel));
     busy.appendChild(save);
-    busy.appendChild(this._discardButton());
+    busy.appendChild(this._discardButton(number, "header"));
     for (const [node, shown] of [[edit, !editing], [busy, editing]]) {
       if (!shown) {
         node.dataset.hidden = "true";

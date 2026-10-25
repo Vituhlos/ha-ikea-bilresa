@@ -547,7 +547,7 @@ test("the step curve is set-once, behind the rotation toggle", async () => {
   // Behind Rotation's own toggle, not among the fields shown every time.
   assert.ok(toggle > 0 && extras > toggle && extras < shortPress);
   assert.ok(source.slice(extras, shortPress).includes('"step_curve"'));
-  assert.ok(!source.slice(0, toggle).includes('"step_curve"'));
+  assert.ok(!source.slice(source.indexOf('this._formSection(sections, "rotation")'), toggle).includes('"step_curve"'));
 });
 
 test("a response that rules gestures out clears them", () => {
@@ -854,6 +854,103 @@ test("opening another channel over unsaved changes arms Discard first", () => {
   panel._discard();
   assert.equal(panel._editingChannel, 2);
   panel._disarmDiscard();
+});
+
+test("a short-press target nothing shows is dropped, not left to be reported", () => {
+  const panel = newPanel();
+
+  // A stored scene cycle with a target behind it: the draft is shown without
+  // it, and cleaning it up is not an edit.
+  panel._loadEditor(false, {
+    click_action: "toggle",
+    click_target: "light.old",
+    scenes: ["scene.a"],
+  });
+  assert.equal("click_target" in panel._editorData, false);
+  assert.deepEqual(panel._editorData.scenes, ["scene.a"]);
+  assert.equal(panel._editorDirty(), false);
+
+  // Choosing scene cycling or "no action" hides the picker, so the target goes.
+  for (const choice of ["scenes", "none"]) {
+    panel._loadEditor(false, { click_action: "toggle", click_target: "light.old" });
+    assert.equal(panel._editorData.click_target, "light.old");
+    panel._chooseGesture("click_action", choice);
+    assert.equal("click_target" in panel._editorData, false, choice);
+  }
+  assert.equal(panel._editorData.click_action, "none");
+
+  // A choice that shows the picker keeps its target.
+  panel._loadEditor(false, { click_action: "on", click_target: "light.keep" });
+  assert.equal(panel._editorData.click_target, "light.keep");
+  panel._chooseGesture("click_action", "off");
+  assert.equal(panel._editorData.click_target, "light.keep");
+});
+
+test("a rejected save that marks a hidden rotation field opens the disclosure", async () => {
+  const panel = newPanel();
+  const wheel = { key: "wheel-a", variant: "wheel" };
+  const reject = (fields) => ({
+    callWS: async () => ({ ok: false, error: "validation", fields }),
+  });
+  panel._loadEditor(false, { target: "light.a" });
+  assert.equal(panel._advancedOpen, false);
+
+  // An error on a field that is always shown leaves the disclosure alone.
+  panel._hass = reject({ target: "target_required" });
+  await panel._saveBinding(wheel, { channel: 1 });
+  assert.equal(panel._advancedOpen, false);
+
+  // One inside "More rotation settings" opens it, or the message points at
+  // a field the user cannot see.
+  panel._hass = reject({ max_brightness: "invalid_value" });
+  await panel._saveBinding(wheel, { channel: 1 });
+  assert.equal(panel._advancedOpen, true);
+  assert.deepEqual(panel._editorErrors, { max_brightness: "invalid_value" });
+});
+
+test("each Discard button has its own stable id, so focus survives a render", async () => {
+  const { readFileSync } = await import("node:fs");
+  const node = () => ({
+    className: "",
+    textContent: "",
+    dataset: {},
+    children: [],
+    attributes: {},
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    },
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    addEventListener() {},
+  });
+  const previous = globalThis.document;
+  globalThis.document = { createElement: node };
+  try {
+    const panel = newPanel();
+    const header = panel._discardButton(2, "header");
+    const form = panel._discardButton(2, "form");
+    const other = panel._discardButton(3, "header");
+
+    assert.equal(header.id, "discard-wheel-a-2-header");
+    assert.equal(new Set([header.id, form.id, other.id]).size, 3);
+    // The same button gets the same id after a render, which is what lets
+    // _render() hand the keyboard focus back to it.
+    assert.equal(panel._discardButton(2, "header").id, header.id);
+  } finally {
+    globalThis.document = previous;
+  }
+
+  const source = readFileSync(
+    new URL(
+      "../custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.ok(source.includes('this._discardButton(number, "header")'));
+  assert.ok(source.includes('this._discardButton(this._editingChannel, "form")'));
 });
 
 test("without Home Assistant's components the panel builds no ha-selector", () => {

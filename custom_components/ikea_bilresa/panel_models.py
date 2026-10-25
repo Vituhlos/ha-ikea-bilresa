@@ -624,6 +624,13 @@ def _channel_summaries(
         target = data.get(CONF_TARGET)
         # The click target defaults to the scroll target, mirroring binding.py.
         click_target = data.get(CONF_CLICK_TARGET) or target
+        # A scene cycle replaces the short press, and "no action" never uses its
+        # target. A target left in the stored data then does nothing, so it must
+        # not report a fault that the editor no longer shows.
+        if data.get(CONF_SCENES) or (
+            data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION) == CLICK_NONE
+        ):
+            click_target = None
         actions = _wheel_gesture_summaries(hass, data, language)
         state = _worst_target_state(
             [
