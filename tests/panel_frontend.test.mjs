@@ -530,7 +530,7 @@ test("a new binding defaults to the linear step curve", () => {
   assert.equal(panel._editorData.step_curve, "linear");
 });
 
-test("the step curve is a set-once option, not a rotation field", async () => {
+test("the step curve is set-once, behind the rotation toggle", async () => {
   // PANEL_DESIGN.md: the disclosure keeps genuinely set-once options only.
   const { readFileSync } = await import("node:fs");
   const source = readFileSync(
@@ -540,12 +540,32 @@ test("the step curve is a set-once option, not a rotation field", async () => {
     ),
     "utf8",
   );
-  const rotation = source.indexOf("const rotation = this._formSection");
-  const split = source.indexOf("const advancedGrid");
+  const toggle = source.indexOf('this._t("rotation_more")');
+  const extras = source.indexOf("if (this._advancedOpen) {", toggle);
+  const shortPress = source.indexOf('this._formSection(sections, "short_press")');
 
-  assert.ok(source.slice(split).includes('"step_curve"'));
-  // Not among the rotation fields, where it would read as a per-use setting.
-  assert.ok(!source.slice(rotation, split).includes("step_curve"));
+  // Behind Rotation's own toggle, not among the fields shown every time.
+  assert.ok(toggle > 0 && extras > toggle && extras < shortPress);
+  assert.ok(source.slice(extras, shortPress).includes('"step_curve"'));
+  assert.ok(!source.slice(0, toggle).includes('"step_curve"'));
+});
+
+test("a response that rules gestures out clears them", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, {
+    target: "light.a",
+    double_press_target: "light.b",
+    hold_action: "toggle",
+  });
+
+  panel._chooseResponse("fast");
+  assert.equal(panel._editorChoices.double_press, "none");
+  assert.equal("double_press_target" in panel._editorData, false);
+  assert.equal(panel._editorData.hold_action, "toggle");
+
+  panel._chooseResponse("instant");
+  assert.equal(panel._editorData.hold_action, "none");
+  assert.equal(panel._editorData.button_response, "instant");
 });
 
 test("an unavailable target is named plainly; only a missing one is a fault", () => {
@@ -657,26 +677,20 @@ const ledgerPanel = () => {
   };
   return panel;
 };
-const value = (action) =>
-  action.target_label
-    ? `${action.action_label} · ${action.target_label}`
-    : action.action_label;
-
-test("gestures with no action collapse into names, not rows", () => {
+test("gestures with no action get no row", () => {
   const panel = ledgerPanel();
-  const { rows, unset } = panel._ledgerRows(
+  const rows = panel._ledgerRows(
     [
       { gesture: "rotation", gesture_label: "Rotate", action_label: "Brightness", target_label: "Bulb" },
       { gesture: "double_press", gesture_label: "Double press", action_label: "No action", target_label: null },
       { gesture: "hold", gesture_label: "Hold", action_label: "No action", target_label: null },
       { gesture: "release", gesture_label: "Release", action_label: "No action", target_label: null },
     ],
-    value,
   );
 
   assert.deepEqual(rows.map((row) => row.label), ["Rotate"]);
-  // Hold and release are one gesture: one name, not two.
-  assert.deepEqual(unset, ["Double press", "Hold"]);
+  assert.equal(rows[0].action, "Brightness");
+  assert.equal(rows[0].target, "Bulb");
 });
 
 test("a hold row mentions the release only when the release does something", () => {
@@ -685,26 +699,25 @@ test("a hold row mentions the release only when the release does something", () 
 
   const quiet = panel._ledgerRows(
     [hold, { gesture: "release", gesture_label: "Release", action_label: "No action", target_label: null }],
-    value,
   );
-  assert.equal(quiet.rows[0].value, "Ramp · Bulb");
+  assert.equal(quiet[0].action, "Ramp");
+  assert.equal(quiet[0].target, "Bulb");
 
   const stopping = panel._ledgerRows(
     [hold, { gesture: "release", gesture_label: "Release", action_label: "Stop ramp", target_label: null }],
-    value,
   );
-  assert.equal(stopping.rows[0].value, "Ramp · Bulb; on release: Stop ramp");
-  assert.equal(stopping.rows.length, 1);
+  assert.equal(stopping[0].action, "Ramp; on release: Stop ramp");
+  assert.equal(stopping[0].target, "Bulb");
+  assert.equal(stopping.length, 1);
 });
 
 test("a ledger row warns for a missing target, not an unavailable one", () => {
   const panel = ledgerPanel();
-  const { rows } = panel._ledgerRows(
+  const rows = panel._ledgerRows(
     [
       { gesture: "rotation", gesture_label: "Rotate", action_label: "Brightness", target_label: "Bulb", target_state: "unavailable" },
       { gesture: "short_press", gesture_label: "Press", action_label: "Toggle", target_label: "light.gone", target_state: "missing" },
     ],
-    value,
   );
 
   assert.deepEqual(rows.map((row) => row.warning), [false, true]);
@@ -731,6 +744,116 @@ test("scenes keep an order that can be changed", () => {
   panel._sceneAdd("scene.c");
   panel._sceneAdd("");
   assert.deepEqual(panel._editorData.scenes, ["scene.c", "scene.b", "scene.d"]);
+});
+
+test("the editor shows scene cycling as the short press it replaces", () => {
+  const panel = newPanel();
+  const stored = {
+    click_action: "off",
+    scenes: ["scene.a"],
+    double_press_target: "light.a",
+  };
+  panel._loadEditor(false, stored);
+
+  assert.deepEqual(panel._editorChoices, {
+    click_action: "scenes",
+    double_press: "toggle",
+    triple_press: "none",
+  });
+  assert.equal(panel._editorData.click_action, "off");
+  // The draft keeps its own copy: editing it must not touch the snapshot.
+  panel._editorData.scenes.push("scene.b");
+  assert.deepEqual(stored.scenes, ["scene.a"]);
+
+  panel._loadEditor(true, { click_action: "on" });
+  assert.equal(panel._editorChoices.click_action, "on");
+  assert.equal(panel._editorData.scenes, undefined);
+});
+
+test("leaving a press choice drops what only that choice used", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, {
+    click_action: "off",
+    scenes: ["scene.a", "scene.b"],
+    double_press_target: "light.a",
+  });
+  panel._editorErrors = { scenes: "x", double_press_target: "y" };
+
+  panel._chooseGesture("click_action", "toggle");
+  assert.equal(panel._editorData.click_action, "toggle");
+  assert.deepEqual(panel._editorData.scenes, []);
+
+  panel._chooseGesture("double_press", "none");
+  assert.equal("double_press_target" in panel._editorData, false);
+  assert.deepEqual(panel._editorErrors, {});
+
+  // Choosing scenes again keeps the stored action; the runtime ignores it.
+  panel._chooseGesture("click_action", "scenes");
+  assert.equal(panel._editorChoices.click_action, "scenes");
+  assert.equal(panel._editorData.click_action, "toggle");
+});
+
+test("an empty scene cycle or toggle is caught before saving", async () => {
+  const panel = newPanel();
+  let sent = 0;
+  panel._hass = { callWS: async () => { sent += 1; return { ok: true }; } };
+  panel._loadEditor(false, { target: "light.a" });
+  panel._chooseGesture("click_action", "scenes");
+  panel._chooseGesture("triple_press", "toggle");
+
+  await panel._saveBinding({ key: "wheel-a", variant: "wheel" }, { channel: 1 });
+
+  assert.equal(sent, 0);
+  assert.deepEqual(panel._editorErrors, {
+    scenes: "scenes_required",
+    triple_press_target: "target_required",
+  });
+});
+
+test("discarding an untouched editor closes it at once", () => {
+  const panel = newPanel();
+  panel._editingChannel = 1;
+  panel._loadEditor(false, { target: "light.a" });
+
+  panel._discard();
+
+  assert.equal(panel._editorData, null);
+  assert.equal(panel._discardArmed, null);
+});
+
+test("discarding changes takes a second, deliberate press", () => {
+  const panel = newPanel();
+  panel._editingChannel = 1;
+  panel._loadEditor(false, { target: "light.a" });
+  panel._chooseGesture("double_press", "toggle");
+
+  panel._discard();
+  assert.notEqual(panel._discardArmed, null);
+  // A double click is not a decision.
+  panel._discard();
+  assert.notEqual(panel._editorData, null);
+
+  panel._discardArmed.at -= 1000;
+  panel._discard();
+  assert.equal(panel._editorData, null);
+  assert.equal(panel._discardTimer, null);
+});
+
+test("opening another channel over unsaved changes arms Discard first", () => {
+  const panel = newPanel();
+  const wheel = { key: "wheel-a", variant: "wheel", channels: [] };
+  panel._editingChannel = 1;
+  panel._loadEditor(false, { target: "light.a", step: 3 });
+  panel._editorData.step = 7;
+
+  panel._requestEditor(wheel, { channel: 2 });
+  assert.equal(panel._editingChannel, 1);
+  assert.equal(typeof panel._discardArmed.then, "function");
+
+  panel._discardArmed.at -= 1000;
+  panel._discard();
+  assert.equal(panel._editingChannel, 2);
+  panel._disarmDiscard();
 });
 
 test("without Home Assistant's components the panel builds no ha-selector", () => {

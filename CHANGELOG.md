@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **The binding editor shows what will run.** Rotation and every press
+  gesture are their own section, in the order and with the icons of the
+  channel's summary. Each gesture has an Action and a Target.
+  - "Cycle scenes" is a short-press action with its scene list as the target;
+    the list no longer sits beside a short-press action that it silently
+    replaced.
+  - Double and triple press choose between toggle and no action.
+  - A wheel's hold ramp no longer offers a hold target it never used.
+  - The short-press response sits with the short press. A response that rules
+    gestures out (fast release: double and triple press; instant: those and
+    hold) dims them with a note instead of failing on save.
+  - The rotation limits sit behind "More rotation settings" in Rotation; the
+    "Advanced options" group is gone.
+- **Editing no longer shifts the page.** Labels sit above every field, as in
+  Home Assistant's own pickers. While editing, Save and Discard take the place
+  of Edit at the same width. Discard closes an untouched editor at once and
+  asks for a second press when there are unsaved changes.
+- **Reading a channel is quicker.** Each row reads "action · target", and
+  the dots line up across every card. A switched-off channel fades and says
+  so in its header without growing. Wheel channels show the three channel
+  LEDs; dual-button cards show which half of the button they are.
+
+Stored bindings and runtime behaviour are unchanged.
+
 ## [0.7.0-rc.1] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It joins the
@@ -111,6 +136,8 @@ A fix release on top of 0.6.0. The redesigned panel that was published as
 `0.6.1-rc.1` and `0.6.1-rc.2` is not in it: that work continues as 0.7.0.
 
 ### Fixed
+- The editor showed the raw keys `validation_target_required` and
+  `validation_ramp_requires_light` instead of their messages.
 - **The panel speaks the language of the user looking at it.** It used the
   Home Assistant instance's language, so a user who had chosen English in
   their profile on a Czech instance saw a Czech panel inside an English
