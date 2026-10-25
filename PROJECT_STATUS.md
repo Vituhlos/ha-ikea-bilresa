@@ -72,7 +72,11 @@ Validation (`.venv` = uv-managed CPython 3.14.9):
 - GitHub CI on `d184b2d` (commits 1–3): hassfest, unit tests, frontend
   checks, ruff, mypy, HACS validation all **success**; the newest-HA
   pre-release job is skipped by workflow condition. Both Devin Review threads
-  are resolved. Superseded by the CI run on the commit 5 HEAD (in PR #16).
+  are resolved.
+- GitHub CI on `ff6ab08` (commit 5, the code HEAD): hassfest, unit tests,
+  frontend checks, ruff, mypy, HACS validation all **success**; the newest-HA
+  pre-release job is skipped by workflow condition. Later commits on PR #16
+  are docs-only; their CI is on the PR.
 
 Hardware validation: **not performed.** The contributor reported a fork test
 on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
