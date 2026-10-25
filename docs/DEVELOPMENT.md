@@ -131,10 +131,17 @@ IDs, serials, or private URLs were added.
 - Use imperative conventional subjects, for example:
   `feat: add scene cycling and hold-to-ramp`.
 - Do not combine a hardware-unverified feature with a stable release tag.
-- Tags represent owner-tested snapshots. Record the hardware matrix in
-  `PROJECT_STATUS.md` before tagging.
-- Publication, brand work, and default-HACS submission remain deferred until
-  functionality, automated coverage, and physical BILRESA validation are done.
+- **Stable release tags** represent owner-tested snapshots. Record the hardware
+  matrix and results in `PROJECT_STATUS.md` before tagging a stable release.
+- **Pre-release tags** may deliberately be unverified test candidates when the
+  purpose is to validate a change on real hardware after installation. Clearly
+  label the GitHub release as a pre-release, state the missing hardware checks,
+  and keep the matching checklist items open. An unverified pre-release is
+  only a test candidate, not a release-ready feature or a stable release. Never
+  describe it as stable or as hardware-validated until the checks actually pass.
+- Default-HACS submission and any stable release remain deferred until
+  functionality, automated coverage, and applicable physical BILRESA validation
+  are done.
 
 ## 6. Required session handoff
 

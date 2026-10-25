@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.2-rc.2] - 2026-10-25
+
+Pre-release candidate for testing, not a stable release. Includes the Issue #9
+brightness-group fixes from RC1 plus the button-event and disabled-channel
+fixes below.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware. The following
+checks remain open:
+
+- **B/F — short_release:** verify the bus event on the E2490 wheel and the
+  E2489 dual button, including normal short releases and releases within
+  multi-press sequences.
+- **C — disabled channels:** confirm Fast release and Instant bindings do
+  nothing while a wheel channel is disabled, then respond immediately again
+  after that channel is re-enabled.
+- **Issue #9 — Zigbee2MQTT light group:** reproduce the reporter's setup
+  (Home Assistant 2026.10.2, Zigbee2MQTT 2.7.2, 3–4 bulbs, step 3, perceptual
+  curve, minimum 1, transition 0.8) and check for stale-level jumps and
+  steppy dimming on small batches. Keep Issue #9 open until the reporter
+  confirms the result.
+
 ### Added
 - **`short_release` on the `ikea_bilresa_event` bus.** An automation can now
   react the moment a short button press is released instead of waiting for
@@ -953,7 +976,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...HEAD
+[0.6.2-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...v0.6.2-rc.2
 [0.6.2-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1...v0.6.2-rc.1
 [0.6.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...v0.6.0
