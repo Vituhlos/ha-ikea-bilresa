@@ -344,14 +344,16 @@ class BilresaCoordinator:
             return
         # Internal gesture metadata lets bindings distinguish trailing updates
         # from a deliberate new rotation and lets fast button bindings react to
-        # ShortRelease. It never reaches the public HA event bus.
-        async_dispatcher_send(
-            self.hass,
-            signal_raw_button(wheel.node_id, decoded["channel"]),
-            decoded["role"],
-            decoded["event_type"],
-            decoded["endpoint_id"],
-        )
+        # ShortRelease. It never reaches the public HA event bus. A disabled
+        # channel gets none of it either, or a Fast/Instant binding would act.
+        if self.channel_enabled(wheel.node_id, decoded["channel"]):
+            async_dispatcher_send(
+                self.hass,
+                signal_raw_button(wheel.node_id, decoded["channel"]),
+                decoded["role"],
+                decoded["event_type"],
+                decoded["endpoint_id"],
+            )
         action = self._engine.process(wheel, decoded)
         if action is not None:
             self._dispatch(action)

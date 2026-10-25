@@ -183,7 +183,8 @@ press or hold, Instant is accepted only when those separate actions are
 disabled. **Fast release** runs after the first short release and remains safe
 for a normal hold; multi-press aware waits for the BILRESA completion event.
 Existing bindings without this setting retain the completion-aware behavior
-until explicitly changed. Public event entities and triggers keep exact
+until explicitly changed. A disabled channel runs no binding in any of these
+modes. Public event entities and triggers keep exact
 single/double/triple classification in every mode.
 
 The integration then dims that light in real time. Add as many bindings as you

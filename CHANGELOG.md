@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   direct bindings and the panel live feed are unchanged. A disabled channel
   stays silent. Ported from PR #5 by @amodig.
 
+### Fixed
+- **A disabled channel no longer runs Fast release or Instant bindings.** The
+  internal button signal behind those modes was sent before the
+  channel-enabled check, so a binding on a disabled channel could still run
+  its single-press action. Enabled channels and the dual button respond as
+  before.
+
 ## [0.6.2-rc.1] - 2026-10-25
 
 Pre-release candidate for hardware validation of Issue #9. This is not a stable release.

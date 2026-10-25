@@ -15,11 +15,13 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
-## PR #5 port: `short_release` on the `ikea_bilresa_event` bus (2026-10-25)
+## PR #16: `short_release` bus event (port of #5) + disabled-channel raw-signal fix (2026-10-25)
 
 Status: **maintainer-owned port of contributor PR #5 (@amodig) onto `main`
-(`0.6.2-rc.1`). Static + unit + CI verified; NOT hardware-validated; not merged.
-PR #5 itself is left open and untouched.**
+(`0.6.2-rc.1`), widened at the owner's request to fix Fast/Instant bindings
+on disabled channels. Static + unit verified; GitHub CI reruns on every push
+(see PR #16). NOT hardware-validated; not merged. PR #5 itself is left open
+and untouched.**
 
 What changed:
 
@@ -29,22 +31,36 @@ What changed:
   README section. The original hunk no longer applied because `main` had
   since added press-duration bookkeeping to the same branch.
 - Commit 2 (maintainer): `coordinator._dispatch` makes `short_release`
-  **bus-only** — it is fired on `ikea_bilresa_event` after the existing
+  **bus-only**. It is fired on `ikea_bilresa_event` after the existing
   channel-disabled check, then returns before `signal_channel` and the
   `binding_not_configured` activity row. Without this, every click would have
-  reached bindings (`skipped`/`gesture_not_configured` activity rows).
-  Commit 3 (review fix): the panel live feed (`ws_activity_subscribe`, which
-  listens to the bus) drops `short_release`, otherwise every click added an
-  unlabeled, permanently pending row. Event entities, `ikea_bilresa.*` triggers and bindings are
-  unchanged; fast/instant bindings keep using the internal raw signal.
-  Tests: `tests/test_coordinator.py` (bus-only, disabled channel suppresses
-  it, E2489 endpoints with `channel=None`), `tests/test_engine.py` (E2489
+  reached bindings (`skipped`/`gesture_not_configured` activity rows). Event
+  entities, `ikea_bilresa.*` triggers and bindings are unchanged. Tests:
+  `tests/test_coordinator.py` (bus-only; a disabled channel suppresses it;
+  E2489 endpoints with `channel=None`) and `tests/test_engine.py` (E2489
   three-tap overflow: two `short_release`, completion `0` ignored). README
   EN/CS, CHANGELOG `[Unreleased]`, two open `docs/HARDWARE_TEST.md` items.
+- Commit 3 (review fix): the panel live feed (`ws_activity_subscribe`, which
+  listens to the bus) drops `short_release`. Otherwise every click added an
+  unlabeled, permanently pending row.
+- Commit 4: docs only (CI record, changelog wrap).
+- Commit 5 (owner asked to widen the scope): `_handle_node_event` now sends
+  the internal `signal_raw_button` only when `channel_enabled` allows the
+  decoded channel. Before, it was sent ahead of `_dispatch`'s check, so a
+  **Fast release** / **Instant** binding on a disabled channel still ran its
+  single action. The engine still processes the event, and a dual button's
+  `channel=None` always passes. The tests in `tests/test_coordinator.py`
+  route the coordinator's raw signal into a real `LightBinding`. Fast on
+  `short_release` and Instant on `initial_press` fire once when the channel
+  is enabled and never when it is disabled. Disabled wheel channels do not
+  affect the dual button. README EN/CS, CHANGELOG `Fixed`, one
+  `HARDWARE_TEST.md` C item.
 
 Validation (`.venv` = uv-managed CPython 3.14.9):
 
-- `.venv/bin/python -m pytest -q` — **511 passed** (503 on `main`; +8).
+- `.venv/bin/python -m pytest -q` — **516 passed** (503 on `main`; +13).
+  The two disabled-channel Fast/Instant cases fail with the commit 5
+  coordinator change reverted (checked with `git stash`).
   The two bus-only coordinator tests failed before the `_dispatch` gate.
 - `.venv/bin/ruff format --check custom_components tests` — 57 files already
   formatted; `.venv/bin/ruff check custom_components tests` — all passed.
@@ -56,22 +72,19 @@ Validation (`.venv` = uv-managed CPython 3.14.9):
 - GitHub CI on `d184b2d` (commits 1–3): hassfest, unit tests, frontend
   checks, ruff, mypy, HACS validation all **success**; the newest-HA
   pre-release job is skipped by workflow condition. Both Devin Review threads
-  are resolved. Later commits on this PR are docs-only.
+  are resolved. Superseded by the CI run on the commit 5 HEAD (in PR #16).
 
 Hardware validation: **not performed.** The contributor reported a fork test
 on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
 build and is not recorded as a hardware pass.
 
-Known risk found during review, **not fixed here** (separate change): on
-`main`, `_handle_node_event` sends the internal `signal_raw_button` before the
-channel-disabled check in `_dispatch`, and bindings are attached regardless of
-channel state. A **Fast release** or **Instant** binding on a disabled channel
-therefore still runs its single action on `ShortRelease`/`InitialPress`.
-Reproduced with a unit probe; independent of PR #5.
+Disabled-channel raw signal: **fixed in this PR (commit 5)**, see above.
+Earlier it was recorded here as a separate follow-up; the owner asked to
+include it because it shares the channel-enabled guard.
 
-Single best next action: owner review of the port PR and CI; then a physical
-check of the two new `HARDWARE_TEST.md` items before any release notes call it
-verified.
+Single best next action: owner review of PR #16; then a physical check of
+the new `HARDWARE_TEST.md` items (B/F `short_release`, C disabled-channel
+Fast/Instant) before any release notes call it verified.
 
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 

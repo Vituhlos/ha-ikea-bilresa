@@ -179,7 +179,8 @@ režim uložit jen tehdy, když jsou tyto samostatné akce vypnuté. **Rychle po
 uvolnění** reaguje po prvním krátkém uvolnění a zůstává bezpečné pro běžné
 podržení; rozpoznání více stisků čeká na dokončovací událost BILRESY. Existující
 propojení bez uložené volby zachovají dosavadní čekání, dokud režim výslovně
-nezměníte. Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
+nezměníte. Vypnutý kanál nespustí propojení v žádném z těchto režimů.
+Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
 tři stisky ve všech režimech.
 
 Integrace pak to světlo stmívá v reálném čase. Přidejte si klidně víc propojení —
