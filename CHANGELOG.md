@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.3] - 2026-10-25
+
+Pre-release candidate for testing, not a stable release. It changes two things
+in `0.7.0-rc.2`, both found on the owner's phone: the page colour showing above
+the header bar, and the link card for the community label tool. Everything else
+is as in `0.7.0-rc.2`.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware, and the two
+changes below have been seen only in the offline panel preview, not yet in a real
+Home Assistant. The checks of `0.7.0-rc.2` remain open (listed under that
+version), and these are new:
+
+- **Header on a phone:** the white bar reaches the top edge with no band of page
+  colour above it, and the title sits below the status bar or notch, with a
+  theme that pads the panel and with one that does not.
+- **Link card:** outlined, with room above it, a round tinted icon and an arrow
+  out; hover, pressed and keyboard focus are visible; it opens the tool in a new
+  window.
+
 ### Changed
 - **The link card for the community label tool is lighter.** It is only
   outlined, so it no longer looks like one more control beside the channel
@@ -1143,7 +1164,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.2...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.3...HEAD
+[0.7.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.2...v0.7.0-rc.3
 [0.7.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.1...v0.7.0-rc.2
 [0.7.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...v0.7.0-rc.1
 [0.6.2-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...v0.6.2-rc.2

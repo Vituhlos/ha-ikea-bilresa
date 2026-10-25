@@ -294,6 +294,12 @@ controls. Record the Home Assistant version, browser, theme and language.
       second press, and keyboard focus stays on the button.
 - [ ] The link card at the bottom of a device page opens the community label
       tool in a new tab.
+- [ ] Header on a phone (0.7.0-rc.3): the white bar reaches the top edge with no
+      band of page colour above it, and the title sits below the status bar or
+      notch, with a theme that pads the panel and with one that does not.
+- [ ] The link card (0.7.0-rc.3) is outlined with room above it; hover, pressed
+      and keyboard focus are visible; its second line says it opens in a new
+      window.
 
 ## Recorded runs
 
