@@ -1456,16 +1456,16 @@ def test_wandering_group_reports_do_not_move_a_scroll_in_progress(
     )
 
 
-def test_a_change_seen_only_mid_scroll_is_reconciled_on_the_next_scroll(
+def test_a_lingering_off_path_group_state_does_not_reset_the_next_scroll(
     monkeypatch,
 ) -> None:
-    """An external change reported only during a scroll must not be lost.
+    """A stale member level must not rebase even the scroll after next.
 
-    The ignored off-path report cannot be told apart from group chatter
-    mid-gesture, so it is parked. Once the scroll has gone quiet — but while
-    the resync freshness window would still reuse the tracked target — the
-    next scroll must rebuild from the entity's real level, not command the
-    light back to the value it was scrolled away from.
+    A Zigbee2MQTT group's entity state is whichever member bulb reported
+    last; when that report is a stray member level it lingers after the
+    scroll ends. The next scroll must continue from the tracked target it
+    calculated — rebasing onto the lingering state would recreate the
+    stale-level jump one gesture later.
     """
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
@@ -1480,41 +1480,41 @@ def test_a_change_seen_only_mid_scroll_is_reconciled_on_the_next_scroll(
 
     binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
     binding._rotate_brightness(1, up=False)
+    binding._rotate_brightness(1, up=False)
 
-    # Another controller sets the light to 40 while the scroll is running:
-    # off the commanded path, so it is ignored — but parked for later.
+    # One member reports 190 mid-scroll — off the commanded path, ignored.
+    # It stays as the group's entity state: no further reports arrive.
     now[0] = 0.3
     binding._handle_target_state_change(
         SimpleNamespace(
             data={
-                "new_state": SimpleNamespace(state="on", attributes={"brightness": 40})
+                "new_state": SimpleNamespace(state="on", attributes={"brightness": 190})
             }
         )
     )
     binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
     binding.hass.states.get.return_value = SimpleNamespace(
-        state="on", attributes={"brightness": 40}
+        state="on", attributes={"brightness": 190}
     )
 
-    # The authority window has expired (1.6 > 0.4 + grace) while _resync's
-    # freshness window has not (1.6 < 0 + 3): the naive path would reuse the
-    # stale tracked 247 and command ~240, undoing the external change.
+    # The authority window has expired (1.6 > 0.3 + grace) while _resync's
+    # freshness window has not (1.6 < 0 + 3): the tracked target — two
+    # notches from 255 — must still win over the lingering member level.
     now[0] = 1.6
     binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
     binding._rotate_brightness(1, up=False)
 
-    assert binding._tracked == pytest.approx(40 - 7.65)
+    assert binding._tracked == pytest.approx(255 - 3 * 7.65)
     assert binding.hass.services.async_call.call_args.args[2]["brightness"] == round(
-        40 - 7.65
+        255 - 3 * 7.65
     )
 
 
 def test_a_mid_scroll_echo_does_not_force_a_later_resync(monkeypatch) -> None:
-    """Own echoes ignored mid-scroll must not park a reconciliation.
+    """Own echoes ignored mid-scroll must not disturb the next scroll.
 
-    Otherwise every scroll would forget its tracked target on the next
-    gesture and the cumulative accounting the authority window protects
-    would be lost between quick successive scrolls.
+    The cumulative accounting the authority window protects has to carry
+    straight into a quick successive scroll.
     """
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_TRANSITION: 0.0, CONF_STEP: 3, CONF_ACCELERATION: 0}
