@@ -1,21 +1,20 @@
 # IKEA BILRESA pro Home Assistant
 
-> **Předávání vývoje:** aktuální stav implementace, úroveň ověření a prioritní
-> backlog jsou v [PROJECT_STATUS.md](PROJECT_STATUS.md). Společný postup vývoje
-> je v [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
 [English](README.md) · **Čeština**
 
-[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
+[![CI](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/stargazers)
 [![license](https://img.shields.io/github/license/Vituhlos/ha-ikea-bilresa)](LICENSE)
+[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/use/custom_repositories/)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8.0%2B-41BDF5)
 
-Přidává vlastní ovládání pro **kolečko i dvoutlačítko IKEA BILRESA** (Matter
-přes Thread). Kolečko zpracovává události `MultiPressOngoing` už během otáčení.
-Fyzický ovladač ale stále hlásí cvaknutí v dávkách, takže jde o svižnější
-stupňovité ovládání, nikoli o skutečně analogově plynulé scrollování.
-Dvoutlačítko získává samostatné event entity, propojení, spouštěče automatizací
-a stejný panel BILRESA.
+Responzivní ovládání s konfigurací v GUI pro **kolečko i dvoutlačítko IKEA
+BILRESA** (Matter přes Thread). Kolečko zpracovává události `MultiPressOngoing`
+a reaguje už během otáčení — ne až po zastavení. Fyzický ovladač ale stále hlásí
+cvaknutí v dávkách, takže jde o svižnější stupňovité ovládání, nikoli o
+skutečně analogově plynulé scrollování. Dvoutlačítko získává samostatné event
+entity, propojení, spouštěče automatizací a stejný panel BILRESA.
 
 > **Stav:** poslední stabilní vydání je **v0.6.1**, tedy 0.6.0 s opravou: panel
 > mluví jazykem, který si každý uživatel zvolil ve svém profilu. Řada 0.6
@@ -29,9 +28,6 @@ a stejný panel BILRESA.
 > pokračuje jako 0.7.0. Některé kombinace zařízení a gest stále čekají na
 > hardwarové ověření; aktuální checklist je v
 > [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
->
-> Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
-> [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ---
 
@@ -129,10 +125,18 @@ dvojitý stisk, podržení a uvolnění (`MultiPressMax = 2`).
 
 ### HACS (doporučeno)
 
+[![Otevře váš Home Assistant a zobrazí tento repozitář v HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+Nebo ručně:
+
 1. HACS → ⋮ → **Vlastní repozitáře** → přidejte
    `https://github.com/Vituhlos/ha-ikea-bilresa`, kategorie **Integration**.
 2. Nainstalujte **IKEA BILRESA**.
 3. **Restartujte Home Assistant.**
+
+Integrace zatím není ve výchozím katalogu HACS — výše uvedený krok s vlastním
+repozitářem je potřeba. Přechod z 0.5.x obsahuje breaking changes; přečtěte si
+[CHANGELOG.md](CHANGELOG.md) a nejdřív udělejte zálohu.
 
 ### Ručně
 
@@ -374,11 +378,16 @@ logger:
 
 ## Přispívání
 
-Issues a pull requesty jsou vítány. Při hlášení problému prosím uveďte firmware
-kolečka a verze Home Assistantu / Matter Serveru a u problémů s otáčením přiložte
-debug log událostí. Postup vývoje a hardwarového ověření je v
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) a
-[docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
+Issues a pull requesty jsou vítány — [CONTRIBUTING.md](CONTRIBUTING.md)
+vysvětluje, jak nahlásit chybu nebo navrhnout funkci (pro obojí jsou připravené
+formuláře), jak spustit kontroly a kdy je potřeba hardwarové ověření. Hlášení
+bezpečnostních problémů řeší [SECURITY.md](SECURITY.md).
+
+Pro vývojáře a agenty: aktuální stav implementace, úroveň ověření a prioritní
+backlog jsou v [PROJECT_STATUS.md](PROJECT_STATUS.md), kanonický postup vývoje
+v [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) a plánovací dokumenty v
+[docs/ROADMAP.md](docs/ROADMAP.md) a
+[docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ## Licence
 

@@ -2,16 +2,20 @@
 
 **English** · [Čeština](README.cs.md)
 
-[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
+[![CI](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/stargazers)
 [![license](https://img.shields.io/github/license/Vituhlos/ha-ikea-bilresa)](LICENSE)
+[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/use/custom_repositories/)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8.0%2B-41BDF5)
 
-Add dedicated Home Assistant control for the **IKEA BILRESA scroll wheel and
+Responsive, GUI-configurable control for the **IKEA BILRESA scroll wheel and
 dual button** (Matter over Thread). The wheel processes real-time
-`MultiPressOngoing` events to respond during rotation. The physical remote still
-reports scroll input in batches, so this is responsive stepped control rather
-than truly analog-continuous scrolling. The dual button gains independent event
-entities, control bindings, automation triggers and the same BILRESA panel.
+`MultiPressOngoing` events to react during rotation — not only after you stop.
+The physical remote still reports scroll input in batches, so this is
+responsive stepped control rather than truly analog-continuous scrolling. The
+dual button gains independent event entities, control bindings, automation
+triggers and the same BILRESA panel.
 
 > **Status:** latest stable release **v0.6.1**, which is 0.6.0 plus a fix: the
 > panel now speaks the language each user chose in their profile. The 0.6 line
@@ -25,12 +29,6 @@ entities, control bindings, automation triggers and the same BILRESA panel.
 > continues as 0.7.0. Hardware validation is incomplete for some
 > device/gesture combinations; see [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)
 > for the current checklist.
-
-> **Development handoff:** current implementation state, validation level, and
-> prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
-> workflow is documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-> The wheel release train is in [docs/ROADMAP.md](docs/ROADMAP.md); the dual
-> button train is in [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ---
 
@@ -130,10 +128,18 @@ double press, hold and release (`MultiPressMax = 2`).
 
 ### HACS (recommended)
 
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+Or add it manually:
+
 1. HACS → ⋮ → **Custom repositories** → add
    `https://github.com/Vituhlos/ha-ikea-bilresa`, category **Integration**.
 2. Install **IKEA BILRESA**.
 3. **Restart Home Assistant.**
+
+The integration is not in the default HACS store yet — the custom-repository
+step above is required. Upgrading from 0.5.x has breaking changes; read the
+[CHANGELOG.md](CHANGELOG.md) and take a backup first.
 
 ### Manual
 
@@ -378,11 +384,16 @@ logger:
 
 ## Contributing
 
-Issues and pull requests are welcome. Please describe your wheel firmware and
-Home Assistant / Matter Server versions when reporting a problem, and include a
-debug log of the events if it concerns scrolling behaviour. Development and
-hardware-validation procedures are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-and [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
+Issues and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md)
+explains how to report a bug or propose a feature (there are issue forms for
+both), how to run the checks, and when hardware validation is required.
+Security reports are covered by [SECURITY.md](SECURITY.md).
+
+For developers and agents: the current implementation state, validation level
+and prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md), the
+canonical workflow is [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), and the
+release trains are [docs/ROADMAP.md](docs/ROADMAP.md) and
+[docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ## License
 

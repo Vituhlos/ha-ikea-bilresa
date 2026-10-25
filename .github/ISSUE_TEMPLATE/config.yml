@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Development documentation
+    url: https://github.com/Vituhlos/ha-ikea-bilresa/blob/main/docs/DEVELOPMENT.md
+    about: The canonical development workflow and verification gates
+  - name: Hardware test checklist
+    url: https://github.com/Vituhlos/ha-ikea-bilresa/blob/main/docs/HARDWARE_TEST.md
+    about: What has and has not been validated on a physical BILRESA
