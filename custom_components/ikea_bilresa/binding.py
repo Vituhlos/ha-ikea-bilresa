@@ -275,6 +275,8 @@ class LightBinding:
         # everything after it.
         self._scroll_epoch = 0
         self._commanded_epoch: int | None = None
+        # The newest off-path report parked while a scroll was authoritative.
+        self._deferred_off_path_report: float | None = None
         self._active_scrolls: dict[int | None, float] = {}
         self._last_scroll_seen: float | None = None
         # Where the target last said it was. One end of the path it is on.
@@ -542,7 +544,11 @@ class LightBinding:
         # of those produced the stale-level jumps of issue #9. The window is
         # bounded, not permanent — the first report after the scroll goes quiet
         # still takes over below, so a genuine external change is only delayed
-        # a couple of seconds, never lost.
+        # a couple of seconds, never lost. And if no report ever arrives — an
+        # external change seen only mid-scroll — the newest off-path value is
+        # parked below and `_resync` drops the tracked target on the first
+        # action after the window, so the next gesture reads reality instead
+        # of commanding from a level that was overwritten.
         now = time.monotonic()
         self._active_scrolls = {
             endpoint_id: last_seen
@@ -564,6 +570,8 @@ class LightBinding:
                 reported=observed,
                 tracked=None if self._tracked is None else round(self._tracked, 2),
             )
+            if not own_echo and observed is not None:
+                self._deferred_off_path_report = observed
             return
         # Outside a scroll, ignore only state echoes covered by the configured
         # service transition. A later external update invalidates the desired
@@ -671,6 +679,9 @@ class LightBinding:
                 recent_commands=[round(value, 2) for value, _span in self._commanded],
             )
         self._tracked = None
+        # Any rebase supersedes a parked mid-scroll report: the value we are
+        # about to read is at least as fresh as what was deferred.
+        self._deferred_off_path_report = None
         # The command history is deliberately kept. It describes where the
         # target is still travelling to, and that stays true after we give up
         # our calculated value — clearing it made the very next report look
@@ -719,6 +730,15 @@ class LightBinding:
             }
             if not self._scroll_authoritative(now):
                 self._scroll_epoch += 1
+                if self._deferred_off_path_report is not None:
+                    # Reconcile before this scroll becomes authoritative:
+                    # the parked mid-scroll report may have been a real
+                    # external change, and the next command must not build
+                    # on the overwritten tracked target.
+                    self._forget_target(
+                        "deferred_report_after_scroll",
+                        self._deferred_off_path_report,
+                    )
             # Every raw scroll event extends the window in which our own
             # calculated target outranks a lagging absolute state report,
             # including the completion that ends one Matter gesture of a
@@ -1096,6 +1116,23 @@ class LightBinding:
     def _resync(self, current: float | None, fallback: float) -> float:
         """Return the tracked target, resyncing from reality when idle."""
         now = time.monotonic()
+        self._active_scrolls = {
+            endpoint: last_seen
+            for endpoint, last_seen in self._active_scrolls.items()
+            if now - last_seen < _ACTIVE_SCROLL_TIMEOUT
+        }
+        if (
+            self._deferred_off_path_report is not None
+            and not self._scroll_authoritative(now)
+        ):
+            # An off-path report arrived mid-scroll, when it could not be told
+            # apart from group chatter, and no report has arrived since. If it
+            # was a real external change the tracked target was overwritten;
+            # by now any target fade has settled, so drop it and let the
+            # branches below read the entity's current state.
+            self._forget_target(
+                "deferred_report_after_scroll", self._deferred_off_path_report
+            )
         recent = self._tracked is not None and (now - self._last) < _RESYNC_AFTER
         self._last = now
         if recent and self._tracked is not None:

@@ -42,6 +42,17 @@ Worst-case delay for a genuine mid-scroll external change is the
 `_ACTIVE_SCROLL_TIMEOUT` + `_SCROLL_AUTHORITY_GRACE` window (≈2–3 s) — an
 accepted trade-off since the two cases are indistinguishable mid-gesture.
 
+Review round 1 found one hole in that bound: an external change reported
+*only* mid-scroll, with no later report, left `_tracked` stale, and a
+scroll started within `_resync`'s 3 s freshness window then commanded
+from the overwritten level. Fixed by parking the newest ignored off-path
+report in `_deferred_off_path_report` and reconciling the moment the
+authority window has expired: at the epoch bump in `_handle_raw_input`
+(before the new scroll becomes authoritative — checking inside `_resync`
+alone is too late, an `initial_press` has already re-armed the window)
+and inside `_resync` for any other resyncing action. `_forget_target`
+clears the parked value since every rebase supersedes it.
+
 **Steppy dimming, also confirmed:** `_smoothing_transition` returned 0 for
 `notches <= 1` and scaled every batch by `notches/_SMOOTHING_FULL_BATCH`, so
 slow-scroll 1–3 notch batches got ~0–0.2 s of the configured 0.8 s and landed
@@ -57,14 +68,20 @@ hold-to-ramp ticks stay immediate via the existing `_ramp_active` flag. No
 new settings, no config migration; `transition` semantics are unchanged —
 it is still the fade duration per batch.
 
-**Tests** (written first; all 8 failed on the old code before the fix):
+**Tests** (written first; all 8 failed on the old code before the fix,
+then 2 more for the review round):
 `test_wandering_group_reports_do_not_move_a_scroll_in_progress` (interleaved
 off-path member reports, arithmetic lands exactly),
 `test_off_path_report_mid_scroll_cannot_rebase_the_tracked_target` +
 `test_the_first_report_after_a_scroll_ends_still_rebases` (bounded, not
 permanent), smoothing: first-batch-eager / follow-up-full-transition /
 same-scroll later Matter gesture / fresh scroll after quiet / ramp stays
-immediate. Repurposed tests that pinned the old mid-scroll rebase:
+immediate; `test_a_change_seen_only_mid_scroll_is_reconciled_on_the_next_
+scroll` (the reviewer scenario verbatim: the parked report forces a state
+re-read on the next scroll inside the freshness window) and
+`test_a_mid_scroll_echo_does_not_force_a_later_resync` (own echoes park
+nothing, quick successive scrolls keep cumulative accounting).
+Repurposed tests that pinned the old mid-scroll rebase:
 `test_third_party_change_during_a_scroll_rebases_immediately` (split into
 the two tests above), `test_discarding_the_target_records_why_and_what_
 caused_it` (forget record now driven post-quiet), the two `test_replay.py`
@@ -73,7 +90,7 @@ capture gained post-quiet rows and still lands on the external value).
 
 Validated with (`.venv` = uv-managed CPython 3.14.9, matching CI):
 
-- `python -m pytest -q` — **499 passed** (was 491 on main; +8 new tests).
+- `python -m pytest -q` — **501 passed** (was 491 on main; +10 new tests).
 - `ruff format --check custom_components tests` — clean.
 - `ruff check custom_components tests` — clean.
 - `mypy custom_components/ikea_bilresa` — 2 errors, both pre-existing on
