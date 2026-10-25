@@ -127,6 +127,26 @@ dvojitý stisk, podržení a uvolnění (`MultiPressMax = 2`).
   spárovanými do Matteru a funkčními.
 - Nakonfigurovaná jádrová integrace **Matter** (slouží k automatickému zjištění
   URL serveru; BILRESA může být spárovaná do Home Assistantu i Apple Home).
+- Síť Thread dostupná pro integraci Matter, protože BILRESA je zařízení Matter
+  přes Thread.
+
+### Kompatibilita
+
+Integrace funguje s BILRESA zařízeními, která Home Assistant už vidí přes svou
+integraci **Matter**. Záleží na tom, jak se *ovladač* dostane do Home
+Assistantu, a to je oddělené od toho, co *ovládá*.
+
+| Použití | Stav | Doklad |
+|---|---|---|
+| Kolečko (E2490) a dvoutlačítko (E2489) spárované s Matter Serverem a jádrovou integrací Matter | **Podporováno** | Integrace odebírá proud událostí jádrového klienta Matter (`matter` je závislost v `manifest.json`). Zaznamenané hardwarové běhy na firmwaru 1.9.15 šly touto cestou ([HARDWARE_TEST.md](docs/HARDWARE_TEST.md), [DEVICE_REFERENCE.md](docs/DEVICE_REFERENCE.md)); ověření některých gest ještě chybí. |
+| Pasivní WebSocket k Matter Serveru, záloha, když API jádrového klienta není k dispozici | **Podporováno v kódu, na hardwaru neověřeno** | Body kontrolního seznamu pro zálohu v [HARDWARE_TEST.md](docs/HARDWARE_TEST.md) jsou otevřené. |
+| Ovladač spárovaný přes **ZHA** | **Nepodporováno** | Integrace nemá žádnou cestu přes ZHA; čte jen události Matteru. |
+| Ovladač spárovaný přes **Zigbee2MQTT** | **Nepodporováno** | Neexistuje žádná cesta přes MQTT ani Zigbee2MQTT. |
+| Světla a další entity na **ZHA nebo Zigbee2MQTT** jako *cíle* propojení | **Podporováno z návrhu, u skupin neověřeno** | Cílem je jakákoli entita Home Assistantu podporované domény, bez ohledu na integraci, která ji poskytuje. Opravy pro světelné skupiny Zigbee2MQTT jsou v testovacích kandidátech; potvrzení od zadavatele chybí ([issue #9](https://github.com/Vituhlos/ha-ikea-bilresa/issues/9)). |
+| Ovladač spárovaný i s jiným řadičem Matteru (například Apple Home) | **Neověřeno** | Zařízení Matter lze spárovat do více fabric ([DEVICE_REFERENCE.md](docs/DEVICE_REFERENCE.md)); s touto integrací to testováno nebylo. |
+
+„Podporováno“ znamená, že to ukazuje kód a zaznamenané běhy, ne že je každé gesto
+a nastavení ověřené.
 
 ## Instalace
 
@@ -375,8 +395,28 @@ logger:
 - **Nenašla se kolečka** — ověřte, že kolečko funguje v jádrové Matter integraci a
   že URL Matter Serveru je správná. Log při startu vypíše
   `Discovered BILRESA wheel: node …`.
-- **Při otáčení nechodí události** — zkontrolujte baterii kolečka a že se jádrové
-  Matter `event.*` entity při otáčení aktualizují.
+- **Připojeno, ale při otáčení ani stisku nechodí události** — postupujte v tomto
+  pořadí:
+  1. V **Nastavení → Zařízení a služby → Matter** otevřete zařízení BILRESA.
+     Aktualizují se jeho entity `event.*`, když otočíte kolečkem nebo
+     stisknete? Pokud ne, příčina je pod touto integrací (baterie, síť Thread
+     nebo hraniční router, spárování); opravte nejdřív to.
+  2. Otevřete panel BILRESA, vyberte zařízení a **Živý test**. Otočte o jedno
+     cvaknutí a jednou stiskněte. Objeví-li se řádky, události do integrace
+     dorazí. Pokud se jádrové entity aktualizují, ale Živý test zůstává
+     prázdný, pokračujte krokem 3.
+  3. V panelu otevřete **Diagnostiku**: ukazuje, zda je Matter připojený, jaký
+     zdroj událostí se používá (jádrový klient Matter, nebo vlastní WebSocket)
+     a kdy přišla poslední událost. Zapněte debug logování podle návodu výše.
+  4. Zkontrolujte kanál: kolečko má přepínač se 3 polohami a posílá jen zvolený
+     kanál. Kanál vypnutý v panelu nevysílá nic (jeho přepínač je na jeho
+     kartě).
+  5. Pořád ticho? Založte [hlášení chyby](https://github.com/Vituhlos/ha-ikea-bilresa/issues/new/choose) s verzí Home Assistant Core,
+     verzí Matter Serveru, modelem a firmwarem zařízení, informací, zda je
+     spárované i s jiným řadičem, tím, co ukazují Živý test a Diagnostika, a
+     staženou diagnostikou integrace (**Nastavení → Zařízení a služby → IKEA
+     BILRESA → ⋮ → Stáhnout diagnostiku**; známé identifikátory skrývá, před
+     přiložením ji přesto projděte).
 - **Špatný kanál** — kolečko má fyzický přepínač 3 kanálů; posílá ten aktivní.
 
 ## Plán

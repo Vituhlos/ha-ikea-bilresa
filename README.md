@@ -130,6 +130,26 @@ double press, hold and release (`MultiPressMax = 2`).
   wheel(s) already commissioned to Matter and working.
 - The core **Matter** integration configured (used to auto-detect the server
   URL; the BILRESA can be paired to Home Assistant and/or Apple Home).
+- A Thread network that the Matter integration can reach, because the BILRESA
+  is a Matter-over-Thread device.
+
+### Compatibility
+
+The integration works with BILRESA devices that Home Assistant already sees
+through its **Matter** integration. What matters is how the *remote* reaches
+Home Assistant, which is separate from what it *controls*.
+
+| How it is used | Status | Evidence |
+|---|---|---|
+| Wheel (E2490) and dual button (E2489) paired to a Matter Server and Home Assistant's core Matter integration | **Supported** | The integration subscribes to the core Matter client's event stream (`matter` is a dependency in `manifest.json`). Recorded hardware runs on firmware 1.9.15 used this path ([HARDWARE_TEST.md](docs/HARDWARE_TEST.md), [DEVICE_REFERENCE.md](docs/DEVICE_REFERENCE.md)); validation of some gestures is still open. |
+| Read-only WebSocket to the Matter Server, the fallback when the core client API is unavailable | **Supported in code, not verified on hardware** | The checklist items for the fallback in [HARDWARE_TEST.md](docs/HARDWARE_TEST.md) are open. |
+| Remote paired through **ZHA** | **Unsupported** | The integration has no ZHA code path; it reads Matter events only. |
+| Remote paired through **Zigbee2MQTT** | **Unsupported** | There is no MQTT or Zigbee2MQTT code path. |
+| Lights or other entities on **ZHA or Zigbee2MQTT** as the *targets* of a binding | **Supported by design, not verified for groups** | A target is any Home Assistant entity of a supported domain, whichever integration provides it. Fixes for Zigbee2MQTT light groups are in the test candidates; the reporter's confirmation is pending ([issue #9](https://github.com/Vituhlos/ha-ikea-bilresa/issues/9)). |
+| The remote also paired to another Matter controller (for example Apple Home) | **Not verified** | A Matter device can be commissioned to several fabrics ([DEVICE_REFERENCE.md](docs/DEVICE_REFERENCE.md)); it has not been tested with this integration. |
+
+"Supported" means shown by the code and recorded runs, not that every gesture
+and configuration is validated.
 
 ## Installation
 
@@ -380,8 +400,26 @@ logger:
 - **No wheels discovered** — confirm the wheel works in the core Matter
   integration and that the Matter Server URL is correct. The log prints
   `Discovered BILRESA wheel: node …` on startup.
-- **No events when scrolling** — check the wheel's battery and that the core
-  Matter `event.*` entities update when you scroll.
+- **Connected, but no events when you turn or press** — go in this order:
+  1. In **Settings → Devices & Services → Matter**, open the BILRESA device. Do
+     its `event.*` entities update when you turn the wheel or press? If not, the
+     cause is below this integration (battery, Thread network or border router,
+     pairing); fix that first.
+  2. Open the BILRESA panel, choose the device and open **Live test**. Turn one
+     notch and press once. If rows appear, events reach the integration. If the
+     core entities update but the Live test stays empty, go on to step 3.
+  3. Open **Diagnostics** in the panel: it shows whether Matter is connected,
+     which event source is in use (the core Matter client or the dedicated
+     WebSocket) and when the last event arrived. Enable debug logging as above.
+  4. Check the channel: the wheel has a 3-position selector and only the
+     selected channel sends. A channel switched off in the panel emits nothing
+     (its switch is on its card).
+  5. Still silent? Open a [bug report](https://github.com/Vituhlos/ha-ikea-bilresa/issues/new/choose) with the Home Assistant Core
+     version, the Matter Server version, the device model and firmware, whether
+     it is also paired to another controller, what Live test and Diagnostics
+     show, and the integration's downloaded diagnostics (**Settings → Devices &
+     Services → IKEA BILRESA → ⋮ → Download diagnostics**; it redacts known
+     identifiers, but look through it before attaching it).
 - **Wrong channel** — the physical wheel has a 3-position channel selector; the
   active channel is what fires.
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **A compatibility table in both READMEs.** It says, path by path, what is
+  Supported, Unsupported or Not verified, with the evidence for each: the
+  remote works through Home Assistant's Matter integration; ZHA and
+  Zigbee2MQTT cannot be the way the remote reaches Home Assistant, but their
+  lights can be targets. A line about the Thread network joins the
+  requirements.
+- **A step-by-step guide for "connected, but no events"** in the
+  troubleshooting section of both READMEs: the core Matter event entities,
+  the panel's Live test and Diagnostics, the selected and the switched-off
+  channel, and what to put in a bug report.
+
 ### Changed
 - **The link card for the community label tool moved to the top.** It was at
   the foot of a device's page; it is now in the info row under the title, above
