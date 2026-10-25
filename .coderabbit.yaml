@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Pull requests in this repository often target a development branch
+# (for example agent/panel-0.6.1), not main. CodeRabbit reviews only the default
+# branch unless told otherwise, and its "skipped" status looks like a pass.
+# Review every base branch. The house rules below come from AGENTS.md.
+
+language: en
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - ".*"
+  poem: false
+  request_changes_workflow: false
+  path_filters:
+    - "!docs/archive/**"
+  path_instructions:
+    - path: "custom_components/ikea_bilresa/**/*.py"
+      instructions: |
+        - Matter access must stay passive and read-only. Flag any Matter
+          device-control command.
+        - Do not accept changes to endpoint discovery, Matter event decoding,
+          gesture semantics or WebSocket protocol assumptions without evidence
+          from device logs, the Matter specification or verified telemetry.
+        - Changed behaviour needs a test.
+    - path: "custom_components/ikea_bilresa/frontend/**"
+      instructions: |
+        - User-visible text must go through the panel strings, in English and
+          Czech together.
+        - Check keyboard access, focus handling and layout at phone width.
+    - path: "{README.md,README.cs.md,CHANGELOG.md,docs/**,custom_components/ikea_bilresa/translations/**}"
+      instructions: |
+        - English and Czech content must stay aligned.
+        - Documentation is written in English; user-visible behaviour belongs
+          in CHANGELOG.md.
+        - Flag any claim of hardware validation that is not recorded in
+          PROJECT_STATUS.md and docs/HARDWARE_TEST.md. CI success is not
+          hardware validation.
+    - path: "PROJECT_STATUS.md"
+      instructions: |
+        - Must separate what was only statically checked, what CI verified and
+          what was verified on hardware, and must name one next action.

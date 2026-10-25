@@ -104,6 +104,16 @@ GitHub Actions is the canonical Linux environment for:
 
 CI success means only **CI**, not **Hardware**.
 
+CI runs on pull requests to any base branch, not only `main`. A pull request
+from a fork by a first-time contributor does not start CI until a maintainer
+approves the workflow run (Actions tab, "Approve and run workflows"); until
+then its checks are missing, not passing. The approval executes the
+contributor's code on a GitHub runner, so read the diff first. `.coderabbit.yaml`
+makes CodeRabbit review every base branch; a "Review skipped" status is not a
+review. Where CI or a review did not run, run the gates locally, request the
+review by comment (`@coderabbitai review`, `@codex review`) and say so in the
+pull request.
+
 ### Gate D: BILRESA hardware
 
 Any change to event decoding, bindings, timing, reconnect behavior, or supported
