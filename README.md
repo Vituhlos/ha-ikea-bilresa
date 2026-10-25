@@ -55,6 +55,7 @@ If this integration saves you time, you can support its development. It is entir
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 - [Limitations](#limitations)
+- [Community tools](#community-tools)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -421,6 +422,16 @@ logger:
   matching `transition` on the light bridges the batches for a smooth ramp.
 - Target lights round-trip through Home Assistant (rather than a direct
   Matter/Zigbee bind), adding small, usually imperceptible LAN latency.
+
+## Community tools
+
+These are made by other people. They are not part of this integration, which neither
+depends on them nor sends them any data, and the integration does not maintain or
+endorse them; check each project's own terms.
+
+- **[Somrig Inlay Sheet Builder](https://bilresa.marcel1.com/)** — a web tool by a community member for
+  designing inlay sheets (labels) for the switches. According to its author it can also
+  produce 3D-printable cover models.
 
 ## Contributing
 

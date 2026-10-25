@@ -54,6 +54,7 @@ Pokud vám tato integrace šetří čas, můžete podpořit její vývoj. Je to 
 - [Řešení potíží](#řešení-potíží)
 - [Plán](#plán)
 - [Omezení](#omezení)
+- [Komunitní nástroje](#komunitní-nástroje)
 - [Přispívání](#přispívání)
 - [Licence](#licence)
 
@@ -415,6 +416,16 @@ logger:
   `transition` na světle dávky přemostí do plynulého náběhu.
 - Cílová světla jdou přes Home Assistant (ne přímý Matter/Zigbee bind), což přidá
   malou, obvykle nepostřehnutelnou LAN latenci.
+
+## Komunitní nástroje
+
+Tyto nástroje vytvořili jiní lidé. Nejsou součástí integrace, ta na nich nezávisí
+a nic jim neposílá; integrace je neudržuje ani nedoporučuje, řiďte se podmínkami
+jednotlivých projektů.
+
+- **[Somrig Inlay Sheet Builder](https://bilresa.marcel1.com/)** — webový nástroj od člena komunity pro
+  návrh vložek (štítků) pro spínače. Podle jeho autora umí vytvořit i modely krytů
+  pro 3D tisk.
 
 ## Přispívání
 
