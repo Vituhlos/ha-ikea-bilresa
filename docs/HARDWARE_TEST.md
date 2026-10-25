@@ -94,11 +94,22 @@ Repeat on all three channels:
 - [ ] Single, double, and triple press are distinguished.
 - [ ] Long press emits `hold`; releasing it emits `release` exactly once.
 - [ ] Event entity, the `ikea_bilresa.*` trigger, and `ikea_bilresa_event` agree.
+- [ ] Each short button release emits one `ikea_bilresa_event` with
+      `type: short_release`, ahead of the completed `press` (none follows an
+      overflow ending in `MultiPressComplete(0)`); a long hold emits none; a
+      disabled channel emits none; the panel live feed does not list it.
 
 ## C. Binding behavior
 
 - [ ] Brightness moves smoothly, respects min/max, and can switch off only when
       minimum brightness is zero.
+- [ ] **Issue #9 — E2490 Zigbee2MQTT light group:** reproduce the reporter's
+      setup with Home Assistant Core 2026.10.2, Zigbee2MQTT 2.7.2, a group of
+      3–4 bulbs, wheel step 3, perceptual curve, minimum brightness 1, and
+      `transition: 0.8`. Scroll through repeated small batches and confirm
+      there are no stale-level brightness jumps and no steppy dimming. Record
+      exact versions and observations; keep Issue #9 open until the reporter
+      confirms the result.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.
@@ -121,6 +132,8 @@ Repeat on all three channels:
 - [ ] Single/double/triple/hold targets affect only their configured entities.
 - [ ] A binding explicitly set to fast response runs one single-press action on
       `ShortRelease` and does not repeat it on `MultiPressComplete`.
+- [ ] On a disabled channel, a Fast release or Instant binding does nothing;
+      re-enabling the channel restores its immediate response.
 - [ ] A binding set to multi-press recognition preserves completion-aware
       behavior and does not fire the single action early.
 - [ ] The config flow rejects fast response while a double/triple target is
@@ -184,6 +197,9 @@ hardware version, and the endpoint `MultiPressMax` read from diagnostics.
       ignores it and accepts the next valid single exactly once.**
 - [ ] Event entity, the `ikea_bilresa.*` trigger and `ikea_bilresa_event`
       agree for each gesture on each button.
+- [ ] Each short release emits `short_release` with the pressed button's
+      `endpoint_id` and an empty `channel`, including the releases of a
+      three-tap overflow that completes with no `press`.
 
 ### F3. Button binding behaviour
 

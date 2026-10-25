@@ -28,9 +28,15 @@ These instructions apply to the entire repository and to every coding agent.
   Matter client through its feature-detected `subscribe_events` API, and retain
   the dedicated passive WebSocket as the compatibility fallback. Do not issue
   Matter device-control commands.
-- Current product scope is private/home use. Brand assets, the default HACS
-  store, and other publication work are deferred until the integration is
+- Current product scope is private/home use. Brand assets, default-HACS
+  store publication, and stable releases are deferred until the integration is
   finished, automated tests are comprehensive, and hardware validation passes.
+  A maintainer-authorized GitHub pre-release may be published earlier solely as
+  a clearly labelled hardware-test candidate when installation is needed to
+  perform the checks. Its release notes must list pending hardware checks, the
+  matching checklist items must remain open, and it must never be described as
+  stable or hardware-validated before results are recorded in
+  `PROJECT_STATUS.md` and `docs/HARDWARE_TEST.md`.
 - Battery-low repairs are out of scope unless testing proves that core Matter
   does not already handle them.
 

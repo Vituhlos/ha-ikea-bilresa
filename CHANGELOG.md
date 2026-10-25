@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.6.2-rc.2] - 2026-10-25
+
+Pre-release candidate for testing, not a stable release. Includes the Issue #9
+brightness-group fixes from RC1 plus the button-event and disabled-channel
+fixes below.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware. The following
+checks remain open:
+
+- **B/F — short_release:** verify the bus event on the E2490 wheel and the
+  E2489 dual button, including normal short releases and releases within
+  multi-press sequences.
+- **C — disabled channels:** confirm Fast release and Instant bindings do
+  nothing while a wheel channel is disabled, then respond immediately again
+  after that channel is re-enabled.
+- **Issue #9 — Zigbee2MQTT light group:** reproduce the reporter's setup
+  (Home Assistant 2026.10.2, Zigbee2MQTT 2.7.2, 3–4 bulbs, step 3, perceptual
+  curve, minimum 1, transition 0.8) and check for stale-level jumps and
+  steppy dimming on small batches. Keep Issue #9 open until the reporter
+  confirms the result.
+
+### Added
+- **`short_release` on the `ikea_bilresa_event` bus.** An automation can now
+  react the moment a short button press is released instead of waiting for
+  the multi-press window to close. It is opt-in and bus-only: it fires for
+  every short release (also inside a double or triple press), the completed
+  `press` event still follows, and event entities, `ikea_bilresa.*` triggers,
+  direct bindings and the panel live feed are unchanged. A disabled channel
+  stays silent. Ported from PR #5 by @amodig.
+
+### Fixed
+- **A disabled channel no longer runs Fast release or Instant bindings.** The
+  internal button signal behind those modes was sent before the
+  channel-enabled check, so a binding on a disabled channel could still run
+  its single-press action. Enabled channels and the dual button respond as
+  before.
+
+## [0.6.2-rc.1] - 2026-10-25
+
+Pre-release candidate for hardware validation of Issue #9. This is not a stable release.
+
+### Fixed
+- **Brightness no longer jumps to a stale level while scrolling a light
+  group.** A group entity has no single true brightness — a Zigbee2MQTT
+  group republishes whichever member bulb answered last, so during a fade
+  its state wanders to values nobody sent. Each of those reports used to
+  reset the tracked target mid-scroll, and the next notch restarted from a
+  stale member level. Mid-scroll reports are now recorded and ignored
+  instead. A later report after the scroll quiets down re-syncs the
+  target, but there is a known limitation: if a real external change is
+  reported only during the active scroll and never reported again, it can
+  be ignored; a new gesture within the freshness window may briefly start
+  from the previous tracked target. (Issue #9)
+- **Slow scrolling fades smoothly again.** The configured transition was
+  scaled by batch size, so the one-to-three notch batches a slow scroll
+  produces were spread over a fraction of the configured value and each
+  step landed as a visible jump. Batches after the first of a continuous
+  scroll now travel the whole configured transition; the first batch of a
+  scroll stays immediate. (Issue #9)
+
+## [0.6.1] - 2026-10-24
+
+A fix release on top of 0.6.0. The redesigned panel that was published as
+`0.6.1-rc.1` and `0.6.1-rc.2` is not in it: that work continues as 0.7.0.
+
 ### Fixed
 - **The panel speaks the language of the user looking at it.** It used the
   Home Assistant instance's language, so a user who had chosen English in
@@ -934,7 +1001,10 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1-rc.2...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...HEAD
+[0.6.2-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.1...v0.6.2-rc.2
+[0.6.2-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1...v0.6.2-rc.1
+[0.6.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0...v0.6.1
 [0.6.1-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.1-rc.1...v0.6.1-rc.2
 [0.6.1-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.0...v0.6.1-rc.1
 [0.6.0]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.5.0...v0.6.0

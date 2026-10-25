@@ -27,6 +27,7 @@ from .const import (
     ACTION_PRESS,
     ACTION_RELEASE,
     ACTION_ROTATE,
+    ACTION_SHORT_RELEASE,
     DIRECTION_DOWN,
     DIRECTION_UP,
     EVT_INITIAL_PRESS,
@@ -49,6 +50,7 @@ _COMPLETE = SWITCH_EVENT_NAMES[EVT_MULTI_PRESS_COMPLETE]
 _INITIAL_PRESS = SWITCH_EVENT_NAMES[EVT_INITIAL_PRESS]
 _LONG_PRESS = SWITCH_EVENT_NAMES[EVT_LONG_PRESS]
 _LONG_RELEASE = SWITCH_EVENT_NAMES[EVT_LONG_RELEASE]
+_SHORT_RELEASE = SWITCH_EVENT_NAMES[EVT_SHORT_RELEASE]
 
 
 @dataclass(slots=True)
@@ -59,7 +61,7 @@ class WheelAction:
     wheel_name: str
     channel: int | None
     endpoint_id: int
-    type: str  # ACTION_ROTATE / _PRESS / _HOLD / _RELEASE
+    type: str  # ACTION_ROTATE / _PRESS / _HOLD / _RELEASE / _SHORT_RELEASE
     direction: str | None = None  # DIRECTION_UP / DIRECTION_DOWN for rotate
     notches: int = 0  # rotate delta (this event only)
     presses: int = 0  # 1 / 2 / 3 for press
@@ -165,17 +167,19 @@ class GestureEngine:
         if event_type == SWITCH_EVENT_NAMES[EVT_INITIAL_PRESS]:
             self._press_started[key] = self._clock()
             return None
-        if event_type == SWITCH_EVENT_NAMES[EVT_SHORT_RELEASE]:
-            self._press_started.pop(key, None)
-            return None
 
-        observed_duration_ms = self._observed_duration_ms(key)
         base = {
             "node_id": wheel.node_id,
             "wheel_name": wheel.name,
             "channel": decoded["channel"],
             "endpoint_id": endpoint_id,
         }
+        if event_type == _SHORT_RELEASE:
+            self._press_started.pop(key, None)
+            # Opt-in event: existing completed-click bindings keep their semantics.
+            return WheelAction(**base, type=ACTION_SHORT_RELEASE)
+
+        observed_duration_ms = self._observed_duration_ms(key)
         if event_type == _COMPLETE:
             self._press_started.pop(key, None)
             count = decoded.get("count")
@@ -209,7 +213,7 @@ class GestureEngine:
                 type=ACTION_RELEASE,
                 observed_duration_ms=observed_duration_ms,
             )
-        # initial_press / short_release / ongoing -> not actionable on a button
+        # initial_press / ongoing -> not actionable on a button
         return None
 
     def _observed_duration_ms(self, key: tuple[int, int]) -> int | None:

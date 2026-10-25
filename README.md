@@ -2,26 +2,33 @@
 
 **English** · [Čeština](README.cs.md)
 
-[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
+[![CI](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/stargazers)
 [![license](https://img.shields.io/github/license/Vituhlos/ha-ikea-bilresa)](LICENSE)
+[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/use/custom_repositories/)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8.0%2B-41BDF5)
 
-Add first-party-style Home Assistant control for the **IKEA BILRESA scroll
-wheel and dual button** (Matter over Thread). The wheel reacts to real-time
-`MultiPressOngoing` events for DIRIGERA-like smoothness; the dual button gains
-independent events, bindings, automation triggers and the same BILRESA panel.
+Responsive, GUI-configurable control for the **IKEA BILRESA scroll wheel and
+dual button** (Matter over Thread). The wheel processes real-time
+`MultiPressOngoing` events to react during rotation — not only after you stop.
+The physical remote still reports scroll input in batches, so this is
+responsive stepped control rather than truly analog-continuous scrolling. The
+dual button gains independent event entities, control bindings, automation
+triggers and the same BILRESA panel.
 
-> **Status:** latest stable release **v0.6.0**. It adds the BILRESA dual
-> button, the BILRESA panel, more binding targets and automation triggers for
-> every gesture. It needs Home Assistant 2026.8 or newer and replaces the old
-> device triggers; read the upgrade notes in [CHANGELOG.md](CHANGELOG.md) and
-> take a backup before upgrading from 0.5.x.
-
-> **Development handoff:** current implementation state, validation level, and
-> prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md). The shared
-> workflow is documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-> The wheel release train is in [docs/ROADMAP.md](docs/ROADMAP.md); the dual
-> button train is in [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
+> **Status:** latest stable release **v0.6.1**, which is 0.6.0 plus a fix: the
+> panel now speaks the language each user chose in their profile. The 0.6 line
+> adds the BILRESA dual button, the BILRESA panel, more binding targets and
+> automation triggers for every gesture. It needs Home Assistant 2026.8 or newer
+> and replaces the old device triggers; read the upgrade notes in
+> [CHANGELOG.md](CHANGELOG.md) and take a backup before upgrading from 0.5.x.
+>
+> **Testing status:** the pre-releases `v0.6.1-rc.1` and `v0.6.1-rc.2` carry a
+> redesigned panel layout that is not in the stable release; that work
+> continues as 0.7.0. Hardware validation is incomplete for some
+> device/gesture combinations; see [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)
+> for the current checklist.
 
 ---
 
@@ -38,6 +45,7 @@ independent events, bindings, automation triggers and the same BILRESA panel.
   - [Event reference](#event-reference)
   - [Example automations](#example-automations)
   - [The `ikea_bilresa_event` bus event](#the-ikea_bilresa_event-bus-event)
+  - [Immediate short-release actions](#immediate-short-release-actions)
 - [Multiple wheels](#multiple-wheels)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
@@ -121,10 +129,18 @@ double press, hold and release (`MultiPressMax = 2`).
 
 ### HACS (recommended)
 
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+Or add it manually:
+
 1. HACS → ⋮ → **Custom repositories** → add
    `https://github.com/Vituhlos/ha-ikea-bilresa`, category **Integration**.
 2. Install **IKEA BILRESA**.
 3. **Restart Home Assistant.**
+
+The integration is not in the default HACS store yet — the custom-repository
+step above is required. Upgrading from 0.5.x has breaking changes; read the
+[CHANGELOG.md](CHANGELOG.md) and take a backup first.
 
 ### Manual
 
@@ -167,7 +183,8 @@ press or hold, Instant is accepted only when those separate actions are
 disabled. **Fast release** runs after the first short release and remains safe
 for a normal hold; multi-press aware waits for the BILRESA completion event.
 Existing bindings without this setting retain the completion-aware behavior
-until explicitly changed. Public event entities and triggers keep exact
+until explicitly changed. A disabled channel runs no binding in any of these
+modes. Public event entities and triggers keep exact
 single/double/triple classification in every mode.
 
 The integration then dims that light in real time. Add as many bindings as you
@@ -294,7 +311,7 @@ Duplicate with `rotate_down` and a negative step for dimming down, and add a
 Every action is also fired on the event bus as `ikea_bilresa_event` — handy for a
 single automation that handles several wheels. Payload fields: `node_id`,
 `wheel_name`, `channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` /
-`release`), `direction` (`up` / `down`), `notches`, `presses`.
+`release` / `short_release`), `direction` (`up` / `down`), `notches`, `presses`.
 
 ```yaml
 triggers:
@@ -303,6 +320,39 @@ triggers:
     event_data:
       type: rotate
 ```
+
+### Immediate short-release actions
+
+For an automation that should react as soon as a short button press is released,
+listen to `ikea_bilresa_event` with `type: short_release`, filtered by your wheel's
+`node_id` and `channel`. Do not filter on `presses: 1`: the final click count is
+not yet known at release time.
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12  # Replace with your wheel's Matter node ID.
+      channel: 1
+      type: short_release
+```
+
+This bus-only event is emitted for each short release, including releases within
+a double or triple click. Completed `press` events still follow with the final
+count. Replace the automation's completed single-press trigger rather than
+adding a second trigger for the same action, or it will run twice. A separate
+double-click action can override the early action, but the interim effect will
+be visible. Long holds do not emit this event. Existing event entities,
+`ikea_bilresa.*` triggers and direct light bindings keep their completed-gesture
+behavior; a direct binding that should react on release uses its own
+**Button response → Fast release** setting instead. A disabled channel emits no
+`short_release` either.
+
+The E2489 dual button has no channel (`channel` is empty), so filter its two
+buttons by `endpoint_id` instead. Pressing it more than twice in a row still
+emits a `short_release` for each reported release, but no completed `press`
+follows (the device ends the sequence with a zero count).
 
 ## Multiple wheels
 
@@ -351,9 +401,13 @@ logger:
       to the dedicated passive WebSocket. *(next)*
 - [x] Plan the small-patch `0.5.1`–`0.5.7` stabilization train; implementation
       exists in the working tree, but each package keeps its own validation gate.
-- [ ] Complete hardware validation and automated coverage.
-- [ ] **Final publication stage:** brand icon/`home-assistant/brands` PR and
-      default HACS-store submission, only after the integration is finished.
+- [ ] Complete the remaining hardware validation and close the test-coverage
+      gaps; see [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md) and
+      [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current evidence.
+- [ ] **Ecosystem publication:** submit the brand icon to
+      `home-assistant/brands` and the integration to the default HACS store
+      after the remaining validation gates are met. The stable GitHub release
+      and custom-repository installation are already available.
 
 ## Limitations
 
@@ -365,11 +419,16 @@ logger:
 
 ## Contributing
 
-Issues and pull requests are welcome. Please describe your wheel firmware and
-Home Assistant / Matter Server versions when reporting a problem, and include a
-debug log of the events if it concerns scrolling behaviour. Development and
-hardware-validation procedures are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-and [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
+Issues and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md)
+explains how to report a bug or propose a feature (there are issue forms for
+both), how to run the checks, and when hardware validation is required.
+Security reports are covered by [SECURITY.md](SECURITY.md).
+
+For developers and agents: the current implementation state, validation level
+and prioritized backlog live in [PROJECT_STATUS.md](PROJECT_STATUS.md), the
+canonical workflow is [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), and the
+release trains are [docs/ROADMAP.md](docs/ROADMAP.md) and
+[docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ## License
 

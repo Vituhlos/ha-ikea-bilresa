@@ -1,5 +1,14 @@
 # Stabilization roadmap
 
+> **Status (2026-10-24): historical implementation contract.** This document
+> records the original `0.5.x` stabilization plan. That work was later bundled
+> into stable release `v0.6.0`, published on 2026-10-18; the `0.5.x` work
+> packages were not separate stable releases. Publishing `v0.6.0` did not close
+> every hardware-validation gate. See [PROJECT_STATUS.md](../PROJECT_STATUS.md)
+> for the current snapshot and [HARDWARE_TEST.md](HARDWARE_TEST.md) for the
+> checklist. Later sections preserve plans as they were written at the time and
+> should not be read as a current task list.
+
 This roadmap is the ordered implementation contract for the pre-1.0 `0.5.x`
 release train. `PROJECT_STATUS.md` remains the live handoff and validation
 record. A version number below is a work package, not a claim that a release or
@@ -20,9 +29,11 @@ request. Device-facing packages require the applicable checks in
 | `0.5.6` | Binding copy flow and mode presets | Implemented + Static + Unit + CI | Config-flow UI hardware check |
 | `0.5.7` | Degraded-state System Health and actionable Repairs | Implemented + Static + Unit + CI | Live failure-injection checks in HA |
 
-“Implemented” in this table does not close a package. The snapshot is
-CI-verified but none of these packages is stable-released or hardware-verified.
-The exact live validation record is in `PROJECT_STATUS.md`.
+“Implemented” in this table does not close a package. These work packages were
+later included in stable release `v0.6.0`, but release status and hardware
+validation are separate: some hardware exit gates remain open. The current
+validation record is summarized at the top of `PROJECT_STATUS.md`, with the
+remaining checks in `HARDWARE_TEST.md`.
 
 The remote is user-driven and may legitimately remain untouched for days.
 Therefore absence of events alone must not create a Repair. System Health may
@@ -36,10 +47,11 @@ backwards-compatible and independently verifiable work package. Release
 candidates use `v0.5.N-rc.K`. A larger configuration-model change or intentional
 compatibility break requires a minor-version change instead.
 
-If several sequential work packages are shipped in one snapshot, the version
-uses the highest included package number. The current combined snapshot includes
-`0.5.1` through `0.5.7`, so its candidate version is `v0.5.7-rc.1`, not
-`v0.5.1-rc.1`.
+If several sequential work packages were shipped in one snapshot, the version
+used the highest included package number. In the original development snapshot,
+`0.5.1` through `0.5.7` were grouped under candidate `v0.5.7-rc.1`, not
+`v0.5.1-rc.1`. This describes the historical versioning decision; the stable
+release is now `v0.6.0`.
 
 ## Cross-cutting compatibility rule
 

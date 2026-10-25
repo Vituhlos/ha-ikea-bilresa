@@ -4886,3 +4886,338 @@ gate.
    Do not promote RC.3 to stable. RC.4 is the current prerelease and now has
    complete B4 Hardware evidence, including restart recovery, watchdog,
    unavailable-target suppression and normal-path recovery.
+
+
+---
+
+# Entries merged from `main` on 2026-10-25
+
+Moved verbatim from `main`'s `PROJECT_STATUS.md` when `main` was merged into
+`agent/panel-0.6.1`: PR #16, Issue #9 (PRs #14 and #15), the repository
+professionalization pass (PR #13) and the 0.6.1 language release. They record
+what `main` did while this branch carried the panel redesign.
+
+---
+
+## PR #16: `short_release` bus event (port of #5) + disabled-channel raw-signal fix (2026-10-25)
+
+Status: **merged into `main` on 2026-10-25** in merge commit `76a68d5f722f136ad942a59ad970b78527ab2c02`. The merge adds the `short_release` bus event and fixes Fast/Instant bindings on disabled channels. PR #5 remains open and untouched pending follow-up with its author. Hardware validation is still pending.
+
+What changed:
+
+- Commit 1 keeps @amodig as author: `const.py` `ACTION_SHORT_RELEASE`,
+  `engine.py` button `ShortRelease` now returns a `short_release`
+  `WheelAction` (still clearing the press-duration start), his engine test and
+  README section. The original hunk no longer applied because `main` had
+  since added press-duration bookkeeping to the same branch.
+- Commit 2 (maintainer): `coordinator._dispatch` makes `short_release`
+  **bus-only**. It is fired on `ikea_bilresa_event` after the existing
+  channel-disabled check, then returns before `signal_channel` and the
+  `binding_not_configured` activity row. Without this, every click would have
+  reached bindings (`skipped`/`gesture_not_configured` activity rows). Event
+  entities, `ikea_bilresa.*` triggers and bindings are unchanged. Tests:
+  `tests/test_coordinator.py` (bus-only; a disabled channel suppresses it;
+  E2489 endpoints with `channel=None`) and `tests/test_engine.py` (E2489
+  three-tap overflow: two `short_release`, completion `0` ignored). README
+  EN/CS, CHANGELOG `[Unreleased]`, two open `docs/HARDWARE_TEST.md` items.
+- Commit 3 (review fix): the panel live feed (`ws_activity_subscribe`, which
+  listens to the bus) drops `short_release`. Otherwise every click added an
+  unlabeled, permanently pending row.
+- Commit 4: docs only (CI record, changelog wrap).
+- Commit 5 (owner asked to widen the scope): `_handle_node_event` now sends
+  the internal `signal_raw_button` only when `channel_enabled` allows the
+  decoded channel. Before, it was sent ahead of `_dispatch`'s check, so a
+  **Fast release** / **Instant** binding on a disabled channel still ran its
+  single action. The engine still processes the event, and a dual button's
+  `channel=None` always passes. The tests in `tests/test_coordinator.py`
+  route the coordinator's raw signal into a real `LightBinding`. Fast on
+  `short_release` and Instant on `initial_press` fire once when the channel
+  is enabled and never when it is disabled. Disabled wheel channels do not
+  affect the dual button. README EN/CS, CHANGELOG `Fixed`, one
+  `HARDWARE_TEST.md` C item.
+
+Validation (`.venv` = uv-managed CPython 3.14.9):
+
+- `.venv/bin/python -m pytest -q` — **516 passed** (503 on `main`; +13).
+  The two disabled-channel Fast/Instant cases fail with the commit 5
+  coordinator change reverted (checked with `git stash`).
+  The two bus-only coordinator tests failed before the `_dispatch` gate.
+- `.venv/bin/ruff format --check custom_components tests` — 57 files already
+  formatted; `.venv/bin/ruff check custom_components tests` — all passed.
+- `.venv/bin/mypy custom_components/ikea_bilresa` — the 2 pre-existing errors
+  only (`device_link.py:256`, `legacy_triggers.py:68`); none new.
+- `git diff --check` — clean.
+- **Not run:** `node --check` / `node --test` frontend gates — Node is not
+  installed on the agent box; no frontend file changed. CI must confirm.
+- GitHub CI on `d184b2d` (commits 1–3): hassfest, unit tests, frontend
+  checks, ruff, mypy, HACS validation all **success**; the newest-HA
+  pre-release job is skipped by workflow condition. Both Devin Review threads
+  are resolved.
+- GitHub CI on `ff6ab08` (commit 5, the code HEAD): hassfest, unit tests,
+  frontend checks, ruff, mypy, HACS validation all **success**; the newest-HA
+  pre-release job is skipped by workflow condition. Later commits on PR #16
+  are docs-only; their CI is on the PR.
+
+Post-merge CI: GitHub Actions run [40206752722](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40206752722) passed on merge commit `76a68d5f722f136ad942a59ad970b78527ab2c02` (hassfest, unit tests, frontend checks, Ruff, mypy and HACS validation); the newest-HA pre-release job was skipped by workflow condition.
+
+Hardware validation: **not performed.** The contributor reported a fork test
+on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
+build and is not recorded as a hardware pass.
+
+Disabled-channel raw signal: **fixed in this PR (commit 5)**, see above.
+Earlier it was recorded here as a separate follow-up; the owner asked to
+include it because it shares the channel-enabled guard.
+
+Single best next action: after this preparation PR passes review/CI and is merged, publish the clearly labelled `v0.6.2-rc.2` test candidate, install that exact candidate on the owner's Home Assistant, and record results for `short_release` (B/F), disabled-channel Fast/Instant (C), and the original Issue #9 Zigbee2MQTT light-group scenario in `docs/HARDWARE_TEST.md`. For Issue #9, reproduce the reporter's setup (HA 2026.10.2, Zigbee2MQTT 2.7.2, 3–4 bulbs, step 3, perceptual curve, minimum 1, transition 0.8) and keep the issue open until the reporter confirms the result.
+
+## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
+
+Status: **PR #14 merged into `main` on 2026-10-25. Its runtime fix has static + unit/replay verification but is NOT hardware-validated. PR #15 prepares candidate `v0.6.2-rc.1`; Issue #9 remains open pending the reporter's real Zigbee2MQTT-group test.**
+
+### PR #15 — candidate preparation verification (2026-10-25)
+
+This PR changes release metadata and documentation only; it does not change the
+runtime code from merged PR #14.
+
+- On the initial candidate-preparation commit
+  `ec90259c78dcc653270577a50e7f2c1bcf4af017`, GitHub Actions run
+  [40199787876](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40199787876)
+  passed **Ruff, HACS validation, unit tests, frontend checks, mypy, and
+  Hassfest**. The optional unit-test job for the newest Home Assistant
+  pre-release was **skipped by the workflow**.
+- The later PR #15 head `d8e41f62bcb0fdafe13d12ded17558ad92da572c`
+  also passed the same required GitHub Actions jobs in run
+  [40200362672](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/40200362672).
+  The optional newest-Home-Assistant-pre-release unit-test job was skipped.
+  This entry's current change adding the changelog comparison links is newer
+  than that run, so its CI must finish before merge. Do not attribute the
+  runtime PR #14's 503 tests to release-preparation PR #15.
+- Hardware validation was **not performed by PR #15**. The underlying fix from
+  PR #14 still needs an owner-side BILRESA sanity check and, especially, the
+  reporter's original Zigbee2MQTT group test (3–4 bulbs, step 3, transition
+  0.8). Unit/replay tests are not physical hardware evidence.
+- Known behavior trade-off: an external light change reported only during an
+  active scroll, with no later state report, can be ignored. This is an
+  acknowledged limitation of avoiding stale group-member reports; a subsequent
+  gesture inside the freshness window may briefly use the previously tracked
+  target.
+- **Next action:** review the corrected changelog wording and wait for all
+  required CI checks on the updated PR #15 head. Do not publish a pre-release
+  tag until the repo's owner-side hardware check is recorded; do not call the
+  candidate stable.
+
+
+User report ([issue
+#9](https://github.com/Vituhlos/ha-ikea-bilresa/issues/9), BILRESA E2490 over
+Thread, Zigbee2MQTT 2.7.2 groups of 3–4 bulbs): brightness occasionally jumps
+to a stale level while scrolling, and single-notch batches dim steppy even
+with `transition` configured.
+
+**Root cause of the jumps, confirmed in code** (the reporter's
+`_forget_target` hypothesis was right in substance): while
+`_scroll_authoritative` is true, any state report that is not an own echo
+called `_forget_target("unrecognized_value_during_scroll")`. A Z2M group
+republishes whichever member bulb answered last — not an average — so during
+a fade it reports levels off the commanded path, each dropping the tracked
+target; the next notch then resynced from a stale member level.
+
+**Fix (smallest safe, cumulative accounting preserved):** for **light
+modes** (`brightness`, `color_temp`, `color` — always `light.*` targets)
+no state report rebases while a scroll is authoritative. Off-path reports
+mid-scroll are recorded as a new `scroll_report_ignored` trace row
+instead of a `forget`. External changes are still honoured, bounded: the
+first report after the scroll goes quiet forgets via the existing
+`outside_scroll_authority` path, and `_resync`'s 3 s freshness window
+picks up reality on the next gesture. Worst-case delay for a genuine
+mid-scroll external change is the `_ACTIVE_SCROLL_TIMEOUT` +
+`_SCROLL_AUTHORITY_GRACE` window (≈2–3 s) — an accepted trade-off since
+the two cases are indistinguishable mid-gesture.
+
+**Scope decision (review round 3):** the ignore-window applies to light
+modes only. The mid-scroll ambiguity exists solely because an aggregated
+light entity's state is not its physical truth; a cover, climate, media
+player, fan or number target has no such double meaning, so for those
+modes an off-path report mid-scroll remains a real external change and
+still rebases immediately (`unrecognized_value_during_scroll`) —
+preserving the established semantics outside the reported scenario. A
+group cannot be identified reliably (a Z2M group is an ordinary `light`
+entity with no distinguishing state attributes or registry data), so
+mode is the only defensible scope boundary.
+
+Review rounds 1–2 probed the residual hard: an external change reported
+*only* mid-scroll, with no report ever following it, is ignored too — a
+scroll started within `_resync`'s 3 s freshness window then still
+commands from the pre-change tracked level. A first attempt parked the
+newest ignored report (`_deferred_off_path_report`) and reconciled on the
+next action after expiry, but review round 2 showed why that cannot
+stand: for a Z2M group the entity's lingering state *is* the stray member
+level, so reconciling onto it recreates the stale-level jump one gesture
+later — and an in-flight transition makes any state inside the window
+equally untrusted. A change seen only inside the window and never
+re-reported is *observably indistinguishable* from member chatter, so no
+state-based criterion can reconcile it safely; the reconcile was
+reverted. Documented residual: a real external change visible only
+mid-scroll is honoured once any later report arrives (or after `_last`
+ages past `_RESYNC_AFTER`); within the freshness window a re-scroll can
+carry one stale-notch — the accepted bound, since the alternative
+reintroduces the reported bug for the common group case.
+
+**Steppy dimming, also confirmed:** `_smoothing_transition` returned 0 for
+`notches <= 1` and scaled every batch by `notches/_SMOOTHING_FULL_BATCH`, so
+slow-scroll 1–3 notch batches got ~0–0.2 s of the configured 0.8 s and landed
+as visible jumps. New rule: the *first dispatched batch of a continuous
+scroll* keeps the old behaviour (1 notch → 0, larger first batches scaled) —
+eager response preserved; every following batch gets the full configured
+transition. "Continuous scroll" is delimited by the authority window going
+quiet (`_scroll_epoch`, bumped in `_handle_raw_input`), **not** by Matter
+gesture boundaries — the firmware emits `initial_press` before every batch
+(`_scroll_gesture` increments per batch, making it unusable here).
+`_dispatch_call` records which epoch it served (`_commanded_epoch`);
+hold-to-ramp ticks stay immediate via the existing `_ramp_active` flag. No
+new settings, no config migration; `transition` semantics are unchanged —
+it is still the fade duration per batch.
+
+**Tests** (written first; all 8 failed on the old code before the fix,
+then 4 more across the review rounds):
+`test_wandering_group_reports_do_not_move_a_scroll_in_progress` (interleaved
+off-path member reports, arithmetic lands exactly),
+`test_off_path_report_mid_scroll_cannot_rebase_the_tracked_target` +
+`test_the_first_report_after_a_scroll_ends_still_rebases` (bounded, not
+permanent), smoothing: first-batch-eager / follow-up-full-transition /
+same-scroll later Matter gesture / fresh scroll after quiet / ramp stays
+immediate; `test_a_lingering_off_path_group_state_does_not_reset_the_
+next_scroll` (a stray member level lingering as the entity state must
+not rebase the next scroll either — the review-round-2 regression);
+`test_a_mid_scroll_echo_does_not_force_a_later_resync` (quick successive
+scrolls keep cumulative accounting); scope: `test_an_off_path_report_
+mid_scroll_is_ignored_for_a_color_temp_light` (the light scope covers
+color_temp/hue groups too) and `test_a_non_light_target_still_rebases_
+on_a_mid_scroll_external_change` (cover keeps the immediate rebase).
+Repurposed tests that pinned the old mid-scroll rebase:
+`test_third_party_change_during_a_scroll_rebases_immediately` (split into
+the two tests above), `test_discarding_the_target_records_why_and_what_
+caused_it` (forget record now driven post-quiet), the two `test_replay.py`
+scenario tests (`from_source`/`forgets` expectations; the outside-change
+capture gained post-quiet rows and still lands on the external value).
+
+Validated with (`.venv` = uv-managed CPython 3.14.9, matching CI):
+
+- `python -m pytest -q` — **503 passed** (was 491 on main; +12 new tests).
+- `ruff format --check custom_components tests` — clean.
+- `ruff check custom_components tests` — clean.
+- `mypy custom_components/ikea_bilresa` — 2 errors, both pre-existing on
+  unmodified `main` (verified via `git stash`): `device_link.py:256`
+  arg-type, `legacy_triggers.py:68` misc. Not regressions.
+- `python -m compileall -q custom_components tests`, `python -m json.tool`
+  on `translations/en.json`+`cs.json`, `git diff --check` — all clean.
+
+Not run: node/frontend checks — `docs/DEVELOPMENT.md` Gate A includes them
+but no `.js`/`.mjs` file changed, so they cannot be affected; CI runs them
+on the PR anyway. Hardware validation: **none** — unit/replay only. The
+Z2M-group timing itself was modelled, not reproduced on physical hardware.
+
+Files changed: `custom_components/ikea_bilresa/binding.py` (scroll-authority
+report handling, `_scroll_epoch`/`_commanded_epoch`, `_smoothing_transition`,
+comments/docstrings), `tests/test_binding.py`, `tests/test_trace.py`,
+`tests/test_replay.py`, `CHANGELOG.md` (`[Unreleased]` Fixed entries), this
+file. No Matter decoding, endpoint discovery, protocol, event-entity, stored
+config or panel changes.
+
+Risks/assumptions: (a) a genuine external change *during* an active scroll
+is honoured only after the gesture — bounded ≈3 s, documented as
+deliberate; a change seen only mid-scroll and never re-reported is the
+unresolvable residual described above;
+(b) repeated mid-scroll `initial_press` batches now ramp with the full
+transition — intended per the issue discussion, worth an owner A/B feel
+check; (c) `test_action` (panel live-test) dispatches count towards the
+epoch, so a second live-test click shows the full transition — matching real
+scroll behaviour.
+
+**Single best next action:** run the applicable owner-side BILRESA hardware sanity checks, then publish `v0.6.2-rc.1` as a pre-release for the Issue #9 reporter to verify on the original Z2M group setup (step 3, transition 0.8). Keep the issue open until the reporter confirms results; do not publish a stable release based on CI alone.
+
+## Historical handoff: repository professionalization (PR #13, 2026-10-25)
+
+Archived record: PR [#13](https://github.com/Vituhlos/ha-ikea-bilresa/pull/13)
+was merged into `main`. The notes below describe that completed
+documentation-only work; they are not the current release status.
+
+A documentation/repository-hygiene pass aimed at a more professional public
+presentation (the goal: a README a visitor understands in ~30 s and a clear
+contributor path):
+
+- `README.md` / `README.cs.md`: badge row now shows release, CI status
+  (`ci.yml` on `main`), stars, license, HACS-custom and minimum HA 2026.8.0;
+  HACS badge links to the custom-repository docs. The developer-handoff
+  blockquote moved from the landing area to the *Contributing* section. The
+  HACS section gains the `my.home-assistant.io` repository redirect button and
+  an explicit note that the integration is not in the default HACS store and
+  that upgrading from 0.5.x has breaking changes. No Downloads badge: `v0.6.1`
+  publishes no release assets, so there are no meaningful download stats.
+- New `CONTRIBUTING.md`: bug/feature reporting via the issue forms, the
+  feature-branch workflow, the Gate A/B check commands, the CI ≠ hardware
+  rule, the English+Czech pairing rule, changelog and `PROJECT_STATUS.md`
+  handoff expectations. Details stay in `docs/DEVELOPMENT.md` — no duplicated
+  guide.
+- New `SECURITY.md`: latest-release-only support and an honest reporting path
+  — GitHub private vulnerability reporting is **disabled** on this repo
+  (verified via API), so sensitive reports ask for a private contact through a
+  minimal public issue instead.
+- New `.github/ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml` plus
+  their Czech twins `bug_report_cs.yml`, `feature_request_cs.yml` (GitHub does
+  not localize forms, so each language is its own form), `config.yml`
+  (contact links to DEVELOPMENT.md and HARDWARE_TEST.md) and
+  `.github/PULL_REQUEST_TEMPLATE.md` (checks, hardware validation, EN/CS,
+  changelog, no-secrets checklist).
+- The four `docs/images/panel/*.png` screenshots show the superseded rc-panel
+  layout and were deliberately **not** added to the READMEs; current-panel
+  screenshots would be a good future addition.
+
+Validated with:
+
+- `git diff --check` — clean.
+- `python3 -c "import yaml; yaml.safe_load(...)"` over
+  `.github/ISSUE_TEMPLATE/*.yml` and `.github/workflows/ci.yml` — all parse.
+- A small Python link-check script over the changed Markdown files:
+  every `[text](relative/path)` target exists on disk, and every TOC anchor in
+  `README.md` / `README.cs.md` resolves to a heading — no broken links.
+- `git status --short` — only documentation and `.github` template files
+  changed; nothing under `custom_components/` or `tests/`.
+
+Not run: pytest, mypy, ruff, frontend tests — the diff contains no Python or
+JavaScript, so they cannot be affected; GitHub Actions runs them on the PR
+anyway. Hardware validation: **not applicable** (documentation-only change;
+no device-facing behavior touched).
+
+Assumptions: the `my.home-assistant.io` `hacs_repository` redirect works for
+custom repositories (standard pattern used by non-default-store projects);
+GitHub issue forms are English with Czech twins (`*_cs.yml`) because GitHub
+does not localize forms.
+
+**Possible follow-up ideas recorded at the time:** consider enabling GitHub
+private vulnerability reporting so SECURITY.md can name a confidential
+channel, and add real screenshots of the stable panel.
+
+
+## Fix release 0.6.1: the panel follows the user's language (2026-10-24)
+
+Status: **Code + tests + preview; released as stable 0.6.1 from `main` via PR #10.**
+
+The owner, preparing a Reddit post, found Czech text in the panel. Nothing was
+hard-coded: the panel and the gesture/action labels built by the server used
+`hass.config.language` (the instance's), so a user who had chosen English in
+their profile on a Czech instance saw a Czech panel inside an English UI.
+
+Fix: the panel config carries every language (`labels_by_language`); the panel
+picks `hass.language` (base-tag fallback, then the instance's) and sends it
+with `ikea_bilresa/overview` and `.../overview/subscribe`, which take an
+optional `language`; a language switch resubscribes. `language` and `labels`
+stay for a cached older script. Live-test durations now use the user's number
+format (`_language` had only ever been set by a test). Checked: ruff, mypy,
+492 Python and 45 frontend tests; preview with `lang=en&instance=cs` showed no
+Czech word in the overview or the detail and the requests carried `en`.
+
+Numbering, decided by the owner: the fix is stable **0.6.1** (0.6.0 + this);
+the redesign published as `0.6.1-rc.1/rc.2` continues as **0.7.0** on
+`agent/panel-0.6.1`, which also carries this fix (cherry-picked as `ea74fee`).
+The owner's instance still runs `0.6.1-rc.2`; HACS will offer 0.6.1 as an
+update there, which would drop the new layout.

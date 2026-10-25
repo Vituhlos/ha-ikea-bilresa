@@ -175,10 +175,13 @@ def test_replay_is_deterministic(monkeypatch) -> None:
     ]
 
 
-def test_a_capture_reports_which_steps_restarted_from_the_entity(
-    monkeypatch,
-) -> None:
-    """`from_source` is what a capture is read for: it names the cause."""
+def test_a_capture_reports_which_steps_stayed_on_tracking(monkeypatch) -> None:
+    """`from_source` is what a capture is read for: it names the cause.
+
+    A report of a value nobody sent used to restart the next step from the
+    entity. During an active scroll it is now ignored — the issue #9 fix —
+    so the field must show the step continued its own arithmetic instead.
+    """
     capture = {
         "capture_version": CAPTURE_VERSION,
         "bindings": {"14:channel:1": {"step": 3, "transition": 0.0}},
@@ -198,7 +201,8 @@ def test_a_capture_reports_which_steps_restarted_from_the_entity(
                 "notches": 1,
                 "direction": "down",
             },
-            # a value nobody sent: a genuine third-party change
+            # a value nobody sent: group chatter or a third-party change,
+            # indistinguishable mid-scroll either way
             {
                 "t": 0.3,
                 "kind": "state",
@@ -218,10 +222,11 @@ def test_a_capture_reports_which_steps_restarted_from_the_entity(
 
     result = replay(capture, monkeypatch, initial_value=255)
 
-    assert [row["from_source"] for row in result.rotations] == ["state", "state"]
-    assert [row["reason"] for row in result.forgets] == [
-        "unrecognized_value_during_scroll"
+    assert [row["from_source"] for row in result.rotations] == [
+        "state",
+        "tracked",
     ]
+    assert not result.forgets
 
 
 def test_recorded_hardware_captures_still_hold(monkeypatch) -> None:
@@ -297,7 +302,12 @@ def test_the_same_gesture_survives_every_kind_of_target(monkeypatch) -> None:
 
 
 def test_a_genuine_outside_change_is_still_honoured(monkeypatch) -> None:
-    """The trajectory test must not become "ignore everything"."""
+    """The mid-scroll ignore must not become "ignore everything".
+
+    While the scroll owns the target the off-path report is dropped; once
+    the scroll has been quiet the same value is a real external change and
+    the next rotation resyncs onto it.
+    """
     capture = {
         "capture_version": CAPTURE_VERSION,
         "bindings": {"14:channel:1": {"step": 3, "transition": 0.0}},
@@ -317,7 +327,8 @@ def test_a_genuine_outside_change_is_still_honoured(monkeypatch) -> None:
                 "notches": 2,
                 "direction": "down",
             },
-            # far below anything on the path from 255 towards 239
+            # far below anything on the path from 255 towards 239: ignored
+            # while the scroll is live either way
             {
                 "t": 0.3,
                 "kind": "state",
@@ -332,15 +343,33 @@ def test_a_genuine_outside_change_is_still_honoured(monkeypatch) -> None:
                 "notches": 1,
                 "direction": "down",
             },
+            # the scroll has gone quiet: the next report is authoritative
+            {
+                "t": 2.5,
+                "kind": "state",
+                "binding": "14:channel:1",
+                "state": "on",
+                "value": 40,
+            },
+            {
+                "t": 2.6,
+                "kind": "rotate",
+                "binding": "14:channel:1",
+                "notches": 1,
+                "direction": "down",
+            },
         ),
     }
 
     result = replay(capture, monkeypatch, initial_value=255)
 
-    assert [row["reason"] for row in result.forgets] == [
-        "unrecognized_value_during_scroll"
+    assert [row["reason"] for row in result.forgets] == ["outside_scroll_authority"]
+    assert [row["from_source"] for row in result.rotations] == [
+        "state",
+        "tracked",
+        "state",
     ]
-    assert result.rotations[-1]["from_source"] == "state"
+    assert result.sent[-1] == round(40 - NOTCH_UNITS)
 
 
 # -- smoothness scoring ----------------------------------------------------

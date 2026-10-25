@@ -20,6 +20,7 @@ from homeassistant.helpers.event import async_call_later
 from .binding import LightBinding
 from .channel_controls import DEFAULT_SETTINGS, WheelSettings
 from .const import (
+    ACTION_SHORT_RELEASE,
     ATTR_SWITCH_CURRENT_POSITION,
     CLUSTER_SWITCH,
     CONF_CHANNEL,
@@ -343,14 +344,16 @@ class BilresaCoordinator:
             return
         # Internal gesture metadata lets bindings distinguish trailing updates
         # from a deliberate new rotation and lets fast button bindings react to
-        # ShortRelease. It never reaches the public HA event bus.
-        async_dispatcher_send(
-            self.hass,
-            signal_raw_button(wheel.node_id, decoded["channel"]),
-            decoded["role"],
-            decoded["event_type"],
-            decoded["endpoint_id"],
-        )
+        # ShortRelease. It never reaches the public HA event bus. A disabled
+        # channel gets none of it either, or a Fast/Instant binding would act.
+        if self.channel_enabled(wheel.node_id, decoded["channel"]):
+            async_dispatcher_send(
+                self.hass,
+                signal_raw_button(wheel.node_id, decoded["channel"]),
+                decoded["role"],
+                decoded["event_type"],
+                decoded["endpoint_id"],
+            )
         action = self._engine.process(wheel, decoded)
         if action is not None:
             self._dispatch(action)
@@ -389,6 +392,10 @@ class BilresaCoordinator:
         ):
             event_data["device_id"] = device_id
         self.hass.bus.async_fire(EVENT_BILRESA, event_data)
+        if action.type == ACTION_SHORT_RELEASE:
+            # Bus-only: entities, triggers and bindings keep completed-gesture
+            # semantics; fast bindings already get ShortRelease via the raw signal.
+            return
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )

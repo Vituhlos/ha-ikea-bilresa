@@ -1,83 +1,83 @@
 # Project status and agent handoff
 
-Last updated: **2026-10-25 by Claude Code** (branch `agent/panel-0.6.1`).
-The dated log up to this point, unchanged, is in
+Last updated: **2026-10-25 by Claude Code** (branch `agent/panel-0.6.1`, with `main` merged in, not yet pushed).
+The dated log up to the first handoff is in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
+The entries `main` wrote on 2026-10-25 (PR #16, Issue #9 / PRs #14 and #15, PR #13,
+the 0.6.1 language release) were appended to the end of that file.
 
 ## Goal
 
-- **Stable line:** `v0.6.1` is the latest stable release (0.6.0 plus "the panel
-  follows the viewing user's language"). `main` declares `0.6.1`.
-- **Development line:** branch `agent/panel-0.6.1` becomes **0.7.0**. It holds
-  the redesigned panel (detail is a Home Assistant subpage, compact channel
-  cards) plus the 0.6.1 language fix. The pre-releases `v0.6.1-rc.1/rc.2` came
-  from this branch and are marked superseded on GitHub.
-- **Planned for 0.7.0:** the "room lights" profile from discussion #7 (hold +
-  rotate = white temperature, hold + release = Kelvin presets) and the port of
-  PR #5 (`short_release` event, credit amodig).
-- **Nearest step:** the owner decides whether to release and deploy
-  `0.7.0-rc.1` from this branch. His instance runs `0.6.1-rc.2`, and HACS
-  offers `0.6.1` there, which would drop the new layout. Tell him not to take it.
+- **Stable line:** `v0.6.1` is the latest stable release on `main`.
+- **Test candidates on `main`:** `v0.6.2-rc.1` and `v0.6.2-rc.2` (pre-releases) carry
+  the Issue #9 fixes (PR #14) and the `short_release` bus event with the
+  disabled-channel fix (PR #16). They have the **old panel layout**. Hardware
+  validation of both is pending; Issue #9 stays open until its reporter confirms.
+- **Development line:** this branch carries the redesigned panel (detail is a Home
+  Assistant subpage, compact channel cards), the language fix, and now everything
+  on `main`. It becomes **0.7.0**. The manifest still says `0.6.1-rc.2` and is set
+  by the release commit, not by the merge.
+- **Nearest step:** the owner decides on pushing this merge, then on `0.7.0-rc.1`.
+  His instance runs `0.6.1-rc.2`; HACS offers `0.6.2-rc.2` there, which has the old
+  layout. Tell him not to take it.
 
 ## Done
 
-- 2026-10-18: stable `v0.6.0` (PR #2 → `agent/stabilize-0.5-x`, PR #1 → `main`, merge commits).
-- 2026-10-18: critique of the panel; owner chose layout A (HA subpage, no rail, no 1/2/3 spine).
-- 2026-10-18: layout A implemented; classic layout deleted (`97e255d`); `v0.6.1-rc.1` released and deployed.
-- 2026-10-18: compact cards after the owner's rc.1 screenshots: 880 px max, one-line unconfigured channels, channel switch on its card, dial fields stacked (`9c8f7a8`); `v0.6.1-rc.2` released and deployed.
-- 2026-10-24: language fix: panel config carries `labels_by_language`; panel picks `hass.language` and sends `language` with `ikea_bilresa/overview` and `/overview/subscribe` (PR #10).
-- 2026-10-24: CodeRabbit follow-ups: stale connects drop their answer and subscription; the Live test feed restarts after a language reconnect (`9eb7955`, here `e252e6e`).
-- 2026-10-24: stable `v0.6.1` tagged on merge `514811a`; rc.1/rc.2 notes marked superseded.
-- 2026-10-24: owner chose the numbering: stable fix = 0.6.1, development = 0.7.0.
-- Earlier: PR #8 measurement by cassus recorded in `docs/DEVICE_REFERENCE.md` (credited); reply posted.
+- 2026-10-18: stable `v0.6.0`; panel critique; layout A implemented; `v0.6.1-rc.1` and `v0.6.1-rc.2` released and deployed (details in the archive).
+- 2026-10-24: language fix (PR #10) and stable `v0.6.1` on `main`; owner chose 0.7.0 as the number of this branch.
+- 2026-10-25 (done on `main` by the owner and another agent, not by this branch): PR #13 repository professionalization, PR #14 Issue #9 fix, PR #15 `v0.6.2-rc.1`, PR #16 `short_release` port and disabled-channel fix, PR #18 `v0.6.2-rc.2`; Issue #9 answered with `v0.6.2-rc.2`.
+- 2026-10-25: handoff committed (`31d937d`). Then `origin/main` (`176cfc3`) was merged into this branch with a merge commit (local, unpushed). Conflicts resolved by hand in `CHANGELOG.md` (both histories kept: `main`'s `0.6.2-rc.*` and `0.6.1` sections, then this branch's `0.6.1-rc.2` and `rc.1`), `tools/panel_preview/build.py` (docstring keeps `theme=warm`), `manifest.json` (this branch's `0.6.1-rc.2` kept) and this file.
 
 ## Verified
 
-- 2026-10-24, PR #10 head `9eb7955`: GitHub CI all jobs green (hassfest, HACS, ruff, mypy, frontend, unit tests).
-- 2026-10-24, `main` merge `514811a`: CI run `40132322918` success; `git diff 9eb7955 origin/main` empty.
-- 2026-10-24: Codex review of `9eb7955` after `@codex review`: completed, no findings.
-- 2026-10-24: `gh api repos/Vituhlos/ha-ikea-bilresa/releases/latest` → `v0.6.1`, not a pre-release.
-- 2026-10-24, this branch at `e252e6e`: `pytest` 490 passed; `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs` 46 passed.
-- 2026-10-24, local preview `?lang=en&instance=cs`: no Czech word in overview or detail; both requests carried `language: "en"`.
-- 2026-10-18, owner's instance after deploying `v0.6.1-rc.2`: manifest `0.6.1-rc.2`, entry `loaded`, overview contract 6, 3 devices, no system-log entry from the integration.
-- 2026-10-18: backup `pred-bilresa-0.6.1-rc.2-2026-10-18` (`79ed7d29`, 1.19 GB) on the Synology agent only; unencrypted, as that location is configured.
-- 2026-10-18: owner had already saved bindings and dial settings through the rc.16+ editor (new revisions, no log errors).
+Merged tree, local Windows stand-ins, 2026-10-25:
+
+- `ruff format --check custom_components tests tools`: 58 files already formatted.
+- `ruff check custom_components tests tools`: all checks passed.
+- `.venv\Scripts\python.exe -m mypy custom_components/ikea_bilresa` (mypy 2.4.0, installed into the ignored `.venv`): only the 2 known errors, `device_link.py:256` and `legacy_triggers.py:68`, as on `main`.
+- JSON of `strings.json`, `translations/en.json`, `translations/cs.json`, `manifest.json` valid; `compileall` clean; `node --check` on the panel clean; `git diff --check` clean.
+- `pytest` **514 passed** (Unit, local, Windows stand-ins).
+- `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`: 46 passed.
+- **Not run:** GitHub CI on the merged tree (nothing pushed); hardware of any kind.
+- On `main`: CI success on merge `176cfc3` (run `40208892387`); `v0.6.2-rc.2` is a pre-release.
+- 2026-10-18, owner's instance on `v0.6.1-rc.2`: manifest `0.6.1-rc.2`, entry `loaded`, 3 devices, no log entry from the integration. Backup `pred-bilresa-0.6.1-rc.2-2026-10-18` on the Synology agent.
 
 ## Failed
 
-- `ha_get_dashboard_screenshot` (Puppet) cannot render the panel: "Unknown config specified: ikea-bilresa". It only renders Lovelace dashboards.
-- Side-loading a script from `localhost` into the owner's HA tab is blocked by the browser pane (`ERR_BLOCKED_BY_CLIENT`). Fetching a pushed commit from `raw.githubusercontent.com` and importing it from a Blob URL works.
-- The in-app browser's HA sign-in has expired; the agent must not enter passwords. Screenshots fail while the app window is in the background.
-- 2026-10-18: PRs #1/#2 were merged before the Codex review finished. It found nothing, but wait for reviews before merging.
-- CodeRabbit's free tier ran out on PR #10 ("Review limit reached", about an hour); `@codex review` was used instead.
+- `ha_get_dashboard_screenshot` (Puppet) cannot render the panel; it only renders Lovelace dashboards.
+- Side-loading a script from `localhost` into the owner's HA tab is blocked by the browser pane. Fetching a pushed commit from `raw.githubusercontent.com` and importing it from a Blob URL works.
+- The in-app browser's HA sign-in has expired; the agent must not enter passwords.
+- 2026-10-18: PRs #1/#2 were merged before the Codex review finished. Wait for reviews before merging.
+- CodeRabbit's free tier ran out on PR #10; `@codex review` was used instead.
 - `ruff check ... | tail -1` in a `&&` chain hides a failing lint; run ruff without the pipe.
-- Bash heredocs containing `'''` fail in this tool; write scripts to the scratchpad instead.
+- Bash heredocs containing `'''` fail in this tool; write scripts to the scratchpad. A PowerShell here-string passed to `git commit -F -` was read as a pathspec; write the message to a file and use `-F <file>`.
 - `ha_manage_backup create` and `ha_restart` time out or drop the MCP transport; do not repeat them. Poll `backup/info` and read the manifest version instead.
-- Reading `backup/config/info` returns the backup encryption password; never print it. Pass it only inside the sandboxed call that needs it.
+- Reading `backup/config/info` returns the backup encryption password; never print it.
+- The global `mypy` (Python 3.13) cannot parse Home Assistant's Python 3.14 syntax; use the one in `.venv`.
 
 ## Remaining
 
-1. Owner's decision: release `0.7.0-rc.1` from this branch (manifest → `0.7.0-rc.1`, CHANGELOG section, CI via `gh workflow run ci.yml --ref agent/panel-0.6.1`, tag, pre-release) and deploy with a Synology backup.
-2. New since the last session: PR #11 "Binding editor: one section per gesture…" by Liquidmasl (2026-10-25, base `agent/panel-0.6.1`) and issue #9 (Zigbee2MQTT light group: stale brightness jumps, single notches without transition; Pieter64, 2026-10-20, no comments). Read both; reply only after the owner approves, disclosed as written by Claude; never close or merge.
-3. Owner to confirm rc.2 (or 0.7.0-rc.1) on desktop and phone; the agent cannot sign in to look.
-4. Automation offered to the owner, not started: a CI test that checks manifest version against CHANGELOG, both READMEs and this file; a tag-triggered release workflow; `.coderabbit.yaml` (review non-default bases, house rules); a rule in `AGENTS.md` to wait for reviews. Branch protection on `main` needs the owner's explicit "yes".
-5. 0.7.0 features: room-lights profile (discussion #7), PR #5 port.
+1. Owner's decision: push the merge (needs `gh workflow run ci.yml --ref agent/panel-0.6.1` afterwards), then `0.7.0-rc.1` from this branch: manifest, CHANGELOG section that folds the `0.6.1-rc.*` redesign entries into 0.7.0, tag, pre-release whose notes list the open hardware checks (`AGENTS.md` rule from `main`). Deploy only with a Synology backup first.
+2. PR #11 (Liquidmasl, binding editor rework, base `agent/panel-0.6.1`): not reviewed beyond a first read. No CI or CodeRabbit ran on it (base is not `main`). It conflicted with the old `PROJECT_STATUS.md` and may conflict with `CHANGELOG.md` and `tests/test_panel.py` now; not test-merged against this merge. Review after the merge is pushed; the owner must read its Czech strings; a save through the new editor and a press on a BILRESA are untested. Nothing posted, closed or merged.
+3. Hardware checks still open on `main`'s candidates: `short_release` (B/F), Fast/Instant on a disabled channel (C), Issue #9 on a Zigbee2MQTT group (see `docs/HARDWARE_TEST.md`).
+4. Automation offered, not started: CI test that the manifest version matches the CHANGELOG, both READMEs and this file; CI on pull requests to non-default bases; `.coderabbit.yaml` for non-default bases; release workflow. Branch protection on `main` needs the owner's explicit yes.
+5. Owner to confirm the panel on desktop and phone; the agent cannot sign in to look.
 6. Still owed from `docs/V0.6.0_CHECKLIST.md`: keyboard and screen-reader pass, dark and custom theme check, Section G, smoothing A/B.
-7. Issue #3 (stable release is out) and PR #8 (stable is out) were promised updates; issue #4 (icon) is left on purpose.
-8. Note for the owner: entity names ("Kanál 1") are translated by Home Assistant in the instance language, not per user.
+7. Issue #3 and PR #8 were promised updates about the stable release; issue #4 (icon) is left on purpose. PR #5 stays open and untouched (its change was ported in PR #16).
+8. Entity names ("Kanál 1") are translated by Home Assistant in the instance language, not per user.
+9. The room-lights profile (discussion #7) is still planned for 0.7.0.
 
 ## Git / build / test
 
 - Repo `C:\Users\Pech\Documents\Cursor\HomeAssistant\ha-ikea-bilresa`, GitHub `Vituhlos/ha-ikea-bilresa`.
-- Current branch `agent/panel-0.6.1` at `03447a3`, pushed. Manifest still says `0.6.1-rc.2`.
-- `main` at `514811a` (`v0.6.1`). Branch `agent/i18n-user-language` is merged.
-- Uncommitted: this file and `docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md` (handoff only).
-- Gates (Windows, local stand-ins in `.venv`):
+- Branch `agent/panel-0.6.1`: `origin` is at `31d937d`; the local branch has the merge commit of `origin/main` (`176cfc3`) on top, unpushed.
+- `main` at `176cfc3` (tag `v0.6.2-rc.2`); latest stable `v0.6.1`.
+- Gates (Windows, stand-ins in `.venv`; `ruff` is the global one):
   - `ruff format --check custom_components tests tools`
   - `ruff check custom_components tests tools`
-  - `mypy custom_components/ikea_bilresa`
+  - `.venv\Scripts\python.exe -m mypy custom_components/ikea_bilresa`
   - `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -p bilresa_windows_local`
   - `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`
-- CI runs on PRs and pushes to `main`. For a branch without a PR, use `gh workflow run ci.yml --ref <branch>`.
+- CI runs on PRs and pushes to `main`. For another branch use `gh workflow run ci.yml --ref <branch>`.
 - Preview: `python tools/panel_preview/build.py`, then start `bilresa-panel-preview` from `..\.claude\launch.json` (port 8765). Query: `lang`, `instance`, `theme=warm`, `inset=16`, `narrow=1`, `open`, `view`, `edit`.
-- Deploy: backup first (Synology agent `synology_dsm.2260S6RZATVV9` via `backup/generate`), HACS `update_information` then `download` with the tag, restart, read back manifest and log.
+- Deploy: backup first (Synology agent `synology_dsm.2260S6RZATVV9` via `backup/generate`), HACS `update_information` then `download` with the tag, restart, read back manifest and log. Do not install `0.6.2-rc.*` or `0.6.1` on the owner's instance: they would drop the new panel layout.

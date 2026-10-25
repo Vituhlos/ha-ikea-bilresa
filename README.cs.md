@@ -1,28 +1,33 @@
 # IKEA BILRESA pro Home Assistant
 
-> **Předávání vývoje:** aktuální stav implementace, úroveň ověření a prioritní
-> backlog jsou v [PROJECT_STATUS.md](PROJECT_STATUS.md). Společný postup vývoje
-> je v [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
 [English](README.md) · **Čeština**
 
-[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![release](https://img.shields.io/github/v/release/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/releases)
+[![CI](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Vituhlos/ha-ikea-bilresa/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/Vituhlos/ha-ikea-bilresa)](https://github.com/Vituhlos/ha-ikea-bilresa/stargazers)
 [![license](https://img.shields.io/github/license/Vituhlos/ha-ikea-bilresa)](LICENSE)
+[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/use/custom_repositories/)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8.0%2B-41BDF5)
 
-Přidává ovládání pro **kolečko i dvoutlačítko IKEA BILRESA** (Matter přes
-Thread). Kolečko reaguje na události `MultiPressOngoing` v reálném čase, takže
-je plynulé jako přes DIRIGERA; dvoutlačítko získává nezávislé eventy,
-propojení, spouštěče automatizací a stejný panel BILRESA.
+Responzivní ovládání s konfigurací v GUI pro **kolečko i dvoutlačítko IKEA
+BILRESA** (Matter přes Thread). Kolečko zpracovává události `MultiPressOngoing`
+a reaguje už během otáčení — ne až po zastavení. Fyzický ovladač ale stále hlásí
+cvaknutí v dávkách, takže jde o svižnější stupňovité ovládání, nikoli o
+skutečně analogově plynulé scrollování. Dvoutlačítko získává samostatné event
+entity, propojení, spouštěče automatizací a stejný panel BILRESA.
 
-> **Stav:** poslední stabilní vydání je **v0.6.0**. Přidává dvoutlačítko
-> BILRESA, panel BILRESA, další cíle propojení a spouštěče automatizací pro
-> každé gesto. Vyžaduje Home Assistant 2026.8 nebo novější a nahrazuje dřívější
-> spouštěče zařízení; před přechodem z 0.5.x si přečtěte poznámky k přechodu v
-> [CHANGELOG.md](CHANGELOG.md) a udělejte zálohu.
+> **Stav:** poslední stabilní vydání je **v0.6.1**, tedy 0.6.0 s opravou: panel
+> mluví jazykem, který si každý uživatel zvolil ve svém profilu. Řada 0.6
+> přidává dvoutlačítko BILRESA, panel BILRESA, další cíle propojení a spouštěče
+> automatizací pro každé gesto. Vyžaduje Home Assistant 2026.8 nebo novější a
+> nahrazuje dřívější spouštěče zařízení; před přechodem z 0.5.x si přečtěte
+> poznámky k přechodu v [CHANGELOG.md](CHANGELOG.md) a udělejte zálohu.
 >
-> Plán kolečka je v [docs/ROADMAP.md](docs/ROADMAP.md), plán dvoutlačítka v
-> [docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
+> **Stav ověření:** předběžná vydání `v0.6.1-rc.1` a `v0.6.1-rc.2` obsahují
+> přepracované rozložení panelu, které ve stabilním vydání není; tato práce
+> pokračuje jako 0.7.0. Některé kombinace zařízení a gest stále čekají na
+> hardwarové ověření; aktuální checklist je v
+> [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
 
 ---
 
@@ -39,6 +44,7 @@ propojení, spouštěče automatizací a stejný panel BILRESA.
   - [Přehled událostí](#přehled-událostí)
   - [Příklady automatizací](#příklady-automatizací)
   - [Sběrnicová událost `ikea_bilresa_event`](#sběrnicová-událost-ikea_bilresa_event)
+  - [Okamžité akce po krátkém uvolnění](#okamžité-akce-po-krátkém-uvolnění)
 - [Více koleček](#více-koleček)
 - [Řešení potíží](#řešení-potíží)
 - [Plán](#plán)
@@ -120,10 +126,18 @@ dvojitý stisk, podržení a uvolnění (`MultiPressMax = 2`).
 
 ### HACS (doporučeno)
 
+[![Otevře váš Home Assistant a zobrazí tento repozitář v HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+Nebo ručně:
+
 1. HACS → ⋮ → **Vlastní repozitáře** → přidejte
    `https://github.com/Vituhlos/ha-ikea-bilresa`, kategorie **Integration**.
 2. Nainstalujte **IKEA BILRESA**.
 3. **Restartujte Home Assistant.**
+
+Integrace zatím není ve výchozím katalogu HACS — výše uvedený krok s vlastním
+repozitářem je potřeba. Přechod z 0.5.x obsahuje breaking changes; přečtěte si
+[CHANGELOG.md](CHANGELOG.md) a nejdřív udělejte zálohu.
 
 ### Ručně
 
@@ -165,7 +179,8 @@ režim uložit jen tehdy, když jsou tyto samostatné akce vypnuté. **Rychle po
 uvolnění** reaguje po prvním krátkém uvolnění a zůstává bezpečné pro běžné
 podržení; rozpoznání více stisků čeká na dokončovací událost BILRESY. Existující
 propojení bez uložené volby zachovají dosavadní čekání, dokud režim výslovně
-nezměníte. Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
+nezměníte. Vypnutý kanál nespustí propojení v žádném z těchto režimů.
+Veřejné event entity a spouštěče přesně rozlišují jeden, dva a
 tři stisky ve všech režimech.
 
 Integrace pak to světlo stmívá v reálném čase. Přidejte si klidně víc propojení —
@@ -290,8 +305,8 @@ Zduplikujte s `rotate_down` a záporným krokem pro ztlumení a přidejte spouš
 
 Každá akce se navíc vypálí na sběrnici jako `ikea_bilresa_event` — hodí se pro
 jednu automatizaci obsluhující víc koleček. Pole: `node_id`, `wheel_name`,
-`channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` / `release`),
-`direction` (`up` / `down`), `notches`, `presses`.
+`channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` / `release` /
+`short_release`), `direction` (`up` / `down`), `notches`, `presses`.
 
 ```yaml
 triggers:
@@ -300,6 +315,39 @@ triggers:
     event_data:
       type: rotate
 ```
+
+### Okamžité akce po krátkém uvolnění
+
+Automatizace, která má zareagovat hned po uvolnění krátkého stisku tlačítka,
+naslouchá `ikea_bilresa_event` s `type: short_release`, filtrované podle
+`node_id` a `channel` vašeho kolečka. Nefiltrujte podle `presses: 1`: konečný
+počet stisků v okamžiku uvolnění ještě není známý.
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12  # Nahraďte Matter node ID svého kolečka.
+      channel: 1
+      type: short_release
+```
+
+Tato událost existuje jen na sběrnici a přijde při každém krátkém uvolnění,
+včetně uvolnění uvnitř dvojitého nebo trojitého stisku. Dokončená událost
+`press` s konečným počtem přijde i nadále. Spouštěč dokončeného jednoduchého
+stisku v automatizaci nahraďte, nepřidávejte druhý spouštěč pro stejnou akci,
+jinak se spustí dvakrát. Samostatná akce na dvojitý stisk může tu časnou akci
+přebít, ale mezistav bude vidět. Dlouhé podržení tuto událost nevysílá. Event
+entity, spouštěče `ikea_bilresa.*` a přímé vazby na světla se chovají dál podle
+dokončeného gesta; přímá vazba, která má reagovat už při uvolnění, k tomu má
+vlastní nastavení **Odezva tlačítka → Rychle po uvolnění**. Vypnutý kanál
+nevysílá ani `short_release`.
+
+Dvoutlačítko E2489 nemá kanál (`channel` je prázdné), jeho dvě tlačítka proto
+rozlišujte podle `endpoint_id`. Při více než dvou stiscích za sebou přijde
+`short_release` pro každé nahlášené uvolnění, ale žádné dokončené `press` už
+nenásleduje (zařízení ukončí sekvenci s nulovým počtem).
 
 ## Více koleček
 
@@ -347,9 +395,13 @@ logger:
       samostatný pasivní WebSocket. *(další)*
 - [x] Naplánovaný stabilizační patch train `0.5.1`–`0.5.7`; implementace je v
       pracovním stromu, ale každý balík má vlastní ověřovací bránu.
-- [ ] Dokončit hardwarové ověření a automatické pokrytí testy.
-- [ ] **Finální publikační fáze:** brand icon/PR do `home-assistant/brands` a
-      zařazení do výchozího HACS katalogu, až když bude integrace hotová.
+- [ ] Dokončit zbývající hardwarové ověření a doplnit chybějící testovací
+      pokrytí; aktuální důkazy jsou v [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)
+      a [PROJECT_STATUS.md](PROJECT_STATUS.md).
+- [ ] **Publikace do ekosystému:** po splnění zbývajících ověřovacích kroků
+      odeslat ikonu do `home-assistant/brands` a požádat o zařazení integrace
+      do výchozího HACS katalogu. Stabilní vydání na GitHubu i instalace přes
+      vlastní HACS repozitář už jsou k dispozici.
 
 ## Omezení
 
@@ -361,11 +413,16 @@ logger:
 
 ## Přispívání
 
-Issues a pull requesty jsou vítány. Při hlášení problému prosím uveďte firmware
-kolečka a verze Home Assistantu / Matter Serveru a u problémů s otáčením přiložte
-debug log událostí. Postup vývoje a hardwarového ověření je v
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) a
-[docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
+Issues a pull requesty jsou vítány — [CONTRIBUTING.md](CONTRIBUTING.md)
+vysvětluje, jak nahlásit chybu nebo navrhnout funkci (pro obojí jsou připravené
+formuláře), jak spustit kontroly a kdy je potřeba hardwarové ověření. Hlášení
+bezpečnostních problémů řeší [SECURITY.md](SECURITY.md).
+
+Pro vývojáře a agenty: aktuální stav implementace, úroveň ověření a prioritní
+backlog jsou v [PROJECT_STATUS.md](PROJECT_STATUS.md), kanonický postup vývoje
+v [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) a plánovací dokumenty v
+[docs/ROADMAP.md](docs/ROADMAP.md) a
+[docs/ROADMAP_BUTTON.md](docs/ROADMAP_BUTTON.md).
 
 ## Licence
 
