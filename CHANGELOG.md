@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   react the moment a short button press is released instead of waiting for
   the multi-press window to close. It is opt-in and bus-only: it fires for
   every short release (also inside a double or triple press), the completed
-  `press` event still follows, and event entities, `ikea_bilresa.*` triggers
-  and direct bindings are unchanged. A disabled channel stays silent. Ported
+  `press` event still follows, and event entities, `ikea_bilresa.*` triggers,
+  direct bindings and the panel live feed are unchanged. A disabled channel
+  stays silent. Ported
   from PR #5 by @amodig.
 
 ## [0.6.2-rc.1] - 2026-10-25

@@ -32,8 +32,10 @@ What changed:
   **bus-only** — it is fired on `ikea_bilresa_event` after the existing
   channel-disabled check, then returns before `signal_channel` and the
   `binding_not_configured` activity row. Without this, every click would have
-  reached bindings (`skipped`/`gesture_not_configured` activity rows) and the
-  panel feed. Event entities, `ikea_bilresa.*` triggers and bindings are
+  reached bindings (`skipped`/`gesture_not_configured` activity rows).
+  Commit 3 (review fix): the panel live feed (`ws_activity_subscribe`, which
+  listens to the bus) drops `short_release`, otherwise every click added an
+  unlabeled, permanently pending row. Event entities, `ikea_bilresa.*` triggers and bindings are
   unchanged; fast/instant bindings keep using the internal raw signal.
   Tests: `tests/test_coordinator.py` (bus-only, disabled channel suppresses
   it, E2489 endpoints with `channel=None`), `tests/test_engine.py` (E2489
@@ -42,7 +44,7 @@ What changed:
 
 Validation (`.venv` = uv-managed CPython 3.14.9):
 
-- `.venv/bin/python -m pytest -q` — **510 passed** (503 on `main`; +7).
+- `.venv/bin/python -m pytest -q` — **511 passed** (503 on `main`; +8).
   The two bus-only coordinator tests failed before the `_dispatch` gate.
 - `.venv/bin/ruff format --check custom_components tests` — 57 files already
   formatted; `.venv/bin/ruff check custom_components tests` — all passed.

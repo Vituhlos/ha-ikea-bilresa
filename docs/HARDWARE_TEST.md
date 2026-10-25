@@ -95,8 +95,9 @@ Repeat on all three channels:
 - [ ] Long press emits `hold`; releasing it emits `release` exactly once.
 - [ ] Event entity, the `ikea_bilresa.*` trigger, and `ikea_bilresa_event` agree.
 - [ ] Each short button release emits one `ikea_bilresa_event` with
-      `type: short_release` before the completed `press`; a long hold emits
-      none; a disabled channel emits none.
+      `type: short_release`, ahead of the completed `press` (none follows an
+      overflow ending in `MultiPressComplete(0)`); a long hold emits none; a
+      disabled channel emits none; the panel live feed does not list it.
 
 ## C. Binding behavior
 
