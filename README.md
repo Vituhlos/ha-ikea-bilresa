@@ -17,6 +17,10 @@ responsive stepped control rather than truly analog-continuous scrolling. The
 dual button gains independent event entities, control bindings, automation
 triggers and the same BILRESA panel.
 
+If this integration saves you time, you can support its development. It is entirely optional.
+
+<a href="https://buymeacoffee.com/Vituhlos"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
+
 > **Status:** latest stable release **v0.6.1**, which is 0.6.0 plus a fix: the
 > panel now speaks the language each user chose in their profile. The 0.6 line
 > adds the BILRESA dual button, the BILRESA panel, more binding targets and

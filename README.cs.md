@@ -16,6 +16,10 @@ cvaknutí v dávkách, takže jde o svižnější stupňovité ovládání, niko
 skutečně analogově plynulé scrollování. Dvoutlačítko získává samostatné event
 entity, propojení, spouštěče automatizací a stejný panel BILRESA.
 
+Pokud vám tato integrace šetří čas, můžete podpořit její vývoj. Je to zcela dobrovolné.
+
+<a href="https://buymeacoffee.com/Vituhlos"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
+
 > **Stav:** poslední stabilní vydání je **v0.6.1**, tedy 0.6.0 s opravou: panel
 > mluví jazykem, který si každý uživatel zvolil ve svém profilu. Řada 0.6
 > přidává dvoutlačítko BILRESA, panel BILRESA, další cíle propojení a spouštěče
