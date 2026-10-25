@@ -1976,3 +1976,28 @@ def test_scene_cycling_runs_a_scene_that_was_never_activated(monkeypatch) -> Non
         "scene.a",
         "scene.b",
     ]
+
+
+@pytest.mark.parametrize(
+    ("entity", "named"),
+    [("scene.go", "run"), ("script.go", "toggle"), ("light.other", "toggle")],
+)
+def test_the_live_activity_names_what_a_press_did(
+    monkeypatch, entity: str, named: str
+) -> None:
+    """A scene is shown as run, not as "turned on"."""
+    binding, _i, _w = _binding(monkeypatch, **{CONF_DOUBLE_TARGET: entity})
+    binding._report_activity = Mock()
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    pending = [
+        call
+        for call in binding._report_activity.call_args_list
+        if call.args[0] == "pending"
+    ]
+    assert pending[0].kwargs["result"] == {
+        "kind": "entity_action",
+        "action": named,
+        "target": entity,
+    }

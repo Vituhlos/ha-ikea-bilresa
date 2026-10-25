@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   press or hold.** A scene is run with `scene.turn_on`, whatever the gesture
   asked for, because it has no `toggle` or `turn_off` service; a short press set
   to "Turn target off" is therefore refused for a scene, in the panel and in the
-  native flow, and the gesture ledger says "Run". A script is toggled, turned on
+  native flow, and the gesture ledger and the live activity say "Run". The
+  native form no longer calls the double and triple press "toggle entity", and
+  the hold option reads "Toggle target (a scene is run)". A script is toggled, turned on
   or turned off like any other target, so a second press can stop one that is
   still running.
 - **A compatibility table in both READMEs.** It says, path by path, what is

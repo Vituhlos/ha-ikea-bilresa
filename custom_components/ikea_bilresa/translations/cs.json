@@ -51,8 +51,8 @@
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
-            "double_press_target": "Dvojitý stisk: přepnout entitu (volitelné)",
-            "triple_press_target": "Trojitý stisk: přepnout entitu (volitelné)",
+            "double_press_target": "Cíl dvojitého stisku (volitelné)",
+            "triple_press_target": "Cíl trojitého stisku (volitelné)",
             "hold_target": "Cíl akce při podržení",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
@@ -89,8 +89,8 @@
             "click_action": "Akce jednoduchého stisku",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
-            "double_press_target": "Dvojitý stisk: přepnout entitu (volitelné)",
-            "triple_press_target": "Trojitý stisk: přepnout entitu (volitelné)",
+            "double_press_target": "Cíl dvojitého stisku (volitelné)",
+            "triple_press_target": "Cíl trojitého stisku (volitelné)",
             "hold_target": "Cíl akce při podržení",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
@@ -141,7 +141,7 @@
     },
     "hold_action": {
       "options": {
-        "toggle": "Přepnout entitu",
+        "toggle": "Přepnout cíl (scéna se spustí)",
         "ramp": "Plynule měnit cíl při podržení",
         "none": "Nedělat nic"
       }

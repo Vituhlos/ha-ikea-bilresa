@@ -141,6 +141,11 @@ def _entity_service(entity_id: str, service: str) -> tuple[str, str]:
     return "homeassistant", service
 
 
+def _result_action(domain: str, service: str) -> str:
+    """How the live activity names what a press did: a scene is run."""
+    return "run" if domain == "scene" else service
+
+
 # How long our tracked target stays authoritative before we resync from state.
 _RESYNC_AFTER = 3.0
 _STATE_ECHO_MARGIN = 0.25
@@ -1494,7 +1499,7 @@ class LightBinding:
             self._click_target,
             result={
                 "kind": "entity_action",
-                "action": service,
+                "action": _result_action(domain, service),
                 "target": self._click_target,
             },
         )
@@ -1509,7 +1514,7 @@ class LightBinding:
                 target,
                 result={
                     "kind": "entity_action",
-                    "action": service,
+                    "action": _result_action(domain, service),
                     "target": target,
                 },
             )

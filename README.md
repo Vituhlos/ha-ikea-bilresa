@@ -219,7 +219,8 @@ single/double/triple classification in every mode.
 The integration then dims that light in real time. Add as many bindings as you
 like — one per wheel channel — so this scales to any number of wheels with no
 YAML. A binding sends no command while its target is missing, unknown or
-unavailable; hold-to-ramp stops safely and the next action resynchronizes from
+unavailable (a scene or a script that reports `unknown`, such as a scene never
+activated, is still run); hold-to-ramp stops safely and the next action resynchronizes from
 the recovered entity's real state. Rotate-up from an off light starts at the
 configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a

@@ -198,7 +198,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_off": "Turn target off",
         "click_none": "No action",
         "click_scenes": "Cycle scenes",
-        "hold_toggle": "Toggle hold target",
+        "hold_toggle": "Toggle or run hold target",
         "hold_ramp": "Ramp rotation target",
         "hold_none": "No action",
         "ramp_direction_alternate": "Alternate up and down",
@@ -357,6 +357,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "service_toggle": "Toggle",
         "service_turn_on": "Turn on",
         "service_turn_off": "Turn off",
+        "service_run": "Run",
         "source_panel_test": "Triggered from the panel test controls",
         "test_controls_heading": "Test configured actions",
         "test_controls_intro": (
@@ -598,7 +599,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_off": "Vypnout cíl",
         "click_none": "Bez akce",
         "click_scenes": "Procházet scény",
-        "hold_toggle": "Přepnout cíl podržení",
+        "hold_toggle": "Přepnout nebo spustit cíl podržení",
         "hold_ramp": "Plynule měnit cíl otáčení",
         "hold_none": "Bez akce",
         "ramp_direction_alternate": "Střídat zesílení a zeslabení",
@@ -757,6 +758,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "service_toggle": "Přepnout",
         "service_turn_on": "Zapnout",
         "service_turn_off": "Vypnout",
+        "service_run": "Spustit",
         "source_panel_test": "Spuštěno testovacími ovladači v panelu",
         "test_controls_heading": "Otestovat nastavené akce",
         "test_controls_intro": (

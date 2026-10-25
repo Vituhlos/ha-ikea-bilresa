@@ -215,7 +215,8 @@ tři stisky ve všech režimech.
 Integrace pak to světlo stmívá v reálném čase. Přidejte si klidně víc propojení —
 jedno na kanál kolečka — takže to škáluje na libovolný počet koleček bez YAML.
 Když cíl chybí nebo je `unknown` či `unavailable`, propojení neposílá žádný
-příkaz; rampování se bezpečně zastaví a další akce po návratu vyjde ze skutečného
+příkaz (scénu nebo skript ve stavu `unknown`, například dosud nespuštěnou scénu,
+ale spustí); rampování se bezpečně zastaví a další akce po návratu vyjde ze skutečného
 stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 (nebo prvním použitelném kroku, když je minimum nula). Externí změna v HA
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje

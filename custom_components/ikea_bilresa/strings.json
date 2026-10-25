@@ -51,8 +51,8 @@
             "click_action": "Button single-press action",
             "button_response": "Button response",
             "click_target": "Single-press target",
-            "double_press_target": "Double-press: toggle entity (optional)",
-            "triple_press_target": "Triple-press: toggle entity (optional)",
+            "double_press_target": "Double-press target (optional)",
+            "triple_press_target": "Triple-press target (optional)",
             "hold_target": "Hold-action target",
             "hold_action": "Button hold action",
             "ramp_direction": "Hold-ramp direction",
@@ -89,8 +89,8 @@
             "click_action": "Button single-press action",
             "button_response": "Button response",
             "click_target": "Single-press target",
-            "double_press_target": "Double-press: toggle entity (optional)",
-            "triple_press_target": "Triple-press: toggle entity (optional)",
+            "double_press_target": "Double-press target (optional)",
+            "triple_press_target": "Triple-press target (optional)",
             "hold_target": "Hold-action target",
             "hold_action": "Button hold action",
             "ramp_direction": "Hold-ramp direction",
@@ -141,7 +141,7 @@
     },
     "hold_action": {
       "options": {
-        "toggle": "Toggle entity",
+        "toggle": "Toggle target (a scene is run)",
         "ramp": "Ramp target while held",
         "none": "Do nothing"
       }
