@@ -941,3 +941,22 @@ def test_an_unknown_instance_language_falls_back_to_english(monkeypatch) -> None
     snapshot = async_overview_snapshot(_hass(language="de"), entry)
 
     assert snapshot["wheels"][0]["channels"][0]["behaviour"] == "Smooth dimming"
+
+
+def test_a_script_or_scene_is_described_as_run_not_toggled(monkeypatch) -> None:
+    channel = _click_target_channel(
+        monkeypatch,
+        **{
+            CONF_CLICK_TARGET: "script.go",
+            CONF_DOUBLE_TARGET: "scene.a",
+            CONF_TRIPLE_TARGET: "switch.fan",
+        },
+    )
+
+    labels = {
+        action["gesture"]: action["action_label"] for action in channel["actions"]
+    }
+
+    assert labels["short_press"] == "Run"
+    assert labels["double_press"] == "Run"
+    assert labels["triple_press"] == "Toggle"

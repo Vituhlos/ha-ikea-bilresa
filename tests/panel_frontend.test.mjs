@@ -1038,7 +1038,7 @@ test("selectors describe the same ranges and domains the server validates", () =
         binding_numbers: { step: { min: 1, max: 25, step: 1, unit: "%" } },
         settings_numbers: { step: { min: 1, max: 25, step: 1, unit: null } },
         mode_domains: { volume: ["media_player"] },
-        press_target_domains: ["light", "switch"],
+        press_target_domains: ["light", "switch", "script", "scene"],
         ramp_target_domains: ["light"],
       },
     },

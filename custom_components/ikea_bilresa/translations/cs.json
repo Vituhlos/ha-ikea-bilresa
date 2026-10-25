@@ -110,6 +110,7 @@
         "instant_response_conflicts_with_hold": "Okamžitou odezvu nelze kombinovat se samostatnou akcí podržení. Nastavte podržení na Nedělat nic nebo zvolte Rychle po uvolnění či rozpoznání více stisků.",
         "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním. Vyberte odpovídající entitu nebo změňte, co otáčení ovládá.",
         "target_required": "Vyberte cíl této akce, nebo nastavte Nedělat nic.",
+        "run_target_cannot_turn_off": "Scénu nebo skript lze jen spustit, ne vypnout. Nastavte akci krátkého stisku na Přepnout nebo Zapnout.",
         "ramp_requires_light": "Plynulá změna při podržení vyžaduje jako cíl světlo."
       },
       "abort": {

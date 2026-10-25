@@ -68,6 +68,7 @@ from .const import (
     ROLE_BUTTON,
     SUBENTRY_BINDING,
     SUBENTRY_WHEEL,
+    is_run_target,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
 from .model import BilresaWheel
@@ -394,6 +395,20 @@ _CLICK_KEYS = {
 }
 
 
+def _click_key(click_action: str, target: str | None) -> str:
+    """The label key for a short press: a scene or a script is run, not toggled."""
+    if click_action in (CLICK_TOGGLE, CLICK_ON) and is_run_target(target):
+        return "action_run"
+    return _CLICK_KEYS.get(click_action, "action_toggle")
+
+
+def _press_key(target: str | None) -> str:
+    """The label key for a multi-press or a hold that switches its target."""
+    if not target:
+        return "action_none"
+    return "action_run" if is_run_target(target) else "action_toggle"
+
+
 def _gesture_summary(
     hass: HomeAssistant,
     language: str | None,
@@ -471,7 +486,7 @@ def _wheel_gesture_summaries(
                 hass,
                 language,
                 "short_press",
-                _CLICK_KEYS.get(click_action, "action_toggle"),
+                _click_key(click_action, click_target),
                 None if click_action == CLICK_NONE else click_target,
             )
         )
@@ -482,14 +497,14 @@ def _wheel_gesture_summaries(
                 hass,
                 language,
                 "double_press",
-                "action_toggle" if double_target else "action_none",
+                _press_key(double_target),
                 double_target,
             ),
             _gesture_summary(
                 hass,
                 language,
                 "triple_press",
-                "action_toggle" if triple_target else "action_none",
+                _press_key(triple_target),
                 triple_target,
             ),
         )
@@ -504,7 +519,9 @@ def _wheel_gesture_summaries(
         )
     elif hold_action == HOLD_TOGGLE and hold_target:
         summaries.append(
-            _gesture_summary(hass, language, "hold", "action_toggle", hold_target)
+            _gesture_summary(
+                hass, language, "hold", _press_key(hold_target), hold_target
+            )
         )
         summaries.append(_gesture_summary(hass, language, "release", "action_none"))
     else:
@@ -529,7 +546,7 @@ def _button_gesture_summaries(
             hass,
             language,
             "short_press",
-            _CLICK_KEYS.get(click_action, "action_toggle"),
+            _click_key(click_action, click_target),
             None if click_action == CLICK_NONE else click_target,
         )
     ]
@@ -540,7 +557,7 @@ def _button_gesture_summaries(
                 hass,
                 language,
                 "double_press",
-                "action_toggle" if double_target else "action_none",
+                _press_key(double_target),
                 double_target,
             )
         )
@@ -563,7 +580,9 @@ def _button_gesture_summaries(
         )
     elif hold_action == HOLD_TOGGLE and hold_target:
         summaries.append(
-            _gesture_summary(hass, language, "hold", "action_toggle", hold_target)
+            _gesture_summary(
+                hass, language, "hold", _press_key(hold_target), hold_target
+            )
         )
         summaries.append(_gesture_summary(hass, language, "release", "action_none"))
     else:

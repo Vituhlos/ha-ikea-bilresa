@@ -194,7 +194,10 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
   **button target entity** — so a press can act on a *different* entity than the
-  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch),
+  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch). The target
+  of a press, double press, triple press or hold may also be a **scene** or a
+  **script**: the gesture then runs it (a scene or script is never toggled or
+  turned off),
 - the **button response**: instant initial press, fast short release, or exact
   single/double/triple recognition for multi-press bindings,
 - an optional ordered list of **scenes** to cycle on single presses (this takes

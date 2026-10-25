@@ -251,6 +251,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_invalid_value": "Choose or enter a valid value.",
         "validation_target_required": "Choose a target.",
         "validation_ramp_requires_light": "Ramping needs a light as the hold target.",
+        "validation_run_target_cannot_turn_off": (
+            "A scene or a script can only be run, not turned off. "
+            "Choose Toggle target or Turn target on."
+        ),
         "validation_scenes_required": "Add at least one scene.",
         "validation_mode_target_mismatch": (
             "The selected rotation mode cannot control this entity."
@@ -276,6 +280,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_toggle": "Toggle",
         "action_turn_on": "Turn on",
         "action_turn_off": "Turn off",
+        "action_run": "Run",
         "action_none": "No action",
         "action_cycle_scenes": "Cycle scenes",
         "action_ramp": "Ramp target",
@@ -647,6 +652,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_ramp_requires_light": (
             "Pro plynulou změnu musí být cílem podržení světlo."
         ),
+        "validation_run_target_cannot_turn_off": (
+            "Scénu nebo skript lze jen spustit, ne vypnout. "
+            "Zvolte Přepnout cíl nebo Zapnout cíl."
+        ),
         "validation_scenes_required": "Přidejte alespoň jednu scénu.",
         "validation_mode_target_mismatch": (
             "Vybraný režim otáčení nemůže ovládat tuto entitu."
@@ -672,6 +681,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_toggle": "Přepnout",
         "action_turn_on": "Zapnout",
         "action_turn_off": "Vypnout",
+        "action_run": "Spustit",
         "action_none": "Bez akce",
         "action_cycle_scenes": "Procházet scény",
         "action_ramp": "Plynule měnit cíl",

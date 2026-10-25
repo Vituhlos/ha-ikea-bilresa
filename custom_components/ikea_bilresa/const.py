@@ -302,6 +302,20 @@ CLICK_OFF = "off"
 CLICK_NONE = "none"
 CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
 
+# Entity domains a press, double press, triple press or hold may act on. A light
+# or a switch is toggled or switched on or off; a scene or a script has no on/off
+# state to toggle, so a gesture runs it instead.
+PRESS_TARGET_DOMAINS = ("light", "switch", "script", "scene")
+RUN_TARGET_DOMAINS = ("script", "scene")
+
+
+def is_run_target(entity_id: str | None) -> bool:
+    """Whether a gesture runs this entity rather than switching it."""
+    if not entity_id:
+        return False
+    return entity_id.split(".", 1)[0] in RUN_TARGET_DOMAINS
+
+
 # Sensible fallback white-temperature range (Kelvin) if a light doesn't report it.
 FALLBACK_MIN_KELVIN = 2000
 FALLBACK_MAX_KELVIN = 6500

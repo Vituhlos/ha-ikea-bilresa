@@ -110,6 +110,7 @@
         "instant_response_conflicts_with_hold": "Instant response cannot be combined with a separate hold action. Set hold to Do nothing or choose Fast release / Multi-press aware.",
         "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls.",
         "target_required": "Choose a target for this action, or set the action to Do nothing.",
+        "run_target_cannot_turn_off": "A scene or a script can only be run, not turned off. Set the single-press action to Toggle or Turn on.",
         "ramp_requires_light": "Hold-to-ramp requires a light target."
       },
       "abort": {

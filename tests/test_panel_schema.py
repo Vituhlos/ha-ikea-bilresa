@@ -57,7 +57,7 @@ def test_the_panel_schema_is_plain_json_and_covers_every_mode() -> None:
     }
     # The dial's step is in the dial's own units, so it carries no unit.
     assert schema["settings_numbers"]["step"]["unit"] is None
-    assert schema["press_target_domains"] == ["light", "switch"]
+    assert schema["press_target_domains"] == ["light", "switch", "script", "scene"]
     assert schema["ramp_target_domains"] == ["light"]
 
 
