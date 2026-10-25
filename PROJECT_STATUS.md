@@ -87,7 +87,7 @@ Disabled-channel raw signal: **fixed in this PR (commit 5)**, see above.
 Earlier it was recorded here as a separate follow-up; the owner asked to
 include it because it shares the channel-enabled guard.
 
-Single best next action: publish the clearly labelled `v0.6.2-rc.2` test candidate after this preparation PR is merged, install it on the owner's Home Assistant, then record hardware results for `short_release` (B/F) and disabled-channel Fast/Instant (C) in `docs/HARDWARE_TEST.md`.
+Single best next action: after this preparation PR passes review/CI and is merged, publish the clearly labelled `v0.6.2-rc.2` test candidate, install that exact candidate on the owner's Home Assistant, and record results for `short_release` (B/F), disabled-channel Fast/Instant (C), and the original Issue #9 Zigbee2MQTT light-group scenario in `docs/HARDWARE_TEST.md`. For Issue #9, reproduce the reporter's setup (HA 2026.10.2, Zigbee2MQTT 2.7.2, 3–4 bulbs, step 3, perceptual curve, minimum 1, transition 0.8) and keep the issue open until the reporter confirms the result.
 
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 
