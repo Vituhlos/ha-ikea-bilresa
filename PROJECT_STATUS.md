@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-10-25 by Claude Code** (branch `agent/panel-0.6.1`, `main` merged in and pushed; `0.7.0-rc.1` prepared locally, not committed, tagged or published).
+Last updated: **2026-10-25 by Claude Code** (branch `agent/panel-0.6.1`, `main` merged in; release commit `9eadbdf` for `0.7.0-rc.1` pushed, CI green; not tagged or published).
 The dated log up to the first handoff is in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
 The entries `main` wrote on 2026-10-25 (PR #16, Issue #9 / PRs #14 and #15, PR #13,
@@ -15,8 +15,8 @@ the 0.6.1 language release) were appended to the end of that file.
   validation of both is pending; Issue #9 stays open until its reporter confirms.
 - **Development line:** this branch carries the redesigned panel (detail is a Home
   Assistant subpage, compact channel cards), the language fix, and now everything
-  on `main`. It becomes **0.7.0**. The manifest now says `0.7.0-rc.1` (prepared, uncommitted).
-- **Nearest step:** the owner reviews the prepared `0.7.0-rc.1` diff and says go for the commit, push, CI, tag and pre-release; deployment is a further approval, with a Synology backup first.
+  on `main`. It becomes **0.7.0**. The manifest says `0.7.0-rc.1` (commit `9eadbdf`).
+- **Nearest step:** the owner says go for the tag `v0.7.0-rc.1` and the GitHub pre-release (notes = the CHANGELOG section); deployment is a further approval, with a Synology backup first.
   His instance runs `0.6.1-rc.2`; HACS offers `0.6.2-rc.2` there, which has the old
   layout. Tell him not to take it.
 
@@ -29,7 +29,7 @@ the 0.6.1 language release) were appended to the end of that file.
 
 - 2026-10-25: the merge was pushed (`a303ea3`); CI run `40212877477` passed all 7 jobs. Step 1: `tests/test_version_consistency.py` and two `AGENTS.md` rules, commit `f94f0f3`, CI run `40214428726` all 7 jobs success.
 - 2026-10-25: tracker in itsaplan, project `BILRESA` (HA IKEA BILRESA): initiative "0.7.0: redesigned panel on top of the 0.6.2 fixes" with BILRESA-9 (merge, Done), BILRESA-10 (version guard, Done), BILRESA-11 (release 0.7.0-rc.1, In Progress), BILRESA-12 (hardware validation), BILRESA-13 (CI and reviews for non-default bases), BILRESA-14 (review PR #11). The older BILRESA-1 to 8 (Reddit feedback audit) were not touched. Keep issue states in step with this file; a Done needs recorded evidence.
-- 2026-10-25, prepared and **not committed**: `0.7.0-rc.1` = `manifest.json` `0.7.0-rc.1`, `CHANGELOG.md` section and link references (pending hardware checks listed), both READMEs' testing status, new section H "Redesigned panel" in `docs/HARDWARE_TEST.md` (all open). PR #11 deliberately not included.
+- 2026-10-25, release commit `9eadbdf` pushed; GitHub CI run `40215590846` on it: all 7 jobs success. Tag and pre-release not created. The preparation, uncommitted until then, was: `0.7.0-rc.1` = `manifest.json` `0.7.0-rc.1`, `CHANGELOG.md` section and link references (pending hardware checks listed), both READMEs' testing status, new section H "Redesigned panel" in `docs/HARDWARE_TEST.md` (all open). PR #11 deliberately not included.
 
 ## Verified
 
