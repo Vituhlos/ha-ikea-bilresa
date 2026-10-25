@@ -19,6 +19,7 @@ from .const import (
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
+    CLICK_OFF,
     CONF_ACCELERATION,
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
@@ -56,6 +57,7 @@ from .const import (
     MODES,
     RAMP_DIRECTIONS,
     STEP_CURVES,
+    is_scene_target,
     mode_supports_target,
 )
 from .panel_schema import BINDING_NUMBERS
@@ -216,6 +218,13 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
     """Return field-addressable semantic errors for normalized binding data."""
     errors: dict[str, str] = {}
     is_button = CONF_ENDPOINT in data
+    click_target = data.get(CONF_CLICK_TARGET) or data.get(CONF_TARGET)
+    if (
+        data.get(CONF_CLICK_ACTION) == CLICK_OFF
+        and not data.get(CONF_SCENES)
+        and is_scene_target(click_target)
+    ):
+        errors[CONF_CLICK_ACTION] = "scene_cannot_turn_off"
     if is_button:
         if data[CONF_CLICK_ACTION] != CLICK_NONE and not data.get(CONF_CLICK_TARGET):
             errors[CONF_CLICK_TARGET] = "target_required"

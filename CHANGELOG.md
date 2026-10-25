@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Added
+- **A scene or a script can be the target of a press, double press, triple
+  press or hold.** A scene is run with `scene.turn_on`, whatever the gesture
+  asked for, because it has no `toggle` or `turn_off` service; a short press set
+  to "Turn target off" is therefore refused for a scene, in the panel and in the
+  native flow, and the gesture ledger and the live activity say "Run". The
+  native form no longer calls the double and triple press "toggle entity", and
+  the hold option reads "Toggle target (a scene is run)". A script is toggled, turned on
+  or turned off like any other target, so a second press can stop one that is
+  still running.
 - **A compatibility table in both READMEs.** It says, path by path, what is
   Supported, Unsupported or Not verified, with the evidence for each: the
   remote works through Home Assistant's Matter integration; ZHA and
@@ -18,6 +27,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   troubleshooting section of both READMEs: the core Matter event entities,
   the panel's Live test and Diagnostics, the selected and the switched-off
   channel, and what to put in a bug report.
+
+### Fixed
+- **A scene that was never activated is no longer skipped.** A fresh scene
+  reports the state `unknown`, which the binding treated as unavailable, so
+  scene cycling skipped it with a warning until it had been run once by other
+  means. A scene or a script is now unreachable only when it is missing or
+  `unavailable`; a light or a switch reporting `unknown` is still skipped, as
+  before.
 
 ### Changed
 - **The link card for the community label tool moved to the top.** It was at

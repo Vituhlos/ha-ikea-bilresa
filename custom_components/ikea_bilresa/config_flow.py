@@ -76,6 +76,7 @@ from .const import (
     MODE_TEMPERATURE,
     MODE_VOLUME,
     MODES,
+    PRESS_TARGET_DOMAINS,
     RAMP_DIRECTIONS,
     ROLE_BUTTON,
     STEP_CURVES,
@@ -626,19 +627,19 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 CONF_CLICK_TARGET,
                 description={"suggested_value": defaults.get(CONF_CLICK_TARGET)},
             ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Optional(
                 CONF_DOUBLE_TARGET,
                 description={"suggested_value": defaults.get(CONF_DOUBLE_TARGET)},
             ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Optional(
                 CONF_HOLD_TARGET,
                 description={"suggested_value": defaults.get(CONF_HOLD_TARGET)},
             ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Required(
                 CONF_HOLD_ACTION,
@@ -658,7 +659,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                     description={"suggested_value": defaults.get(CONF_TRIPLE_TARGET)},
                 )
             ] = selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             )
             fields[
                 vol.Optional(

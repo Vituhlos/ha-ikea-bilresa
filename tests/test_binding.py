@@ -44,6 +44,7 @@ from custom_components.ikea_bilresa.const import (
     DIRECTION_UP,
     HOLD_NONE,
     HOLD_RAMP,
+    HOLD_TOGGLE,
     MODE_COLOR_TEMP,
     MODE_COVER,
     MODE_VOLUME,
@@ -1851,3 +1852,152 @@ def test_the_perceptual_curve_cannot_leave_the_brightness_range(monkeypatch) -> 
 
     assert binding._brightness_step(255, 80, True) <= 255
     assert binding._brightness_step(4, 80, False) >= 0
+
+
+# -- scenes and scripts as gesture targets ----------------------------------
+
+
+def _service_calls(binding) -> list[tuple[str, str, dict]]:
+    """The (domain, service, data) of every service call the binding started."""
+    return [
+        (call.args[0], call.args[1], call.args[2])
+        for call in binding.hass.services.async_call.call_args_list
+    ]
+
+
+@pytest.mark.parametrize(
+    ("domain", "service"), [("script", "toggle"), ("scene", "turn_on")]
+)
+@pytest.mark.parametrize(
+    ("gesture", "overrides"),
+    [
+        ("short", {CONF_CLICK_TARGET: "{entity}"}),
+        ("double", {CONF_DOUBLE_TARGET: "{entity}"}),
+        ("hold", {CONF_HOLD_ACTION: HOLD_TOGGLE, CONF_HOLD_TARGET: "{entity}"}),
+    ],
+)
+def test_a_scene_is_run_and_a_script_is_toggled(
+    monkeypatch, domain: str, service: str, gesture: str, overrides: dict
+) -> None:
+    """A scene has no ``toggle``; a script is toggled, so a second press stops it."""
+    entity = f"{domain}.evening"
+    binding, _i, _w = _binding(
+        monkeypatch,
+        **{key: value.format(entity=entity) for key, value in overrides.items()},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(state="off", attributes={})
+    action = {
+        "short": _action(ACTION_PRESS, presses=1),
+        "double": _action(ACTION_PRESS, presses=2),
+        "hold": _action(ACTION_HOLD),
+    }[gesture]
+
+    binding._handle_action(action)
+
+    assert _service_calls(binding) == [(domain, service, {"entity_id": entity})]
+
+
+@pytest.mark.parametrize(
+    ("click", "service"),
+    [("toggle", "toggle"), ("on", "turn_on"), ("off", "turn_off")],
+)
+def test_a_script_short_press_follows_the_stored_click_action(
+    monkeypatch, click: str, service: str
+) -> None:
+    binding, _i, _w = _binding(
+        monkeypatch, click_action=click, **{CONF_CLICK_TARGET: "script.go"}
+    )
+
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(binding) == [("script", service, {"entity_id": "script.go"})]
+
+
+@pytest.mark.parametrize("click", ["toggle", "on"])
+def test_a_scene_short_press_is_always_run(monkeypatch, click: str) -> None:
+    binding, _i, _w = _binding(
+        monkeypatch, click_action=click, **{CONF_CLICK_TARGET: "scene.go"}
+    )
+
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(binding) == [("scene", "turn_on", {"entity_id": "scene.go"})]
+
+
+def test_a_light_target_still_goes_through_homeassistant(monkeypatch) -> None:
+    binding, _i, _w = _binding(monkeypatch, **{CONF_DOUBLE_TARGET: "light.other"})
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    assert _service_calls(binding) == [
+        ("homeassistant", "toggle", {"entity_id": "light.other"})
+    ]
+
+
+def test_a_scene_never_activated_still_runs(monkeypatch) -> None:
+    """A fresh scene reports ``unknown``; that is no reason to skip it."""
+    binding, _i, _w = _binding(monkeypatch, **{CONF_DOUBLE_TARGET: "scene.fresh"})
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="unknown", attributes={}
+    )
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    assert _service_calls(binding) == [
+        ("scene", "turn_on", {"entity_id": "scene.fresh"})
+    ]
+
+
+def test_an_unavailable_scene_or_missing_script_is_skipped(monkeypatch) -> None:
+    binding, _i, _w = _binding(monkeypatch, **{CONF_DOUBLE_TARGET: "scene.gone"})
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="unavailable", attributes={}
+    )
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    binding.hass.states.get.return_value = None
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    assert _service_calls(binding) == []
+
+
+def test_scene_cycling_runs_a_scene_that_was_never_activated(monkeypatch) -> None:
+    binding, _i, _w = _binding(
+        monkeypatch, scenes=["scene.a", "scene.b"], click_action="toggle"
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="unknown", attributes={}
+    )
+
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert [call[2]["entity_id"] for call in _service_calls(binding)] == [
+        "scene.a",
+        "scene.b",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("entity", "named"),
+    [("scene.go", "run"), ("script.go", "toggle"), ("light.other", "toggle")],
+)
+def test_the_live_activity_names_what_a_press_did(
+    monkeypatch, entity: str, named: str
+) -> None:
+    """A scene is shown as run, not as "turned on"."""
+    binding, _i, _w = _binding(monkeypatch, **{CONF_DOUBLE_TARGET: entity})
+    binding._report_activity = Mock()
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    pending = [
+        call
+        for call in binding._report_activity.call_args_list
+        if call.args[0] == "pending"
+    ]
+    assert pending[0].kwargs["result"] == {
+        "kind": "entity_action",
+        "action": named,
+        "target": entity,
+    }

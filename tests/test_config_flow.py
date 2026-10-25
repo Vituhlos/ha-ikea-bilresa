@@ -459,3 +459,54 @@ def test_mode_rejects_incompatible_target() -> None:
             CONF_TARGET: "light.test",
         }
     ) == {CONF_TARGET: "mode_target_mismatch"}
+
+
+def test_a_scene_cannot_be_turned_off() -> None:
+    """A scene is only ever run; "off" would need a service that does not exist."""
+    assert BindingSubentryFlowHandler._validate_binding(
+        {
+            CONF_CLICK_ACTION: "off",
+            CONF_CLICK_TARGET: "scene.evening",
+            CONF_MODE: MODE_BRIGHTNESS,
+            CONF_TARGET: "light.test",
+        }
+    ) == {CONF_CLICK_ACTION: "scene_cannot_turn_off"}
+
+
+@pytest.mark.parametrize(
+    ("click", "target"),
+    [
+        ("toggle", "scene.evening"),
+        ("on", "scene.evening"),
+        ("none", "scene.evening"),
+        ("toggle", "script.go"),
+        ("on", "script.go"),
+        ("off", "script.go"),
+    ],
+)
+def test_what_a_scene_or_script_can_do_is_accepted(click: str, target: str) -> None:
+    assert (
+        BindingSubentryFlowHandler._validate_binding(
+            {
+                CONF_CLICK_ACTION: click,
+                CONF_CLICK_TARGET: target,
+                CONF_MODE: MODE_BRIGHTNESS,
+                CONF_TARGET: "light.test",
+            }
+        )
+        == {}
+    )
+
+
+def test_a_light_may_still_be_turned_off() -> None:
+    assert (
+        BindingSubentryFlowHandler._validate_binding(
+            {
+                CONF_CLICK_ACTION: "off",
+                CONF_CLICK_TARGET: "light.test",
+                CONF_MODE: MODE_BRIGHTNESS,
+                CONF_TARGET: "light.test",
+            }
+        )
+        == {}
+    )

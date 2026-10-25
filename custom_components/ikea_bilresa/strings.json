@@ -51,8 +51,8 @@
             "click_action": "Button single-press action",
             "button_response": "Button response",
             "click_target": "Single-press target",
-            "double_press_target": "Double-press: toggle entity (optional)",
-            "triple_press_target": "Triple-press: toggle entity (optional)",
+            "double_press_target": "Double-press target (optional)",
+            "triple_press_target": "Triple-press target (optional)",
             "hold_target": "Hold-action target",
             "hold_action": "Button hold action",
             "ramp_direction": "Hold-ramp direction",
@@ -89,8 +89,8 @@
             "click_action": "Button single-press action",
             "button_response": "Button response",
             "click_target": "Single-press target",
-            "double_press_target": "Double-press: toggle entity (optional)",
-            "triple_press_target": "Triple-press: toggle entity (optional)",
+            "double_press_target": "Double-press target (optional)",
+            "triple_press_target": "Triple-press target (optional)",
             "hold_target": "Hold-action target",
             "hold_action": "Button hold action",
             "ramp_direction": "Hold-ramp direction",
@@ -110,6 +110,7 @@
         "instant_response_conflicts_with_hold": "Instant response cannot be combined with a separate hold action. Set hold to Do nothing or choose Fast release / Multi-press aware.",
         "mode_target_mismatch": "This target is not compatible with the selected scroll control. Choose a matching entity or change what scrolling controls.",
         "target_required": "Choose a target for this action, or set the action to Do nothing.",
+        "scene_cannot_turn_off": "A scene can only be run, not turned off. Set the single-press action to Toggle or Turn on.",
         "ramp_requires_light": "Hold-to-ramp requires a light target."
       },
       "abort": {
@@ -140,7 +141,7 @@
     },
     "hold_action": {
       "options": {
-        "toggle": "Toggle entity",
+        "toggle": "Toggle target (a scene is run)",
         "ramp": "Ramp target while held",
         "none": "Do nothing"
       }

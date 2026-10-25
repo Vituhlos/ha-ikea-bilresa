@@ -23,12 +23,11 @@ from .const import (
     CONF_STEP,
     CONF_TRANSITION,
     MODE_TARGET_DOMAINS,
+    PRESS_TARGET_DOMAINS,
 )
 
 SCHEMA_VERSION = 1
 
-# Entity domains a press, double press, triple press or hold may toggle.
-PRESS_TARGET_DOMAINS = ("light", "switch")
 # A hold that ramps changes brightness, so it needs a light.
 RAMP_TARGET_DOMAINS = ("light",)
 

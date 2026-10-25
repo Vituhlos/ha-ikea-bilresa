@@ -302,6 +302,26 @@ CLICK_OFF = "off"
 CLICK_NONE = "none"
 CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
 
+# Entity domains a press, double press, triple press or hold may act on. A light,
+# a switch or a script is toggled, switched on or off; a scene can only be run.
+PRESS_TARGET_DOMAINS = ("light", "switch", "script", "scene")
+# Entities whose state is not an on/off answer: a scene reports when it was last
+# activated (``unknown`` before the first time) and a script is idle or running.
+RUN_TARGET_DOMAINS = ("script", "scene")
+
+
+def is_run_target(entity_id: str | None) -> bool:
+    """Whether this entity is a scene or a script."""
+    if not entity_id:
+        return False
+    return entity_id.split(".", 1)[0] in RUN_TARGET_DOMAINS
+
+
+def is_scene_target(entity_id: str | None) -> bool:
+    """Whether this entity is a scene, which can only be run."""
+    return bool(entity_id) and str(entity_id).startswith("scene.")
+
+
 # Sensible fallback white-temperature range (Kelvin) if a light doesn't report it.
 FALLBACK_MIN_KELVIN = 2000
 FALLBACK_MAX_KELVIN = 6500

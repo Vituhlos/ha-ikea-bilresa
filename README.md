@@ -194,7 +194,10 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
   **button target entity** — so a press can act on a *different* entity than the
-  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch),
+  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch). The target
+  of a press, double press, triple press or hold may also be a **scene** or a
+  **script**: a scene is run; a script is toggled, turned on or turned off like
+  any other entity (so a second press can stop it),
 - the **button response**: instant initial press, fast short release, or exact
   single/double/triple recognition for multi-press bindings,
 - an optional ordered list of **scenes** to cycle on single presses (this takes
@@ -216,7 +219,8 @@ single/double/triple classification in every mode.
 The integration then dims that light in real time. Add as many bindings as you
 like — one per wheel channel — so this scales to any number of wheels with no
 YAML. A binding sends no command while its target is missing, unknown or
-unavailable; hold-to-ramp stops safely and the next action resynchronizes from
+unavailable (a scene or a script that reports `unknown`, such as a scene never
+activated, is still run); hold-to-ramp stops safely and the next action resynchronizes from
 the recovered entity's real state. Rotate-up from an off light starts at the
 configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a

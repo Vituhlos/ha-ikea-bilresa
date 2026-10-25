@@ -198,7 +198,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_off": "Turn target off",
         "click_none": "No action",
         "click_scenes": "Cycle scenes",
-        "hold_toggle": "Toggle hold target",
+        "hold_toggle": "Toggle or run hold target",
         "hold_ramp": "Ramp rotation target",
         "hold_none": "No action",
         "ramp_direction_alternate": "Alternate up and down",
@@ -251,6 +251,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_invalid_value": "Choose or enter a valid value.",
         "validation_target_required": "Choose a target.",
         "validation_ramp_requires_light": "Ramping needs a light as the hold target.",
+        "validation_scene_cannot_turn_off": (
+            "A scene can only be run, not turned off. "
+            "Choose Toggle target or Turn target on."
+        ),
         "validation_scenes_required": "Add at least one scene.",
         "validation_mode_target_mismatch": (
             "The selected rotation mode cannot control this entity."
@@ -276,6 +280,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_toggle": "Toggle",
         "action_turn_on": "Turn on",
         "action_turn_off": "Turn off",
+        "action_run": "Run",
         "action_none": "No action",
         "action_cycle_scenes": "Cycle scenes",
         "action_ramp": "Ramp target",
@@ -352,6 +357,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "service_toggle": "Toggle",
         "service_turn_on": "Turn on",
         "service_turn_off": "Turn off",
+        "service_run": "Run",
         "source_panel_test": "Triggered from the panel test controls",
         "test_controls_heading": "Test configured actions",
         "test_controls_intro": (
@@ -593,7 +599,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_off": "Vypnout cíl",
         "click_none": "Bez akce",
         "click_scenes": "Procházet scény",
-        "hold_toggle": "Přepnout cíl podržení",
+        "hold_toggle": "Přepnout nebo spustit cíl podržení",
         "hold_ramp": "Plynule měnit cíl otáčení",
         "hold_none": "Bez akce",
         "ramp_direction_alternate": "Střídat zesílení a zeslabení",
@@ -647,6 +653,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_ramp_requires_light": (
             "Pro plynulou změnu musí být cílem podržení světlo."
         ),
+        "validation_scene_cannot_turn_off": (
+            "Scénu lze jen spustit, ne vypnout. Zvolte Přepnout cíl nebo Zapnout cíl."
+        ),
         "validation_scenes_required": "Přidejte alespoň jednu scénu.",
         "validation_mode_target_mismatch": (
             "Vybraný režim otáčení nemůže ovládat tuto entitu."
@@ -672,6 +681,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_toggle": "Přepnout",
         "action_turn_on": "Zapnout",
         "action_turn_off": "Vypnout",
+        "action_run": "Spustit",
         "action_none": "Bez akce",
         "action_cycle_scenes": "Procházet scény",
         "action_ramp": "Plynule měnit cíl",
@@ -748,6 +758,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "service_toggle": "Přepnout",
         "service_turn_on": "Zapnout",
         "service_turn_off": "Vypnout",
+        "service_run": "Spustit",
         "source_panel_test": "Spuštěno testovacími ovladači v panelu",
         "test_controls_heading": "Otestovat nastavené akce",
         "test_controls_intro": (

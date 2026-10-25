@@ -72,7 +72,7 @@ const FALLBACK_SCHEMA = {
     acceleration: { min: 0, max: 100, step: 5, unit: "%" },
   },
   mode_domains: MODE_DOMAINS,
-  press_target_domains: ["light", "switch"],
+  press_target_domains: ["light", "switch", "script", "scene"],
   ramp_target_domains: ["light"],
 };
 

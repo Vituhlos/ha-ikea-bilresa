@@ -103,6 +103,8 @@ from .const import (
     SIGNAL_CONNECTION,
     STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
+    is_run_target,
+    is_scene_target,
     mode_supports_target,
     signal_channel,
     signal_raw_button,
@@ -122,6 +124,27 @@ ATTR_MAX_KELVIN = "max_color_temp_kelvin"
 _CLICK_SERVICE = {"toggle": "toggle", CLICK_ON: "turn_on", CLICK_OFF: "turn_off"}
 
 _UNAVAILABLE = (None, "unknown", "unavailable")
+
+
+def _entity_service(entity_id: str, service: str) -> tuple[str, str]:
+    """The service that carries out a press on this entity.
+
+    A scene is run, whatever the gesture asked for: it has no ``toggle`` and no
+    ``turn_off``. A script keeps what was asked, so a second press can stop it
+    and "turn off" does. Everything else goes through ``homeassistant``, which
+    fits any switchable domain.
+    """
+    if is_scene_target(entity_id):
+        return "scene", "turn_on"
+    if is_run_target(entity_id):
+        return "script", service
+    return "homeassistant", service
+
+
+def _result_action(domain: str, service: str) -> str:
+    """How the live activity names what a press did: a scene is run."""
+    return "run" if domain == "scene" else service
+
 
 # How long our tracked target stays authoritative before we resync from state.
 _RESYNC_AFTER = 3.0
@@ -1420,7 +1443,12 @@ class LightBinding:
     def _available_state(self, entity_id: str) -> State | None:
         """Return an available state and log only availability transitions."""
         state = self.hass.states.get(entity_id)
-        if state is None or state.state in _UNAVAILABLE:
+        # A scene that was never activated reports "unknown" and still runs, as
+        # does a script; only a missing or unavailable one is out of reach.
+        unreachable = (
+            ("unavailable",) if is_run_target(entity_id) else ("unknown", "unavailable")
+        )
+        if state is None or state.state in unreachable:
             if entity_id not in self._unavailable_targets:
                 self._unavailable_targets.add(entity_id)
                 _LOGGER.warning(
@@ -1459,17 +1487,19 @@ class LightBinding:
         if self._click == CLICK_NONE:
             self._report_activity("skipped", reason="short_press_not_configured")
             return
-        service = _CLICK_SERVICE.get(self._click, "toggle")
         if self._click_target is None:
             self._report_activity("skipped", reason="target_not_configured")
             return
+        domain, service = _entity_service(
+            self._click_target, _CLICK_SERVICE.get(self._click, "toggle")
+        )
         self._call_entity(
-            "homeassistant",
+            domain,
             service,
             self._click_target,
             result={
                 "kind": "entity_action",
-                "action": service,
+                "action": _result_action(domain, service),
                 "target": self._click_target,
             },
         )
@@ -1477,13 +1507,14 @@ class LightBinding:
     @callback
     def _toggle(self, target: str | None) -> None:
         if target:
+            domain, service = _entity_service(target, "toggle")
             self._call_entity(
-                "homeassistant",
-                "toggle",
+                domain,
+                service,
                 target,
                 result={
                     "kind": "entity_action",
-                    "action": "toggle",
+                    "action": _result_action(domain, service),
                     "target": target,
                 },
             )
