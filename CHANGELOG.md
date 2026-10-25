@@ -14,8 +14,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   every short release (also inside a double or triple press), the completed
   `press` event still follows, and event entities, `ikea_bilresa.*` triggers,
   direct bindings and the panel live feed are unchanged. A disabled channel
-  stays silent. Ported
-  from PR #5 by @amodig.
+  stays silent. Ported from PR #5 by @amodig.
 
 ## [0.6.2-rc.1] - 2026-10-25
 

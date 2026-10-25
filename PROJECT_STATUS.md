@@ -18,7 +18,7 @@ The dated entries below are preserved as a historical implementation and testing
 ## PR #5 port: `short_release` on the `ikea_bilresa_event` bus (2026-10-25)
 
 Status: **maintainer-owned port of contributor PR #5 (@amodig) onto `main`
-(`0.6.2-rc.1`). Static + unit verified only; NOT hardware-validated; not merged.
+(`0.6.2-rc.1`). Static + unit + CI verified; NOT hardware-validated; not merged.
 PR #5 itself is left open and untouched.**
 
 What changed:
@@ -53,6 +53,10 @@ Validation (`.venv` = uv-managed CPython 3.14.9):
 - `git diff --check` — clean.
 - **Not run:** `node --check` / `node --test` frontend gates — Node is not
   installed on the agent box; no frontend file changed. CI must confirm.
+- GitHub CI on `d184b2d` (commits 1–3): hassfest, unit tests, frontend
+  checks, ruff, mypy, HACS validation all **success**; the newest-HA
+  pre-release job is skipped by workflow condition. Both Devin Review threads
+  are resolved. Later commits on this PR are docs-only.
 
 Hardware validation: **not performed.** The contributor reported a fork test
 on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
