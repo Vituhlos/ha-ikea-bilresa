@@ -50,6 +50,14 @@ These instructions apply to the entire repository and to every coding agent.
   user explicitly requests it.
 - Keep English and Czech user-facing strings/documentation aligned.
 - Update `CHANGELOG.md` for user-visible behavior.
+- Do not merge a pull request until its required CI checks and the automated
+  reviews requested on it (Codex and CodeRabbit) have finished and their
+  findings are answered. A skipped review is not a passed review: where CI or a
+  review does not run on a pull request's base branch, run the gates locally,
+  trigger the review by comment, and say so in the pull request.
+- A release changes the version in `manifest.json`, `CHANGELOG.md` (section and
+  link reference), both READMEs and `PROJECT_STATUS.md` in one commit.
+  `tests/test_version_consistency.py` fails when they disagree.
 
 ## Required handoff
 

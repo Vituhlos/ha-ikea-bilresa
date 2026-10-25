@@ -28,7 +28,11 @@ the 0.6.1 language release) were appended to the end of that file.
 - 2026-10-25 (done on `main` by the owner and another agent, not by this branch): PR #13 repository professionalization, PR #14 Issue #9 fix, PR #15 `v0.6.2-rc.1`, PR #16 `short_release` port and disabled-channel fix, PR #18 `v0.6.2-rc.2`; Issue #9 answered with `v0.6.2-rc.2`.
 - 2026-10-25: handoff committed (`31d937d`). Then `origin/main` (`176cfc3`) was merged into this branch with a merge commit (local, unpushed). Conflicts resolved by hand in `CHANGELOG.md` (both histories kept: `main`'s `0.6.2-rc.*` and `0.6.1` sections, then this branch's `0.6.1-rc.2` and `rc.1`), `tools/panel_preview/build.py` (docstring keeps `theme=warm`), `manifest.json` (this branch's `0.6.1-rc.2` kept) and this file.
 
+- 2026-10-25: the merge was pushed (`a303ea3`); CI run `40212877477` passed all 7 jobs, including the newest-Home-Assistant job. Then step 1 of the agreed order (protection before releasing): `tests/test_version_consistency.py` (manifest version has a CHANGELOG section and link; both READMEs and this file name the latest stable release as the CHANGELOG does) and two rules in `AGENTS.md` (wait for CI and reviews before merging; a release changes all version places in one commit). Committed locally, not pushed. Agreed order after it: `0.7.0-rc.1` without PR #11 (Synology backup first), then CI for PRs to non-default bases and `.coderabbit.yaml`, then PR #11 into `0.7.0-rc.2`.
+
 ## Verified
+
+With the version test added (521 passed; ruff, mypy and node results unchanged from below). The test was shown to fail when the manifest version or a README's stable release was changed.
 
 Merged tree, local Windows stand-ins, 2026-10-25:
 
