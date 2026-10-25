@@ -586,7 +586,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_on": "Zapnout cíl",
         "click_off": "Vypnout cíl",
         "click_none": "Bez akce",
-        "click_scenes": "Střídat scény",
+        "click_scenes": "Procházet scény",
         "hold_toggle": "Přepnout cíl podržení",
         "hold_ramp": "Plynule měnit cíl otáčení",
         "hold_none": "Bez akce",
@@ -639,7 +639,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_invalid_value": "Vyberte nebo zadejte platnou hodnotu.",
         "validation_target_required": "Vyberte cíl.",
         "validation_ramp_requires_light": (
-            "Plynulá změna vyžaduje jako cíl podržení světlo."
+            "Pro plynulou změnu musí být cílem podržení světlo."
         ),
         "validation_scenes_required": "Přidejte alespoň jednu scénu.",
         "validation_mode_target_mismatch": (
