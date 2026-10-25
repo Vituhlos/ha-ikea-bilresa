@@ -176,8 +176,11 @@ scroll behaviour.
 
 **Single best next action:** run the applicable owner-side BILRESA hardware sanity checks, then publish `v0.6.2-rc.1` as a pre-release for the Issue #9 reporter to verify on the original Z2M group setup (step 3, transition 0.8). Keep the issue open until the reporter confirms results; do not publish a stable release based on CI alone.
 
-Status: **Docs-only PR on `devin/20261025-project-professionalization`; no
-runtime code touched.**
+## Historical handoff: repository professionalization (PR #13, 2026-10-25)
+
+Archived record: PR [#13](https://github.com/Vituhlos/ha-ikea-bilresa/pull/13)
+was merged into `main`. The notes below describe that completed
+documentation-only work; they are not the current release status.
 
 A documentation/repository-hygiene pass aimed at a more professional public
 presentation (the goal: a README a visitor understands in ~30 s and a clear
@@ -231,9 +234,9 @@ custom repositories (standard pattern used by non-default-store projects);
 GitHub issue forms are English with Czech twins (`*_cs.yml`) because GitHub
 does not localize forms.
 
-**Single best next action:** owner reviews the PR and merges; afterwards
-consider enabling GitHub private vulnerability reporting so SECURITY.md can
-name a confidential channel, and add real screenshots of the stable panel.
+**Possible follow-up ideas recorded at the time:** consider enabling GitHub
+private vulnerability reporting so SECURITY.md can name a confidential
+channel, and add real screenshots of the stable panel.
 
 
 ## Fix release 0.6.1: the panel follows the user's language (2026-10-24)
