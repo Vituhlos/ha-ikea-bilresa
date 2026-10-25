@@ -103,6 +103,13 @@ Repeat on all three channels:
 
 - [ ] Brightness moves smoothly, respects min/max, and can switch off only when
       minimum brightness is zero.
+- [ ] **Issue #9 — E2490 Zigbee2MQTT light group:** reproduce the reporter's
+      setup with Home Assistant Core 2026.10.2, Zigbee2MQTT 2.7.2, a group of
+      3–4 bulbs, wheel step 3, perceptual curve, minimum brightness 1, and
+      `transition: 0.8`. Scroll through repeated small batches and confirm
+      there are no stale-level brightness jumps and no steppy dimming. Record
+      exact versions and observations; keep Issue #9 open until the reporter
+      confirms the result.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.
