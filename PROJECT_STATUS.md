@@ -15,6 +15,58 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## PR #5 port: `short_release` on the `ikea_bilresa_event` bus (2026-10-25)
+
+Status: **maintainer-owned port of contributor PR #5 (@amodig) onto `main`
+(`0.6.2-rc.1`). Static + unit verified only; NOT hardware-validated; not merged.
+PR #5 itself is left open and untouched.**
+
+What changed:
+
+- Commit 1 keeps @amodig as author: `const.py` `ACTION_SHORT_RELEASE`,
+  `engine.py` button `ShortRelease` now returns a `short_release`
+  `WheelAction` (still clearing the press-duration start), his engine test and
+  README section. The original hunk no longer applied because `main` had
+  since added press-duration bookkeeping to the same branch.
+- Commit 2 (maintainer): `coordinator._dispatch` makes `short_release`
+  **bus-only** — it is fired on `ikea_bilresa_event` after the existing
+  channel-disabled check, then returns before `signal_channel` and the
+  `binding_not_configured` activity row. Without this, every click would have
+  reached bindings (`skipped`/`gesture_not_configured` activity rows) and the
+  panel feed. Event entities, `ikea_bilresa.*` triggers and bindings are
+  unchanged; fast/instant bindings keep using the internal raw signal.
+  Tests: `tests/test_coordinator.py` (bus-only, disabled channel suppresses
+  it, E2489 endpoints with `channel=None`), `tests/test_engine.py` (E2489
+  three-tap overflow: two `short_release`, completion `0` ignored). README
+  EN/CS, CHANGELOG `[Unreleased]`, two open `docs/HARDWARE_TEST.md` items.
+
+Validation (`.venv` = uv-managed CPython 3.14.9):
+
+- `.venv/bin/python -m pytest -q` — **510 passed** (503 on `main`; +7).
+  The two bus-only coordinator tests failed before the `_dispatch` gate.
+- `.venv/bin/ruff format --check custom_components tests` — 57 files already
+  formatted; `.venv/bin/ruff check custom_components tests` — all passed.
+- `.venv/bin/mypy custom_components/ikea_bilresa` — the 2 pre-existing errors
+  only (`device_link.py:256`, `legacy_triggers.py:68`); none new.
+- `git diff --check` — clean.
+- **Not run:** `node --check` / `node --test` frontend gates — Node is not
+  installed on the agent box; no frontend file changed. CI must confirm.
+
+Hardware validation: **not performed.** The contributor reported a fork test
+on one wheel (P2.0, fw 1.9.15) with HA-log timings only; that is not this
+build and is not recorded as a hardware pass.
+
+Known risk found during review, **not fixed here** (separate change): on
+`main`, `_handle_node_event` sends the internal `signal_raw_button` before the
+channel-disabled check in `_dispatch`, and bindings are attached regardless of
+channel state. A **Fast release** or **Instant** binding on a disabled channel
+therefore still runs its single action on `ShortRelease`/`InitialPress`.
+Reproduced with a unit probe; independent of PR #5.
+
+Single best next action: owner review of the port PR and CI; then a physical
+check of the two new `HARDWARE_TEST.md` items before any release notes call it
+verified.
+
 ## Issue #9: stale-level jumps mid-scroll and steppy dimming on small batches (2026-10-25)
 
 Status: **PR #14 merged into `main` on 2026-10-25. Its runtime fix has static + unit/replay verification but is NOT hardware-validated. PR #15 prepares candidate `v0.6.2-rc.1`; Issue #9 remains open pending the reporter's real Zigbee2MQTT-group test.**

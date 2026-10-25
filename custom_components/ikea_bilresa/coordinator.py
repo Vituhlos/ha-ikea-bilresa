@@ -20,6 +20,7 @@ from homeassistant.helpers.event import async_call_later
 from .binding import LightBinding
 from .channel_controls import DEFAULT_SETTINGS, WheelSettings
 from .const import (
+    ACTION_SHORT_RELEASE,
     ATTR_SWITCH_CURRENT_POSITION,
     CLUSTER_SWITCH,
     CONF_CHANNEL,
@@ -389,6 +390,10 @@ class BilresaCoordinator:
         ):
             event_data["device_id"] = device_id
         self.hass.bus.async_fire(EVENT_BILRESA, event_data)
+        if action.type == ACTION_SHORT_RELEASE:
+            # Bus-only: entities, triggers and bindings keep completed-gesture
+            # semantics; fast bindings already get ShortRelease via the raw signal.
+            return
         async_dispatcher_send(
             self.hass, signal_channel(action.node_id, action.channel), action
         )

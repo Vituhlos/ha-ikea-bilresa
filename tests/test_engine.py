@@ -362,7 +362,6 @@ def test_button_hold_and_release(wheel: BilresaWheel) -> None:
     assert release.type == ACTION_RELEASE
 
 
-
 @pytest.mark.parametrize("count", [1, 2, 3])
 def test_short_release_precedes_completed_click(
     wheel: BilresaWheel, count: int
@@ -385,6 +384,7 @@ def test_short_release_precedes_completed_click(
     release = engine.process(wheel, _decoded(3, ROLE_BUTTON, "long_release"))
     assert hold is not None and hold.type == ACTION_HOLD
     assert release is not None and release.type == ACTION_RELEASE
+
 
 def test_hold_duration_uses_one_uninterrupted_monotonic_press(
     wheel: BilresaWheel,
@@ -434,6 +434,38 @@ def test_button_count_above_reported_multi_press_max_is_ignored(
         engine.process(wheel, _decoded(3, ROLE_BUTTON, "multi_press_complete", 3))
         is None
     )
+
+
+def test_dual_button_overflow_releases_without_a_completed_press() -> None:
+    """Three rapid E2489 taps: releases are reported, the completion is not.
+
+    Matter 1.6 permits MultiPressComplete(0) once MultiPressMax is exceeded;
+    the short releases already happened, so they stay on the bus.
+    """
+    dual = BilresaWheel(
+        node_id=NODE,
+        name="Test button",
+        product_name="BILRESA dual button",
+        serial=None,
+        endpoints={
+            1: SwitchEndpoint(1, None, ROLE_BUTTON, multi_press_max=2),
+            2: SwitchEndpoint(2, None, ROLE_BUTTON, multi_press_max=2),
+        },
+    )
+    engine = GestureEngine()
+
+    def button(event_type: str, count=None) -> dict:
+        return {**_decoded(1, ROLE_BUTTON, event_type, count), "channel": None}
+
+    releases = []
+    for _ in range(2):
+        engine.process(dual, button("initial_press"))
+        releases.append(engine.process(dual, button("short_release")))
+    assert [(a.type, a.channel, a.endpoint_id) for a in releases if a] == [
+        (ACTION_SHORT_RELEASE, None, 1),
+        (ACTION_SHORT_RELEASE, None, 1),
+    ]
+    assert engine.process(dual, button("multi_press_complete", 0)) is None
 
 
 def test_released_current_position_preserves_active_scroll_sequence(

@@ -45,6 +45,7 @@ triggers and the same BILRESA panel.
   - [Event reference](#event-reference)
   - [Example automations](#example-automations)
   - [The `ikea_bilresa_event` bus event](#the-ikea_bilresa_event-bus-event)
+  - [Immediate short-release actions](#immediate-short-release-actions)
 - [Multiple wheels](#multiple-wheels)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
@@ -309,7 +310,7 @@ Duplicate with `rotate_down` and a negative step for dimming down, and add a
 Every action is also fired on the event bus as `ikea_bilresa_event` — handy for a
 single automation that handles several wheels. Payload fields: `node_id`,
 `wheel_name`, `channel`, `endpoint_id`, `type` (`rotate` / `press` / `hold` /
-`release`), `direction` (`up` / `down`), `notches`, `presses`.
+`release` / `short_release`), `direction` (`up` / `down`), `notches`, `presses`.
 
 ```yaml
 triggers:
@@ -341,8 +342,16 @@ a double or triple click. Completed `press` events still follow with the final
 count. Replace the automation's completed single-press trigger rather than
 adding a second trigger for the same action, or it will run twice. A separate
 double-click action can override the early action, but the interim effect will
-be visible. Long holds do not emit this event. Existing event entities, device
-triggers and direct light bindings keep their completed-gesture behavior.
+be visible. Long holds do not emit this event. Existing event entities,
+`ikea_bilresa.*` triggers and direct light bindings keep their completed-gesture
+behavior; a direct binding that should react on release uses its own
+**Button response → Fast release** setting instead. A disabled channel emits no
+`short_release` either.
+
+The E2489 dual button has no channel (`channel` is empty), so filter its two
+buttons by `endpoint_id` instead. Pressing it more than twice in a row still
+emits a `short_release` for each reported release, but no completed `press`
+follows (the device ends the sequence with a zero count).
 
 ## Multiple wheels
 

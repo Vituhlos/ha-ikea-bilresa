@@ -15,6 +15,7 @@ from custom_components.ikea_bilresa.channel_controls import (
 from custom_components.ikea_bilresa.const import (
     ACTION_PRESS,
     ACTION_ROTATE,
+    ACTION_SHORT_RELEASE,
     CLUSTER_SWITCH,
     CONF_CHANNEL,
     CONF_CHANNEL_ENABLED,
@@ -423,3 +424,63 @@ def test_a_wheel_without_settings_has_every_channel_enabled(monkeypatch) -> None
 
     fire.assert_called_once()
     assert coordinator.settings_for(12) is DEFAULT_SETTINGS
+
+
+def _short_release(
+    node_id: int, channel: int | None, endpoint_id: int = 3
+) -> WheelAction:
+    return WheelAction(
+        node_id=node_id,
+        wheel_name="Test wheel",
+        channel=channel,
+        endpoint_id=endpoint_id,
+        type=ACTION_SHORT_RELEASE,
+    )
+
+
+def test_short_release_reaches_only_the_public_bus(monkeypatch) -> None:
+    """Entities, triggers and bindings keep completed-gesture semantics.
+
+    Fast bindings already see ShortRelease on the internal raw signal; the
+    public action must not also reach the channel signal or the panel's
+    binding-activity feed, where every click would log a skipped gesture.
+    """
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+
+    coordinator._dispatch(_short_release(12, 2))
+
+    fire.assert_called_once()
+    event_type, event_data = fire.call_args.args
+    assert event_type == EVENT_BILRESA
+    assert (event_data["type"], event_data["channel"]) == (ACTION_SHORT_RELEASE, 2)
+    dispatch.assert_not_called()
+
+
+def test_disabled_channel_suppresses_short_release(monkeypatch) -> None:
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+    coordinator.wheel_settings = {
+        12: WheelSettings.from_data(
+            {CONF_NODE_ID: 12, CONF_CHANNEL_ENABLED: {"2": False}}
+        )
+    }
+
+    coordinator._dispatch(_short_release(12, 2))
+
+    fire.assert_not_called()
+    dispatch.assert_not_called()
+    assert coordinator.telemetry["actions_suppressed"] == 1
+
+
+def test_dual_button_short_release_is_told_apart_by_endpoint(monkeypatch) -> None:
+    """The E2489 has no channel; its two buttons differ only by endpoint."""
+    coordinator, fire, dispatch = _dispatch_coordinator(monkeypatch)
+
+    coordinator._dispatch(_short_release(12, None, endpoint_id=1))
+    coordinator._dispatch(_short_release(12, None, endpoint_id=2))
+
+    payloads = [call.args[1] for call in fire.call_args_list]
+    assert [(p["channel"], p["endpoint_id"]) for p in payloads] == [
+        (None, 1),
+        (None, 2),
+    ]
+    dispatch.assert_not_called()
