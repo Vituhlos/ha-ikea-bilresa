@@ -292,14 +292,20 @@ controls. Record the Home Assistant version, browser, theme and language.
       limit opens "More rotation settings".
 - [ ] Discard: an untouched editor closes at once, one with changes asks for a
       second press, and keyboard focus stays on the button.
-- [ ] The link card at the bottom of a device page opens the community label
-      tool in a new tab.
+- [ ] The link card in the info row of a device page (0.7.0-rc.4) opens the
+      community label tool in a new tab; on a phone it is a slim full-width row
+      under the info text.
 - [ ] Header on a phone (0.7.0-rc.3): the white bar reaches the top edge with no
       band of page colour above it, and the title sits below the status bar or
       notch, with a theme that pads the panel and with one that does not.
-- [ ] The link card (0.7.0-rc.3) is outlined with room above it; hover, pressed
-      and keyboard focus are visible; its second line says it opens in a new
-      window.
+- [ ] The link card is outlined; hover, pressed and keyboard focus are visible;
+      it says it opens in a new window (on a wide pane; on a phone the words are
+      only read by a screen reader).
+- [ ] Scene and script targets (0.7.0-rc.4): a double press, triple press or hold
+      aimed at a scene runs it; a short press on a script toggles, turns on or
+      turns off; a second press stops a running script; "Turn target off" is
+      refused for a scene; the live activity says "Run"; scene cycling runs a
+      scene that was never activated.
 
 ## Recorded runs
 

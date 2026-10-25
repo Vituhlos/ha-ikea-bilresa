@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.4] - 2026-10-25
+
+Pre-release candidate for testing, not a stable release. It adds scenes and
+scripts as gesture targets and fixes scene cycling, moves the link card for the
+community label tool into the info row, and adds a compatibility table and a
+"no events" guide to the READMEs. Everything else is as in `0.7.0-rc.3`.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware, and the panel
+changes have been seen only in the offline panel preview, not yet in a real Home
+Assistant. The checks of `0.7.0-rc.2` and `0.7.0-rc.3` remain open (listed under
+those versions), and these are new:
+
+- **Scene and script targets:** a double press, triple press or hold aimed at a
+  scene runs it; a short press on a script toggles, turns on or turns off; a
+  second press on a running script stops it; "Turn target off" is refused for a
+  scene; the live activity says "Run" for a scene.
+- **Scene cycling** now runs a scene that was never activated.
+- **Link card in the info row** on a wide pane and on a phone.
+
 ### Added
 - **A scene or a script can be the target of a press, double press, triple
   press or hold.** A scene is run with `scene.turn_on`, whatever the gesture
@@ -14,9 +35,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   to "Turn target off" is therefore refused for a scene, in the panel and in the
   native flow, and the gesture ledger and the live activity say "Run". The
   native form no longer calls the double and triple press "toggle entity", and
-  the hold option reads "Toggle target (a scene is run)". A script is toggled, turned on
-  or turned off like any other target, so a second press can stop one that is
-  still running.
+  the hold option reads "Toggle target (a scene is run)". A script is toggled,
+  turned on or turned off like any other target, so a second press can stop one
+  that is still running.
 - **A compatibility table in both READMEs.** It says, path by path, what is
   Supported, Unsupported or Not verified, with the evidence for each: the
   remote works through Home Assistant's Matter integration; ZHA and
@@ -1202,7 +1223,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.3...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.4...HEAD
+[0.7.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.3...v0.7.0-rc.4
 [0.7.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.2...v0.7.0-rc.3
 [0.7.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.1...v0.7.0-rc.2
 [0.7.0-rc.1]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.6.2-rc.2...v0.7.0-rc.1
