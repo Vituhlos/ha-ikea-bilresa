@@ -273,6 +273,16 @@ A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
 below. Unchecked items belong to the broader all-features matrix and are not
 claims made by B4.
 
+### 2026-10-27 — Contributor E2490 colour recipe on `v0.6.2-rc.2`
+
+@amodig tested `v0.6.2-rc.2` on E2490 P2.0 / firmware 1.9.15, HA Green /
+Core 2026.10.4, with three KAJPLATS lamps over Matter/Thread. Observed
+short-release events during single/double/triple clicks, plus hold/release
+and rotation. User reported no worse lag; intermittent missed clicks remain.
+Channel 1 only; no raw Matter capture, E2489 or disabled-channel testing.
+Broader checklist items remain open.
+[Detailed observations and caveats](https://github.com/Vituhlos/ha-ikea-bilresa/pull/5#issuecomment-6452179129).
+
 ### 2026-07-18 — `v0.6.0-rc.6` deployment baseline
 
 - annotated tag and GitHub prerelease `v0.6.0-rc.6` resolve to exact commit

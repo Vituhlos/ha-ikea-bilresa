@@ -12,6 +12,10 @@
 
 - **Minimum Home Assistant Core:** 2026.8.0. Upgrading from 0.5.x has breaking changes: old device triggers were removed, and first startup can remove duplicate BILRESA device-registry entries. Users should back up before upgrading and follow [CHANGELOG.md](CHANGELOG.md).
 - **Validation:** the project has automated tests and some real-device/real-Home-Assistant checks, but the hardware checklist still contains open items. Do not claim that every gesture, device variant, firmware or configuration has been fully validated. See [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md) for the authoritative checklist.
+- **Contributor test (2026-10-27):** @amodig observed `short_release` during
+  single/double/triple clicks on one E2490 channel with `v0.6.2-rc.2`.
+  Missed clicks persist; broader validation remains pending. See the
+  [dated hardware record](docs/HARDWARE_TEST.md#2026-10-27--contributor-e2490-colour-recipe-on-v062-rc2).
 
 The dated entries below are preserved as a historical implementation and testing log. Their status lines and “single best next action” notes describe the state at the time they were written; they are not current release status. Use this snapshot, [CHANGELOG.md](CHANGELOG.md), and the hardware checklist for current information.
 
