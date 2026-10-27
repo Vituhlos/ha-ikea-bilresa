@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Documentation
+- Add a complete short-release colour automation recipe, with Czech setup
+  instructions: click to turn on/change colour, double-click for warm white,
+  and hold to turn off. Requires the 0.6.2 `short_release` event; tested with
+  v0.6.2-rc.2.
+
 ## [0.6.2-rc.2] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. Includes the Issue #9

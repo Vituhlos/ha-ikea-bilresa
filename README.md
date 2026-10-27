@@ -354,6 +354,106 @@ buttons by `endpoint_id` instead. Pressing it more than twice in a row still
 emits a `short_release` for each reported release, but no completed `press`
 follows (the device ends the sequence with a zero count).
 
+#### Recipe: change colour on release, restore white on double-click
+
+Requires **0.6.2 with the `short_release` bus event** (available and tested in
+**v0.6.2-rc.2**; not supported by 0.6.1). Use a light or light group supporting
+both colour and colour temperature. Replace every `light.example`, and set
+`node_id` and `channel` in all three triggers to match your wheel.
+
+Each short release turns an off light on, or changes an already-on light to a
+fully saturated colour. The hue advances by a random 90–270 degrees modulo
+360, avoiding colours close to the reported current hue. A completed double
+click restores 3000 K white; holding turns the light off. No helpers or scripts
+are required.
+
+Keep any scrolling brightness binding, but disable its button/hold actions and
+any overlapping button automations. Releases inside double/triple clicks also
+change colour: intermediate colours before double-click white are expected.
+Queued mode preserves action order, but rapid releases can read the same stale
+light state before a bulb reports its new hue; distinct colours on every rapid
+release are not guaranteed. There is deliberately no `presses: 1` filter.
+
+<details>
+<summary>Complete automation YAML</summary>
+
+```yaml
+alias: BILRESA – colours, white and off
+triggers:
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12
+      channel: 1
+      type: short_release
+    id: single
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12
+      channel: 1
+      type: press
+      presses: 2
+    id: double
+  - trigger: event
+    event_type: ikea_bilresa_event
+    event_data:
+      node_id: 12
+      channel: 1
+      type: hold
+    id: hold
+conditions: []
+actions:
+  - choose:
+      - conditions: "{{ trigger.id == 'hold' }}"
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: light.example
+            data:
+              transition: 0
+      - conditions: "{{ trigger.id == 'double' }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.example
+            data:
+              color_temp_kelvin: 3000
+              transition: 0
+      - conditions: "{{ trigger.id == 'single' }}"
+        sequence:
+          - if:
+              - condition: state
+                entity_id: light.example
+                state: "off"
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: light.example
+                data:
+                  transition: 0
+            else:
+              - action: light.turn_on
+                target:
+                  entity_id: light.example
+                data:
+                  hs_color: >-
+                    {% set hs = state_attr('light.example', 'hs_color') %}
+                    {{ [((hs[0] if hs else 0) + (range(90, 271) | random)) % 360, 100] }}
+                  transition: 0
+mode: queued
+max: 10
+```
+
+</details>
+
+Based on a working automation tested on Home Assistant Green, HA 2026.10.4,
+an E2490 wheel (P2.0, firmware 1.9.15), and three KAJPLATS lamps over
+Matter/Thread. Short-release events were observed before completed single,
+double and triple clicks. Existing intermittent missed clicks remained;
+this recipe does not recover events the integration never receives.
+See the [hardware observations in PR #5](https://github.com/Vituhlos/ha-ikea-bilresa/pull/5#issuecomment-6452179129).
+
 ## Multiple wheels
 
 Everything is keyed by Matter node and endpoint, so **any number of wheels** work
