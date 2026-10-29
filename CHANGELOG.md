@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Stop cannot pass variables (`script.toggle` has none).
 - A README section "Scenes and scripts as targets" with the table of what each
   action does and an example script.
+- **The panel has two variables a theme can set**, `bilresa-accent` and
+  `bilresa-on-accent` (GitHub #22). A theme that sets Home Assistant's
+  `state-icon-color` and `text-primary-color` to one colour, as some
+  light-on-dark themes do, left the label of a primary button ("Save binding",
+  "Add a control binding") as bright as its fill. The accent still defaults to
+  `state-icon-color` and the label to `text-primary-color`, so nothing changes
+  for a theme that does not set them. The README says how.
 
 ### Changed
 - The gesture ledger and the live activity say *Run*, *Stop* or *Toggle* for a

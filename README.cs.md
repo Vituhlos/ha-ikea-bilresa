@@ -461,6 +461,20 @@ logger:
      BILRESA → ⋮ → Stáhnout diagnostiku**; známé identifikátory skrývá, před
      přiložením ji přesto projděte).
 - **Špatný kanál** — kolečko má fyzický přepínač 3 kanálů; posílá ten aktivní.
+- **Tlačítko v panelu nemá v mém tématu čitelný popisek** — panel vyplňuje
+  hlavní tlačítka akcentní barvou, tedy `state-icon-color` tématu, a píše na ně
+  barvou `text-primary-color`. Téma, které obě nastaví na stejnou barvu (některá
+  světlá na tmavém to dělají), udělá popisek stejně světlý jako výplň. Nastavte
+  v tématu vlastní proměnné panelu, které nic jiného v Home Assistantu nemění:
+
+  ```yaml
+  # ve vašem tématu
+  bilresa-accent: "#44739e"                # volitelné: výplň
+  bilresa-on-accent: "rgba(0, 0, 0, 0.85)" # popisek na výplni
+  ```
+
+  Obě jsou volitelné a bez nich se použije `state-icon-color` a
+  `text-primary-color`, takže téma, které je nenastaví, vypadá jako dřív.
 
 ## Plán
 
