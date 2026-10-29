@@ -24,7 +24,12 @@ DOC_INDEX = ROOT / "docs" / "README.md"
 # the one long text it was split from.
 README_MAX_LINES = 160
 
-_LINK = re.compile(r"!?\[(?:[^\[\]]|\[[^\]]*\])*\]\(([^)\s]+)\)")
+# A link destination: plain, with one level of parentheses in it, or in angle
+# brackets, optionally followed by a title.
+_LINK = re.compile(
+    r"!?\[(?:[^\[\]]|\[[^\]]*\])*\]"
+    r"\(\s*(<[^>]+>|(?:[^()\s]|\([^()\s]*\))+)(?:\s+\"[^\"]*\")?\s*\)"
+)
 _HEADING = re.compile(r"^(#{1,6}) (.+?)\s*$")
 
 
@@ -76,7 +81,7 @@ def _anchors(path: Path) -> set[str]:
 def _links(path: Path) -> list[str]:
     targets = []
     for line in _lines_outside_fences(path):
-        targets += _LINK.findall(line)
+        targets += [t.strip("<>") for t in _LINK.findall(line)]
     return targets
 
 
@@ -156,3 +161,18 @@ def test_the_docs_index_lists_every_guide() -> None:
     for language in ("en", "cs"):
         for guide in (ROOT / "docs" / language).glob("*.md"):
             assert f"{language}/{guide.name}" in linked
+
+
+def test_the_link_pattern_reads_titles_and_parentheses() -> None:
+    line = (
+        "[a](plain.md) [b](page_(draft).md#x) [c](<with space.md>) "
+        '[d](titled.md "A title") ![e](img.png)'
+    )
+
+    assert [t.strip("<>") for t in _LINK.findall(line)] == [
+        "plain.md",
+        "page_(draft).md#x",
+        "with space.md",
+        "titled.md",
+        "img.png",
+    ]

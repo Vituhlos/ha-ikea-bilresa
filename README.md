@@ -58,7 +58,8 @@ entirely optional.
    [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 3. **Add the integration** in **Settings → Devices & Services → Add Integration →
    IKEA BILRESA**, then open **IKEA BILRESA** in the sidebar, choose a device and
-   press **Edit binding** on a channel.
+   press **Edit binding** on a channel (in the stable v0.6.1 a channel with no
+   binding yet offers **Add a control binding** instead).
 
 Details, and what to do when something does not work, are in the guides below.
 

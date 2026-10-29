@@ -56,7 +56,8 @@ dobrovolné.
    [![Otevřít vaši instanci Home Assistantu a tento repozitář v obchodě HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 3. **Přidejte integraci** v **Nastavení → Zařízení a služby → Přidat integraci →
    IKEA BILRESA**, pak v postranním menu otevřete **IKEA BILRESA**, vyberte
-   zařízení a u kanálu stiskněte **Upravit propojení**.
+   zařízení a u kanálu stiskněte **Upravit propojení** (ve stabilní verzi v0.6.1 nabízí kanál
+   bez propojení místo toho **Přidat propojení**).
 
 Podrobnosti a postup, když něco nefunguje, jsou v průvodcích níže.
 

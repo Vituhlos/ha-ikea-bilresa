@@ -2,6 +2,10 @@
 
 [README](../../README.md) · [All guides](../README.md) · **English** · [Čeština](../cs/panel.md)
 
+This guide describes the panel of the 0.7 pre-releases. The stable v0.6.1 has an
+older layout; for example, a channel with no binding yet offers **Add a control
+binding** there instead of **Edit binding**.
+
 Home Assistant adds an **IKEA BILRESA** entry to the sidebar (administrators
 only; you can hide it like any other panel). It is where you see and set up
 everything without YAML.

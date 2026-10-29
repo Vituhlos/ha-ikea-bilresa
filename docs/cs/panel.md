@@ -2,6 +2,10 @@
 
 [README](../../README.cs.md) · [Všichni průvodci](../README.md) · [English](../en/panel.md) · **Čeština**
 
+Tento průvodce popisuje panel předběžných vydání 0.7. Stabilní v0.6.1 má starší
+rozložení; například kanál bez propojení tam místo **Upravit propojení** nabízí
+**Přidat propojení**.
+
 Home Assistant přidá do postranního menu položku **IKEA BILRESA** (jen pro
 administrátory; jako každý panel ji lze skrýt). Tady vše vidíte a nastavíte bez
 YAML.
