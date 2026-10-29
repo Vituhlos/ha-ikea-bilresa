@@ -223,8 +223,14 @@ const STYLES = `
     /* The detail needs the same ceiling as the overview. Without it a 1650px
        window drags a fact's label and value ~600px apart. */
     --_detail-max: 880px;
-    /* The icon colour clears the 3:1 non-text bar where a word would not. */
-    --_accent: var(--state-icon-color, #44739e);
+    /* The icon colour clears the 3:1 non-text bar where a word would not.
+       A theme that sets the icon colour and the primary text colour to one
+       colour (visionOS does) leaves a filled control with a label the colour
+       of its fill, and cannot change either variable without recolouring the
+       rest of Home Assistant, so the panel has two of its own. */
+    --_accent: var(--bilresa-accent, var(--state-icon-color, #44739e));
+    /* The label on a control filled with the accent. */
+    --_on-accent: var(--bilresa-on-accent, var(--text-primary-color, #fff));
 
     /* A theme may inset the whole panel (padding on the element that hosts
        it). Measured in _fitFrame, so the header sticks where it already sits
@@ -1001,7 +1007,7 @@ const STYLES = `
   .action-button[data-primary="true"] {
     border-color: var(--_accent);
     background: var(--_accent);
-    color: var(--text-primary-color, #fff);
+    color: var(--_on-accent);
   }
   .action-button[data-danger="true"] {
     border-color: var(--error-color, var(--_ink));
