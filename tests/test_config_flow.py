@@ -12,6 +12,7 @@ import pytest
 from custom_components.ikea_bilresa.config_flow import (
     BindingSubentryFlowHandler,
     _run_scripts_and_scenes,
+    _with_explicit_actions,
 )
 from custom_components.ikea_bilresa.const import (
     BINDING_PROFILE_CLIMATE,
@@ -546,6 +547,7 @@ def test_the_form_shows_the_stored_actions_and_leaves_the_rest_empty() -> None:
     }
 
     assert suggested[CONF_DOUBLE_ACTION] == "on"
+    assert suggested[CONF_CLICK_ACTION] is None
     assert suggested[CONF_TRIPLE_ACTION] == "off"
     # Nothing stored: empty, so the person is not made to choose, and the stored
     # default (toggle) applies unless the target is a script or a scene.
@@ -589,3 +591,140 @@ def test_a_hold_that_ramps_is_given_no_action() -> None:
     )
 
     assert CONF_HOLD_TARGET_ACTION not in filled
+
+
+@pytest.mark.parametrize("target", ["script.go", "scene.evening"])
+def test_a_new_short_press_on_a_script_or_scene_is_run_unless_chosen(target) -> None:
+    assert _run_scripts_and_scenes({CONF_CLICK_TARGET: target})[CONF_CLICK_ACTION] == (
+        "on"
+    )
+    # An explicit choice, including "no action", is the person's.
+    for chosen in ("toggle", "off", "none"):
+        kept = _run_scripts_and_scenes(
+            {CONF_CLICK_TARGET: target, CONF_CLICK_ACTION: chosen}
+        )
+        assert kept[CONF_CLICK_ACTION] == chosen
+
+
+def test_a_short_press_with_no_script_target_gets_no_action_filled_in() -> None:
+    assert CONF_CLICK_ACTION not in _run_scripts_and_scenes({})
+    assert CONF_CLICK_ACTION not in _run_scripts_and_scenes(
+        {CONF_CLICK_TARGET: "light.hall"}
+    )
+
+
+def test_a_copy_does_what_its_source_does_for_a_gesture_with_no_action() -> None:
+    """A missing action toggled; an empty select on a new binding would run."""
+    source = {
+        CONF_CLICK_TARGET: "script.go",
+        CONF_DOUBLE_TARGET: "script.go",
+        CONF_TRIPLE_TARGET: "scene.evening",
+        CONF_TRIPLE_ACTION: "on",
+        CONF_HOLD_TARGET: "script.go",
+    }
+
+    copied = _with_explicit_actions(source)
+
+    assert copied[CONF_CLICK_ACTION] == "toggle"
+    assert copied[CONF_DOUBLE_ACTION] == "toggle"
+    assert copied[CONF_TRIPLE_ACTION] == "on"
+    assert copied[CONF_HOLD_TARGET_ACTION] == "toggle"
+    # The copy then goes through the new-binding fill and keeps toggling.
+    assert _run_scripts_and_scenes(copied)[CONF_DOUBLE_ACTION] == "toggle"
+
+
+def test_a_copy_gains_no_action_for_a_gesture_without_a_target() -> None:
+    copied = _with_explicit_actions({CONF_DOUBLE_TARGET: "light.hall"})
+
+    assert copied == {CONF_DOUBLE_TARGET: "light.hall", CONF_DOUBLE_ACTION: "toggle"}
+
+
+def _form_flow() -> BindingSubentryFlowHandler:
+    """A flow that can be submitted without a Home Assistant around it."""
+    flow = object.__new__(BindingSubentryFlowHandler)
+    flow._pending_node_id = "101"
+    flow._pending_defaults = {CONF_NODE_ID: "101"}
+    flow._title = lambda _data: "title"
+    flow._get_entry = lambda: "entry"
+    flow._get_reconfigure_subentry = lambda: "subentry"
+    flow.async_create_entry = lambda *, title, data: {
+        "type": "create_entry",
+        "data": data,
+    }
+    flow.async_update_and_abort = lambda _entry, _subentry, *, title, data: {
+        "type": "abort",
+        "data": data,
+    }
+    return flow
+
+
+_WHEEL_FORM = {
+    CONF_CHANNEL: "1",
+    CONF_MODE: MODE_BRIGHTNESS,
+    CONF_TARGET: "light.main",
+    CONF_CLICK_TARGET: "script.go",
+    CONF_DOUBLE_TARGET: "scene.evening",
+    CONF_TRIPLE_TARGET: "script.go",
+    CONF_HOLD_ACTION: HOLD_TOGGLE,
+    CONF_HOLD_TARGET: "script.go",
+}
+
+
+async def test_submitting_a_new_binding_runs_its_scripts_and_scenes() -> None:
+    """Through the real submit path: no action chosen, so a script is run."""
+    result = await _form_flow()._async_step_form("user", dict(_WHEEL_FORM))
+
+    assert result["type"] == "create_entry"
+    stored = result["data"]
+    assert stored[CONF_CLICK_ACTION] == "on"
+    assert stored[CONF_DOUBLE_ACTION] == "on"
+    assert stored[CONF_TRIPLE_ACTION] == "on"
+    assert stored[CONF_HOLD_TARGET_ACTION] == "on"
+
+
+async def test_submitting_a_new_binding_keeps_a_chosen_action_and_other_targets() -> (
+    None
+):
+    form = {
+        **_WHEEL_FORM,
+        CONF_CLICK_ACTION: "toggle",
+        CONF_TRIPLE_TARGET: "light.hall",
+    }
+
+    stored = (await _form_flow()._async_step_form("user", form))["data"]
+
+    assert stored[CONF_CLICK_ACTION] == "toggle"
+    # A light with no action chosen toggles, as it always did.
+    assert stored[CONF_TRIPLE_ACTION] == "toggle"
+
+
+async def test_saving_an_edited_binding_does_not_start_running_its_script() -> None:
+    """A binding that toggled a script keeps toggling it when its form is saved."""
+    result = await _form_flow()._async_step_form("reconfigure", dict(_WHEEL_FORM))
+
+    assert result["type"] == "abort"  # the update is applied, then the flow ends
+    stored = result["data"]
+    assert stored[CONF_CLICK_ACTION] == "toggle"
+    assert stored[CONF_DOUBLE_ACTION] == "toggle"
+    assert stored[CONF_TRIPLE_ACTION] == "toggle"
+    assert stored[CONF_HOLD_TARGET_ACTION] == "toggle"
+
+
+async def test_a_copied_binding_keeps_toggling_when_it_is_saved() -> None:
+    flow = _form_flow()
+    flow._pending_defaults = _with_explicit_actions(
+        {CONF_NODE_ID: "101", **_WHEEL_FORM}
+    )
+    # The copy's form shows its defaults and the person saves it untouched.
+    untouched = {
+        field: value
+        for field, value in flow._pending_defaults.items()
+        if field != CONF_NODE_ID
+    }
+
+    stored = (await flow._async_step_form("user", untouched))["data"]
+
+    assert stored[CONF_CLICK_ACTION] == "toggle"
+    assert stored[CONF_DOUBLE_ACTION] == "toggle"
+    assert stored[CONF_TRIPLE_ACTION] == "toggle"
+    assert stored[CONF_HOLD_TARGET_ACTION] == "toggle"

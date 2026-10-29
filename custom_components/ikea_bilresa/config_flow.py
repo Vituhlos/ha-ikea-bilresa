@@ -63,7 +63,6 @@ from .const import (
     CONF_URL,
     DEFAULT_ACCELERATION,
     DEFAULT_BUTTON_RESPONSE,
-    DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
     DEFAULT_MATTER_URL,
     DEFAULT_MAX_BRIGHTNESS,
@@ -72,6 +71,7 @@ from .const import (
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_STEP_CURVE,
+    DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     DOMAIN,
     HOLD_ACTIONS,
@@ -107,6 +107,26 @@ def _target_action_selector() -> selector.SelectSelector:
     )
 
 
+def _with_explicit_actions(data: dict[str, Any]) -> dict[str, Any]:
+    """Say what a missing action meant, so a copy does the same as its source.
+
+    A binding saved before the choice existed has no action for a gesture and
+    toggled its target. A copy shows empty selects for those, and an empty one on
+    a new binding means "run" for a script or a scene; written out here, the copy
+    keeps toggling like the binding it came from.
+    """
+    explicit = dict(data)
+    for target_field, action_field in (
+        (CONF_CLICK_TARGET, CONF_CLICK_ACTION),
+        (CONF_DOUBLE_TARGET, CONF_DOUBLE_ACTION),
+        (CONF_TRIPLE_TARGET, CONF_TRIPLE_ACTION),
+        (CONF_HOLD_TARGET, CONF_HOLD_TARGET_ACTION),
+    ):
+        if explicit.get(target_field) and not explicit.get(action_field):
+            explicit[action_field] = DEFAULT_TARGET_ACTION
+    return explicit
+
+
 def _run_scripts_and_scenes(candidate: dict[str, Any]) -> dict[str, Any]:
     """A new gesture aimed at a script or a scene runs it, unless told otherwise.
 
@@ -119,6 +139,7 @@ def _run_scripts_and_scenes(candidate: dict[str, Any]) -> dict[str, Any]:
     """
     filled = dict(candidate)
     pairs = [
+        (CONF_CLICK_TARGET, CONF_CLICK_ACTION),
         (CONF_DOUBLE_TARGET, CONF_DOUBLE_ACTION),
         (CONF_TRIPLE_TARGET, CONF_TRIPLE_ACTION),
     ]
@@ -395,7 +416,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         subentry = self._get_entry().subentries.get(copy_from)
         if subentry is None or subentry.subentry_type != SUBENTRY_BINDING:
             return None
-        return dict(subentry.data)
+        return _with_explicit_actions(dict(subentry.data))
 
     @staticmethod
     @callback
@@ -644,9 +665,9 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         defaults: dict[str, Any], *, wheel: bool
     ) -> dict[Any, Any]:
         fields: dict[Any, Any] = {
-            vol.Required(
+            vol.Optional(
                 CONF_CLICK_ACTION,
-                default=defaults.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION),
+                description={"suggested_value": defaults.get(CONF_CLICK_ACTION)},
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=CLICK_ACTIONS,
