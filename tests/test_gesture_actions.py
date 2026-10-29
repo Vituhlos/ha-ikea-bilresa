@@ -362,3 +362,36 @@ def test_a_new_gesture_defaults_to_the_first_thing_the_target_can_do() -> None:
     assert default_verb("lock.a") == "lock"
     assert default_verb("media_player.a") == "toggle"
     assert default_verb(None) == "toggle"
+
+
+@pytest.mark.parametrize(
+    ("entity", "action", "ledger", "activity"),
+    [
+        ("siren.alarm", "off", "action_turn_off", "turn_off"),
+        ("cover.blind", "toggle", "action_toggle", "toggle"),
+        ("media_player.tv", "on", "action_turn_on", "turn_on"),
+        ("media_player.tv", "play_pause", "action_play_pause", "play_pause"),
+    ],
+)
+def test_every_verb_reads_as_words_the_panel_has(
+    entity, action, ledger, activity
+) -> None:
+    """A siren turned off must not show up as the literal "action_off"."""
+    from custom_components.ikea_bilresa.panel_models import _action_key
+    from custom_components.ikea_bilresa.panel_strings import STRINGS
+
+    assert _action_key(action, entity) == ledger
+    assert result_label(entity, action) == activity
+    for strings in STRINGS.values():
+        assert ledger in strings
+        assert f"service_{activity}" in strings or f"action_{activity}" in strings
+
+
+def test_a_scene_asked_for_a_verb_it_lacks_is_not_told_it_cannot_be_turned_off() -> (
+    None
+):
+    stored = _normalize(
+        **{CONF_DOUBLE_TARGET: "scene.evening", CONF_DOUBLE_ACTION: "play_pause"}
+    )
+
+    assert binding_errors(stored) == {CONF_DOUBLE_ACTION: "action_not_supported"}

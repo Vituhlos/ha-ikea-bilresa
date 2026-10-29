@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   purpose:** unlocking, opening or toggling a lock, turning a siren on, opening a
   valve and disarming an alarm (see the bindings guide). A button that was never
   pressed (state `unknown`) is pressed all the same. Bindings saved before keep
-  their toggle, turn on and turn off. Addresses GitHub #17.
+  working as they were: a lock, a siren, a valve, a button or an automation
+  could not be the target of a gesture until now. Addresses GitHub #17.
 
 ### Documentation
 - **The scroll limitation is explained plainly** (how-it-works guide, English and

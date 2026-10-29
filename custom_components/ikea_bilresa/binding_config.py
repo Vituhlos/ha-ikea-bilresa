@@ -19,6 +19,7 @@ from .const import (
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
+    CLICK_OFF,
     CONF_ACCELERATION,
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
@@ -278,7 +279,7 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
         if target and not action_is_supported(target, action):
             errors[field] = (
                 "scene_cannot_turn_off"
-                if is_scene_target(target)
+                if is_scene_target(target) and action == CLICK_OFF
                 else "action_not_supported"
             )
     if is_button:

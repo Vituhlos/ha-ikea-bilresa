@@ -40,6 +40,9 @@ _RESULT = {
 }
 
 
+_SWITCHABLE_WORDS = {"toggle": "toggle", "on": "turn_on", "off": "turn_off"}
+
+
 def action_is_supported(entity_id: str | None, action: str) -> bool:
     """Whether this action can be carried out on this entity.
 
@@ -98,7 +101,9 @@ def result_label(entity_id: str, action: str) -> str:
     key = (verb.domain, verb.service)
     if key in _RESULT:
         return _RESULT[key]
-    return action
+    # Toggle, on and off are named as Home Assistant's own services whichever
+    # kind of entity carries them; any other verb is named after itself.
+    return _SWITCHABLE_WORDS.get(action, action)
 
 
 def passes_variables(entity_id: str, action: str) -> bool:
