@@ -52,9 +52,20 @@ nebo `script.turn_on`, na zvolené entitě. Přes Matter integrace nic neposíl�
 
 ## Omezení
 
-- Kolečko má vestavěnou ~500ms–1s anti-flood brzdu mezi dávkami cvaknutí, takže se
-  to *blíží* pocitu DIRIGERA, ale není to úplně analogově spojité. Odpovídající
-  `transition` na světle dávky přemostí do plynulého náběhu.
+- Kolečko nehlásí každé cvaknutí hned. Jeho firmware cvaknutí sbírá do dávek a
+  průběžný součet pošle zhruba každých 0,5–1 s, takže při otáčení dostane světlo
+  novou hodnotu přibližně tak často, ne po každém cvaknutí. Zpoždění je časové,
+  ne podle počtu cvaknutí, a je to omezení kolečka, které Home Assistant
+  neodstraní. Pocitu DIRIGERA se to *blíží*, ale není to úplně analogově spojité.
+  - Přechod mezeru skrývá, neodstraňuje ji: každá dávka se pošle s *Přechodem*
+    propojení, takže světlo do další hodnoty plynule dojede místo skoku. První
+    dávka otáčení dostane málo přechodu nebo žádný (jedno cvaknutí žádný), takže
+    první cvaknutí reaguje hned.
+    Přechod mnohem kratší než mezera vypadá schodovitě, delší než mezera ho další
+    dávka přeruší.
+  - Strop 8 cvaknutí patří vlastní Matter integraci Home Assistantu, která po
+    skončení otáčení nahlásí jeden součet. Tato integrace čte průběžný čítač,
+    takže rychlé otáčení neořízne.
 - Cílová světla jdou přes Home Assistant (ne přímý Matter/Zigbee bind), což přidá
   malou, obvykle nepostřehnutelnou LAN latenci.
 - Gesto působí na jednu entitu, nebo spustí jednu scénu či jeden skript. Pro víc

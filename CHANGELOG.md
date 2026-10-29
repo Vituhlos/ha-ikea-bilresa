@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Documentation
+- **The scroll limitation is explained plainly** (how-it-works guide, English and
+  Czech): the wheel sends a running total about every 0.5–1 s, what the
+  transition does and does not hide, and that the cap of 8 notches belongs to
+  Home Assistant's own Matter integration, not to this one.
+
 ## [0.7.0-rc.5] - 2026-10-29
 
 Pre-release candidate for testing, not a stable release. It adds an action for
