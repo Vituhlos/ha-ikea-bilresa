@@ -405,3 +405,60 @@ async def test_a_removed_node_leaves_nothing_behind(monkeypatch) -> None:
     client.callback(FakeEventType("attribute_updated"), 1)
 
     assert set(source._position_paths) == {1, 2}
+
+
+@pytest.mark.asyncio
+async def test_a_table_changed_in_place_without_changing_size_is_found_in_time(
+    monkeypatch,
+) -> None:
+    """The one change the cache cannot see on its own is noticed after a while."""
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.matter_core.time.monotonic",
+        lambda: clock["now"],
+    )
+    client = BusyMatterClient()
+    source, events = await _started(monkeypatch, client)
+    client.callback(FakeEventType("attribute_updated"), 1)
+    events.clear()
+
+    # One position path is swapped for another; the number of attributes is the
+    # same and the table is the same object.
+    table = client.tables[12]
+    del table["1/59/0"]
+    table["3/59/0"] = 1
+    client.callback(FakeEventType("attribute_updated"), 1)
+    assert not any(e[1][1] == "3/59/0" for e in events if e[0] == "attribute_updated")
+
+    # Within a minute (30 seconds plus at most 30 more per node) it is looked up
+    # again, and the new path is forwarded.
+    clock["now"] += 61.0
+    client.callback(FakeEventType("attribute_updated"), 1)
+    assert ("attribute_updated", [12, "3/59/0", 1]) in events
+
+
+@pytest.mark.asyncio
+async def test_the_lookup_is_not_repeated_within_the_age_limit(monkeypatch) -> None:
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.matter_core.time.monotonic",
+        lambda: clock["now"],
+    )
+    client = BusyMatterClient()
+    source, _events = await _started(monkeypatch, client)
+    client.callback(FakeEventType("attribute_updated"), 1)
+    after_the_first = client.walks()
+
+    clock["now"] += 29.0
+    for _ in range(20):
+        client.callback(FakeEventType("attribute_updated"), 1)
+
+    assert client.walks() == after_the_first
+
+    # Past the limit each node is looked up once, not on every update after that.
+    clock["now"] += 40.0
+    client.callback(FakeEventType("attribute_updated"), 1)
+    once_more = client.walks()
+    for _ in range(20):
+        client.callback(FakeEventType("attribute_updated"), 1)
+    assert client.walks() == once_more

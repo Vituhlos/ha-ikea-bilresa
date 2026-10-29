@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from datetime import timedelta
 import logging
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -23,6 +24,12 @@ _LOGGER = logging.getLogger(__name__)
 EventCallback = Callable[[str, Any], None]
 UnavailableCallback = Callable[[str], None]
 _CLIENT_CHECK_INTERVAL = timedelta(seconds=5)
+# The paths of a node's Switch.CurrentPosition values are looked up again at least
+# this often, plus up to this much more per node so that the nodes do not all fall
+# due in one update. A table changed in place with the same number of attributes
+# is the one change the cache cannot see; this bounds how long it stays unseen.
+_POSITION_PATH_MAX_AGE = 30.0
+_POSITION_PATH_JITTER = 30
 # A Matter Server app restart temporarily unloads the core Matter config entry.
 # Keep preferring the supported core client for one minute before treating a
 # runtime outage as permanent enough to require the compatibility WebSocket.
@@ -73,10 +80,10 @@ class CoreMatterEventSource:
         self._switch_positions: dict[tuple[int, str], Any] = {}
         # Where each node keeps its Switch.CurrentPosition values, found once.
         # The key is the node id; the value is the attribute table the paths
-        # were read from, its length then, and the paths. See
+        # were read from, its length then, the paths and when they were found. See
         # _current_switch_positions for when it is read again.
         self._position_paths: dict[
-            int, tuple[dict[str, Any], int, tuple[str, ...]]
+            int, tuple[dict[str, Any], int, tuple[str, ...], float]
         ] = {}
 
     @property
@@ -238,11 +245,14 @@ class CoreMatterEventSource:
         What must not be repeated is finding them: walking every attribute of
         every node took a minute or two of the Home Assistant event loop on an
         install with 63 nodes. The paths are found once per attribute table and
-        read again only when the table is another object or has another size,
-        which is when a node was interviewed again or gained an attribute.
+        read again when the table is another object or has another size, which is
+        when a node was interviewed again or gained an attribute, and in any case
+        every 30 to 60 seconds, so that a table changed in place without changing
+        its size (the one change those two checks cannot see) is noticed soon.
         """
         positions: dict[tuple[int, str], Any] = {}
         seen: set[int] = set()
+        now = time.monotonic()
         for node in self._matter_client.get_nodes():
             fields = self._node_fields(node)
             if fields is None:
@@ -254,11 +264,13 @@ class CoreMatterEventSource:
                 cached is None
                 or cached[0] is not attributes
                 or cached[1] != len(attributes)
+                or now - cached[3]
+                > _POSITION_PATH_MAX_AGE + node_id % _POSITION_PATH_JITTER
             ):
                 paths = tuple(
                     path for path in attributes if self._is_switch_position_path(path)
                 )
-                cached = (attributes, len(attributes), paths)
+                cached = (attributes, len(attributes), paths, now)
                 self._position_paths[node_id] = cached
             for path in cached[2]:
                 if path in attributes:
