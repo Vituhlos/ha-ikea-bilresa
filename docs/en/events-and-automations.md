@@ -112,19 +112,6 @@ max: 20
 Duplicate with `rotate_down` and a negative step for dimming down, and add a
 `press` trigger calling `light.toggle` for the button.
 
-## Blueprint: smooth dimming
-
-For an automation-based setup, a blueprint dims one light with one channel:
-scrolling changes the brightness by the notch count (with a transition that
-bridges the wheel's batched updates) and a single press toggles the light. Its
-inputs are the channel's event entity, the light, the brightness step per notch
-and the transition.
-
-[![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FVituhlos%2Fha-ikea-bilresa%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fikea_bilresa%2Fsmooth_dimming.yaml)
-
-The turnkey [control bindings](bindings.md#gui-control-bindings-turnkey-control) need no
-automation at all; use the blueprint when you want one.
-
 ## The `ikea_bilresa_event` bus event
 
 Every action is also fired on the event bus as `ikea_bilresa_event` — handy for a
