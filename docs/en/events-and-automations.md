@@ -266,7 +266,9 @@ max: 10
 
 </details>
 
-Based on a working automation tested on Home Assistant Green, HA 2026.10.4,
+Recipe and testing by [@amodig](https://github.com/amodig), contributed in
+[#23](https://github.com/Vituhlos/ha-ikea-bilresa/pull/23). Based on a working
+automation tested on Home Assistant Green, HA 2026.10.4,
 an E2490 wheel (P2.0, firmware 1.9.15), and three KAJPLATS lamps over
 Matter/Thread. Short-release events were observed before completed single,
 double and triple clicks. Existing intermittent missed clicks remained;

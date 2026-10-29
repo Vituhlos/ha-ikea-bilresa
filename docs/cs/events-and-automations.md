@@ -195,7 +195,9 @@ stejný zastaralý stav, než žárovka nahlásí nový odstín; odlišná barva
 každém rychlém uvolnění proto není zaručena. Filtr `presses: 1` je záměrně
 vynechán.
 
-Příklad vychází z funkční automatizace otestované na Home Assistant Green,
+Recept a testování: [@amodig](https://github.com/amodig), přispěno v
+[#23](https://github.com/Vituhlos/ha-ikea-bilresa/pull/23). Vychází z funkční
+automatizace otestované na Home Assistant Green,
 HA 2026.10.4, kolečku E2490 (P2.0, firmware 1.9.15) a třech žárovkách
 KAJPLATS přes Matter/Thread. Krátká uvolnění byla zaznamenána před dokončenými
 jednoduchými, dvojitými i trojitými stisky. Dřívější občasné vynechávání
