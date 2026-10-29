@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.5] - 2026-10-29
+
+Pre-release candidate for testing, not a stable release. It adds an action for
+every press gesture (scripts are told which gesture started them), the panel
+theme variables, the fix for the Home Assistant freeze on Matter attribute
+updates (GitHub #21), and the split documentation with a recipe for the
+`short_release` event. The smooth-dimming blueprint is removed. Everything else
+is as in `0.7.0-rc.4`.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware and has not been
+seen in a real Home Assistant. The checks of the earlier candidates remain open
+(listed under those versions), and these are new:
+
+- **An action per gesture:** a double press, triple press and hold each toggle,
+  turn on or turn off their target; a script offers Run, Stop and Toggle with Run
+  pre-selected; a script run by a gesture receives `gesture`, `presses`,
+  `channel`, `endpoint` and `device` (read them in the script's trace).
+- **The freeze fix (GitHub #21):** on an install with many Matter nodes, fading
+  many lights at once no longer stalls Home Assistant; only a real install shows
+  this, the unit tests do not.
+- **Theme variables (GitHub #22):** `bilresa-accent` and `bilresa-on-accent` change
+  the panel's accent and the label on it, and a theme that sets neither looks as
+  before.
+
 ### Added
 - **Each press gesture has its own action on its target.** A double press, a
   triple press and a hold can now toggle, turn on or turn off their target, as
@@ -1308,7 +1334,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.4...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.5...HEAD
+[0.7.0-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.4...v0.7.0-rc.5
 [0.7.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.3...v0.7.0-rc.4
 [0.7.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.2...v0.7.0-rc.3
 [0.7.0-rc.2]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.1...v0.7.0-rc.2

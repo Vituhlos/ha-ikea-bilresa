@@ -301,11 +301,17 @@ controls. Record the Home Assistant version, browser, theme and language.
 - [ ] The link card is outlined; hover, pressed and keyboard focus are visible;
       it says it opens in a new window (on a wide pane; on a phone the words are
       only read by a screen reader).
-- [ ] Action per gesture (after 0.7.0-rc.4): a double press, a triple press and
+- [ ] Action per gesture (0.7.0-rc.5): a double press, a triple press and
       a hold each toggle, turn on or turn off their target; a script offers Run,
       Stop and Toggle and Run is pre-selected; a script run by a gesture receives
       `gesture`, `presses`, `channel`, `endpoint` and `device` (check in the
       script's trace); the live activity says Run, Stop or Toggle.
+- [ ] Freeze fix (0.7.0-rc.5, GitHub #21): on an install with many Matter nodes,
+      fading many lights at once does not stall Home Assistant, and the wheel
+      still reports presses and rotation.
+- [ ] Theme variables (0.7.0-rc.5, GitHub #22): with `bilresa-accent` and
+      `bilresa-on-accent` set in a theme the primary button changes; with
+      neither set the panel looks as before.
 - [ ] Scene and script targets (0.7.0-rc.4): a double press, triple press or hold
       aimed at a scene runs it; a short press on a script toggles, turns on or
       turns off; a second press stops a running script; "Turn target off" is

@@ -23,8 +23,9 @@ analogové plynulé posouvání.
 > přechodem z 0.5.x udělejte zálohu a přečtěte si poznámky k přechodu v
 > [CHANGELOGu](CHANGELOG.md).
 >
-> **Testovací kandidát:** předběžné vydání **v0.7.0-rc.4** má přepracovaný panel
-> a editor propojení, které stabilní vydání nemá, a opravy z `v0.6.2-rc.2`
+> **Testovací kandidát:** předběžné vydání **v0.7.0-rc.5** má přepracovaný panel
+> a editor propojení, které stabilní vydání nemá, akci pro každé gesto, opravu
+> zamrzání při Matter aktualizacích (GitHub #21) a opravy z `v0.6.2-rc.2`
 > (světelné skupiny Zigbee2MQTT, událost `short_release`, vypnuté kanály).
 > Není ověřené na hardwaru a některé kombinace zařízení a gest stále čekají na
 > ověření; viz [hardwarový kontrolní seznam](docs/HARDWARE_TEST.md).

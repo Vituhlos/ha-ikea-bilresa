@@ -23,8 +23,9 @@ scrolling.
 > take a backup and read the upgrade notes in the [CHANGELOG](CHANGELOG.md)
 > before upgrading from 0.5.x.
 >
-> **Test candidate:** the pre-release **v0.7.0-rc.4** has a redesigned panel and
-> binding editor that the stable release does not have, plus the fixes of
+> **Test candidate:** the pre-release **v0.7.0-rc.5** has a redesigned panel and
+> binding editor that the stable release does not have, an action for every
+> gesture, the fix for the Matter freeze (GitHub #21), plus the fixes of
 > `v0.6.2-rc.2` (Zigbee2MQTT light groups, the `short_release` event, disabled
 > channels). It is not hardware-validated, and some device and gesture
 > combinations still wait for validation; see the
