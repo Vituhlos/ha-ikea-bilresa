@@ -84,11 +84,12 @@ script:
       - action: light.toggle
         target:
           entity_id: >-
-            {{ 'light.hall' if gesture == 'double_press' else 'light.kitchen' }}
+            {{ 'light.example_b' if gesture == 'double_press' else 'light.example_a' }}
 ```
 
-Vyberte tento skript jako cíl krátkého i dvojitého stisku s akcí *Spustit
-skript*; jedním přepnete kuchyňské světlo, druhým chodbové. Scéna, která nebyla
+Nahraďte `light.example_a` a `light.example_b` vlastními světly. Vyberte skript
+jako cíl krátkého i dvojitého stisku s akcí *Spustit skript*; jedním přepnete
+první světlo, druhým druhé. Scéna, která nebyla
 nikdy aktivována, hlásí stav `unknown` a přesto se spustí.
 
 U dvoutlačítka stejný průvodce nejdřív vybere Tlačítko 1 nebo Tlačítko 2 a pak

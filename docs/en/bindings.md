@@ -84,12 +84,12 @@ script:
       - action: light.toggle
         target:
           entity_id: >-
-            {{ 'light.hall' if gesture == 'double_press' else 'light.kitchen' }}
+            {{ 'light.example_b' if gesture == 'double_press' else 'light.example_a' }}
 ```
 
-Select this script as the target of a short press and of a double press with
-the action *Run script*; it then toggles the kitchen light for one and the hall
-light for the other. A scene that was never activated reports the state
+Replace `light.example_a` and `light.example_b` with your own lights. Select the
+script as the target of a short press and of a double press with the action *Run
+script*; it then toggles the first light for one and the second for the other. A scene that was never activated reports the state
 `unknown` and is run all the same.
 
 For a dual button, the same flow first selects Button 1 or Button 2 and then

@@ -13,8 +13,8 @@ Two devices in this installation, both measured rather than assumed:
 
 | Target | Configured minimum | Actual floor | Dead travel |
 |---|---|---|---|
-| `light.zarovka_lustr` (Matter bulb) | 1 % (3 units) | **26** units | bottom ~10 % |
-| `light.linka` (Shelly Plus 0-10V) | 1 % | `range_map [10, 100]` | bottom ~10 % |
+| `light.matter_bulb` (Matter bulb) | 1 % (3 units) | **26** units | bottom ~10 % |
+| `light.shelly_dimmer` (Shelly Plus 0-10V) | 1 % | `range_map [10, 100]` | bottom ~10 % |
 
 The bulb's floor was established on 2026-08-02 by two probes that bypass this
 integration completely:
@@ -54,7 +54,7 @@ So the range has to be **learned from behaviour**, not read from a field.
 here.** Both look like: we sent a value, the entity did not reach it.
 
 This is not hypothetical. `PROJECT_STATUS.md` records seventeen seconds of
-silence from `light.linka` during which fourteen dispatched commands never
+silence from `light.shelly_dimmer` during which fourteen dispatched commands never
 landed, and a later session where the entity went `unavailable` twice while
 nothing was being sent. A learner that read those as a floor would raise the
 minimum permanently, silently, and wrongly — narrowing the usable range in

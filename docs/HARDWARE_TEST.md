@@ -237,9 +237,9 @@ or duplicated raw notch.
 
 Current hardware note (2026-07-18): Home Assistant's device registry confirms
 that both commissioned physical scroll wheels, as well as the dual button, now
-run firmware `1.9.15`. The owner selected only `Kolečko Obývák` for controlled
+run firmware `1.9.15`. The owner selected only `wheel B` for controlled
 RC.5 wheel tuning. Results below therefore apply only to that wheel; they must
-not be generalized to `Kolečko Nelča`. Earlier `1.8.7` observations remain
+not be generalized to `wheel A`. Earlier `1.8.7` observations remain
 valid historical evidence, but that firmware is no longer available for this
 candidate and must not be claimed as RC.5 hardware coverage.
 
@@ -330,7 +330,7 @@ claims made by B4.
   / matterjs-server `1.2.6`, server schema 12, compatibility schema 11,
   `core_matter_client`, no fallback, two wheels, one dual button and six
   bindings;
-- `Kolečko Obývák` channel 1 retained the controlled-test settings: brightness
+- `wheel B` channel 1 retained the controlled-test settings: brightness
   mode, step 3%, acceleration 0%, bounds 1–100% and transition 0.0 seconds;
 - the integration config entry is loaded at logger level `WARNING`, diagnostics
   list no integration issue, and post-restart logs contain no integration
@@ -363,9 +363,9 @@ deployment baseline.
 
 ### 2026-07-18 — E2490 RC.5 controlled response and accounting runs
 
-Tester: owner operating only `Kolečko Obývák`; Codex observing Home Assistant,
+Tester: owner operating only `wheel B`; Codex observing Home Assistant,
 the integration diagnostics, recorder and sanitized Matter Server events
-through MCP. Channel 1 targeted `light.linka` (Shelly Plus 0-10V Dimmer), with
+through MCP. Channel 1 targeted `light.shelly_dimmer` (Shelly Plus 0-10V Dimmer), with
 step 3%, acceleration 0%, minimum 1% and maximum 100%.
 
 - One deliberate slow upward notch produced its public action approximately

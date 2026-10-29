@@ -8,7 +8,12 @@ vydání jsou označené v [PROJECT_STATUS.md](../../PROJECT_STATUS.md).
 ## Event entity
 
 Každý kanál kolečka se stane `event` entitou, např.
-`event.bilresa_scroll_wheel_channel_1`. Její stav je časové razítko poslední
+`event.bilresa_scroll_wheel_channel_1`. Id vychází z názvu zařízení, takže u vás
+bude jiné, pokud jste zařízení přejmenovali nebo máte víc koleček: najdete ho v
+**Nastavení → Zařízení a služby → Entity** a id i `light.example` v příkladech
+níže nahraďte vlastními.
+
+Stav entity je časové razítko poslední
 akce; atribut `event_type` (a `notches` / `presses`) říká, co se stalo. Používejte ji
 jako hlavní spouštěč automatizace. Entity používají nativní button event device
 class Home Assistantu; kompatibilní doménová událost navíc obsahuje registry
@@ -60,7 +65,7 @@ triggers:
 actions:
   - action: light.turn_on
     target:
-      entity_id: light.priklad
+      entity_id: light.example
     data:
       brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
       transition: 1
@@ -96,7 +101,7 @@ conditions:
 actions:
   - action: light.turn_on
     target:
-      entity_id: light.priklad
+      entity_id: light.example
     data:
       brightness_step_pct: "{{ trigger.to_state.attributes.notches * 3 }}"
       transition: 1

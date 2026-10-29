@@ -25,7 +25,7 @@ not be folded into a `0.5.x` release candidate. The `0.5.x` stabilization gates
 
 ## Device facts (current knowledge, confirm before building)
 
-Observed for the owner's unit "Tlačítko Obývák" via read-only Home Assistant MCP
+Observed for the owner's unit via read-only Home Assistant MCP
 on 2026-07-17. These are **HA-surface** facts; the raw Matter facts marked
 *(confirm)* must be captured from the Matter Server before Phase B1 (see the
 instrumentation note under Phase B4).

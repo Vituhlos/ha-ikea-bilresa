@@ -176,3 +176,80 @@ def test_the_link_pattern_reads_titles_and_parentheses() -> None:
         "titled.md",
         "img.png",
     ]
+
+
+# -- nothing from one household ------------------------------------------------
+#
+# The documentation and the handoff are public and are read by people who have
+# their own Home Assistant. Examples use placeholders, and a measurement says
+# what kind of device it was ("a Shelly dimmer") instead of naming one. The
+# project's own rule (docs/DEVICE_REFERENCE.md) is that names, entity ids,
+# serial numbers and addresses are never added to a document.
+
+_ENTITY = re.compile(
+    r"\b(light|switch|event|number|scene|script|media_player|cover|climate|fan"
+    r"|sensor|binary_sensor|input_[a-z]+|button)\.([a-z][a-z0-9_]*)\b"
+)
+# What may follow a domain: a file name (event.py), a service, an entity id Home
+# Assistant makes up by itself from the default device name, or a placeholder.
+# A new real entity id fails here and has to be turned into a placeholder, or
+# added on purpose, which a reviewer will see.
+_ALLOWED_AFTER_DOMAIN = {
+    "py",
+    "turn_on",
+    "turn_off",
+    "toggle",
+    "set_value",
+    "received",
+    "bilresa_scroll_wheel_channel_1",
+    "example",
+    "example_a",
+    "example_b",
+    "matter_bulb",
+    "matter_bulb_2",
+    "shelly_dimmer",
+}
+_PRIVATE = [
+    (re.compile(r"[A-Za-z]:\\Users\\"), "a local Windows path"),
+    (re.compile(r"\b[a-z_]+_dsm\.[A-Za-z0-9]+"), "a NAS backup agent id"),
+    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "an IPv4 address"),
+]
+
+
+def _prose_documents() -> list[Path]:
+    files = [
+        ROOT / name
+        for name in (
+            "README.md",
+            "README.cs.md",
+            "CHANGELOG.md",
+            "PROJECT_STATUS.md",
+            "AGENTS.md",
+            "CONTRIBUTING.md",
+        )
+    ]
+    files += sorted((ROOT / "docs").rglob("*.md"))
+    return files
+
+
+@pytest.mark.parametrize(
+    "path", _prose_documents(), ids=lambda p: str(p.relative_to(ROOT))
+)
+def test_documents_name_no_real_entity_and_no_private_identifier(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+
+    entities = sorted(
+        {
+            match.group(0)
+            for match in _ENTITY.finditer(text)
+            if match.group(2) not in _ALLOWED_AFTER_DOMAIN
+        }
+    )
+    private = [
+        f"{what}: {match.group(0)}"
+        for pattern, what in _PRIVATE
+        for match in pattern.finditer(text)
+    ]
+
+    assert not entities, f"entity ids that are not placeholders: {entities}"
+    assert not private, f"private identifiers: {private}"

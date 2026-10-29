@@ -8,7 +8,12 @@ latest release are identified in [PROJECT_STATUS.md](../../PROJECT_STATUS.md).
 ## Event entities
 
 Each wheel channel becomes an `event` entity, e.g.
-`event.bilresa_scroll_wheel_channel_1`. Its state is the timestamp of the
+`event.bilresa_scroll_wheel_channel_1`. The id comes from the device's name, so
+yours will differ if you renamed the device or have several wheels: find it in
+**Settings → Devices & Services → Entities**, and replace the ids and the
+`light.example` in the examples below with your own.
+
+The entity's state is the timestamp of the
 last action; the `event_type` attribute (and `notches` / `presses`) tells you
 what happened. Use it as the primary automation trigger. These entities use
 Home Assistant's button event device class; the compatibility domain event also

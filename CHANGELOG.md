@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   notes. `tests/test_docs.py` fails on a broken link or heading, on a guide that
   exists in one language only or has a different structure in the other, and on
   a README that grows past 160 lines.
+- **The documents name nothing from one household.** Examples use placeholders
+  (`light.example`) and measurements say what kind of device they were taken
+  on instead of naming one; the guides tell the reader that an entity id comes
+  from the device's name and will differ. A test fails when a document names an
+  entity id that is not a known placeholder, a local Windows path, a NAS backup
+  agent id or an IP address.
 - **The README (English and Czech) describes the panel and the entities.** New
   sections: the BILRESA panel (overview, a device's tabs, the editor, the dial,
   language and themes), the dial and button entities of every wheel channel, and
