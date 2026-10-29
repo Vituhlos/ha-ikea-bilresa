@@ -42,12 +42,19 @@ Pokud vám tato integrace šetří čas, můžete podpořit její vývoj. Je to 
 - [Funkce](#funkce)
 - [Jak to funguje](#jak-to-funguje)
 - [Požadavky](#požadavky)
+  - [Kompatibilita](#kompatibilita)
 - [Instalace](#instalace)
 - [Nastavení](#nastavení)
+  - [Panel BILRESA](#panel-bilresa)
+  - [GUI ovládací propojení](#gui-ovládací-propojení-ovládání-bez-yaml)
+  - [Scény a skripty jako cíle](#scény-a-skripty-jako-cíle)
 - [Používání (manuál)](#používání-manuál)
   - [Event entity](#event-entity)
+  - [Entity číselníku a tlačítka](#entity-číselníku-a-tlačítka)
   - [Přehled událostí](#přehled-událostí)
+  - [Spouštěče](#spouštěče)
   - [Příklady automatizací](#příklady-automatizací)
+  - [Blueprint: plynulé stmívání](#blueprint-plynulé-stmívání)
   - [Sběrnicová událost `ikea_bilresa_event`](#sběrnicová-událost-ikea_bilresa_event)
   - [Okamžité akce po krátkém uvolnění](#okamžité-akce-po-krátkém-uvolnění)
 - [Více koleček](#více-koleček)
@@ -90,17 +97,29 @@ Navazující práce v HA:
   tlačítko 1/2 nabízí `press`, `double_press`, `hold`, `release`.
 - 🔘 **Nezávislá propojení dvoutlačítka** — každé tlačítko může přepínat jiný
   cíl, nebo mohou na společném světle používat pevný směr zesílit/zeslabit.
+- 🖥️ **Panel v postranním menu** — přehled zařízení BILRESA, editor s jednou
+  částí na každé gesto, živý test, který ukáže, co gesto udělalo, a diagnostika
+  jen pro čtení. Česky a anglicky, každému uživateli v jeho vlastním jazyce.
+- 🎚️ **Ovládací propojení bez YAML** — otáčení stmívá světlo, mění hlasitost,
+  polohu krytu, teplotu nebo rychlost ventilátoru; stisk, dvojitý stisk, trojitý
+  stisk nebo podržení přepne, zapne či vypne, nebo spustí **scénu** či **skript**.
+- 📟 **Entity číselníku a tlačítka** — každý kanál kolečka má navíc číselník
+  1–100 a přepínač zapnuto/vypnuto, které umí číst automatizace i dashboardy.
 - 🪶 **Žádné závislosti navíc** — drobný WebSocket klient nad `aiohttp`, nic se
   neinstaluje ani nerozbíjí při aktualizacích.
-- 🛡️ **Bezpečné a pasivní** — jen *poslouchá*; nikdy neposílá příkazy zařízením,
-  takže nemůže rušit jádrovou Matter integraci.
+- 🛡️ **Do sítě Matter se nic nezapisuje** — integrace poslouchá události Matteru
+  a nikdy neposílá ovladači žádný příkaz Matteru ani nemění jeho spárování.
+  Propojení působí jen přes běžné služby Home Assistantu na entitách, které
+  zvolíte.
 
 ## Jak to funguje
 
 ```
-kolečko / dvoutlačítko BILRESA ──Matter/Thread──▶ Matter Server ──WS──▶ tato integrace
-                                                                       ├▶ event entity
-                                                                       └▶ ikea_bilresa_event
+kolečko / dvoutlačítko BILRESA ──Matter/Thread──▶ Matter Server ──▶ tato integrace
+                                                                    ├▶ event entity, číselník a tlačítko
+                                                                    ├▶ ikea_bilresa_event a spouštěče
+                                                                    └▶ ovládací propojení ──▶ služby Home Assistantu
+                                                                         (světla, scény, skripty, …)
 ```
 
 Integrace běžně znovu použije existující subscription klienta `MatterClient` z
@@ -119,6 +138,10 @@ Každé kolečko má **3 kanály**, každý = 3 Matter Switch endpointy:
 Dvoutlačítko E2489 má dva samostatné tlačítkové endpointy bez označení kanálu.
 Každý vytvoří vlastní event entitu Tlačítko 1/2 a podporuje jednoduchý stisk,
 dvojitý stisk, podržení a uvolnění (`MultiPressMax = 2`).
+
+Ovládací propojení běží uvnitř Home Assistantu: propojení přečte rozpoznané
+gesto a zavolá služby Home Assistantu, například `light.turn_on`, `scene.turn_on`
+nebo `script.turn_on`, na zvolené entitě. Přes Matter integrace nic neposílá.
 
 ## Požadavky
 
@@ -177,10 +200,48 @@ Potvrďte předvyplněnou URL Matter Serveru (měňte ji, jen pokud běží jind
 najde všechna podporovaná zařízení BILRESA automaticky. Kolečko dostane event
 entitu na každý kanál, dvoutlačítko na každé fyzické tlačítko.
 
+### Panel BILRESA
+
+Home Assistant přidá do postranního menu položku **IKEA BILRESA** (jen pro
+administrátory; jako každý panel ji lze skrýt). Tady vše vidíte a nastavíte bez
+YAML.
+
+- **Přehled.** Každé kolečko a dvoutlačítko, které integrace našla, s názvem,
+  oblastí a časem poslední aktivity. Pruh upozorní, když je Matter odpojený,
+  když se zastavily živé aktualizace nebo když propojení míří na entitu, která už
+  neexistuje.
+- **Stránka zařízení** má tři záložky. *Kanály* (u dvoutlačítka *Tlačítka*)
+  vypíše každý kanál s tím, co dělá které gesto a na čem, a tlačítko **Upravit
+  propojení**; přepínač u kanálu ho vypne a vypnutý kanál nedělá nic, dokud ho
+  znovu nezapnete. *Živý test* ukazuje každé gesto, jak je rozpoznáno, a akci,
+  kterou poslalo svému cíli, ale jen dokud je záložka otevřená. *Diagnostika* je
+  pohled jen pro čtení na dostupnost, spojení s Matterem, použitý zdroj událostí
+  a propojení se zařízením; soukromé identifikátory Matteru se neukazují.
+- **Editor** má pro každé gesto jednu část: otáčení (jen kolečko), krátký stisk,
+  dvojitý stisk, trojitý stisk (jen kolečko) a podržení. Každá ukazuje akci a
+  cíl. Krátký stisk navíc obsahuje **odezvu**: počkat na jednoduchý, dvojitý či
+  trojitý stisk, spustit po prvním krátkém uvolnění, nebo spustit už při prvním
+  stisku (viz [ovládací propojení](#gui-ovládací-propojení-ovládání-bez-yaml)).
+  Odezva, která nějaké gesto vylučuje, to řekne v jeho části, místo aby selhalo
+  uložení. **Uložit propojení** zkontroluje pole a označí ta, která odmítne;
+  **Zahodit** zavře needitovaný editor hned a při neuložených změnách chce druhý
+  stisk; **Smazat propojení** žádá potvrzení. Pokud se propojení mezitím změnilo
+  jinde, panel to řekne a nepřepíše ho.
+- **Číselník.** Každý kanál kolečka má číselnou entitu (1 až 100), kterou otáčení
+  posouvá. Část *Číselník* nastavuje, o kolik ji posune jedno cvaknutí a kolik
+  přidá rychlejší otáčení; na propojení to nemá vliv.
+- **Jazyk a téma.** Panel mluví jazykem zvoleným v profilu každého uživatele
+  (česky nebo anglicky). Téma, kvůli kterému jsou hlavní tlačítka nečitelná,
+  může nastavit dvě proměnné; viz [Řešení potíží](#řešení-potíží).
+
+Panel lze použít místo nativního průvodce níže i spolu s ním; oba zapisují stejná
+propojení.
+
 ### GUI ovládací propojení (ovládání bez YAML)
 
-Nechcete psát automatizace? U položky **IKEA BILRESA**
-(Nastavení → Zařízení a služby) klikněte na **＋ Přidat → Ovládací propojení** a vyberte:
+Nechcete psát automatizace? V [panelu](#panel-bilresa), nebo u položky **IKEA
+BILRESA** (Nastavení → Zařízení a služby) přes **＋ Přidat → Ovládací propojení**,
+vyberte:
 
 - výchozí profil (světlo, média, kryt, klimatizace, scény nebo vlastní), případně
   zkopírujte existující propojení jako výchozí nastavení,
@@ -287,6 +348,16 @@ jako hlavní spouštěč automatizace. Entity používají nativní button event
 class Home Assistantu; kompatibilní doménová událost navíc obsahuje registry
 `device_id`, pokud je dostupné.
 
+### Entity číselníku a tlačítka
+
+Kromě event entit má každý kanál kolečka ještě dvě, nezávislé na jakémkoli
+propojení:
+
+| Entita | Co to je |
+|---|---|
+| `number` *Číselník* | Posuvník od 1 do 100. Otáčení kolečka ho posouvá o *Změnu číselníku na cvaknutí* z panelu (s volitelným zrychlením); hodnota se zachová přes restart. Hodí se ke čtení kolečka v automatizacích a dashboardech, nebo si ji nastavíte sami. |
+| `switch` *Tlačítko* | Přepínač zapnuto/vypnuto, který překlopí každý jednoduchý stisk tlačítka kanálu. Jen si pamatuje stav; na zařízení se nic nepřikazuje. Dvojitý stisk, trojitý stisk a podržení se ho netýkají, takže zůstávají volné pro jiné využití. |
+
 ### Přehled událostí
 
 | `event_type` | Význam | Atribut navíc |
@@ -369,6 +440,18 @@ max: 20
 
 Zduplikujte s `rotate_down` a záporným krokem pro ztlumení a přidejte spouštěč
 `press` volající `light.toggle` pro tlačítko.
+
+### Blueprint: plynulé stmívání
+
+Pro nastavení přes automatizace je tu blueprint, který jedním kanálem stmívá
+jedno světlo: otáčení mění jas podle počtu cvaknutí (s přechodem, který
+překlenuje dávkové aktualizace kolečka) a jednoduchý stisk světlo přepne.
+Vstupy jsou event entita kanálu, světlo, krok jasu na cvaknutí a přechod.
+
+[![Otevřít vaši instanci Home Assistantu s importem tohoto blueprintu.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FVituhlos%2Fha-ikea-bilresa%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fikea_bilresa%2Fsmooth_dimming.yaml)
+
+Ovládací propojení bez YAML [nepotřebují](#gui-ovládací-propojení-ovládání-bez-yaml)
+žádnou automatizaci; blueprint použijte, když ji chcete.
 
 ### Sběrnicová událost `ikea_bilresa_event`
 
@@ -478,33 +561,31 @@ logger:
 
 ## Plán
 
-- [x] Listener v reálném čase, auto-discovery koleček, `ikea_bilresa_event`. *(0.1)*
-- [x] Gesture engine, `event` entity, zařízení na kolečko, čisté akce. *(0.2)*
-- [x] **GUI bindings na světla** (config subentries) — namapuj kanál kolečka na
-      světlo a integrace řídí jas přímo, bez YAML. *(0.3)*
-- [x] Minimální práh jasu a samostatný cíl tlačítka. *(0.4)*
-- [x] CI, unit testy a diagnostics. *(0.5)*
-- [x] Hot add/remove koleček, stav připojení/Repairs a in-place bindingy.
-      *(další)*
-- [x] Režimy otáčení (jas / teplota bílé / barva), zrychlení, max jas,
-      akce double/triple/hold. *(další)*
-- [x] **Spouštěče automatizací** a **blueprint na plynulé stmívání**. *(další)*
-- [x] Cyklení scén, hold-to-ramp a informace System Health. *(další)*
-- [x] Změna URL Matter Serveru přes parent reconfigure flow. *(další)*
-- [x] Prověřené discovery — HA nemá podporovaný discovery zdroj pro závislost na
-      jiné integraci; rozhodnutí je v [docs/DISCOVERY.md](docs/DISCOVERY.md).
-- [x] Interní `quality_scale.yaml` pouze s doloženými pravidly `done`/`exempt`.
-- [x] Reuse event streamu core Matter klienta s kompatibilním fallbackem na
-      samostatný pasivní WebSocket. *(další)*
-- [x] Naplánovaný stabilizační patch train `0.5.1`–`0.5.7`; implementace je v
-      pracovním stromu, ale každý balík má vlastní ověřovací bránu.
-- [ ] Dokončit zbývající hardwarové ověření a doplnit chybějící testovací
-      pokrytí; aktuální důkazy jsou v [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md)
-      a [PROJECT_STATUS.md](PROJECT_STATUS.md).
-- [ ] **Publikace do ekosystému:** po splnění zbývajících ověřovacích kroků
-      odeslat ikonu do `home-assistant/brands` a požádat o zařazení integrace
-      do výchozího HACS katalogu. Stabilní vydání na GitHubu i instalace přes
-      vlastní HACS repozitář už jsou k dispozici.
+Co obsahuje které vydání, je v [CHANGELOG](CHANGELOG.md). Tady je, kam projekt
+míří; nic z toho není slib ani termín a každá položka ještě potřebuje své kontroly
+v [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
+
+**Stabilní (v0.6.1).** Event entity, spouštěče automatizací, entity číselníku a
+tlačítka, ovládací propojení s několika režimy otáčení, zrychlením, procházením
+scén a plynulou změnou při podržení, dvoutlačítko, panel BILRESA, využití
+Matter klienta Home Assistantu s WebSocketem jen pro čtení jako zálohou, česky a
+anglicky.
+
+**V předběžném vydání, bez ověření na hardwaru** (až `v0.7.0-rc.4`). Přepracovaný
+panel a jeho editor propojení, událost `short_release`, opravy světelných skupin
+Zigbee2MQTT, vypnuté kanály, které mlčí, a scény a skripty jako cíle gest.
+
+**Plánováno, zhruba v tomto pořadí.**
+
+- Vlastní akce pro každé gesto, skripty dostanou informaci, které gesto je
+  spustilo: sloučeno po `v0.7.0-rc.4`, zatím v žádném vydání.
+- Podržení s akcí při začátku a jinou při konci, například pro spuštění skriptu,
+  který cokoli mění, dokud držíte, a zastavení při uvolnění.
+- Plné akce Home Assistantu (libovolná služba s daty) pro gesto, místo jediné
+  entity.
+- Režim otáčení, který prochází seznamem scén.
+- Zbývající hardwarové ověření a potom ikona značky v `home-assistant/brands` a
+  výchozí obchod HACS.
 
 ## Omezení
 
@@ -513,6 +594,11 @@ logger:
   `transition` na světle dávky přemostí do plynulého náběhu.
 - Cílová světla jdou přes Home Assistant (ne přímý Matter/Zigbee bind), což přidá
   malou, obvykle nepostřehnutelnou LAN latenci.
+- Gesto působí na jednu entitu, nebo spustí jednu scénu či jeden skript. Pro víc
+  věcí naráz ho zaměřte na skript (nebo scénu), který je udělá; skript spuštěný
+  akcí *Spustit skript* se navíc dozví, které gesto ho spustilo.
+- Panel je pro administrátory; ostatní uživatelé ho nevidí. Event entity,
+  spouštěče a propojení na něm nezávisí.
 
 ## Komunitní nástroje
 
@@ -522,7 +608,7 @@ jednotlivých projektů.
 
 - **[Somrig Inlay Sheet Builder](https://bilresa.marcel1.com/)** — webový nástroj od člena komunity pro
   návrh vložek (štítků) pro spínače. Podle jeho autora umí vytvořit i modely krytů
-  pro 3D tisk.
+  pro 3D tisk. Panel na něj odkazuje ze stránky zařízení.
 
 ## Přispívání
 
