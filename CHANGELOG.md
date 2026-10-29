@@ -31,6 +31,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `state-icon-color` and the label to `text-primary-color`, so nothing changes
   for a theme that does not set them. The README says how.
 
+### Documentation
+- **The README (English and Czech) describes the panel and the entities.** New
+  sections: the BILRESA panel (overview, a device's tabs, the editor, the dial,
+  language and themes), the dial and button entities of every wheel channel, and
+  the smooth-dimming blueprint with an import button. The feature list, the
+  "how it works" diagram and the table of contents match what the integration
+  does now, the roadmap says what is stable, what is in pre-release and what is
+  planned, and the limitations name the two things people ask about (one entity
+  or one script per gesture; the panel is for administrators).
+- The claim that the integration "never sends commands to devices" is
+  replaced by what is true: nothing is written to the Matter network, and a
+  binding acts through Home Assistant services on the entities you choose.
+
 ### Changed
 - The gesture ledger and the live activity say *Run*, *Stop* or *Toggle* for a
   script, and *Run* for a scene. "Turn target off" is refused for a scene on

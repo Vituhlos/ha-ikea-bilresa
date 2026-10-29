@@ -43,12 +43,19 @@ If this integration saves you time, you can support its development. It is entir
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Requirements](#requirements)
+  - [Compatibility](#compatibility)
 - [Installation](#installation)
 - [Setup](#setup)
+  - [The BILRESA panel](#the-bilresa-panel)
+  - [GUI control bindings](#gui-control-bindings-turnkey-control)
+  - [Scenes and scripts as targets](#scenes-and-scripts-as-targets)
 - [Usage](#usage) — the manual
   - [Event entities](#event-entities)
+  - [Dial and button entities](#dial-and-button-entities)
   - [Event reference](#event-reference)
+  - [Triggers](#triggers)
   - [Example automations](#example-automations)
+  - [Blueprint: smooth dimming](#blueprint-smooth-dimming)
   - [The `ikea_bilresa_event` bus event](#the-ikea_bilresa_event-bus-event)
   - [Immediate short-release actions](#immediate-short-release-actions)
 - [Multiple wheels](#multiple-wheels)
@@ -93,17 +100,29 @@ Related upstream work:
   button 1/2 expose `press`, `double_press`, `hold`, `release`.
 - 🔘 **Independent dual-button bindings** — each button can toggle a different
   target, or a shared light can use fixed brighten/dim hold directions.
+- 🖥️ **A panel in the sidebar** — an overview of your BILRESA devices, an editor
+  with one section per gesture, a live test that shows what a gesture did and a
+  read-only diagnostics view. English and Czech, in each user's own language.
+- 🎚️ **Control bindings without YAML** — scrolling dims a light, moves a volume,
+  a cover, a temperature or a fan; a press, double press, triple press or hold
+  toggles, turns on or off, or runs a **scene** or a **script**.
+- 📟 **Dial and button entities** — every wheel channel also has a 1–100 dial
+  and an on/off toggle that automations and dashboards can read.
 - 🪶 **No extra dependencies** — a tiny `aiohttp` WebSocket client, nothing to
   install or break on upgrades.
-- 🛡️ **Safe & passive** — it only *listens*; it never sends commands to devices,
-  so it cannot interfere with the core Matter integration.
+- 🛡️ **Nothing is written to the Matter network** — the integration listens to
+  Matter events and never sends a Matter command to the remote or changes its
+  pairing. A binding acts only through ordinary Home Assistant services on the
+  entities you choose.
 
 ## How it works
 
 ```
-BILRESA wheel / dual button ──Matter/Thread──▶ Matter Server ──WS──▶ this integration
-                                                                    ├▶ event entities
-                                                                    └▶ ikea_bilresa_event
+BILRESA wheel / dual button ──Matter/Thread──▶ Matter Server ──▶ this integration
+                                                                  ├▶ event, dial and button entities
+                                                                  ├▶ ikea_bilresa_event and triggers
+                                                                  └▶ control bindings ──▶ Home Assistant services
+                                                                       (lights, scenes, scripts, …)
 ```
 
 The integration normally reuses the core Matter integration's existing
@@ -122,6 +141,11 @@ Each wheel exposes **3 channels**, each of which is 3 Matter Switch endpoints:
 The E2489 dual button exposes two button-only endpoints with no channel labels.
 Each becomes a separate Button 1/2 event entity and supports single press,
 double press, hold and release (`MultiPressMax = 2`).
+
+Control bindings run inside Home Assistant: a binding reads the recognised
+gesture and calls Home Assistant services, such as `light.turn_on`,
+`scene.turn_on` or `script.turn_on`, on the entity you chose. The integration
+sends nothing over Matter.
 
 ## Requirements
 
@@ -181,10 +205,50 @@ Server elsewhere). The integration discovers all supported BILRESA devices
 automatically. A wheel gets an event entity per channel; a dual button gets one
 per physical button.
 
+### The BILRESA panel
+
+Home Assistant adds an **IKEA BILRESA** entry to the sidebar (administrators
+only; you can hide it like any other panel). It is where you see and set up
+everything without YAML.
+
+- **Overview.** Every wheel and dual button the integration found, with its
+  name, area and the time of its last activity. A banner says when Matter is
+  disconnected, when live updates have stopped, or when a binding points to an
+  entity that no longer exists.
+- **A device's page** has three tabs. *Channels* (a dual button has *Buttons*)
+  lists each channel with what every gesture does and on what, and an **Edit
+  binding** button; a switch on the channel turns it off, and a channel that is
+  off does nothing until you turn it back on. *Live test* shows each gesture as
+  it is recognised and the action it sent to its target, but only while the tab
+  is open. *Diagnostics* is a read-only view of availability, the Matter
+  connection, the event source in use and the device link; private Matter
+  identifiers are not shown.
+- **The editor** has one section for each gesture: rotation (a wheel only),
+  short press, double press, triple press (a wheel only) and hold. Each shows its
+  action and its target. The short press also holds the **response**: wait for
+  single/double/triple press, run after the first short release, or run on the
+  initial press (see [Control bindings](#gui-control-bindings-turnkey-control)).
+  A response that rules a gesture out says so in that gesture's section instead
+  of failing on save. **Save binding** checks the fields and marks any it
+  refuses; **Discard** closes an untouched editor at once and asks for a second
+  press when there are unsaved changes; **Delete binding** asks to confirm. If
+  the binding was changed elsewhere in the meantime, the panel says so instead of
+  overwriting it.
+- **Dial.** Each wheel channel has a number entity (1 to 100) that scrolling
+  moves. The *Dial* section sets how far one notch moves it and how much
+  turning faster adds; it does not affect the binding.
+- **Language and theme.** The panel follows the language chosen in each user's
+  own profile (English or Czech). A theme that makes the primary buttons
+  unreadable can set two variables; see [Troubleshooting](#troubleshooting).
+
+The panel can be used instead of, or together with, the native flow below; both
+write the same bindings.
+
 ### GUI control bindings (turnkey control)
 
-Prefer not to write automations? On the **IKEA BILRESA** entry
-(Settings → Devices & Services) click **＋ Add → Control binding** and pick:
+Prefer not to write automations? In the [panel](#the-bilresa-panel), or on the
+**IKEA BILRESA** entry (Settings → Devices & Services) with **＋ Add → Control
+binding**, pick:
 
 - a starting profile (light, media, cover, climate, scenes, or custom), or copy
   an existing binding as a starting point,
@@ -293,6 +357,16 @@ what happened. Use it as the primary automation trigger. These entities use
 Home Assistant's button event device class; the compatibility domain event also
 includes registry `device_id` when available.
 
+### Dial and button entities
+
+Besides the event entities, every wheel channel has two more, independent of any
+binding:
+
+| Entity | What it is |
+|---|---|
+| `number` *Dial* | A slider from 1 to 100. Turning the wheel moves it by the *Dial change per notch* set in the panel (with optional acceleration); the value is kept across restarts. Use it to read the wheel in automations and dashboards, or set it yourself. |
+| `switch` *Button* | An on/off toggle that every single press of the channel's button flips. It only remembers on or off; nothing is commanded on the device. Double press, triple press and hold do not touch it, so they stay free for other uses. |
+
 ### Event reference
 
 | `event_type` | Meaning | Extra attribute |
@@ -375,6 +449,19 @@ max: 20
 
 Duplicate with `rotate_down` and a negative step for dimming down, and add a
 `press` trigger calling `light.toggle` for the button.
+
+### Blueprint: smooth dimming
+
+For an automation-based setup, a blueprint dims one light with one channel:
+scrolling changes the brightness by the notch count (with a transition that
+bridges the wheel's batched updates) and a single press toggles the light. Its
+inputs are the channel's event entity, the light, the brightness step per notch
+and the transition.
+
+[![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FVituhlos%2Fha-ikea-bilresa%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fikea_bilresa%2Fsmooth_dimming.yaml)
+
+The turnkey [control bindings](#gui-control-bindings-turnkey-control) need no
+automation at all; use the blueprint when you want one.
 
 ### The `ikea_bilresa_event` bus event
 
@@ -484,33 +571,32 @@ logger:
 
 ## Roadmap
 
-- [x] Real-time listener, wheel auto-discovery, `ikea_bilresa_event`. *(0.1)*
-- [x] Gesture engine, `event` entities, per-wheel devices, clean actions. *(0.2)*
-- [x] **GUI light bindings** (config subentries) — map a wheel channel to a light
-      and let the integration drive brightness directly, no YAML. *(0.3)*
-- [x] Minimum-brightness floor and a separate button target entity. *(0.4)*
-- [x] CI, unit tests and diagnostics. *(0.5)*
-- [x] Hot add/remove of wheels, connection health/Repairs, in-place binding
-      updates. *(next)*
-- [x] Scroll modes (brightness / colour temperature / colour), acceleration,
-      maximum brightness, double/triple/hold actions. *(next)*
-- [x] **Automation triggers** and a **smooth-dimming blueprint**. *(next)*
-- [x] Scene cycling, hold-to-ramp and System Health information. *(next)*
-- [x] Parent Matter Server URL reconfiguration. *(next)*
-- [x] Discovery feasibility reviewed — no supported dependency-discovery source;
-      decision documented in [docs/DISCOVERY.md](docs/DISCOVERY.md). *(next)*
-- [x] Internal `quality_scale.yaml` with only evidenced `done`/`exempt` rules.
-- [x] Reuse the core Matter client event stream, with a compatibility fallback
-      to the dedicated passive WebSocket. *(next)*
-- [x] Plan the small-patch `0.5.1`–`0.5.7` stabilization train; implementation
-      exists in the working tree, but each package keeps its own validation gate.
-- [ ] Complete the remaining hardware validation and close the test-coverage
-      gaps; see [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md) and
-      [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current evidence.
-- [ ] **Ecosystem publication:** submit the brand icon to
-      `home-assistant/brands` and the integration to the default HACS store
-      after the remaining validation gates are met. The stable GitHub release
-      and custom-repository installation are already available.
+What each release contains is in the [CHANGELOG](CHANGELOG.md). This is where the
+project is going; none of it is a promise or a date, and each item still needs
+its checks in [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md).
+
+**Stable (v0.6.1).** Event entities, automation triggers, dial and button
+entities, control bindings with several scroll modes, acceleration, scene
+cycling and hold-to-ramp, the dual button, the BILRESA panel, reuse of Home
+Assistant's Matter client with a read-only WebSocket fallback, English and
+Czech.
+
+**In pre-release, not hardware-validated** (up to `v0.7.0-rc.4`). The
+redesigned panel and its binding editor, the `short_release` event, Zigbee2MQTT
+light-group fixes, disabled channels that stay silent, and scenes and scripts as
+gesture targets.
+
+**Planned, roughly in this order.**
+
+- An action of its own for every gesture, with scripts told which gesture
+  started them (in review).
+- Hold with an action when it starts and another when it ends, for example to
+  run a script that changes something while you hold and stop it on release.
+- Full Home Assistant actions (any service, with data) for a gesture, instead of
+  a single entity.
+- A rotation mode that steps through a list of scenes.
+- The remaining hardware validation, and then the brand icon in
+  `home-assistant/brands` and the default HACS store.
 
 ## Limitations
 
@@ -519,6 +605,11 @@ logger:
   matching `transition` on the light bridges the batches for a smooth ramp.
 - Target lights round-trip through Home Assistant (rather than a direct
   Matter/Zigbee bind), adding small, usually imperceptible LAN latency.
+- A gesture acts on one entity, or runs one scene or one script. For several
+  things at once, point it at a script (or a scene) that does them; a script
+  started with *Run script* also learns which gesture started it.
+- The panel is for administrators; other users do not see it. The event
+  entities, triggers and bindings do not depend on it.
 
 ## Community tools
 
@@ -528,7 +619,7 @@ endorse them; check each project's own terms.
 
 - **[Somrig Inlay Sheet Builder](https://bilresa.marcel1.com/)** — a web tool by a community member for
   designing inlay sheets (labels) for the switches. According to its author it can also
-  produce 3D-printable cover models.
+  produce 3D-printable cover models. The panel links to it from a device's page.
 
 ## Contributing
 
