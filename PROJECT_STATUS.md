@@ -18,6 +18,20 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## Issue #21: the event loop freezes on Matter attribute updates (2026-10-29)
+
+Status: **fix on branch `fix/matter-core-scan-cost`, in a pull request to `main`; not merged, not released.** Tracker: BILRESA-26.
+
+What changed: `matter_core.py` `CoreMatterEventSource`. Every `attribute_updated` event converted every node with `dataclasses.asdict` and walked every attribute of every node to find `Switch.CurrentPosition`, on the Home Assistant event loop. The attribute paths are now found once per node and cached with the attribute table they came from and its length; an update reads only those values from the live tables, without copying them. A table that is another object or has another size is scanned again, a node that disappeared is dropped from the cache. The events forwarded are the same.
+
+Measured on synthetic data of the reported size (63 nodes, 15,089 attributes, 32 position paths), on the developer's Windows machine: about 79 ms per update before, 0.4 ms after; 568 updates, as in the report, 45 s projected before and 0.14 s measured after. The reporter measured 94.8 s for those 568 calls on a Home Assistant VM, so the real gain on a real install is not known from this.
+
+Validation commands, run locally: `ruff format --check custom_components tests tools`; `ruff check custom_components tests tools`; `.venv\Scripts\python.exe -m mypy custom_components/ikea_bilresa` (the same 2 known errors); `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -p bilresa_windows_local` (522 passed); `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs` (47 passed); ruff clean. New tests in `tests/test_matter_core.py`: the node tables are not walked again by later updates, no node is converted to a mapping, a changed position is forwarded once among many nodes, a position path that appears later and a replaced table are found, a removed node leaves nothing in the cache. Three of them failed on the old code.
+
+Not run, and why: a real Home Assistant with many Matter nodes (the agent has none and cannot reproduce the freeze; the unit tests count work, they do not show a freeze); any hardware check (postponed by the owner, BILRESA-12).
+
+Single best next action: the reporter or the owner tries a release candidate with this fix on an install with many Matter devices and a light fade.
+
 ## PR #16: `short_release` bus event (port of #5) + disabled-channel raw-signal fix (2026-10-25)
 
 Status: **merged into `main` on 2026-10-25** in merge commit `76a68d5f722f136ad942a59ad970b78527ab2c02`. The merge adds the `short_release` bus event and fixes Fast/Instant bindings on disabled channels. PR #5 remains open and untouched pending follow-up with its author. Hardware validation is still pending.
