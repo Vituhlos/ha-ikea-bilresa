@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **The panel has two variables a theme can set**, `bilresa-accent` and
+  `bilresa-on-accent` (GitHub #22). A theme that sets Home Assistant's
+  `state-icon-color` and `text-primary-color` to one colour, as some
+  light-on-dark themes do, left the label of a primary button ("Save binding",
+  "Add a control binding") as bright as its fill. The accent still defaults to
+  `state-icon-color` and the label to `text-primary-color`, so nothing changes
+  for a theme that does not set them. The README says how.
+
 ## [0.7.0-rc.4] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It adds scenes and
