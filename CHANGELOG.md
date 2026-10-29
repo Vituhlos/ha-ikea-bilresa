@@ -49,6 +49,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   script, and *Run* for a scene. "Turn target off" is refused for a scene on
   every gesture, not only the short press.
 
+### Fixed
+- **A Matter attribute update no longer scans every node.** With Home Assistant's
+  core Matter client as the event source, every attribute update from any Matter
+  device converted every node to a mapping and walked every attribute of every
+  node, on the Home Assistant event loop, to find the BILRESA switch positions.
+  On an install with 63 nodes and about 15,000 attributes, fading a dozen lights
+  at once stalled Home Assistant for one to two minutes and the Supervisor
+  watchdog restarted Core (GitHub issue #21). The attribute paths are now found
+  once per node and read again when a node's attribute table is replaced or
+  changes size, and in any case every 30 to 60 seconds; an update reads the few
+  position values it needs; a node that is removed is dropped from the cache at
+  once. The same events are forwarded as before. The dedicated WebSocket source was not
+  affected.
+
 ## [0.7.0-rc.4] - 2026-10-25
 
 Pre-release candidate for testing, not a stable release. It adds scenes and

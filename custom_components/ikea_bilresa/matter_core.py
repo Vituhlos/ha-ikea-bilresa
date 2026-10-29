@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from datetime import timedelta
 import logging
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -23,6 +24,12 @@ _LOGGER = logging.getLogger(__name__)
 EventCallback = Callable[[str, Any], None]
 UnavailableCallback = Callable[[str], None]
 _CLIENT_CHECK_INTERVAL = timedelta(seconds=5)
+# The paths of a node's Switch.CurrentPosition values are looked up again at least
+# this often, plus up to this much more per node so that the nodes do not all fall
+# due in one update. A table changed in place with the same number of attributes
+# is the one change the cache cannot see; this bounds how long it stays unseen.
+_POSITION_PATH_MAX_AGE = 30.0
+_POSITION_PATH_JITTER = 30
 # A Matter Server app restart temporarily unloads the core Matter config entry.
 # Keep preferring the supported core client for one minute before treating a
 # runtime outage as permanent enough to require the compatibility WebSocket.
@@ -71,6 +78,13 @@ class CoreMatterEventSource:
         self._connected = False
         self._unavailable_checks = 0
         self._switch_positions: dict[tuple[int, str], Any] = {}
+        # Where each node keeps its Switch.CurrentPosition values, found once.
+        # The key is the node id; the value is the attribute table the paths
+        # were read from, its length then, the paths and when they were found. See
+        # _current_switch_positions for when it is read again.
+        self._position_paths: dict[
+            int, tuple[dict[str, Any], int, tuple[str, ...], float]
+        ] = {}
 
     @property
     def server_info(self) -> dict[str, Any] | None:
@@ -104,6 +118,7 @@ class CoreMatterEventSource:
         self._unsubscribe_safely()
         self._matter_client = None
         self._switch_positions.clear()
+        self._position_paths.clear()
         self._set_connected(False)
 
     def _get_loaded_client(self) -> Any:
@@ -130,7 +145,8 @@ class CoreMatterEventSource:
         self._matter_client = matter_client
         self._unsubscribe = matter_client.subscribe_events(callback=self._handle_event)
         nodes = [self._node_to_mapping(node) for node in matter_client.get_nodes()]
-        self._switch_positions = self._switch_position_snapshot(nodes)
+        self._position_paths.clear()
+        self._switch_positions = self._current_switch_positions()
         self._set_connected(True)
         self._unavailable_checks = 0
         self._on_event("__nodes__", nodes)
@@ -172,6 +188,7 @@ class CoreMatterEventSource:
         if event_name in ("node_added", "node_updated"):
             self._on_event("node_added", self._node_to_mapping(data))
         elif event_name == "node_removed":
+            self._forget_node(data)
             self._on_event("node_removed", data)
         elif event_name == "node_event":
             self._on_event("node_event", _as_mapping(data))
@@ -184,32 +201,101 @@ class CoreMatterEventSource:
         elif event_name == "server_shutdown":
             self._set_connected(False)
 
+    @callback
+    def _forget_node(self, node: Any) -> None:
+        """Drop what the position lookup holds for a node that is gone.
+
+        Each cache entry keeps the node's whole attribute table alive, so it must
+        not wait for a later attribute update to be pruned: on a quiet install
+        that update may not come, and repeated removals would pile tables up.
+        """
+        node_id = getattr(node, "node_id", node)
+        if not isinstance(node_id, int) or isinstance(node_id, bool):
+            return
+        self._position_paths.pop(node_id, None)
+        self._switch_positions = {
+            key: value
+            for key, value in self._switch_positions.items()
+            if key[0] != node_id
+        }
+
     @staticmethod
-    def _switch_position_snapshot(
-        nodes: list[dict[str, Any]],
-    ) -> dict[tuple[int, str], Any]:
-        """Return Switch.CurrentPosition values from cached Matter nodes."""
+    def _is_switch_position_path(path: Any) -> bool:
+        """Whether an attribute path is endpoint/0x3B/0, Switch.CurrentPosition."""
+        if not isinstance(path, str):
+            return False
+        parts = path.split("/")
+        if len(parts) != 3:
+            return False
+        try:
+            _endpoint, cluster, attribute = (int(part) for part in parts)
+        except ValueError:
+            return False
+        return (
+            cluster == _SWITCH_CLUSTER_ID
+            and attribute == _SWITCH_CURRENT_POSITION_ATTRIBUTE_ID
+        )
+
+    @staticmethod
+    def _node_fields(node: Any) -> tuple[int, dict[str, Any]] | None:
+        """A node's id and its live attribute table, without copying either.
+
+        The table is read as it is: converting a node to a mapping copies every
+        attribute recursively, and a house with many Matter devices has tens of
+        thousands of them.
+        """
+        node_data = getattr(node, "node_data", node)
+        if isinstance(node_data, dict):
+            node_id = node_data.get("node_id")
+            attributes = node_data.get("attributes")
+        else:
+            node_id = getattr(node_data, "node_id", None)
+            attributes = getattr(node_data, "attributes", None)
+        if not isinstance(node_id, int) or not isinstance(attributes, dict):
+            return None
+        return node_id, attributes
+
+    @callback
+    def _current_switch_positions(self) -> dict[tuple[int, str], Any]:
+        """Read every node's Switch.CurrentPosition values from the live cache.
+
+        An attribute update names only its new value, not the node or the path
+        it belongs to, so every node's positions have to be read after each one.
+        What must not be repeated is finding them: walking every attribute of
+        every node took a minute or two of the Home Assistant event loop on an
+        install with 63 nodes. The paths are found once per attribute table and
+        read again when the table is another object or has another size, which is
+        when a node was interviewed again or gained an attribute, and in any case
+        every 30 to 60 seconds, so that a table changed in place without changing
+        its size (the one change those two checks cannot see) is noticed soon.
+        """
         positions: dict[tuple[int, str], Any] = {}
-        for node in nodes:
-            node_id = node.get("node_id")
-            attributes = node.get("attributes")
-            if not isinstance(node_id, int) or not isinstance(attributes, dict):
+        seen: set[int] = set()
+        now = time.monotonic()
+        for node in self._matter_client.get_nodes():
+            fields = self._node_fields(node)
+            if fields is None:
                 continue
-            for path, value in attributes.items():
-                if not isinstance(path, str):
-                    continue
-                parts = path.split("/")
-                if len(parts) != 3:
-                    continue
-                try:
-                    _endpoint, cluster, attribute = (int(part) for part in parts)
-                except ValueError:
-                    continue
-                if (
-                    cluster == _SWITCH_CLUSTER_ID
-                    and attribute == _SWITCH_CURRENT_POSITION_ATTRIBUTE_ID
-                ):
-                    positions[(node_id, path)] = value
+            node_id, attributes = fields
+            seen.add(node_id)
+            cached = self._position_paths.get(node_id)
+            if (
+                cached is None
+                or cached[0] is not attributes
+                or cached[1] != len(attributes)
+                or now - cached[3]
+                > _POSITION_PATH_MAX_AGE + node_id % _POSITION_PATH_JITTER
+            ):
+                paths = tuple(
+                    path for path in attributes if self._is_switch_position_path(path)
+                )
+                cached = (attributes, len(attributes), paths, now)
+                self._position_paths[node_id] = cached
+            for path in cached[2]:
+                if path in attributes:
+                    positions[(node_id, path)] = attributes[path]
+        for node_id in self._position_paths.keys() - seen:
+            del self._position_paths[node_id]
         return positions
 
     @callback
@@ -217,10 +303,7 @@ class CoreMatterEventSource:
         """Forward changed CurrentPosition values with node and path context."""
         if self._matter_client is None:
             return
-        nodes = [
-            self._node_to_mapping(node) for node in self._matter_client.get_nodes()
-        ]
-        current = self._switch_position_snapshot(nodes)
+        current = self._current_switch_positions()
         for key, value in current.items():
             if self._switch_positions.get(key) == value:
                 continue
