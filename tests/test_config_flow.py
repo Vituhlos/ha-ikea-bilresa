@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from custom_components.ikea_bilresa.config_flow import BindingSubentryFlowHandler
+from custom_components.ikea_bilresa.config_flow import (
+    BindingSubentryFlowHandler,
+    _run_scripts_and_scenes,
+)
 from custom_components.ikea_bilresa.const import (
     BINDING_PROFILE_CLIMATE,
     BINDING_PROFILE_COVER,
@@ -46,6 +49,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_TRIPLE_TARGET,
     HOLD_NONE,
     HOLD_RAMP,
+    HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_COVER,
     MODE_TEMPERATURE,
@@ -531,13 +535,57 @@ def test_the_native_form_offers_an_action_per_gesture() -> None:
     assert CONF_TRIPLE_ACTION not in button
 
 
-def test_the_form_keeps_the_stored_actions_as_its_defaults() -> None:
+def test_the_form_shows_the_stored_actions_and_leaves_the_rest_empty() -> None:
     fields = BindingSubentryFlowHandler._button_action_fields(
         {CONF_DOUBLE_ACTION: "on", CONF_TRIPLE_ACTION: "off"}, wheel=True
     )
-    defaults = {str(key): key.default() for key in fields if callable(key.default)}
+    suggested = {
+        str(key): (key.description or {}).get("suggested_value")
+        for key in fields
+        if getattr(key, "description", None) is not None
+    }
 
-    assert defaults[CONF_DOUBLE_ACTION] == "on"
-    assert defaults[CONF_TRIPLE_ACTION] == "off"
-    # Nothing stored: what a gesture always did.
-    assert defaults[CONF_HOLD_TARGET_ACTION] == "toggle"
+    assert suggested[CONF_DOUBLE_ACTION] == "on"
+    assert suggested[CONF_TRIPLE_ACTION] == "off"
+    # Nothing stored: empty, so the person is not made to choose, and the stored
+    # default (toggle) applies unless the target is a script or a scene.
+    assert suggested[CONF_HOLD_TARGET_ACTION] is None
+
+
+@pytest.mark.parametrize("target", ["script.go", "scene.evening"])
+def test_a_new_script_or_scene_is_run_unless_an_action_was_chosen(target) -> None:
+    filled = _run_scripts_and_scenes(
+        {
+            CONF_DOUBLE_TARGET: target,
+            CONF_TRIPLE_TARGET: target,
+            CONF_HOLD_ACTION: HOLD_TOGGLE,
+            CONF_HOLD_TARGET: target,
+        }
+    )
+
+    assert filled[CONF_DOUBLE_ACTION] == "on"
+    assert filled[CONF_TRIPLE_ACTION] == "on"
+    assert filled[CONF_HOLD_TARGET_ACTION] == "on"
+
+
+def test_a_chosen_action_and_other_targets_are_left_alone() -> None:
+    filled = _run_scripts_and_scenes(
+        {
+            CONF_DOUBLE_TARGET: "script.go",
+            CONF_DOUBLE_ACTION: "toggle",
+            CONF_TRIPLE_TARGET: "light.hall",
+            CONF_HOLD_ACTION: HOLD_TOGGLE,
+        }
+    )
+
+    assert filled[CONF_DOUBLE_ACTION] == "toggle"
+    assert CONF_TRIPLE_ACTION not in filled
+    assert CONF_HOLD_TARGET_ACTION not in filled
+
+
+def test_a_hold_that_ramps_is_given_no_action() -> None:
+    filled = _run_scripts_and_scenes(
+        {CONF_HOLD_ACTION: HOLD_RAMP, CONF_HOLD_TARGET: "script.go"}
+    )
+
+    assert CONF_HOLD_TARGET_ACTION not in filled

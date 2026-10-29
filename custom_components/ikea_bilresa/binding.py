@@ -217,8 +217,14 @@ class LightBinding:
         hass: HomeAssistant,
         data: dict[str, Any],
         trace: RotationTrace | None = None,
+        device_name: Callable[[], str] | None = None,
     ) -> None:
         self.hass = hass
+        # The wheel's name, asked for when needed because it can change and the
+        # wheel may be discovered after the binding. A Fast or Instant short
+        # press runs before the gesture engine has built its action, so it
+        # cannot take the name from there.
+        self._device_name = device_name or (lambda: "")
         # Optional so a binding constructed without a coordinator - in tests,
         # and in any future caller - still works, with tracing simply absent.
         self._trace = trace or RotationTrace()
@@ -823,7 +829,7 @@ class LightBinding:
         previous_action = self._active_action
         self._active_action = WheelAction(
             node_id=self._node_id,
-            wheel_name="",
+            wheel_name=self._device_name(),
             channel=self._channel,
             endpoint_id=self._endpoint_id or 0,
             type=ACTION_PRESS,
@@ -1535,7 +1541,8 @@ class LightBinding:
             "presses": active.presses if active is not None else 0,
             "channel": self._channel,
             "endpoint": self._endpoint_id,
-            "device": active.wheel_name if active is not None else None,
+            "device": (active.wheel_name if active is not None else "")
+            or self._device_name(),
         }
 
     # -- service helpers --------------------------------------------------

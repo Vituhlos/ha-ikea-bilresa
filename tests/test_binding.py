@@ -2167,3 +2167,48 @@ def test_the_live_activity_names_a_script_press(
         if call.args[0] == "pending"
     ]
     assert pending[0].kwargs["result"]["action"] == named
+
+
+@pytest.mark.parametrize(
+    ("response", "raw_events"),
+    [
+        (BUTTON_RESPONSE_FAST, ["short_release"]),
+        (BUTTON_RESPONSE_INSTANT, ["initial_press"]),
+    ],
+)
+def test_a_script_started_by_an_early_press_is_told_the_device_name(
+    monkeypatch, response: str, raw_events: list[str]
+) -> None:
+    """Fast and Instant run before the engine has named the wheel."""
+    binding, _i, _w = _binding(
+        monkeypatch,
+        **{
+            CONF_BUTTON_RESPONSE: response,
+            CONF_CLICK_TARGET: "script.go",
+            "click_action": "on",
+            CONF_HOLD_ACTION: HOLD_NONE,
+        },
+    )
+    binding._device_name = lambda: "Living room wheel"
+    binding.hass.states.get.return_value = SimpleNamespace(state="off", attributes={})
+
+    for event in raw_events:
+        binding._handle_raw_button(event)
+
+    [(_domain, _service, data)] = _service_calls(binding)
+    assert data["variables"]["device"] == "Living room wheel"
+    assert data["variables"]["gesture"] == "short_press"
+    assert data["variables"]["presses"] == 1
+
+
+def test_a_completed_press_names_the_device_from_its_own_action(monkeypatch) -> None:
+    binding, _i, _w = _binding(
+        monkeypatch, **{CONF_DOUBLE_TARGET: "script.go", "double_press_action": "on"}
+    )
+    binding._device_name = lambda: "Another name"
+    binding.hass.states.get.return_value = SimpleNamespace(state="off", attributes={})
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    [(_domain, _service, data)] = _service_calls(binding)
+    assert data["variables"]["device"] == "Test wheel"

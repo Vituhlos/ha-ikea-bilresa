@@ -13,8 +13,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the short press always could. For a script the choices are named *Run script*,
   *Stop script* and *Toggle script*; for a scene only *Run scene* exists. The
   panel pre-selects *Run* when a script or a scene is chosen, and the native flow
-  has the same three selects. A binding saved before this has no action stored
-  and keeps toggling.
+  has the same three selects, which leave a new script or scene on *Run* when
+  you do not choose. A binding saved before this has no action stored and keeps
+  toggling. Two gestures have no action of their own: scene cycling replaces
+  the short press's action, and a hold set to ramp the light acts on the
+  rotation target.
 - **A script run by a gesture is told which gesture started it**, in the
   variables `gesture`, `presses`, `channel`, `endpoint` and `device`. Toggle and
   Stop cannot pass variables (`script.toggle` has none).

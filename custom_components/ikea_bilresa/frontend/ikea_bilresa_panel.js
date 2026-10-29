@@ -3476,6 +3476,8 @@ class IkeaBilresaPanel extends HTMLElement {
           this._t("gesture_hold_effect"),
           this._actionOptions(this._editorData.hold_target, { none: false }),
           {
+            // A hold with no target yet still shows what it will do.
+            value: this._editorData.hold_target_action || "toggle",
             help: this._actionHelp(
               this._editorData.hold_target,
               this._editorData.hold_target_action,

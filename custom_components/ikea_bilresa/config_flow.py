@@ -34,6 +34,7 @@ from .const import (
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
+    CLICK_ON,
     CONF_ACCELERATION,
     CONF_BINDING_PROFILE,
     CONF_BUTTON_RESPONSE,
@@ -71,10 +72,10 @@ from .const import (
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_STEP_CURVE,
-    DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     DOMAIN,
     HOLD_ACTIONS,
+    HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_COVER,
     MODE_TEMPERATURE,
@@ -87,6 +88,7 @@ from .const import (
     SUBENTRY_BINDING,
     TARGET_ACTIONS,
     TARGET_DOMAINS,
+    is_run_target,
 )
 from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
@@ -103,6 +105,29 @@ def _target_action_selector() -> selector.SelectSelector:
             translation_key="target_action",
         )
     )
+
+
+def _run_scripts_and_scenes(candidate: dict[str, Any]) -> dict[str, Any]:
+    """A new gesture aimed at a script or a scene runs it, unless told otherwise.
+
+    The action selects have no default of their own, so an empty one means the
+    person did not choose. For a script or a scene that is "run", the only
+    action that carries variables to a script; for anything else it stays empty
+    and the stored default, toggle, applies. Only a new binding is given this: a
+    binding being edited keeps what it has, so a script it already toggled does
+    not start running when the form is saved.
+    """
+    filled = dict(candidate)
+    pairs = [
+        (CONF_DOUBLE_TARGET, CONF_DOUBLE_ACTION),
+        (CONF_TRIPLE_TARGET, CONF_TRIPLE_ACTION),
+    ]
+    if candidate.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION) == HOLD_TOGGLE:
+        pairs.append((CONF_HOLD_TARGET, CONF_HOLD_TARGET_ACTION))
+    for target_field, action_field in pairs:
+        if not filled.get(action_field) and is_run_target(filled.get(target_field)):
+            filled[action_field] = CLICK_ON
+    return filled
 
 
 def _matter_server_url(hass: HomeAssistant) -> str:
@@ -249,6 +274,8 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         normalized: dict[str, Any] | None = None
         if user_input is not None:
             candidate = {CONF_NODE_ID: self._pending_node_id, **user_input}
+            if step_id != "reconfigure":
+                candidate = _run_scripts_and_scenes(candidate)
             normalized, errors = self._normalize_and_validate(candidate)
             if normalized is not None and CONF_ENDPOINT in normalized:
                 device = self._device(str(normalized[CONF_NODE_ID]))
@@ -651,9 +678,9 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
-            vol.Required(
+            vol.Optional(
                 CONF_DOUBLE_ACTION,
-                default=defaults.get(CONF_DOUBLE_ACTION, DEFAULT_TARGET_ACTION),
+                description={"suggested_value": defaults.get(CONF_DOUBLE_ACTION)},
             ): _target_action_selector(),
             vol.Optional(
                 CONF_HOLD_TARGET,
@@ -661,9 +688,9 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
-            vol.Required(
+            vol.Optional(
                 CONF_HOLD_TARGET_ACTION,
-                default=defaults.get(CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION),
+                description={"suggested_value": defaults.get(CONF_HOLD_TARGET_ACTION)},
             ): _target_action_selector(),
             vol.Required(
                 CONF_HOLD_ACTION,
@@ -686,9 +713,9 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             )
             fields[
-                vol.Required(
+                vol.Optional(
                     CONF_TRIPLE_ACTION,
-                    default=defaults.get(CONF_TRIPLE_ACTION, DEFAULT_TARGET_ACTION),
+                    description={"suggested_value": defaults.get(CONF_TRIPLE_ACTION)},
                 )
             ] = _target_action_selector()
             fields[

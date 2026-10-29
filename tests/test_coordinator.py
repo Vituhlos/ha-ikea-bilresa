@@ -343,7 +343,8 @@ def test_button_binding_keys_separate_endpoints_and_multiple_devices(
     created = []
 
     class FakeBinding:
-        def __init__(self, _hass, data, trace=None) -> None:
+        def __init__(self, _hass, data, trace=None, device_name=None) -> None:
+            self.device_name = device_name
             self.node_id = int(data[CONF_NODE_ID])
             self.channel = int(data[CONF_CHANNEL]) if CONF_CHANNEL in data else None
             self.endpoint_id = (
@@ -405,6 +406,10 @@ def test_button_binding_keys_separate_endpoints_and_multiple_devices(
         binding.test_action.call_count == (1 if binding is created[2] else 0)
         for binding in created
     )
+    # Each binding can ask for the name of its own wheel.
+    coordinator.wheels[202] = SimpleNamespace(name="Second dual button")
+    assert created[2].device_name() == "Second dual button"
+    assert created[0].device_name() == ""
 
 
 def test_public_event_includes_registry_device_id_without_breaking_payload(
@@ -586,3 +591,15 @@ def test_dual_button_short_release_is_told_apart_by_endpoint(monkeypatch) -> Non
         (None, 2),
     ]
     dispatch.assert_not_called()
+
+
+def test_a_binding_can_ask_for_its_wheels_current_name() -> None:
+    coordinator = BilresaCoordinator(SimpleNamespace(), "ws://matter/ws")
+    name = coordinator._device_name_for("101")
+
+    assert name() == ""  # not discovered yet
+    coordinator.wheels[101] = SimpleNamespace(name="Living room wheel")
+    assert name() == "Living room wheel"
+    coordinator.wheels[101] = SimpleNamespace(name="Renamed")
+    assert name() == "Renamed"
+    assert coordinator._device_name_for(None)() == ""
