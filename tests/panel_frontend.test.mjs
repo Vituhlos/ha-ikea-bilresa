@@ -1469,3 +1469,140 @@ test("an enabled double press without a target is caught before saving", async (
   assert.equal(sent, 0);
   assert.deepEqual(panel._editorErrors, { double_press_target: "target_required" });
 });
+
+// -- verbs by kind of target -------------------------------------------------
+
+const withVerbs = (panel, verbs, labels = {}) => {
+  panel._panel = {
+    config: {
+      labels,
+      schema: { gesture_verbs: verbs, press_target_domains: Object.keys(verbs) },
+    },
+  };
+  return panel;
+};
+
+test("the actions on offer are the verbs of the chosen kind of target", () => {
+  const panel = withVerbs(
+    newPanel(),
+    {
+      light: ["toggle", "on", "off"],
+      media_player: ["toggle", "play_pause", "mute_toggle"],
+      lock: ["lock"],
+    },
+    {
+      click_toggle: "Toggle target",
+      click_play_pause: "Play / pause",
+      click_mute_toggle: "Mute / unmute",
+      click_lock: "Lock",
+      click_none: "No action",
+    },
+  );
+
+  assert.deepEqual(
+    panel._actionOptions("media_player.tv").map((o) => [o.value, o.label]),
+    [
+      ["toggle", "Toggle target"],
+      ["play_pause", "Play / pause"],
+      ["mute_toggle", "Mute / unmute"],
+      ["none", "No action"],
+    ],
+  );
+  assert.deepEqual(
+    panel._actionOptions("lock.door", { none: false }).map((o) => o.value),
+    ["lock"],
+  );
+});
+
+test("a backend that sends no verbs still offers toggle, on and off", () => {
+  const panel = newPanel();
+  panel._panel = { config: { labels: {} } };
+
+  assert.deepEqual(
+    panel._actionOptions("light.a", { none: false }).map((o) => o.value),
+    ["toggle", "on", "off"],
+  );
+});
+
+test("a new target keeps the action while it can do it, else brings its own", () => {
+  const panel = withVerbs(newPanel(), {
+    light: ["toggle", "on", "off"],
+    media_player: ["toggle", "on", "off", "play_pause"],
+    lock: ["lock"],
+    script: ["on", "off", "toggle"],
+  });
+  panel._loadEditor(false, { double_press_target: "light.a" });
+
+  // Both are switchable: what was chosen stays.
+  panel._chooseGesture("double_press", "off");
+  panel._retarget("double_press", "light.a", "media_player.tv");
+  assert.equal(panel._editorChoices.double_press, "off");
+
+  // A verb of the player means nothing to a lock: the lock brings its own.
+  panel._chooseGesture("double_press", "play_pause");
+  panel._retarget("double_press", "media_player.tv", "lock.door");
+  assert.equal(panel._editorChoices.double_press, "lock");
+  assert.equal(panel._editorData.double_press_action, "lock");
+
+  // A script is run.
+  panel._retarget("double_press", "lock.door", "script.go");
+  assert.equal(panel._editorChoices.double_press, "on");
+});
+
+test("opening a garage door or a gate with a press is said beside the choice", () => {
+  const panel = withVerbs(newPanel(), { cover: ["toggle", "open", "close", "stop"] }, {
+    cover_open_warning: "Opens with nobody watching.",
+  });
+  panel._hass = {
+    states: {
+      "cover.garage": { attributes: { device_class: "garage" } },
+      "cover.blind": { attributes: { device_class: "blind" } },
+    },
+  };
+
+  assert.equal(panel._actionHelp("cover.garage", "open"), "Opens with nobody watching.");
+  assert.equal(panel._actionHelp("cover.garage", "toggle"), "Opens with nobody watching.");
+  assert.equal(panel._actionHelp("cover.garage", "close"), undefined);
+  assert.equal(panel._actionHelp("cover.blind", "open"), undefined);
+});
+
+test("the live activity names a verb after the verb unless it has service words", () => {
+  const panel = withVerbs(newPanel(), { light: ["toggle"] }, {
+    service_toggle: "Toggle",
+    action_play_pause: "Play / pause",
+  });
+
+  assert.equal(panel._serviceLabel("toggle"), "Toggle");
+  assert.equal(panel._serviceLabel("play_pause"), "Play / pause");
+});
+
+test("an old short press its target cannot do is shown as no action", () => {
+  const panel = withVerbs(newPanel(), {
+    light: ["toggle", "on", "off"],
+    input_number: ["step_up", "step_down"],
+  });
+  // Saved when only toggle, on and off existed: toggle on a number did nothing.
+  panel._loadEditor(false, { target: "input_number.level", click_action: "toggle" });
+
+  assert.equal(panel._editorChoices.click_action, "none");
+  assert.equal(panel._editorData.click_action, "none");
+
+  // A light keeps its toggle.
+  panel._loadEditor(false, { target: "light.a", click_action: "toggle" });
+  assert.equal(panel._editorChoices.click_action, "toggle");
+});
+
+test("clearing the short press target hands the choice to the rotation target", () => {
+  const panel = withVerbs(newPanel(), {
+    light: ["toggle", "on", "off"],
+    button: ["press"],
+  });
+  panel._loadEditor(false, { target: "light.a", click_target: "button.doorbell" });
+  panel._editorChoices.click_action = "press";
+  panel._editorData.click_action = "press";
+
+  panel._retarget("click", "button.doorbell", undefined);
+
+  assert.equal(panel._editorChoices.click_action, "toggle");
+  assert.equal(panel._editorData.click_action, "toggle");
+});

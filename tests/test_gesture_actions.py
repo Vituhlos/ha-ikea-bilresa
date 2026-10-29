@@ -222,3 +222,176 @@ def test_a_scene_turn_off_is_ignored_where_the_gesture_is_not_used() -> None:
 
     assert binding_errors(cycling) == {}
     assert binding_errors(ramping) == {}
+
+
+# -- the table of verbs ------------------------------------------------------
+
+
+def test_every_verb_has_words_in_both_languages_and_in_the_native_form() -> None:
+    """A verb without a label is a blank row in a picker."""
+    import json
+    from pathlib import Path
+
+    from custom_components.ikea_bilresa.gesture_verbs import ALL_VERBS
+    from custom_components.ikea_bilresa.panel_strings import STRINGS
+
+    root = Path(__file__).parents[1] / "custom_components/ikea_bilresa"
+    native = [
+        json.loads((root / name).read_text(encoding="utf-8"))
+        for name in ("strings.json", "translations/en.json", "translations/cs.json")
+    ]
+    own = [verb for verb in ALL_VERBS if verb not in ("toggle", "on", "off")]
+    assert own, "no verbs of their own"
+    for language, strings in STRINGS.items():
+        for verb in own:
+            assert f"click_{verb}" in strings, (language, verb)
+            assert f"action_{verb}" in strings, (language, verb)
+    for catalog in native:
+        for selector_name in ("target_action", "click_action"):
+            options = catalog["selector"][selector_name]["options"]
+            for verb in ALL_VERBS:
+                assert verb in options, (selector_name, verb)
+
+
+def test_the_panel_is_told_the_same_verbs_the_server_validates() -> None:
+    from custom_components.ikea_bilresa.const import PRESS_TARGET_DOMAINS
+    from custom_components.ikea_bilresa.gesture_verbs import VERBS, schema_verbs
+
+    offered = schema_verbs()
+    assert tuple(offered) == tuple(PRESS_TARGET_DOMAINS)
+    for domain, verbs in offered.items():
+        assert verbs, domain
+        for verb in verbs:
+            assert action_is_supported(f"{domain}.x", verb), (domain, verb)
+            assert target_service(f"{domain}.x", verb) is not None, (domain, verb)
+    # What older bindings hold keeps running but is no longer offered.
+    assert "toggle" in VERBS["scene"] and "toggle" not in offered["scene"]
+
+
+@pytest.mark.parametrize(
+    ("entity", "action", "supported"),
+    [
+        ("media_player.a", "play_pause", True),
+        ("media_player.a", "open", False),
+        ("cover.a", "open", True),
+        ("cover.a", "play_pause", False),
+        ("lock.a", "lock", True),
+        ("lock.a", "toggle", False),
+        ("lock.a", "off", False),
+        ("siren.a", "off", True),
+        ("siren.a", "on", False),
+        ("valve.a", "close", True),
+        ("valve.a", "on", False),
+        # Before the verbs a gesture toggled anything, including the target a
+        # wheel's short press shares with its rotation; that still validates.
+        ("number.a", "toggle", True),
+        ("input_number.a", "toggle", True),
+        ("climate.a", "on", True),
+        ("number.a", "play_pause", False),
+        ("light.a", "none", True),
+        ("lock.a", "none", True),
+    ],
+)
+def test_which_verbs_a_kind_of_target_accepts(entity, action, supported) -> None:
+    assert action_is_supported(entity, action) is supported
+
+
+def test_a_stateful_verb_needs_a_boolean_attribute() -> None:
+    from custom_components.ikea_bilresa.gesture_actions import gesture_call, needs_state
+
+    assert needs_state("media_player.a", "mute_toggle")
+    assert not needs_state("media_player.a", "play_pause")
+    assert gesture_call("media_player.a", "mute_toggle", {"is_volume_muted": True}) == (
+        "media_player",
+        "volume_mute",
+        {"is_volume_muted": False},
+    )
+    for attributes in (None, {}, {"is_volume_muted": None}, {"is_volume_muted": 1}):
+        assert gesture_call("media_player.a", "mute_toggle", attributes) is None
+
+
+@pytest.mark.parametrize(
+    ("entity", "action", "error"),
+    [
+        ("lock.door", "play_pause", "action_not_supported"),
+        ("media_player.tv", "open", "action_not_supported"),
+        ("scene.evening", "off", "scene_cannot_turn_off"),
+    ],
+)
+def test_a_verb_the_target_lacks_is_refused_when_the_binding_is_saved(
+    entity: str, action: str, error: str
+) -> None:
+    stored = _normalize(**{CONF_DOUBLE_TARGET: entity, CONF_DOUBLE_ACTION: action})
+
+    assert binding_errors(stored) == {CONF_DOUBLE_ACTION: error}
+
+
+def test_a_verb_of_the_targets_own_kind_is_accepted_and_stored() -> None:
+    stored = _normalize(
+        **{CONF_DOUBLE_TARGET: "media_player.tv", CONF_DOUBLE_ACTION: "play_pause"}
+    )
+
+    assert binding_errors(stored) == {}
+    assert editor_data(stored)[CONF_DOUBLE_ACTION] == "play_pause"
+
+
+@pytest.mark.parametrize(
+    ("entity", "action", "supported"),
+    [
+        # Never targets of a gesture before the verbs, so no old data holds them.
+        ("button.a", "toggle", False),
+        ("automation.a", "toggle", False),
+        ("vacuum.a", "on", False),
+        ("select.a", "toggle", False),
+        ("input_button.a", "off", False),
+    ],
+)
+def test_the_switchable_words_are_not_handed_to_kinds_that_never_had_them(
+    entity, action, supported
+) -> None:
+    assert action_is_supported(entity, action) is supported
+
+
+def test_a_new_gesture_defaults_to_the_first_thing_the_target_can_do() -> None:
+    from custom_components.ikea_bilresa.gesture_verbs import default_verb
+
+    assert default_verb("light.a") == "toggle"
+    assert default_verb("script.a") == "on"
+    assert default_verb("scene.a") == "on"
+    assert default_verb("button.a") == "press"
+    assert default_verb("lock.a") == "lock"
+    assert default_verb("media_player.a") == "toggle"
+    assert default_verb(None) == "toggle"
+
+
+@pytest.mark.parametrize(
+    ("entity", "action", "ledger", "activity"),
+    [
+        ("siren.alarm", "off", "action_turn_off", "turn_off"),
+        ("cover.blind", "toggle", "action_toggle", "toggle"),
+        ("media_player.tv", "on", "action_turn_on", "turn_on"),
+        ("media_player.tv", "play_pause", "action_play_pause", "play_pause"),
+    ],
+)
+def test_every_verb_reads_as_words_the_panel_has(
+    entity, action, ledger, activity
+) -> None:
+    """A siren turned off must not show up as the literal "action_off"."""
+    from custom_components.ikea_bilresa.panel_models import _action_key
+    from custom_components.ikea_bilresa.panel_strings import STRINGS
+
+    assert _action_key(action, entity) == ledger
+    assert result_label(entity, action) == activity
+    for strings in STRINGS.values():
+        assert ledger in strings
+        assert f"service_{activity}" in strings or f"action_{activity}" in strings
+
+
+def test_a_scene_asked_for_a_verb_it_lacks_is_not_told_it_cannot_be_turned_off() -> (
+    None
+):
+    stored = _normalize(
+        **{CONF_DOUBLE_TARGET: "scene.evening", CONF_DOUBLE_ACTION: "play_pause"}
+    )
+
+    assert binding_errors(stored) == {CONF_DOUBLE_ACTION: "action_not_supported"}

@@ -57,7 +57,13 @@ def test_the_panel_schema_is_plain_json_and_covers_every_mode() -> None:
     }
     # The dial's step is in the dial's own units, so it carries no unit.
     assert schema["settings_numbers"]["step"]["unit"] is None
-    assert schema["press_target_domains"] == ["light", "switch", "script", "scene"]
+    # The kinds of target a gesture may act on, and what each can do.
+    assert schema["press_target_domains"][:2] == ["light", "switch"]
+    assert set(schema["gesture_verbs"]) == set(schema["press_target_domains"])
+    assert schema["gesture_verbs"]["script"] == ["on", "off", "toggle"]
+    assert schema["gesture_verbs"]["scene"] == ["on"]
+    assert "play_pause" in schema["gesture_verbs"]["media_player"]
+    assert "unlock" not in schema["gesture_verbs"]["lock"]
     assert schema["ramp_target_domains"] == ["light"]
 
 

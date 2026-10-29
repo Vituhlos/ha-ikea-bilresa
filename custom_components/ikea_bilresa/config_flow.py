@@ -34,7 +34,6 @@ from .const import (
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
-    CLICK_ON,
     CONF_ACCELERATION,
     CONF_BINDING_PROFILE,
     CONF_BUTTON_RESPONSE,
@@ -88,9 +87,9 @@ from .const import (
     SUBENTRY_BINDING,
     TARGET_ACTIONS,
     TARGET_DOMAINS,
-    is_run_target,
 )
 from .device_link import resolve_matter_device
+from .gesture_verbs import default_verb
 from .matter_ws import MatterWSIncompatible, validate_server_info
 from .model import BilresaWheel
 from .presentation import generated_binding_title, generated_button_binding_title
@@ -128,14 +127,15 @@ def _with_explicit_actions(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_scripts_and_scenes(candidate: dict[str, Any]) -> dict[str, Any]:
-    """A new gesture aimed at a script or a scene runs it, unless told otherwise.
+    """A new gesture gets the sensible action for its target when none was chosen.
 
     The action selects have no default of their own, so an empty one means the
     person did not choose. For a script or a scene that is "run", the only
-    action that carries variables to a script; for anything else it stays empty
-    and the stored default, toggle, applies. Only a new binding is given this: a
-    binding being edited keeps what it has, so a script it already toggled does
-    not start running when the form is saved.
+    action that carries variables to a script; for a light or anything else with
+    a toggle it is toggle, as it always was; for a button it is press and for a
+    lock lock. Only a new binding is given this: a binding being edited keeps
+    what it has, so a script it already toggled does not start running when the
+    form is saved.
     """
     filled = dict(candidate)
     pairs = [
@@ -146,8 +146,12 @@ def _run_scripts_and_scenes(candidate: dict[str, Any]) -> dict[str, Any]:
     if candidate.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION) == HOLD_TOGGLE:
         pairs.append((CONF_HOLD_TARGET, CONF_HOLD_TARGET_ACTION))
     for target_field, action_field in pairs:
-        if not filled.get(action_field) and is_run_target(filled.get(target_field)):
-            filled[action_field] = CLICK_ON
+        target = filled.get(target_field)
+        # Toggle is what a missing action already means, so it is left empty.
+        if target and not filled.get(action_field):
+            verb = default_verb(target)
+            if verb != DEFAULT_TARGET_ACTION:
+                filled[action_field] = verb
     return filled
 
 

@@ -52,6 +52,44 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
 
+## Akce podle druhu cíle
+
+Co gesto umí, závisí na cíli, který zvolíte: seznam akcí v panelu ukáže jen to,
+co daný druh cíle dokáže provést. Přepnout, zapnout a vypnout existuje pro vše
+přepínatelné (světlo, vypínač, ventilátor, zvlhčovač, dálkové ovládání,
+klimatizaci, input boolean); ostatní:
+
+| Cíl | Akce |
+|---|---|
+| **přehrávač** | přehrát / pozastavit, přehrát, pozastavit, zastavit, další skladba, předchozí skladba, hlasitěji, tišeji, ztlumit / zrušit ztlumení, a přepnout, zapnout, vypnout |
+| **roleta, vrata (cover)** | přepnout, otevřít, zavřít, zastavit |
+| **zámek** | zamknout |
+| **vysavač** | spustit, pozastavit, zastavit, vrátit do stanice, najít |
+| **ventilátor** | zrychlit, zpomalit, a přepnout, zapnout, vypnout |
+| **tlačítko, input button** | stisknout tlačítko |
+| **automatizace** | spustit automatizaci |
+| **input select, select** | další, předchozí, první, poslední možnost |
+| **input number** | zvýšit, snížit (o krok čísla) |
+| **ventil** | zavřít, zastavit |
+| **siréna** | vypnout |
+| skript, scéna | viz níže |
+
+Ztlumit / zrušit ztlumení požádá přehrávač o opak toho, co v okamžiku stisku
+hlásí; přehrávač, který neřekne, zda je ztlumený (třeba vypnutý), se přeskočí.
+Nedostupný cíl se přeskočí a živá aktivita řekne proč.
+
+**Co je záměrně vynecháno:** odemknutí zámku, jeho otevření nebo přepnutí;
+zapnutí sirény; otevření ventilu; vypnutí alarmu. Jeden náhodný stisk na ovladači,
+který si může vzít kdokoli, nesmí otevřít dveře, spustit sirénu, pustit vodu ani
+vypnout alarm; použijte skript nebo automatizaci, kde si určíte jak. U garážových
+vrat a brány panel vedle *Otevřít* a *Přepnout* upozorní, že se po stisku otevřou,
+i když se nikdo nedívá.
+
+Pokud zařízení některou akci nepodporuje (třeba přehrávač nemá *další skladbu*),
+Home Assistant zapíše chybu do protokolu; živá aktivita přesto řekne, že akce byla
+přijata, protože volání se posílá bez čekání na zařízení. Propojení uložené před
+touto změnou funguje beze změny.
+
 ## Scény a skripty jako cíle
 
 Každé gesto stisku (jednoduchý, dvojitý, trojitý stisk a podržení) provede jednu

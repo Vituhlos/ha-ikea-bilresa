@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **A gesture can do more than toggle, turn on and turn off.** The action list now
+  depends on the target: a media player has play / pause, next and previous track,
+  volume up and down and mute / unmute; a cover open, close and stop; a vacuum
+  start, pause, stop, return to dock and locate; a lock *lock*; a button *press*;
+  an automation *run*; a select or input select next, previous, first and last
+  option; an input number increase and decrease; a fan speed up and slow down; a
+  valve close and stop; a siren turn off. The panel, the native form, the live
+  activity and the gesture ledger use the same table, and the panel warns beside
+  *Open* and *Toggle* for a garage door or a gate. Mute asks for the opposite of
+  what the player reports and is skipped when it does not say. **Left out on
+  purpose:** unlocking, opening or toggling a lock, turning a siren on, opening a
+  valve and disarming an alarm (see the bindings guide). A button that was never
+  pressed (state `unknown`) is pressed all the same. Bindings saved before keep
+  working as they were: a lock, a siren, a valve, a button or an automation
+  could not be the target of a gesture until now. Addresses GitHub #17.
+
 ### Documentation
 - **The scroll limitation is explained plainly** (how-it-works guide, English and
   Czech): the wheel sends a running total about every 0.5–1 s, what the

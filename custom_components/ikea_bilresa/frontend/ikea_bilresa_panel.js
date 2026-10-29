@@ -73,6 +73,12 @@ const FALLBACK_SCHEMA = {
   },
   mode_domains: MODE_DOMAINS,
   press_target_domains: ["light", "switch", "script", "scene"],
+  gesture_verbs: {
+    light: ["toggle", "on", "off"],
+    switch: ["toggle", "on", "off"],
+    script: ["on", "off", "toggle"],
+    scene: ["on"],
+  },
   ramp_target_domains: ["light"],
 };
 
@@ -1583,10 +1589,16 @@ const GESTURE_FIELDS = {
   hold: { action: "hold_target_action", target: "hold_target" },
 };
 
+const domainOf = (entityId) => String(entityId || "").split(".", 1)[0];
+
 const targetKind = (entityId) => {
-  const domain = String(entityId || "").split(".", 1)[0];
+  const domain = domainOf(entityId);
   return domain === "scene" || domain === "script" ? domain : "other";
 };
+
+// Garage doors, gates and doors open when the button is pressed, with nobody
+// watching; the panel says so beside the choice.
+const OPENING_COVERS = ["garage", "gate", "door"];
 
 // A scene has no toggle and no off: both read as "run".
 const actionFor = (kind, action) =>
@@ -1758,6 +1770,14 @@ class IkeaBilresaPanel extends HTMLElement {
     const base = wanted.split("-", 1)[0];
     if (available.includes(base)) return base;
     return config.language || "en";
+  }
+
+  // What the live activity calls what was done: the service words it always
+  // had, and the verb's own name for the rest.
+  _serviceLabel(action) {
+    const config = this._panel?.config || {};
+    const labels = config.labels_by_language?.[this._lang()] || config.labels || {};
+    return this._t(labels[`service_${action}`] === undefined ? `action_${action}` : `service_${action}`);
   }
 
   _t(key, placeholders) {
@@ -2388,6 +2408,17 @@ class IkeaBilresaPanel extends HTMLElement {
         targetKind(this._editorData.click_target),
         this._editorChoices.click_action,
       );
+      // A binding saved when only toggle, on and off existed may hold one its
+      // target cannot do (toggle on a number, which did nothing): it is shown,
+      // and saved, as no action rather than as a choice the list lacks.
+      const shortTarget = this._editorData.click_target || this._editorData.target;
+      if (
+        shortTarget &&
+        this._editorChoices.click_action !== "none" &&
+        !this._verbsFor(shortTarget).includes(this._editorChoices.click_action)
+      ) {
+        this._editorChoices.click_action = "none";
+      }
       this._editorData.click_action = this._editorChoices.click_action;
     }
     // Scene cycling and "no action" show no short-press target. A binding that
@@ -2548,17 +2579,22 @@ class IkeaBilresaPanel extends HTMLElement {
   // The words for the actions of one gesture, per kind of target. Scene
   // cycling is a choice of the short press alone, and "no action" of every
   // gesture but the hold, which has its own mode for it.
-  _actionOptions(target, { scenes = false, none = true } = {}) {
+  // The verbs come from the server's table (gesture_verbs.py), by the kind of
+  // entity; a backend that predates it offers the three words it always had.
+  _verbsFor(target) {
+    const verbs = this._schema().gesture_verbs?.[domainOf(target)];
+    return verbs || ["toggle", "on", "off"];
+  }
+
+  _verbLabel(target, verb) {
     const kind = targetKind(target);
-    const actions =
-      kind === "scene"
-        ? ["on"]
-        : kind === "script"
-          ? ["on", "off", "toggle"]
-          : ["toggle", "on", "off"];
-    const options = actions.map((action) => ({
+    return this._t(kind === "other" ? `click_${verb}` : `click_${kind}_${verb}`);
+  }
+
+  _actionOptions(target, { scenes = false, none = true } = {}) {
+    const options = this._verbsFor(target).map((action) => ({
       value: action,
-      label: this._t(kind === "other" ? `click_${action}` : `click_${kind}_${action}`),
+      label: this._verbLabel(target, action),
     }));
     if (scenes) options.push({ value: "scenes", label: this._t("click_scenes") });
     if (none) options.push({ value: "none", label: this._t("click_none") });
@@ -2568,6 +2604,10 @@ class IkeaBilresaPanel extends HTMLElement {
   // What running or toggling a script means for the script, said where the
   // choice is made: variables travel only with "run".
   _actionHelp(target, action) {
+    if (domainOf(target) === "cover" && ["open", "toggle"].includes(action)) {
+      const deviceClass = this._hass?.states?.[target]?.attributes?.device_class;
+      if (OPENING_COVERS.includes(deviceClass)) return this._t("cover_open_warning");
+    }
     if (targetKind(target) !== "script") return undefined;
     if (action === "on") return this._t("script_run_help");
     if (action === "toggle") return this._t("script_toggle_help");
@@ -2577,9 +2617,29 @@ class IkeaBilresaPanel extends HTMLElement {
   // A new kind of target brings its own sensible action: a scene or a script
   // is run, anything else is toggled. The same kind keeps what was chosen.
   _retarget(gesture, previous, next) {
-    if (!next || targetKind(previous) === targetKind(next)) return;
+    // A wheel's short press with no target of its own acts on the rotation
+    // target, so clearing the target hands the choice to that one.
+    const effective = next || (gesture === "click" ? this._editorData.target : undefined);
+    if (!effective) return;
     const { action } = GESTURE_FIELDS[gesture];
-    const fresh = targetKind(next) === "other" ? "toggle" : "on";
+    const verbs = this._verbsFor(effective);
+    const current =
+      gesture === "click"
+        ? this._editorChoices.click_action
+        : gesture === "hold"
+          ? this._editorData[action]
+          : this._editorChoices[gesture];
+    // What was chosen stays while the new target is the same kind and can do
+    // it; otherwise the new target brings its own: run for a scene or a script,
+    // toggle where there is one, else its first verb.
+    const sameKind = targetKind(previous) === targetKind(effective);
+    if (sameKind && (current === "scenes" || current === "none" || verbs.includes(current))) return;
+    const fresh =
+      targetKind(effective) !== "other"
+        ? "on"
+        : verbs.includes("toggle")
+          ? "toggle"
+          : verbs[0];
     if (gesture === "double_press" || gesture === "triple_press") {
       this._editorChoices[gesture] = fresh;
     }
@@ -3258,7 +3318,7 @@ class IkeaBilresaPanel extends HTMLElement {
           value: this._editorChoices.click_action,
           onChoose: (next) => this._chooseGesture("click_action", next),
           help: this._actionHelp(
-            this._editorData.click_target,
+            this._editorData.click_target || this._editorData.target,
             this._editorChoices.click_action,
           ),
         },
@@ -4034,7 +4094,7 @@ class IkeaBilresaPanel extends HTMLElement {
     }
     if (result.kind === "entity_action") {
       return this._t("result_entity_action", {
-        action: this._t(`service_${result.action}`),
+        action: this._serviceLabel(result.action),
         target: result.target,
       });
     }
