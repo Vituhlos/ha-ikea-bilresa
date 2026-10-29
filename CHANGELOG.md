@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Added
+- **Each press gesture has its own action on its target.** A double press, a
+  triple press and a hold can now toggle, turn on or turn off their target, as
+  the short press always could. For a script the choices are named *Run script*,
+  *Stop script* and *Toggle script*; for a scene only *Run scene* exists. The
+  panel pre-selects *Run* when a script or a scene is chosen, and the native flow
+  has the same selects (the short press's too), which leave a new script or
+  scene on *Run* when you do not choose; a copied binding keeps what its source
+  does. A binding saved before this has no action stored and keeps toggling. Two gestures have no action of their own: scene cycling replaces
+  the short press's action, and a hold set to ramp the light acts on the
+  rotation target.
+- **A script run by a gesture is told which gesture started it**, in the
+  variables `gesture`, `presses`, `channel`, `endpoint` and `device`. Toggle and
+  Stop cannot pass variables (`script.toggle` has none).
+- A README section "Scenes and scripts as targets" with the table of what each
+  action does and an example script.
 - **The panel has two variables a theme can set**, `bilresa-accent` and
   `bilresa-on-accent` (GitHub #22). A theme that sets Home Assistant's
   `state-icon-color` and `text-primary-color` to one colour, as some
@@ -15,6 +30,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   "Add a control binding") as bright as its fill. The accent still defaults to
   `state-icon-color` and the label to `text-primary-color`, so nothing changes
   for a theme that does not set them. The README says how.
+
+### Changed
+- The gesture ledger and the live activity say *Run*, *Stop* or *Toggle* for a
+  script, and *Run* for a scene. "Turn target off" is refused for a scene on
+  every gesture, not only the short press.
 
 ## [0.7.0-rc.4] - 2026-10-25
 

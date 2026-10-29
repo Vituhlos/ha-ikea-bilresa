@@ -40,19 +40,23 @@ from .const import (
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_RAMP_DIRECTION,
     CONF_SCENES,
     CONF_TARGET,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
     DEFAULT_MODE,
+    DEFAULT_TARGET_ACTION,
     DOMAIN,
     HOLD_NONE,
     HOLD_RAMP,
@@ -68,9 +72,9 @@ from .const import (
     ROLE_BUTTON,
     SUBENTRY_BINDING,
     SUBENTRY_WHEEL,
-    is_scene_target,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
+from .gesture_actions import target_service
 from .model import BilresaWheel
 from .panel_strings import localize
 
@@ -395,18 +399,23 @@ _CLICK_KEYS = {
 }
 
 
-def _click_key(click_action: str, target: str | None) -> str:
-    """The label key for a short press: a scene is run, not toggled."""
-    if click_action in (CLICK_TOGGLE, CLICK_ON) and is_scene_target(target):
-        return "action_run"
-    return _CLICK_KEYS.get(click_action, "action_toggle")
+def _action_key(action: str, target: str | None) -> str:
+    """The label key for what a press does to its target.
 
-
-def _press_key(target: str | None) -> str:
-    """The label key for a multi-press or a hold that switches its target."""
-    if not target:
+    A scene is run whatever was asked, and a script is run, stopped or toggled,
+    so the words differ from a light's; ``gesture_actions`` holds the meaning.
+    """
+    if action == CLICK_NONE or not target:
         return "action_none"
-    return "action_run" if is_scene_target(target) else "action_toggle"
+    call = target_service(target, action)
+    if call is None:
+        return "action_none"
+    domain, service = call
+    if domain == "scene" or (domain, service) == ("script", "turn_on"):
+        return "action_run"
+    if (domain, service) == ("script", "turn_off"):
+        return "action_stop"
+    return _CLICK_KEYS.get(action, "action_toggle")
 
 
 def _gesture_summary(
@@ -439,8 +448,11 @@ def _wheel_gesture_summaries(
     target = data.get(CONF_TARGET)
     click_target = data.get(CONF_CLICK_TARGET) or target
     double_target = data.get(CONF_DOUBLE_TARGET)
+    double_action = data.get(CONF_DOUBLE_ACTION, DEFAULT_TARGET_ACTION)
     triple_target = data.get(CONF_TRIPLE_TARGET)
+    triple_action = data.get(CONF_TRIPLE_ACTION, DEFAULT_TARGET_ACTION)
     hold_target = data.get(CONF_HOLD_TARGET)
+    hold_target_action = data.get(CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION)
     hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
     scenes = list(data.get(CONF_SCENES) or [])
 
@@ -486,7 +498,7 @@ def _wheel_gesture_summaries(
                 hass,
                 language,
                 "short_press",
-                _click_key(click_action, click_target),
+                _action_key(click_action, click_target),
                 None if click_action == CLICK_NONE else click_target,
             )
         )
@@ -497,14 +509,14 @@ def _wheel_gesture_summaries(
                 hass,
                 language,
                 "double_press",
-                _press_key(double_target),
+                _action_key(double_action, double_target),
                 double_target,
             ),
             _gesture_summary(
                 hass,
                 language,
                 "triple_press",
-                _press_key(triple_target),
+                _action_key(triple_action, triple_target),
                 triple_target,
             ),
         )
@@ -520,7 +532,11 @@ def _wheel_gesture_summaries(
     elif hold_action == HOLD_TOGGLE and hold_target:
         summaries.append(
             _gesture_summary(
-                hass, language, "hold", _press_key(hold_target), hold_target
+                hass,
+                language,
+                "hold",
+                _action_key(hold_target_action, hold_target),
+                hold_target,
             )
         )
         summaries.append(_gesture_summary(hass, language, "release", "action_none"))
@@ -546,24 +562,26 @@ def _button_gesture_summaries(
             hass,
             language,
             "short_press",
-            _click_key(click_action, click_target),
+            _action_key(click_action, click_target),
             None if click_action == CLICK_NONE else click_target,
         )
     ]
     if multi_press_max >= 2:
         double_target = data.get(CONF_DOUBLE_TARGET)
+        double_action = data.get(CONF_DOUBLE_ACTION, DEFAULT_TARGET_ACTION)
         summaries.append(
             _gesture_summary(
                 hass,
                 language,
                 "double_press",
-                _press_key(double_target),
+                _action_key(double_action, double_target),
                 double_target,
             )
         )
 
     hold_action = data.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION)
     hold_target = data.get(CONF_HOLD_TARGET)
+    hold_target_action = data.get(CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION)
     if hold_action == HOLD_RAMP:
         direction = str(data.get(CONF_RAMP_DIRECTION, "alternate"))
         summaries.append(
@@ -581,7 +599,11 @@ def _button_gesture_summaries(
     elif hold_action == HOLD_TOGGLE and hold_target:
         summaries.append(
             _gesture_summary(
-                hass, language, "hold", _press_key(hold_target), hold_target
+                hass,
+                language,
+                "hold",
+                _action_key(hold_target_action, hold_target),
+                hold_target,
             )
         )
         summaries.append(_gesture_summary(hass, language, "release", "action_none"))

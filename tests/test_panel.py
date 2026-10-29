@@ -588,8 +588,7 @@ def test_dual_button_reuses_the_panel_shell_with_two_button_controls() -> None:
     assert '"button-surface"' not in asset
     assert '["buttons", "live", "diagnostics"]' in views
     # Scene cycling and triple press exist only on the wheel.
-    assert '? ["toggle", "on", "off", "none"]' in form
-    assert ': ["toggle", "on", "off", "scenes", "none"]' in form
+    assert "{ scenes: !isButton }" in form
     assert '? ["double_press"]' in form
     assert ': ["double_press", "triple_press"]' in form
     assert '"ramp_direction"' in form

@@ -34,6 +34,7 @@ from .const import (
     BUTTON_RESPONSES,
     CLICK_ACTIONS,
     CLICK_NONE,
+    CLICK_ON,
     CONF_ACCELERATION,
     CONF_BINDING_PROFILE,
     CONF_BUTTON_RESPONSE,
@@ -41,10 +42,12 @@ from .const import (
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_COPY_FROM,
+    CONF_DOUBLE_ACTION,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
@@ -55,11 +58,11 @@ from .const import (
     CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_ACTION,
     CONF_TRIPLE_TARGET,
     CONF_URL,
     DEFAULT_ACCELERATION,
     DEFAULT_BUTTON_RESPONSE,
-    DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
     DEFAULT_MATTER_URL,
     DEFAULT_MAX_BRIGHTNESS,
@@ -68,9 +71,11 @@ from .const import (
     DEFAULT_RAMP_DIRECTION,
     DEFAULT_STEP,
     DEFAULT_STEP_CURVE,
+    DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     DOMAIN,
     HOLD_ACTIONS,
+    HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_COVER,
     MODE_TEMPERATURE,
@@ -81,12 +86,69 @@ from .const import (
     ROLE_BUTTON,
     STEP_CURVES,
     SUBENTRY_BINDING,
+    TARGET_ACTIONS,
     TARGET_DOMAINS,
+    is_run_target,
 )
 from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
 from .model import BilresaWheel
 from .presentation import generated_binding_title, generated_button_binding_title
+
+
+def _target_action_selector() -> selector.SelectSelector:
+    """What a gesture does to its target: toggle, turn on or turn off."""
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=TARGET_ACTIONS,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            translation_key="target_action",
+        )
+    )
+
+
+def _with_explicit_actions(data: dict[str, Any]) -> dict[str, Any]:
+    """Say what a missing action meant, so a copy does the same as its source.
+
+    A binding saved before the choice existed has no action for a gesture and
+    toggled its target. A copy shows empty selects for those, and an empty one on
+    a new binding means "run" for a script or a scene; written out here, the copy
+    keeps toggling like the binding it came from.
+    """
+    explicit = dict(data)
+    for target_field, action_field in (
+        (CONF_CLICK_TARGET, CONF_CLICK_ACTION),
+        (CONF_DOUBLE_TARGET, CONF_DOUBLE_ACTION),
+        (CONF_TRIPLE_TARGET, CONF_TRIPLE_ACTION),
+        (CONF_HOLD_TARGET, CONF_HOLD_TARGET_ACTION),
+    ):
+        if explicit.get(target_field) and not explicit.get(action_field):
+            explicit[action_field] = DEFAULT_TARGET_ACTION
+    return explicit
+
+
+def _run_scripts_and_scenes(candidate: dict[str, Any]) -> dict[str, Any]:
+    """A new gesture aimed at a script or a scene runs it, unless told otherwise.
+
+    The action selects have no default of their own, so an empty one means the
+    person did not choose. For a script or a scene that is "run", the only
+    action that carries variables to a script; for anything else it stays empty
+    and the stored default, toggle, applies. Only a new binding is given this: a
+    binding being edited keeps what it has, so a script it already toggled does
+    not start running when the form is saved.
+    """
+    filled = dict(candidate)
+    pairs = [
+        (CONF_CLICK_TARGET, CONF_CLICK_ACTION),
+        (CONF_DOUBLE_TARGET, CONF_DOUBLE_ACTION),
+        (CONF_TRIPLE_TARGET, CONF_TRIPLE_ACTION),
+    ]
+    if candidate.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION) == HOLD_TOGGLE:
+        pairs.append((CONF_HOLD_TARGET, CONF_HOLD_TARGET_ACTION))
+    for target_field, action_field in pairs:
+        if not filled.get(action_field) and is_run_target(filled.get(target_field)):
+            filled[action_field] = CLICK_ON
+    return filled
 
 
 def _matter_server_url(hass: HomeAssistant) -> str:
@@ -233,6 +295,8 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         normalized: dict[str, Any] | None = None
         if user_input is not None:
             candidate = {CONF_NODE_ID: self._pending_node_id, **user_input}
+            if step_id != "reconfigure":
+                candidate = _run_scripts_and_scenes(candidate)
             normalized, errors = self._normalize_and_validate(candidate)
             if normalized is not None and CONF_ENDPOINT in normalized:
                 device = self._device(str(normalized[CONF_NODE_ID]))
@@ -352,7 +416,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         subentry = self._get_entry().subentries.get(copy_from)
         if subentry is None or subentry.subentry_type != SUBENTRY_BINDING:
             return None
-        return dict(subentry.data)
+        return _with_explicit_actions(dict(subentry.data))
 
     @staticmethod
     @callback
@@ -601,9 +665,9 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         defaults: dict[str, Any], *, wheel: bool
     ) -> dict[Any, Any]:
         fields: dict[Any, Any] = {
-            vol.Required(
+            vol.Optional(
                 CONF_CLICK_ACTION,
-                default=defaults.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION),
+                description={"suggested_value": defaults.get(CONF_CLICK_ACTION)},
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=CLICK_ACTIONS,
@@ -636,11 +700,19 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Optional(
+                CONF_DOUBLE_ACTION,
+                description={"suggested_value": defaults.get(CONF_DOUBLE_ACTION)},
+            ): _target_action_selector(),
+            vol.Optional(
                 CONF_HOLD_TARGET,
                 description={"suggested_value": defaults.get(CONF_HOLD_TARGET)},
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
+            vol.Optional(
+                CONF_HOLD_TARGET_ACTION,
+                description={"suggested_value": defaults.get(CONF_HOLD_TARGET_ACTION)},
+            ): _target_action_selector(),
             vol.Required(
                 CONF_HOLD_ACTION,
                 default=defaults.get(CONF_HOLD_ACTION, DEFAULT_HOLD_ACTION),
@@ -661,6 +733,12 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
             ] = selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             )
+            fields[
+                vol.Optional(
+                    CONF_TRIPLE_ACTION,
+                    description={"suggested_value": defaults.get(CONF_TRIPLE_ACTION)},
+                )
+            ] = _target_action_selector()
             fields[
                 vol.Optional(
                     CONF_SCENES,

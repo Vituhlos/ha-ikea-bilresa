@@ -25,6 +25,7 @@ from .const import (
     CLUSTER_SWITCH,
     CONF_CHANNEL,
     CONF_ENDPOINT,
+    CONF_NODE_ID,
     DISCONNECT_GRACE_SECONDS,
     DOMAIN,
     EVENT_BILRESA,
@@ -234,7 +235,10 @@ class BilresaCoordinator:
             if subentry.subentry_type != SUBENTRY_BINDING:
                 continue
             binding = LightBinding(
-                self.hass, dict(subentry.data), trace=self.rotation_trace
+                self.hass,
+                dict(subentry.data),
+                trace=self.rotation_trace,
+                device_name=self._device_name_for(subentry.data.get(CONF_NODE_ID)),
             )
             self._binding_unsubs.append(binding.async_attach())
             key = binding.binding_key
@@ -242,6 +246,16 @@ class BilresaCoordinator:
             self._bindings[key] = binding
         if self._binding_unsubs:
             _LOGGER.debug("Attached %s control binding(s)", len(self._binding_unsubs))
+
+    @callback
+    def _device_name_for(self, node_id: Any) -> Callable[[], str]:
+        """The current name of one wheel, for a binding that needs it later."""
+
+        def name() -> str:
+            wheel = self.wheels.get(int(node_id)) if node_id is not None else None
+            return wheel.name if wheel is not None else ""
+
+        return name
 
     @callback
     def _detach_bindings(self) -> None:

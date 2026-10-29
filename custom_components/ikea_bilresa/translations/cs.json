@@ -48,12 +48,15 @@
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "max_brightness": "Maximální jas (%)",
             "transition": "Vyhlazení velkých skoků (s)",
-            "click_action": "Akce jednoduchého stisku",
+            "click_action": "Akce jednoduchého stisku tlačítka (prázdné: přepnout, u skriptu nebo scény spustit)",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
             "double_press_target": "Cíl dvojitého stisku (volitelné)",
+            "double_press_action": "Akce dvojitého stisku (prázdné: přepnout, u skriptu nebo scény spustit)",
             "triple_press_target": "Cíl trojitého stisku (volitelné)",
+            "triple_press_action": "Akce trojitého stisku (prázdné: přepnout, u skriptu nebo scény spustit)",
             "hold_target": "Cíl akce při podržení",
+            "hold_target_action": "Akce podržení na jeho cíli (prázdné: přepnout, u skriptu nebo scény spustit)",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
             "scenes": "Scény střídané jednoduchým stiskem (volitelné, nahradí jeho akci)",
@@ -86,12 +89,15 @@
             "min_brightness": "Minimální jas (%, 0 = otočením dolů lze vypnout)",
             "max_brightness": "Maximální jas (%)",
             "transition": "Vyhlazení velkých skoků (s)",
-            "click_action": "Akce jednoduchého stisku",
+            "click_action": "Akce jednoduchého stisku tlačítka (prázdné: přepnout, u skriptu nebo scény spustit)",
             "button_response": "Odezva tlačítka",
             "click_target": "Cíl jednoduchého stisku",
             "double_press_target": "Cíl dvojitého stisku (volitelné)",
+            "double_press_action": "Akce dvojitého stisku (prázdné: přepnout, u skriptu nebo scény spustit)",
             "triple_press_target": "Cíl trojitého stisku (volitelné)",
+            "triple_press_action": "Akce trojitého stisku (prázdné: přepnout, u skriptu nebo scény spustit)",
             "hold_target": "Cíl akce při podržení",
+            "hold_target_action": "Akce podržení na jeho cíli (prázdné: přepnout, u skriptu nebo scény spustit)",
             "hold_action": "Akce při podržení tlačítka",
             "ramp_direction": "Směr plynulé změny při podržení",
             "scenes": "Scény střídané jednoduchým stiskem (volitelné, nahradí jeho akci)",
@@ -110,7 +116,7 @@
         "instant_response_conflicts_with_hold": "Okamžitou odezvu nelze kombinovat se samostatnou akcí podržení. Nastavte podržení na Nedělat nic nebo zvolte Rychle po uvolnění či rozpoznání více stisků.",
         "mode_target_mismatch": "Tento cíl není kompatibilní se zvoleným ovládáním. Vyberte odpovídající entitu nebo změňte, co otáčení ovládá.",
         "target_required": "Vyberte cíl této akce, nebo nastavte Nedělat nic.",
-        "scene_cannot_turn_off": "Scénu lze jen spustit, ne vypnout. Nastavte akci krátkého stisku na Přepnout nebo Zapnout.",
+        "scene_cannot_turn_off": "Scénu lze jen spustit, ne vypnout. Pro toto gesto zvolte Přepnout nebo Zapnout.",
         "ramp_requires_light": "Plynulá změna při podržení vyžaduje jako cíl světlo."
       },
       "abort": {
@@ -125,6 +131,13 @@
         "on": "Zapnout",
         "off": "Vypnout",
         "none": "Nedělat nic"
+      }
+    },
+    "target_action": {
+      "options": {
+        "toggle": "Přepnout (scéna se spustí)",
+        "on": "Zapnout (skript nebo scéna se spustí)",
+        "off": "Vypnout (skript se zastaví)"
       }
     },
     "scroll_mode": {

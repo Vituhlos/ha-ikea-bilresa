@@ -1572,6 +1572,26 @@ const ROTATION_MORE_FIELDS = [
   "acceleration",
 ];
 
+// What a press does to its target is the same few words for every gesture,
+// but they mean different things per kind of target (gesture_actions.py): a
+// scene can only be run, a script is run, stopped or toggled, anything else
+// is toggled, turned on or turned off.
+const GESTURE_FIELDS = {
+  click: { action: "click_action", target: "click_target" },
+  double_press: { action: "double_press_action", target: "double_press_target" },
+  triple_press: { action: "triple_press_action", target: "triple_press_target" },
+  hold: { action: "hold_target_action", target: "hold_target" },
+};
+
+const targetKind = (entityId) => {
+  const domain = String(entityId || "").split(".", 1)[0];
+  return domain === "scene" || domain === "script" ? domain : "other";
+};
+
+// A scene has no toggle and no off: both read as "run".
+const actionFor = (kind, action) =>
+  kind === "scene" && action !== "none" ? "on" : action;
+
 const DISCARD_DOUBLE_CLICK_MS = 500;
 const DISCARD_ARMED_MS = 4000;
 
@@ -2354,9 +2374,22 @@ class IkeaBilresaPanel extends HTMLElement {
       click_action: this._editorData.scenes?.length
         ? "scenes"
         : this._editorData.click_action,
-      double_press: this._editorData.double_press_target ? "toggle" : "none",
-      triple_press: this._editorData.triple_press_target ? "toggle" : "none",
+      double_press: this._storedAction("double_press"),
+      triple_press: this._storedAction("triple_press"),
     };
+    if (this._editorData.hold_target || this._editorData.hold_target_action) {
+      this._editorData.hold_target_action = actionFor(
+        targetKind(this._editorData.hold_target),
+        this._editorData.hold_target_action || "toggle",
+      );
+    }
+    if (this._editorChoices.click_action !== "scenes") {
+      this._editorChoices.click_action = actionFor(
+        targetKind(this._editorData.click_target),
+        this._editorChoices.click_action,
+      );
+      this._editorData.click_action = this._editorChoices.click_action;
+    }
     // Scene cycling and "no action" show no short-press target. A binding that
     // still stores one is shown without it, so the next save drops it and it
     // can no longer count as a missing target nobody can see.
@@ -2364,6 +2397,21 @@ class IkeaBilresaPanel extends HTMLElement {
       delete this._editorData.click_target;
     }
     this._editorBaseline = this._editorSnapshot();
+  }
+
+  // A double or triple press is off without a target, otherwise it does what
+  // its stored action says; a binding saved before the choice existed has none
+  // and toggled.
+  _storedAction(press) {
+    const { action, target } = GESTURE_FIELDS[press];
+    const entity = this._editorData[target];
+    if (!entity) return "none";
+    const stored = actionFor(
+      targetKind(entity),
+      this._editorData[action] || "toggle",
+    );
+    this._editorData[action] = stored;
+    return stored;
   }
 
   _editorSnapshot() {
@@ -2462,10 +2510,11 @@ class IkeaBilresaPanel extends HTMLElement {
     if (choices.click_action === "scenes" && !data.scenes?.length) {
       errors.scenes = "scenes_required";
     }
-    if (choices.double_press === "toggle" && !data.double_press_target) {
+    const enabled = (press) => choices[press] && choices[press] !== "none";
+    if (enabled("double_press") && !data.double_press_target) {
       errors.double_press_target = "target_required";
     }
-    if (choices.triple_press === "toggle" && !data.triple_press_target) {
+    if (enabled("triple_press") && !data.triple_press_target) {
       errors.triple_press_target = "target_required";
     }
     return errors;
@@ -2487,8 +2536,56 @@ class IkeaBilresaPanel extends HTMLElement {
       if (this._editorData.scenes) this._editorData.scenes = [];
     } else {
       this._editorChanged(`${name}_target`);
-      if (next === "none") delete this._editorData[`${name}_target`];
+      if (next === "none") {
+        delete this._editorData[`${name}_target`];
+        delete this._editorData[`${name}_action`];
+      } else {
+        this._editorData[`${name}_action`] = next;
+      }
     }
+  }
+
+  // The words for the actions of one gesture, per kind of target. Scene
+  // cycling is a choice of the short press alone, and "no action" of every
+  // gesture but the hold, which has its own mode for it.
+  _actionOptions(target, { scenes = false, none = true } = {}) {
+    const kind = targetKind(target);
+    const actions =
+      kind === "scene"
+        ? ["on"]
+        : kind === "script"
+          ? ["on", "off", "toggle"]
+          : ["toggle", "on", "off"];
+    const options = actions.map((action) => ({
+      value: action,
+      label: this._t(kind === "other" ? `click_${action}` : `click_${kind}_${action}`),
+    }));
+    if (scenes) options.push({ value: "scenes", label: this._t("click_scenes") });
+    if (none) options.push({ value: "none", label: this._t("click_none") });
+    return options;
+  }
+
+  // What running or toggling a script means for the script, said where the
+  // choice is made: variables travel only with "run".
+  _actionHelp(target, action) {
+    if (targetKind(target) !== "script") return undefined;
+    if (action === "on") return this._t("script_run_help");
+    if (action === "toggle") return this._t("script_toggle_help");
+    return undefined;
+  }
+
+  // A new kind of target brings its own sensible action: a scene or a script
+  // is run, anything else is toggled. The same kind keeps what was chosen.
+  _retarget(gesture, previous, next) {
+    if (!next || targetKind(previous) === targetKind(next)) return;
+    const { action } = GESTURE_FIELDS[gesture];
+    const fresh = targetKind(next) === "other" ? "toggle" : "on";
+    if (gesture === "double_press" || gesture === "triple_press") {
+      this._editorChoices[gesture] = fresh;
+    }
+    if (gesture === "click" && this._editorChoices.click_action === "scenes") return;
+    if (gesture === "click") this._editorChoices.click_action = fresh;
+    this._editorData[action] = fresh;
   }
 
   // A response that rules a gesture out drops what that gesture had, as
@@ -2684,12 +2781,13 @@ class IkeaBilresaPanel extends HTMLElement {
     name,
     label,
     domains,
-    { optional = false, help, wide = false, emptyLabel, emptyHelp } = {},
+    { optional = false, help, wide = false, emptyLabel, emptyHelp, onTarget } = {},
   ) {
     const wrap = this._field(wide);
     const id = this._fieldId(name);
     const current = this._editorData[name];
     const onChange = (next) => {
+      if (onTarget) onTarget(current, next);
       this._editorData[name] = next || undefined;
       this._editorChanged(name);
       this._render();
@@ -3143,9 +3241,6 @@ class IkeaBilresaPanel extends HTMLElement {
     // does and on what. Cycling scenes is one of the things a short press does,
     // not a second setting beside it - the runtime lets scenes win, so the
     // form must not show both.
-    const clickChoices = isButton
-      ? ["toggle", "on", "off", "none"]
-      : ["toggle", "on", "off", "scenes", "none"];
     const shortPress = this._formSection(sections, "short_press");
     // Action and response share the first column, so a long scene list in
     // the second never pushes the response down.
@@ -3155,13 +3250,17 @@ class IkeaBilresaPanel extends HTMLElement {
       this._selectField(
         "click_action",
         this._t("gesture_action"),
-        clickChoices.map((action) => ({
-          value: action,
-          label: this._t(`click_${action}`),
-        })),
+        this._actionOptions(
+          this._editorData.click_target || this._editorData.target,
+          { scenes: !isButton },
+        ),
         {
           value: this._editorChoices.click_action,
           onChoose: (next) => this._chooseGesture("click_action", next),
+          help: this._actionHelp(
+            this._editorData.click_target,
+            this._editorChoices.click_action,
+          ),
         },
       ),
     );
@@ -3181,6 +3280,7 @@ class IkeaBilresaPanel extends HTMLElement {
             // "no target" here contradicted that on the same screen.
             emptyLabel: isButton ? undefined : this._t("target_same_as_rotation"),
             emptyHelp: isButton ? undefined : this._t("target_empty_is_rotation"),
+            onTarget: (previous, next) => this._retarget("click", previous, next),
           },
         ),
       );
@@ -3224,24 +3324,28 @@ class IkeaBilresaPanel extends HTMLElement {
       }
       card.appendChild(
         this._selectField(
-          press,
+          `${press}_action`,
           this._t("gesture_action"),
-          ["toggle", "none"].map((action) => ({
-            value: action,
-            label: this._t(`click_${action}`),
-          })),
+          this._actionOptions(this._editorData[`${press}_target`]),
           {
             value: this._editorChoices[press],
             onChoose: (next) => this._chooseGesture(press, next),
+            help: this._actionHelp(
+              this._editorData[`${press}_target`],
+              this._editorChoices[press],
+            ),
           },
         ),
       );
-      if (this._editorChoices[press] === "toggle") {
+      if (this._editorChoices[press] !== "none") {
         card.appendChild(
           this._entityField(
             `${press}_target`,
             this._t("gesture_target"),
             pressDomains,
+            {
+              onTarget: (previous, next) => this._retarget(press, previous, next),
+            },
           ),
         );
       }
@@ -3363,7 +3467,28 @@ class IkeaBilresaPanel extends HTMLElement {
           this._editorData.hold_action === "ramp"
             ? this._schema().ramp_target_domains
             : pressDomains,
-          { optional: !isButton },
+          {
+            optional: !isButton,
+            onTarget: (previous, next) => this._retarget("hold", previous, next),
+          },
+        ),
+      );
+    }
+    // What the hold does to that target, once it has one to name.
+    if (holdAction === "toggle") {
+      hold.appendChild(
+        this._selectField(
+          "hold_target_action",
+          this._t("gesture_hold_effect"),
+          this._actionOptions(this._editorData.hold_target, { none: false }),
+          {
+            // A hold with no target yet still shows what it will do.
+            value: this._editorData.hold_target_action || "toggle",
+            help: this._actionHelp(
+              this._editorData.hold_target,
+              this._editorData.hold_target_action,
+            ),
+          },
         ),
       );
     }

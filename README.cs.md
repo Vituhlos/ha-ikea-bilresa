@@ -192,8 +192,8 @@ Nechcete psát automatizace? U položky **IKEA BILRESA**
   **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
   (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači). Cílem stisku,
   dvojitého či trojitého stisku nebo podržení může být i **scéna** nebo
-  **skript**: scéna se spustí; skript se přepne, zapne nebo vypne jako každá jiná
-  entita (druhý stisk ho tedy může zastavit),
+  **skript** (viz [Scény a skripty](#scény-a-skripty-jako-cíle) níže) a každé z
+  těchto gest má vlastní **akci** na svém cíli: přepnout, zapnout nebo vypnout,
 - **odezvu tlačítka**: okamžitě při prvním stisku, rychle po krátkém uvolnění,
   nebo přesné rozpoznání jednoho, dvou či tří stisků,
 - volitelný seřazený seznam **scén**, které jednoduché stisky postupně aktivují
@@ -221,6 +221,45 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 (nebo prvním použitelném kroku, když je minimum nula). Externí změna v HA
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
+
+#### Scény a skripty jako cíle
+
+Každé gesto stisku (jednoduchý, dvojitý, trojitý stisk a podržení) provede jednu
+akci na jednom cíli. Akce znamená u různých cílů něco jiného:
+
+| Cíl | Přepnout | Zapnout | Vypnout |
+|---|---|---|---|
+| světlo, vypínač | přepne | zapne | vypne |
+| **skript** | spustí ho, nebo zastaví, když běží | **spustí ho** | **zastaví ho** |
+| **scéna** | spustí ji | spustí ji | nejde (při ukládání se odmítne) |
+
+Panel pojmenuje volby podle cíle (u skriptu: *Spustit skript*, *Zastavit
+skript*, *Přepnout skript*) a když vyberete skript nebo scénu, předvybere
+*Spustit*. Propojení uložené před touto volbou nemá akci uloženou a přepíná dál,
+jako vždy.
+
+**Spustit skript** spustí skript a předá mu, které gesto ho spustilo, v
+proměnných `gesture` (`short_press`, `double_press`, `triple_press` nebo
+`hold`), `presses`, `channel`, `endpoint` a `device`, takže jeden skript může
+obsloužit víc tlačítek. Přepnutí a zastavení proměnné předat nemohou. Skript,
+který už běží, se řídí svým
+[režimem](https://www.home-assistant.io/docs/script/#script-modes) (ve výchozím
+stavu se druhé spuštění ignoruje s varováním).
+
+```yaml
+script:
+  bilresa_lights:
+    mode: restart
+    sequence:
+      - action: light.toggle
+        target:
+          entity_id: >-
+            {{ 'light.hall' if gesture == 'double_press' else 'light.kitchen' }}
+```
+
+Vyberte tento skript jako cíl krátkého i dvojitého stisku s akcí *Spustit
+skript*; jedním přepnete kuchyňské světlo, druhým chodbové. Scéna, která nebyla
+nikdy aktivována, hlásí stav `unknown` a přesto se spustí.
 
 U dvoutlačítka stejný průvodce nejdřív vybere Tlačítko 1 nebo Tlačítko 2 a pak
 zobrazí jen podporované akce: nezávislý cíl jednoduchého/dvojitého stisku a

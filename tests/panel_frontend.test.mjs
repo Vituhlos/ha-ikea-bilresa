@@ -1313,3 +1313,159 @@ test("a language switch with the Live test open restarts the live feed", async (
 
   assert.equal(started, 1);
 });
+
+const labelsOf = (options) => options.map((option) => option.value);
+
+test("the choices follow the kind of target: a scene is only run", () => {
+  const panel = newPanel();
+
+  assert.deepEqual(labelsOf(panel._actionOptions("light.a")), [
+    "toggle",
+    "on",
+    "off",
+    "none",
+  ]);
+  assert.deepEqual(labelsOf(panel._actionOptions("script.a")), [
+    "on",
+    "off",
+    "toggle",
+    "none",
+  ]);
+  assert.deepEqual(labelsOf(panel._actionOptions("scene.a")), ["on", "none"]);
+  assert.deepEqual(
+    labelsOf(panel._actionOptions("light.a", { scenes: true, none: false })),
+    ["toggle", "on", "off", "scenes"],
+  );
+  // No target chosen yet: the words of an ordinary switchable entity.
+  assert.deepEqual(labelsOf(panel._actionOptions(undefined)), [
+    "toggle",
+    "on",
+    "off",
+    "none",
+  ]);
+});
+
+test("the words for a script and a scene are their own", () => {
+  // The panel's strings come from the server, so a test sees the keys.
+  const panel = newPanel();
+  const words = (target) =>
+    panel._actionOptions(target).map((option) => option.label);
+
+  assert.deepEqual(words("script.a"), [
+    "click_script_on",
+    "click_script_off",
+    "click_script_toggle",
+    "click_none",
+  ]);
+  assert.deepEqual(words("scene.a"), ["click_scene_on", "click_none"]);
+  assert.deepEqual(words("light.a"), [
+    "click_toggle",
+    "click_on",
+    "click_off",
+    "click_none",
+  ]);
+});
+
+test("only running a script, or toggling it, gets a note about variables", () => {
+  const panel = newPanel();
+
+  assert.equal(panel._actionHelp("script.a", "on"), "script_run_help");
+  assert.equal(panel._actionHelp("script.a", "toggle"), "script_toggle_help");
+  assert.equal(panel._actionHelp("script.a", "off"), undefined);
+  assert.equal(panel._actionHelp("scene.a", "on"), undefined);
+  assert.equal(panel._actionHelp("light.a", "toggle"), undefined);
+});
+
+test("a stored double press keeps its action, and an old one toggled", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, {
+    double_press_target: "script.a",
+    double_press_action: "off",
+    triple_press_target: "script.b",
+    hold_action: "toggle",
+    hold_target: "scene.c",
+  });
+
+  assert.equal(panel._editorChoices.double_press, "off");
+  // No stored action: what it always did.
+  assert.equal(panel._editorChoices.triple_press, "toggle");
+  assert.equal(panel._editorData.triple_press_action, "toggle");
+  // A scene has no toggle; it reads, and is saved, as run.
+  assert.equal(panel._editorData.hold_target_action, "on");
+});
+
+test("a double press without a target is off, whatever was stored", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, { double_press_action: "off" });
+
+  assert.equal(panel._editorChoices.double_press, "none");
+});
+
+test("choosing an action stores it beside the target, and none drops both", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, { double_press_target: "light.a" });
+
+  panel._chooseGesture("double_press", "off");
+  assert.equal(panel._editorData.double_press_action, "off");
+  assert.equal(panel._editorData.double_press_target, "light.a");
+
+  panel._chooseGesture("double_press", "none");
+  assert.equal("double_press_action" in panel._editorData, false);
+  assert.equal("double_press_target" in panel._editorData, false);
+});
+
+test("a script or a scene as a new target is run, anything else toggled", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, { double_press_target: "light.a" });
+
+  panel._retarget("double_press", "light.a", "script.go");
+  assert.equal(panel._editorChoices.double_press, "on");
+  assert.equal(panel._editorData.double_press_action, "on");
+
+  // Another script keeps what the person chose.
+  panel._chooseGesture("double_press", "off");
+  panel._retarget("double_press", "script.go", "script.other");
+  assert.equal(panel._editorChoices.double_press, "off");
+
+  panel._retarget("double_press", "script.other", "switch.fan");
+  assert.equal(panel._editorChoices.double_press, "toggle");
+  assert.equal(panel._editorData.double_press_action, "toggle");
+
+  // Clearing a target changes nothing.
+  panel._retarget("double_press", "switch.fan", undefined);
+  assert.equal(panel._editorChoices.double_press, "toggle");
+});
+
+test("the short press and the hold follow their target the same way", () => {
+  const panel = newPanel();
+  panel._loadEditor(true, { click_target: "light.a", hold_action: "toggle" });
+
+  panel._retarget("click", "light.a", "scene.evening");
+  assert.equal(panel._editorChoices.click_action, "on");
+  assert.equal(panel._editorData.click_action, "on");
+
+  panel._retarget("hold", undefined, "script.go");
+  assert.equal(panel._editorData.hold_target_action, "on");
+});
+
+test("scene cycling is left alone when its target changes", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, { scenes: ["scene.a"] });
+
+  panel._retarget("click", undefined, "script.go");
+
+  assert.equal(panel._editorChoices.click_action, "scenes");
+});
+
+test("an enabled double press without a target is caught before saving", async () => {
+  const panel = newPanel();
+  let sent = 0;
+  panel._hass = { callWS: async () => { sent += 1; return { ok: true }; } };
+  panel._loadEditor(false, { target: "light.a" });
+  panel._chooseGesture("double_press", "on");
+
+  await panel._saveBinding({ key: "wheel-a", variant: "wheel" }, { channel: 1 });
+
+  assert.equal(sent, 0);
+  assert.deepEqual(panel._editorErrors, { double_press_target: "target_required" });
+});

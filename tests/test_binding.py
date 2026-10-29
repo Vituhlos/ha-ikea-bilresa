@@ -40,6 +40,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_STEP_CURVE,
     CONF_TARGET,
     CONF_TRANSITION,
+    CONF_TRIPLE_TARGET,
     DIRECTION_DOWN,
     DIRECTION_UP,
     HOLD_NONE,
@@ -432,13 +433,15 @@ def test_explicit_multi_press_response_waits_for_completion(
         },
     )
     binding._single_press = Mock()
-    binding._toggle = Mock()
+    binding._press_target = Mock()
 
     binding._handle_raw_button("short_release")
     binding._handle_action(_action(ACTION_PRESS, presses=2))
 
     binding._single_press.assert_not_called()
-    binding._toggle.assert_called_once_with("switch.double")
+    binding._press_target.assert_called_once_with(
+        "double_press", "switch.double", "toggle"
+    )
 
 
 def test_missing_response_policy_preserves_completion_aware_behavior(
@@ -1910,7 +1913,11 @@ def test_a_script_short_press_follows_the_stored_click_action(
 
     binding._handle_action(_action(ACTION_PRESS, presses=1))
 
-    assert _service_calls(binding) == [("script", service, {"entity_id": "script.go"})]
+    [(domain, called, data)] = _service_calls(binding)
+    assert (domain, called) == ("script", service)
+    assert data["entity_id"] == "script.go"
+    # Only "run" can tell the script what started it; toggle and stop cannot.
+    assert ("variables" in data) is (service == "turn_on")
 
 
 @pytest.mark.parametrize("click", ["toggle", "on"])
@@ -2001,3 +2008,207 @@ def test_the_live_activity_names_what_a_press_did(
         "action": named,
         "target": entity,
     }
+
+
+# -- one action per gesture --------------------------------------------------
+
+_PRESS_GESTURES = {
+    "double_press": (CONF_DOUBLE_TARGET, "double_press_action", 2),
+    "triple_press": (CONF_TRIPLE_TARGET, "triple_press_action", 3),
+}
+
+
+def _press(binding, gesture: str) -> None:
+    if gesture == "hold":
+        binding._handle_action(_action(ACTION_HOLD))
+    else:
+        presses = {"short_press": 1, "double_press": 2, "triple_press": 3}[gesture]
+        binding._handle_action(_action(ACTION_PRESS, presses=presses))
+
+
+def _gesture_binding(monkeypatch, gesture: str, target: str, action: str | None):
+    """A binding whose one gesture acts on ``target`` with ``action``."""
+    if gesture == "short_press":
+        overrides = {CONF_CLICK_TARGET: target, "click_action": action or "toggle"}
+    elif gesture == "hold":
+        overrides = {
+            CONF_HOLD_ACTION: HOLD_TOGGLE,
+            CONF_HOLD_TARGET: target,
+            **({"hold_target_action": action} if action else {}),
+        }
+    else:
+        target_key, action_key, _presses = _PRESS_GESTURES[gesture]
+        overrides = {target_key: target, **({action_key: action} if action else {})}
+    binding, _i, _w = _binding(monkeypatch, **overrides)
+    binding.hass.states.get.return_value = SimpleNamespace(state="off", attributes={})
+    return binding
+
+
+@pytest.mark.parametrize(
+    "gesture", ["short_press", "double_press", "triple_press", "hold"]
+)
+@pytest.mark.parametrize(
+    ("action", "domain", "service"),
+    [
+        ("toggle", "homeassistant", "toggle"),
+        ("on", "homeassistant", "turn_on"),
+        ("off", "homeassistant", "turn_off"),
+    ],
+)
+def test_every_gesture_can_toggle_turn_on_or_turn_off_a_light(
+    monkeypatch, gesture: str, action: str, domain: str, service: str
+) -> None:
+    binding = _gesture_binding(monkeypatch, gesture, "switch.fan", action)
+
+    _press(binding, gesture)
+
+    assert _service_calls(binding) == [(domain, service, {"entity_id": "switch.fan"})]
+
+
+@pytest.mark.parametrize(
+    "gesture", ["short_press", "double_press", "triple_press", "hold"]
+)
+@pytest.mark.parametrize(
+    ("action", "service"),
+    [("toggle", "toggle"), ("on", "turn_on"), ("off", "turn_off")],
+)
+def test_every_gesture_can_run_stop_or_toggle_a_script(
+    monkeypatch, gesture: str, action: str, service: str
+) -> None:
+    binding = _gesture_binding(monkeypatch, gesture, "script.go", action)
+
+    _press(binding, gesture)
+
+    [(domain, called, data)] = _service_calls(binding)
+    assert (domain, called) == ("script", service)
+    assert data["entity_id"] == "script.go"
+    assert ("variables" in data) is (action == "on")
+
+
+@pytest.mark.parametrize("gesture", ["double_press", "triple_press", "hold"])
+def test_a_gesture_stored_without_an_action_still_toggles(
+    monkeypatch, gesture: str
+) -> None:
+    """Bindings saved before the choice existed toggled their target."""
+    binding = _gesture_binding(monkeypatch, gesture, "script.go", None)
+
+    _press(binding, gesture)
+
+    assert _service_calls(binding) == [("script", "toggle", {"entity_id": "script.go"})]
+
+
+@pytest.mark.parametrize(
+    "gesture", ["short_press", "double_press", "triple_press", "hold"]
+)
+def test_a_scene_is_run_whether_the_action_is_toggle_or_on(
+    monkeypatch, gesture: str
+) -> None:
+    for action in ("toggle", "on"):
+        binding = _gesture_binding(monkeypatch, gesture, "scene.evening", action)
+        _press(binding, gesture)
+        assert _service_calls(binding) == [
+            ("scene", "turn_on", {"entity_id": "scene.evening"})
+        ]
+
+
+@pytest.mark.parametrize(
+    "gesture", ["short_press", "double_press", "triple_press", "hold"]
+)
+def test_a_scene_cannot_be_turned_off_and_nothing_is_sent(
+    monkeypatch, gesture: str
+) -> None:
+    """Data that predates the check is skipped, not sent to a missing service."""
+    binding = _gesture_binding(monkeypatch, gesture, "scene.evening", "off")
+    binding._report_activity = Mock()
+
+    _press(binding, gesture)
+
+    assert _service_calls(binding) == []
+    assert binding._report_activity.call_args.args[0] == "skipped"
+    assert binding._report_activity.call_args.kwargs["reason"] == "action_not_supported"
+
+
+@pytest.mark.parametrize(
+    ("gesture", "presses"),
+    [("short_press", 1), ("double_press", 2), ("triple_press", 3), ("hold", 0)],
+)
+def test_a_script_is_told_which_gesture_started_it(
+    monkeypatch, gesture: str, presses: int
+) -> None:
+    binding = _gesture_binding(monkeypatch, gesture, "script.go", "on")
+
+    _press(binding, gesture)
+
+    [(_domain, _service, data)] = _service_calls(binding)
+    assert data["variables"] == {
+        "gesture": gesture,
+        "presses": presses,
+        "channel": 1,
+        "endpoint": None,
+        "device": "Test wheel",
+    }
+
+
+@pytest.mark.parametrize(
+    ("action", "named"),
+    [("on", "run"), ("off", "stop"), ("toggle", "toggle")],
+)
+def test_the_live_activity_names_a_script_press(
+    monkeypatch, action: str, named: str
+) -> None:
+    binding = _gesture_binding(monkeypatch, "double_press", "script.go", action)
+    binding._report_activity = Mock()
+
+    _press(binding, "double_press")
+
+    pending = [
+        call
+        for call in binding._report_activity.call_args_list
+        if call.args[0] == "pending"
+    ]
+    assert pending[0].kwargs["result"]["action"] == named
+
+
+@pytest.mark.parametrize(
+    ("response", "raw_events"),
+    [
+        (BUTTON_RESPONSE_FAST, ["short_release"]),
+        (BUTTON_RESPONSE_INSTANT, ["initial_press"]),
+    ],
+)
+def test_a_script_started_by_an_early_press_is_told_the_device_name(
+    monkeypatch, response: str, raw_events: list[str]
+) -> None:
+    """Fast and Instant run before the engine has named the wheel."""
+    binding, _i, _w = _binding(
+        monkeypatch,
+        **{
+            CONF_BUTTON_RESPONSE: response,
+            CONF_CLICK_TARGET: "script.go",
+            "click_action": "on",
+            CONF_HOLD_ACTION: HOLD_NONE,
+        },
+    )
+    binding._device_name = lambda: "Living room wheel"
+    binding.hass.states.get.return_value = SimpleNamespace(state="off", attributes={})
+
+    for event in raw_events:
+        binding._handle_raw_button(event)
+
+    [(_domain, _service, data)] = _service_calls(binding)
+    assert data["variables"]["device"] == "Living room wheel"
+    assert data["variables"]["gesture"] == "short_press"
+    assert data["variables"]["presses"] == 1
+
+
+def test_a_completed_press_names_the_device_from_its_own_action(monkeypatch) -> None:
+    binding, _i, _w = _binding(
+        monkeypatch, **{CONF_DOUBLE_TARGET: "script.go", "double_press_action": "on"}
+    )
+    binding._device_name = lambda: "Another name"
+    binding.hass.states.get.return_value = SimpleNamespace(state="off", attributes={})
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    [(_domain, _service, data)] = _service_calls(binding)
+    assert data["variables"]["device"] == "Test wheel"

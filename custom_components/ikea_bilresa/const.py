@@ -175,6 +175,11 @@ CONF_CLICK_TARGET = "click_target"
 CONF_DOUBLE_TARGET = "double_press_target"
 CONF_TRIPLE_TARGET = "triple_press_target"
 CONF_HOLD_TARGET = "hold_target"
+# What a double press, a triple press and a hold do to their target. A missing
+# value means "toggle", which is what they always did before the choice existed.
+CONF_DOUBLE_ACTION = "double_press_action"
+CONF_TRIPLE_ACTION = "triple_press_action"
+CONF_HOLD_TARGET_ACTION = "hold_target_action"
 CONF_HOLD_ACTION = "hold_action"
 CONF_RAMP_DIRECTION = "ramp_direction"
 CONF_SCENES = "scenes"
@@ -301,6 +306,9 @@ CLICK_ON = "on"
 CLICK_OFF = "off"
 CLICK_NONE = "none"
 CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
+# The actions a gesture can carry out on its target; "none" is no gesture at all.
+TARGET_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF]
+DEFAULT_TARGET_ACTION = CLICK_TOGGLE
 
 # Entity domains a press, double press, triple press or hold may act on. A light,
 # a switch or a script is toggled, switched on or off; a scene can only be run.

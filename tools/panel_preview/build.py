@@ -55,6 +55,7 @@ ENTITIES = {
     "light.reading_lamp": ("off", "Reading lamp"),
     "light.hall": ("off", "Hall"),
     "switch.fan": ("off", "Fan"),
+    "script.good_night": ("off", "Good night"),
     "media_player.speaker": ("idle", "Speaker"),
     "scene.evening": ("unknown", "Evening"),
     "scene.movie": ("unknown", "Movie"),
@@ -94,6 +95,19 @@ def _worst(states: list[str]) -> str:
     return max(states, key=order.index, default="ok")
 
 
+def _press_label(target: str | None, action: str) -> str:
+    """The ledger word for a press, as panel_models.py chooses it."""
+    if not target:
+        return "action_none"
+    if target.startswith("scene.") or (target.startswith("script.") and action == "on"):
+        return "action_run"
+    if target.startswith("script.") and action == "off":
+        return "action_stop"
+    return {"on": "action_turn_on", "off": "action_turn_off"}.get(
+        action, "action_toggle"
+    )
+
+
 def _channel(labels: dict, number: int, data: dict | None, *, enabled: bool = True):
     if data is None:
         return {
@@ -130,13 +144,19 @@ def _channel(labels: dict, number: int, data: dict | None, *, enabled: bool = Tr
         _action(
             labels,
             "double_press",
-            "action_toggle" if data.get("double_press_target") else "action_none",
+            _press_label(
+                data.get("double_press_target"),
+                data.get("double_press_action", "toggle"),
+            ),
             data.get("double_press_target"),
         ),
         _action(
             labels,
             "triple_press",
-            "action_toggle" if data.get("triple_press_target") else "action_none",
+            _press_label(
+                data.get("triple_press_target"),
+                data.get("triple_press_action", "toggle"),
+            ),
             data.get("triple_press_target"),
         ),
         _action(
@@ -217,7 +237,10 @@ def _snapshot(labels: dict) -> dict:
                         _binding(
                             "light.ceiling_bulb",
                             click_target="light.ceiling",
-                            double_press_target="switch.fan",
+                            double_press_target="script.good_night",
+                            double_press_action="on",
+                            triple_press_target="scene.movie",
+                            triple_press_action="on",
                         ),
                     ),
                     _channel(

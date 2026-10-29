@@ -196,8 +196,9 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
   **button target entity** — so a press can act on a *different* entity than the
   dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch). The target
   of a press, double press, triple press or hold may also be a **scene** or a
-  **script**: a scene is run; a script is toggled, turned on or turned off like
-  any other entity (so a second press can stop it),
+  **script** (see [Scenes and scripts](#scenes-and-scripts-as-targets) below),
+  and each of these gestures has its own **action** on its target: toggle, turn
+  on or turn off,
 - the **button response**: instant initial press, fast short release, or exact
   single/double/triple recognition for multi-press bindings,
 - an optional ordered list of **scenes** to cycle on single presses (this takes
@@ -225,6 +226,45 @@ the recovered entity's real state. Rotate-up from an off light starts at the
 configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
+
+#### Scenes and scripts as targets
+
+Every press gesture (single, double, triple press and hold) takes one action on
+one target. The action means different things for different targets:
+
+| Target | Toggle | Turn on | Turn off |
+|---|---|---|---|
+| light, switch | toggles | turns on | turns off |
+| **script** | runs it, or stops it if it runs | **runs it** | **stops it** |
+| **scene** | runs it | runs it | not possible (refused when saving) |
+
+The panel names the choices after the target (for a script: *Run script*, *Stop
+script*, *Toggle script*) and pre-selects *Run* when you pick a script or a
+scene. A binding saved before this choice existed has no action stored and keeps
+toggling, as it always did.
+
+**Run script** starts the script and tells it which gesture started it, in the
+variables `gesture` (`short_press`, `double_press`, `triple_press` or `hold`),
+`presses`, `channel`, `endpoint` and `device`, so one script can serve several
+buttons. Toggle and Stop cannot pass variables. A script that is already
+running follows its own [mode](https://www.home-assistant.io/docs/script/#script-modes)
+(by default a second start is ignored with a warning).
+
+```yaml
+script:
+  bilresa_lights:
+    mode: restart
+    sequence:
+      - action: light.toggle
+        target:
+          entity_id: >-
+            {{ 'light.hall' if gesture == 'double_press' else 'light.kitchen' }}
+```
+
+Select this script as the target of a short press and of a double press with
+the action *Run script*; it then toggles the kitchen light for one and the hall
+light for the other. A scene that was never activated reports the state
+`unknown` and is run all the same.
 
 For a dual button, the same flow first selects Button 1 or Button 2 and then
 shows only supported actions: independent single/double-press targets and
