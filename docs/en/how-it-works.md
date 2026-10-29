@@ -55,9 +55,20 @@ sends nothing over Matter.
 
 ## Limitations
 
-- The wheel has a built-in ~500 ms–1 s anti-flood delay between notch batches, so
-  this gets *close* to the DIRIGERA feel but is not truly analog-continuous. A
-  matching `transition` on the light bridges the batches for a smooth ramp.
+- The wheel does not report every notch at once. Its firmware collects notches
+  into batches and sends a running total about every 0.5–1 s, so while you turn
+  it the light gets a new value about that often, not on every notch. This is
+  time based, not a count of notches, and it is a limit of the wheel that
+  nothing in Home Assistant can remove. It gets *close* to the DIRIGERA feel but
+  is not truly analog-continuous.
+  - The transition hides the gap, it does not remove it: each batch is sent with
+    the binding's *Transition*, so the light fades into the next value instead of
+    jumping. The first batch of a scroll gets little or no transition (none for a
+    single notch), so the first notch reacts at once. A transition much shorter than the gap looks steppy; one
+    longer than the gap is interrupted by the next batch.
+  - The cap of 8 notches belongs to Home Assistant's own Matter integration,
+    which reports one total after you stop. This integration reads the running
+    counter instead, so a fast scroll is not cut off.
 - Target lights round-trip through Home Assistant (rather than a direct
   Matter/Zigbee bind), adding small, usually imperceptible LAN latency.
 - A gesture acts on one entity, or runs one scene or one script. For several
