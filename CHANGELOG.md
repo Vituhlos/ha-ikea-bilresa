@@ -59,7 +59,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   watchdog restarted Core (GitHub issue #21). The attribute paths are now found
   once per node and read again when a node's attribute table is replaced or
   changes size, and in any case every 30 to 60 seconds; an update reads the few
-  position values it needs. The same events are forwarded as before. The dedicated WebSocket source was not
+  position values it needs; a node that is removed is dropped from the cache at
+  once. The same events are forwarded as before. The dedicated WebSocket source was not
   affected.
 
 ## [0.7.0-rc.4] - 2026-10-25

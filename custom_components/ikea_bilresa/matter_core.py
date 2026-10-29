@@ -188,6 +188,7 @@ class CoreMatterEventSource:
         if event_name in ("node_added", "node_updated"):
             self._on_event("node_added", self._node_to_mapping(data))
         elif event_name == "node_removed":
+            self._forget_node(data)
             self._on_event("node_removed", data)
         elif event_name == "node_event":
             self._on_event("node_event", _as_mapping(data))
@@ -199,6 +200,24 @@ class CoreMatterEventSource:
             self._forward_switch_position_updates()
         elif event_name == "server_shutdown":
             self._set_connected(False)
+
+    @callback
+    def _forget_node(self, node: Any) -> None:
+        """Drop what the position lookup holds for a node that is gone.
+
+        Each cache entry keeps the node's whole attribute table alive, so it must
+        not wait for a later attribute update to be pruned: on a quiet install
+        that update may not come, and repeated removals would pile tables up.
+        """
+        node_id = getattr(node, "node_id", node)
+        if not isinstance(node_id, int) or isinstance(node_id, bool):
+            return
+        self._position_paths.pop(node_id, None)
+        self._switch_positions = {
+            key: value
+            for key, value in self._switch_positions.items()
+            if key[0] != node_id
+        }
 
     @staticmethod
     def _is_switch_position_path(path: Any) -> bool:

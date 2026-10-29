@@ -462,3 +462,35 @@ async def test_the_lookup_is_not_repeated_within_the_age_limit(monkeypatch) -> N
     for _ in range(20):
         client.callback(FakeEventType("attribute_updated"), 1)
     assert client.walks() == once_more
+
+
+@pytest.mark.asyncio
+async def test_a_removed_node_is_dropped_at_once_not_at_the_next_update(
+    monkeypatch,
+) -> None:
+    """Its attribute table must not be kept alive until some later update."""
+    client = BusyMatterClient()
+    source, events = await _started(monkeypatch, client)
+    client.callback(FakeEventType("attribute_updated"), 1)
+    assert 12 in source._position_paths
+    assert (12, "1/59/0") in source._switch_positions
+
+    client.callback(FakeEventType("node_removed"), 12)
+
+    assert 12 not in source._position_paths
+    assert (12, "1/59/0") not in source._switch_positions
+    assert len(source._position_paths) == 39
+    assert ("node_removed", 12) in events
+
+
+@pytest.mark.asyncio
+async def test_removing_a_node_the_cache_never_saw_is_harmless(monkeypatch) -> None:
+    client = BusyMatterClient(nodes=3, attributes=20)
+    source, events = await _started(monkeypatch, client)
+
+    client.callback(FakeEventType("node_removed"), 999)
+    client.callback(FakeEventType("node_removed"), None)
+    client.callback(FakeEventType("node_removed"), True)
+
+    assert ("node_removed", 999) in events
+    assert len(source._position_paths) == 3
