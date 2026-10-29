@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   for a theme that does not set them. The README says how.
 
 ### Documentation
+- **A recipe for `short_release`** (events-and-automations guide, English and
+  Czech): a short release turns a light on or shifts its colour, a double click
+  restores warm white and a hold turns it off. Contributed by @amodig in
+  [#23](https://github.com/Vituhlos/ha-ikea-bilresa/pull/23), tested on an E2490
+  with `v0.6.2-rc.2`; the missed clicks he saw are not fixed by it.
 - **The README is now a short overview, and the manual is six guides per
   language.** `README.md` and `README.cs.md` keep the title, the status, the
   highlights, a three-step quick start, what works with what, and a table of the

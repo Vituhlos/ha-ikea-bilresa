@@ -172,6 +172,36 @@ rozlišujte podle `endpoint_id`. Při více než dvou stiscích za sebou přijde
 `short_release` pro každé nahlášené uvolnění, ale žádné dokončené `press` už
 nenásleduje (zařízení ukončí sekvenci s nulovým počtem).
 
+### Recept: změna barvy při uvolnění, bílá při dvojitém stisku
+
+Vyžaduje sběrnicovou událost `short_release`, která existuje od **0.6.2**
+(recept byl otestován s v0.6.2-rc.2; verze 0.6.1 událost nemá).
+Světlo nebo skupina světel musí podporovat barvu i teplotu bílé.
+V [kompletním YAML příkladu v anglickém průvodci](../en/events-and-automations.md#recipe-change-colour-on-release-restore-white-on-double-click)
+nahraďte všechny výskyty `light.example` a nastavte `node_id` a `channel`
+ve všech třech spouštěčích podle svého kolečka. Nejsou potřeba žádné
+pomocné entity ani skripty.
+
+Každé krátké uvolnění vypnuté světlo rozsvítí, nebo u zapnutého světla změní
+barvu na plně sytou. Odstín se posune o náhodných 90–270 stupňů modulo 360,
+aby se lišil od právě hlášeného odstínu. Dokončený dvojitý stisk obnoví bílou
+3000 K; podržení světlo vypne.
+
+Vazbu pro stmívání otáčením můžete ponechat, ale vypněte v ní akce tlačítka
+a podržení i překrývající se automatizace. Uvolnění během dvojitého či
+trojitého stisku také mění barvu: přechodné barvy před obnovením bílé jsou
+očekávané. Režim `queued` zachová pořadí akcí, ale rychlá uvolnění mohou číst
+stejný zastaralý stav, než žárovka nahlásí nový odstín; odlišná barva při
+každém rychlém uvolnění proto není zaručena. Filtr `presses: 1` je záměrně
+vynechán.
+
+Příklad vychází z funkční automatizace otestované na Home Assistant Green,
+HA 2026.10.4, kolečku E2490 (P2.0, firmware 1.9.15) a třech žárovkách
+KAJPLATS přes Matter/Thread. Krátká uvolnění byla zaznamenána před dokončenými
+jednoduchými, dvojitými i trojitými stisky. Dřívější občasné vynechávání
+stisků přetrvalo; recept nedokáže obnovit události, které integrace neobdrží.
+Viz [pozorování z hardwarového testu v PR #5](https://github.com/Vituhlos/ha-ikea-bilresa/pull/5#issuecomment-6452179129).
+
 ## Více koleček
 
 Vše je klíčované podle Matter uzlu a endpointu, takže **libovolný počet koleček**
