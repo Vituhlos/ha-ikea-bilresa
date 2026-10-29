@@ -55,6 +55,9 @@ These instructions apply to the entire repository and to every coding agent.
   findings are answered. A skipped review is not a passed review: where CI or a
   review does not run on a pull request's base branch, run the gates locally,
   trigger the review by comment, and say so in the pull request.
+- User documentation is the short `README.md` / `README.cs.md` and the guides in
+  `docs/en` and `docs/cs`. Change both languages in one commit and keep the
+  README an overview; `tests/test_docs.py` checks links, structure and length.
 - A release changes the version in `manifest.json`, `CHANGELOG.md` (section and
   link reference), both READMEs and `PROJECT_STATUS.md` in one commit.
   `tests/test_version_consistency.py` fails when they disagree.

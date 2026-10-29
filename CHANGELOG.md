@@ -32,6 +32,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   for a theme that does not set them. The README says how.
 
 ### Documentation
+- **The README is now a short overview, and the manual is six guides per
+  language.** `README.md` and `README.cs.md` keep the title, the status, the
+  highlights, a three-step quick start, what works with what, and a table of the
+  guides. The text that was in one long README moved, unchanged apart from its
+  links, to `docs/en/` and `docs/cs/`: getting started, the panel, control
+  bindings, events and automations, troubleshooting, and how it works with the
+  limits and the roadmap. `docs/README.md` indexes the guides and the developer
+  notes. `tests/test_docs.py` fails on a broken link or heading, on a guide that
+  exists in one language only or has a different structure in the other, and on
+  a README that grows past 160 lines.
+- **The documents name nothing from one household.** Examples use placeholders
+  (`light.example`) and measurements say what kind of device they were taken
+  on instead of naming one; the guides tell the reader that an entity id comes
+  from the device's name and will differ. A test fails when a document names an
+  entity id that is not a known placeholder, a local Windows path, a NAS backup
+  agent id or an IP address.
 - **The README (English and Czech) describes the panel and the entities.** New
   sections: the BILRESA panel (overview, a device's tabs, the editor, the dial,
   language and themes), the dial and button entities of every wheel channel, and

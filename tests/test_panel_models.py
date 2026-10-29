@@ -205,13 +205,16 @@ def test_key_is_stable_and_hides_the_node_id() -> None:
 def test_snapshot_uses_the_user_name_not_the_product_name(monkeypatch) -> None:
     """model.py sets wheel.name to the product name, identical for every wheel."""
     device = SimpleNamespace(
-        id="dev", name_by_user="Kolecko obyvak", name="Matter device", area_id="area-1"
+        id="dev",
+        name_by_user="Living room wheel",
+        name="Matter device",
+        area_id="area-1",
     )
     _patch(monkeypatch, device=device)
 
     result = async_overview_snapshot(_hass(), _entry([_wheel(NODE_A)]))
 
-    assert result["wheels"][0]["name"] == "Kolecko obyvak"
+    assert result["wheels"][0]["name"] == "Living room wheel"
     assert result["wheels"][0]["area"] == "Living room"
 
 

@@ -59,8 +59,10 @@ always acceptable, an unverified "works" is not.
 
 The integration, the panel and the documentation are bilingual. If your change
 touches user-visible text, update `translations/en.json` **and**
-`translations/cs.json` — and `README.md` / `README.cs.md` together when it
-belongs there.
+`translations/cs.json` — and the documentation in both languages together when it
+belongs there: the short `README.md` / `README.cs.md` and the guides in `docs/en`
+and `docs/cs`. `tests/test_docs.py` fails on a broken link or a heading that
+differs between the two languages.
 
 ## Changelog and handoff
 

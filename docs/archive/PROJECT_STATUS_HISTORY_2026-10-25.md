@@ -30,7 +30,7 @@ Home Assistant by the agent.**
   https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1-rc.2.
 - **Backup on the Synology NAS only**, at the owner's request: one backup
   `pred-bilresa-0.6.1-rc.2-2026-10-18` (`79ed7d29`, 1.19 GB) to the agent
-  `synology_dsm.2260S6RZATVV9` ("JosefNAS"), none local. It is unencrypted,
+  the Synology backup agent (its id is listed by `backup/info`), none local. It is unencrypted,
   like every automatic backup on that location: the location's own setting is
   `protected: false`. The generate call passed the instance's backup password
   internally; Home Assistant applies it only where a location is protected.
@@ -123,7 +123,7 @@ open and ship as they are.
   pre-release, marked latest.
 - Saving through the rc.16+ editor was exercised by the owner before the
   release: the instance shows a first-time dial settings save for
-  `Kolečko Nelča` and a new revision of its channel 1 binding, with no error
+  `wheel A` and a new revision of its channel 1 binding, with no error
   in the log.
 
 Work for 0.6.1 continues on branch `agent/panel-0.6.1`, cut from `main`.
@@ -510,7 +510,7 @@ table below.**
   restarted; config entry `loaded`.
 - Read back afterwards: manifest `0.6.0-rc.14`; 20 entities on the three Matter
   devices (9 / 9 / 2), none unavailable; no device owned by this integration;
-  seven `ikea_bilresa.*` triggers offered on `Kolečko Obývák`; no log entry and
+  seven `ikea_bilresa.*` triggers offered on `wheel B`; no log entry and
   no Repairs issue from this integration; the HACS update entity is `off`, so
   the misleading "update to v0.5.0" from the commit-hash install is gone.
 - The test automation and its notification are gone from the instance.
@@ -592,10 +592,10 @@ this branch.
 
 ### Hardware, same evening (owner at the wheel, read back from Home Assistant)
 
-Partial pass on `Kolečko Obývák`, commit `311a535`:
+Partial pass on `wheel B`, commit `311a535`:
 
-- **Bindings, 21:01.** Channel 2 (`light.zarovka_lustr`) and channel 1
-  (`light.linka`) each followed a continuous rotation: wheel events every
+- **Bindings, 21:01.** Channel 2 (`light.matter_bulb`) and channel 1
+  (`light.shelly_dimmer`) each followed a continuous rotation: wheel events every
   0.2-0.5 s, 39 and 34 light updates, lag 0.1-0.5 s, no error logged. The
   owner judged it smooth. Brightness values are not recorded on this instance,
   so only timing was checked, not the accounting.
@@ -610,7 +610,7 @@ Partial pass on `Kolečko Obývák`, commit `311a535`:
 Two earlier attempts the same evening stalled for reasons outside this
 integration, both visible upstream of it:
 
-- 20:55, `light.linka`: the Shelly Plus 0-10V stopped answering `Light.Set`
+- 20:55, `light.shelly_dimmer`: the Shelly Plus 0-10V stopped answering `Light.Set`
   (11 `DeviceConnectionTimeoutError`, about 34 s of silence, late replies to
   abandoned requests afterwards). Same shape as the rc.10 note below.
 - 20:59, channel 2: the Matter Server log shows the wheel itself reporting
@@ -946,8 +946,8 @@ Unit (382 tests). The A/B decided nothing, which is itself the result.**
 
 ### The A/B
 
-Three controlled runs on `Kolečko Obývák` channel 3 against
-`light.kajplats_e27_ws_globe_1055lm`, each from brightness 255, fast downward
+Three controlled runs on `wheel B` channel 3 against
+`light.matter_bulb_2`, each from brightness 255, fast downward
 rotation, step 3 %, only the smoothing changed between them:
 
 | run | smoothing | first report from the bulb | report lag | largest batch |
@@ -1030,8 +1030,8 @@ Channel 3 is left at smoothing **0.2** by the owner's decision.
 Status: **Hardware-confirmed on `v0.6.0-rc.13`.** The accounting result stands
 on its own; the device-side finding below is about the bulb, not the code.
 
-Every earlier accounting result came from `light.linka`, a Shelly Plus 0-10V.
-This run used `Kolečko Obývák` **channel 2** against `light.zarovka_lustr`, a
+Every earlier accounting result came from `light.shelly_dimmer`, a Shelly Plus 0-10V.
+This run used `wheel B` **channel 2** against `light.matter_bulb`, a
 Matter bulb with effects — different vendor, different transport, and the
 channel carries smoothing 1.0 s rather than the 0 used on the Shelly.
 
@@ -1278,7 +1278,7 @@ the owner before calling frontend work done.
   across the upgrade will not render the settings section until it reloads.
 
 Single best next action: the owner's rc.12 screenshot. If the card now sits
-right, the Hardware pass is next — disable channel 2 on `Kolečko Obývák` from
+right, the Hardware pass is next — disable channel 2 on `wheel B` from
 the panel, confirm the wheel's own `event` entity does **not** fire and no
 automation triggers, then re-enable and confirm the dial moves. That is the
 only check that proves the disabled-channel gate on real hardware. Afterwards
@@ -1368,7 +1368,7 @@ Known risks and assumptions:
   to slow down single notches. That is the owner here, deliberately.
 
 Single best next action for this item: a controlled Hardware A/B on
-`Kolečko Obývák` at step 3 % — compare 0 (today's behavior), 0.2, 0.3 and 0.5,
+`wheel B` at step 3 % — compare 0 (today's behavior), 0.2, 0.3 and 0.5,
 judging first-notch onset and the smoothness of fast rotation separately, then
 record the chosen value and whether it becomes the default.
 
@@ -1378,7 +1378,7 @@ Status: **Hardware-confirmed for the rotation logic. The remaining fault is
 outside the integration.**
 
 A 166-second session on deployed rc.10, tracing armed, scrolling
-`Kolečko Obývák` channel 1 against `light.linka`:
+`wheel B` channel 1 against `light.shelly_dimmer`:
 
 | measure | result |
 |---|---|
@@ -1612,7 +1612,7 @@ released, not deployed.**
 
 ### What the physical wheel showed
 
-Owner scrolled `Kolečko Obývák` channel 1 against `light.linka` (Shelly Plus
+Owner scrolled `wheel B` channel 1 against `light.shelly_dimmer` (Shelly Plus
 0-10V), step 3 %, smoothing 0, from brightness 255.
 
 Round 1, the only round with a complete decode log: **21 dispatched actions
@@ -1716,7 +1716,7 @@ frontend. They confirm, **in Home Assistant rather than in a harness**:
   acceleration below — the defect from the owner's original screenshot;
 - the gesture ledger reads `Otočení doleva / doprava → Jas · Svetylka Světýlka`,
   so the quantity fix is live;
-- the overview shows `Tlačítko Obývák` with a glyph distinct from both wheels,
+- the overview shows the dual button with a glyph distinct from both wheels,
   which closes checklist **#7**.
 
 Checklist **#4** is therefore partly done: light theme only, on a wheel
@@ -1818,7 +1818,7 @@ Deployment results:
 This is publication plus install/startup smoke. **No physical gesture has been
 performed on this candidate**, so nothing in it is Hardware-verified.
 
-Owed next, on the physical `Kolečko Obývák`, in this order:
+Owed next, on the physical `wheel B`, in this order:
 
 1. **#2 + #6 together** — one controlled 18-notch rotation down from brightness
    255 at step 3 % with smoothing 0. The light must land on **117**. Any higher
@@ -1872,8 +1872,8 @@ heading that would repeat its own title. Groups are separated by a hairline,
 not boxed.
 
 The rotation row now names the quantity (`quantity_*` strings, mapped beside
-the existing `_MODE_KEYS`), so the row says `Jas · Linka` while the subtitle
-above still says `Plynulé stmívání · Linka`. The dead `action_adjust` strings
+the existing `_MODE_KEYS`), so the row says `Jas · Dimmer` while the subtitle
+above still says `Plynulé stmívání · Dimmer`. The dead `action_adjust` strings
 were removed from both languages.
 
 The rule is written into `docs/PANEL_DESIGN.md` rather than left in the code,
@@ -1941,7 +1941,7 @@ hassfest not run locally. CI has not run. Not committed, not released, not
 deployed, no Hardware.**
 
 `docs/V0.6.0_CHECKLIST.md` item #6 asked whether the RC.5 anomaly (18 decoded
-notches moved `light.linka` from 255 to 140, worth about 15 configured 3 %
+notches moved `light.shelly_dimmer` from 255 to 140, worth about 15 configured 3 %
 steps) was expected clamping or a real bug. It is a real bug, it is **not**
 closed by RC.6, and it now has a failing-then-passing regression.
 
@@ -2041,7 +2041,7 @@ Known risks and assumptions:
 
 Single best next action: exact-revision CI for this tree (mypy/hassfest are the
 gates local Python 3.14 cannot supply), then a controlled Hardware A/B on the
-owner's `Kolečko Obývák` — one slow 18-notch rotation and one fast one from
+owner's `wheel B` — one slow 18-notch rotation and one fast one from
 brightness 255 at step 3 %, checking the final value equals the single-shot
 arithmetic. That same gesture also discharges checklist item #2.
 
@@ -2081,15 +2081,15 @@ post-restart check remained valid. Loaded diagnostics now report manifest
 `0.6.0-rc.6`, config entry state `loaded`, Matter Server add-on `9.1.0` /
 matterjs-server `1.2.6`, server schema 12 through compatibility schema 11,
 `core_matter_client`, no fallback, two wheels, one dual button and all six
-bindings. `Kolečko Obývák` channel 1 retained transition 0.0 seconds. Diagnostics
+bindings. `wheel B` channel 1 retained transition 0.0 seconds. Diagnostics
 list no integration issue; the post-restart log contains only Home Assistant's
 standard custom-component warning. No corrective Hardware result is claimed
 before a new controlled gesture.
 
 All controlled RC.5 tuning below used only the owner's selected
-`Kolečko Obývák`, channel 1, with acceleration disabled, step 3%, and
-`light.linka` as its target. No RC.5 Hardware claim is made for
-`Kolečko Nelča`.
+`wheel B`, channel 1, with acceleration disabled, step 3%, and
+`light.shelly_dimmer` as its target. No RC.5 Hardware claim is made for
+`wheel A`.
 
 With the configured transition reduced from 1.0 seconds to 0.0 seconds, the
 first Home Assistant target acknowledgement improved from approximately 906 ms
@@ -2133,7 +2133,7 @@ Physical section G is in progress; no G Hardware item is claimed yet.**
 Before publication, a read-only Home Assistant registry recheck confirmed both
 physical E2490 scroll wheels and the E2489 dual button now run firmware
 `1.9.15`. Both wheel nodes were therefore available on the same current
-firmware, but the owner selected only `Kolečko Obývák` for controlled RC.5
+firmware, but the owner selected only `wheel B` for controlled RC.5
 tuning. The earlier `1.8.7` observations remain historical evidence, not an
 available RC.5 comparison target.
 
@@ -2479,7 +2479,7 @@ theme, a screen-reader pass, and a physical notched phone).
 
 Status: **Documentation only. No code, no Static/Unit/CI/Hardware claim.**
 
-The owner added a physical **BILRESA dual button** (E2489, "Tlačítko Obývák",
+The owner added a physical **BILRESA dual button** (E2489,
 Matter node observed via read-only MCP) and asked for a support plan. Recorded,
 not implemented:
 
@@ -4382,7 +4382,7 @@ Publication and deployment results:
 - after restart the config entry was loaded through `core_matter_client`, with
   two wheels, three bindings, fallback count zero and no fallback reason;
 - exactly two unique BILRESA devices were present in the custom integration:
-  `Kolečko Nelča` on firmware `1.8.7` and `Kolečko Obývák` on `1.9.15`; both had
+  `wheel A` on firmware `1.8.7` and `wheel B` on `1.9.15`; both had
   Matter plus `ikea_bilresa` sources and exactly three custom event entities;
 - the legacy standalone device was absent, proving the registry fallback and
   migration in the running HA instance while serial remained absent;
@@ -4396,14 +4396,14 @@ Home Assistant deployment/registry smoke test.
 The owner then operated both installed wheels while Codex observed their event
 entities and diagnostics through read-only Home Assistant MCP calls:
 
-- firmware `1.8.7` (`Kolečko Nelča`) passed clockwise/counter-clockwise routing
+- firmware `1.8.7` (`wheel A`) passed clockwise/counter-clockwise routing
   and a single press on all three channels;
 - its channel 1 additionally passed a batched fast clockwise rotation, single,
   double and triple press, and one `hold` followed by exactly one `release`;
 - the first deliberately slower triple-press attempt was closed by the device
   as separate presses; a retry with all three presses inside the device's
   multi-press window produced `triple_press` with `presses: 3`;
-- firmware `1.9.15` (`Kolečko Obývák`) passed clockwise/counter-clockwise
+- firmware `1.9.15` (`wheel B`) passed clockwise/counter-clockwise
   routing and a single press on all three channels;
 - no event crossed into a non-selected channel, the source remained
   `core_matter_client`, fallback count remained zero, and exact error-log

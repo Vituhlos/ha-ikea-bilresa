@@ -24,7 +24,7 @@ Lovelace dashboards only and rejects a custom panel path.
 ## Findings, most severe first
 
 1. **The editor's controls are bare browser controls.** The entity picker is a
-   plain `<select>` with no search, showing `Linka · light.linka`. The scene
+   plain `<select>` with no search, showing `Dimmer · light.shelly_dimmer`. The scene
    list is a native multi-select: several entries need Ctrl-click, it is close
    to unusable on a phone, and it cannot express order, although scene cycling
    depends on order. Numbers are bare inputs with no slider and the unit in a
@@ -39,7 +39,7 @@ Lovelace dashboards only and rejects a custom panel path.
    ledger stays on screen and the form repeats the same facts underneath; on a
    phone that is three screens of scrolling.
 4. **The ledger is mostly empty rows.** Three of five rows usually read "No
-   action". "Hold → release" with the value "Toggle · Linka — No action" is
+   action". "Hold → release" with the value "Toggle · Dimmer — No action" is
    hard to parse.
 5. **The "Channel behaviour" card mixes two things** (which channels are
    active, and the dial's step and acceleration) and never says what a dial is.
