@@ -1575,3 +1575,34 @@ test("the live activity names a verb after the verb unless it has service words"
   assert.equal(panel._serviceLabel("toggle"), "Toggle");
   assert.equal(panel._serviceLabel("play_pause"), "Play / pause");
 });
+
+test("an old short press its target cannot do is shown as no action", () => {
+  const panel = withVerbs(newPanel(), {
+    light: ["toggle", "on", "off"],
+    input_number: ["step_up", "step_down"],
+  });
+  // Saved when only toggle, on and off existed: toggle on a number did nothing.
+  panel._loadEditor(false, { target: "input_number.level", click_action: "toggle" });
+
+  assert.equal(panel._editorChoices.click_action, "none");
+  assert.equal(panel._editorData.click_action, "none");
+
+  // A light keeps its toggle.
+  panel._loadEditor(false, { target: "light.a", click_action: "toggle" });
+  assert.equal(panel._editorChoices.click_action, "toggle");
+});
+
+test("clearing the short press target hands the choice to the rotation target", () => {
+  const panel = withVerbs(newPanel(), {
+    light: ["toggle", "on", "off"],
+    button: ["press"],
+  });
+  panel._loadEditor(false, { target: "light.a", click_target: "button.doorbell" });
+  panel._editorChoices.click_action = "press";
+  panel._editorData.click_action = "press";
+
+  panel._retarget("click", "button.doorbell", undefined);
+
+  assert.equal(panel._editorChoices.click_action, "toggle");
+  assert.equal(panel._editorData.click_action, "toggle");
+});

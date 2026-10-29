@@ -728,3 +728,32 @@ async def test_a_copied_binding_keeps_toggling_when_it_is_saved() -> None:
     assert stored[CONF_DOUBLE_ACTION] == "toggle"
     assert stored[CONF_TRIPLE_ACTION] == "toggle"
     assert stored[CONF_HOLD_TARGET_ACTION] == "toggle"
+
+
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        ("script.go", "on"),
+        ("scene.evening", "on"),
+        ("button.doorbell", "press"),
+        ("input_button.go", "press"),
+        ("automation.night", "trigger"),
+        ("lock.door", "lock"),
+        ("vacuum.robot", "start"),
+        ("input_number.level", "step_up"),
+    ],
+)
+def test_a_new_gesture_gets_the_sensible_action_for_its_target(
+    target, expected
+) -> None:
+    """A button cannot be toggled; an empty choice must not save one."""
+    filled = _run_scripts_and_scenes({CONF_DOUBLE_TARGET: target})
+
+    assert filled[CONF_DOUBLE_ACTION] == expected
+
+
+@pytest.mark.parametrize("target", ["light.hall", "media_player.tv", "cover.blind"])
+def test_a_target_with_a_toggle_keeps_the_stored_default(target) -> None:
+    assert CONF_DOUBLE_ACTION not in _run_scripts_and_scenes(
+        {CONF_DOUBLE_TARGET: target}
+    )

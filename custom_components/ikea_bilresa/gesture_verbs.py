@@ -150,28 +150,53 @@ def verbs_for(entity_id: str | None) -> tuple[str, ...]:
     return tuple(v for v in VERBS.get(domain, ()) if (domain, v) not in _LEGACY)
 
 
-# Kinds of target that never take the switchable words from outside their own
-# list: a scene has no off, and one stray toggle must not open a lock, sound a
-# siren or open a valve.
-_OWN_VERBS_ONLY = ("scene", "lock", "siren", "valve", "alarm_control_panel")
+# Kinds of target that took toggle, on and off before the verbs existed: the
+# targets of a wheel's rotation (which its short press shares) and the old press
+# targets. They still do, so a binding saved then validates and runs. Every
+# other kind has exactly the verbs of its own list: a scene has no off, and one
+# stray toggle must not open a lock, sound a siren or open a valve.
+_SWITCHABLE_BEFORE = frozenset(
+    {
+        "light",
+        "switch",
+        "media_player",
+        "cover",
+        "climate",
+        "fan",
+        "number",
+        "input_number",
+    }
+)
 
 
 def verb_for(entity_id: str | None, action: str) -> Verb | None:
     """The verb ``action`` means for this entity, or ``None``.
 
-    The entity's own list first. Before the verbs existed a gesture acted on
-    anything with toggle, on or off through ``homeassistant``, including the
-    entity a wheel's short press shares with its rotation (a number, a
-    climate); that stays true, so a binding saved then still validates and
-    runs, except for the kinds listed above.
+    The entity's own list first; then the switchable words for the kinds that
+    always had them (``_SWITCHABLE_BEFORE``).
     """
     domain = str(entity_id or "").split(".", 1)[0]
     verbs = VERBS.get(domain, {})
     if action in verbs:
         return verbs[action]
-    if domain in _OWN_VERBS_ONLY:
+    if domain not in _SWITCHABLE_BEFORE:
         return None
     return _SWITCHABLE.get(action)
+
+
+def default_verb(entity_id: str | None) -> str:
+    """What a new gesture aimed at this entity does when nothing was chosen.
+
+    A scene or a script is run; anything with a toggle is toggled, as always;
+    the rest do their first verb (a button is pressed, a lock locks).
+    """
+    domain = str(entity_id or "").split(".", 1)[0]
+    if domain in ("scene", "script"):
+        return VERB_ON
+    verbs = verbs_for(entity_id)
+    if not verbs or VERB_TOGGLE in verbs:
+        return VERB_TOGGLE
+    return verbs[0]
 
 
 def schema_verbs() -> dict[str, list[str]]:

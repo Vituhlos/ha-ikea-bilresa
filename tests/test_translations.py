@@ -223,3 +223,13 @@ async def test_entity_names_follow_the_instance_language(
     names["dual"] = dual_state.attributes["friendly_name"]
 
     assert names == EXPECTED_NAMES[language]
+
+
+def test_czech_text_is_not_garbled() -> None:
+    """Czech read as the wrong encoding turns "Přehrát" into "PĹ™ehrĂˇt"."""
+    from pathlib import Path
+
+    root = Path(__file__).parents[1] / "custom_components/ikea_bilresa"
+    for name in ("translations/cs.json", "panel_strings.py"):
+        text = (root / name).read_text(encoding="utf-8")
+        assert not {"Ĺ", "Ă", "Ä", "Ć"} & set(text), name

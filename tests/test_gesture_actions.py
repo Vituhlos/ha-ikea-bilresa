@@ -333,3 +333,32 @@ def test_a_verb_of_the_targets_own_kind_is_accepted_and_stored() -> None:
 
     assert binding_errors(stored) == {}
     assert editor_data(stored)[CONF_DOUBLE_ACTION] == "play_pause"
+
+
+@pytest.mark.parametrize(
+    ("entity", "action", "supported"),
+    [
+        # Never targets of a gesture before the verbs, so no old data holds them.
+        ("button.a", "toggle", False),
+        ("automation.a", "toggle", False),
+        ("vacuum.a", "on", False),
+        ("select.a", "toggle", False),
+        ("input_button.a", "off", False),
+    ],
+)
+def test_the_switchable_words_are_not_handed_to_kinds_that_never_had_them(
+    entity, action, supported
+) -> None:
+    assert action_is_supported(entity, action) is supported
+
+
+def test_a_new_gesture_defaults_to_the_first_thing_the_target_can_do() -> None:
+    from custom_components.ikea_bilresa.gesture_verbs import default_verb
+
+    assert default_verb("light.a") == "toggle"
+    assert default_verb("script.a") == "on"
+    assert default_verb("scene.a") == "on"
+    assert default_verb("button.a") == "press"
+    assert default_verb("lock.a") == "lock"
+    assert default_verb("media_player.a") == "toggle"
+    assert default_verb(None) == "toggle"

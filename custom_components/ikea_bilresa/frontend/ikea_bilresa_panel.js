@@ -2408,6 +2408,17 @@ class IkeaBilresaPanel extends HTMLElement {
         targetKind(this._editorData.click_target),
         this._editorChoices.click_action,
       );
+      // A binding saved when only toggle, on and off existed may hold one its
+      // target cannot do (toggle on a number, which did nothing): it is shown,
+      // and saved, as no action rather than as a choice the list lacks.
+      const shortTarget = this._editorData.click_target || this._editorData.target;
+      if (
+        shortTarget &&
+        this._editorChoices.click_action !== "none" &&
+        !this._verbsFor(shortTarget).includes(this._editorChoices.click_action)
+      ) {
+        this._editorChoices.click_action = "none";
+      }
       this._editorData.click_action = this._editorChoices.click_action;
     }
     // Scene cycling and "no action" show no short-press target. A binding that
@@ -2606,9 +2617,12 @@ class IkeaBilresaPanel extends HTMLElement {
   // A new kind of target brings its own sensible action: a scene or a script
   // is run, anything else is toggled. The same kind keeps what was chosen.
   _retarget(gesture, previous, next) {
-    if (!next) return;
+    // A wheel's short press with no target of its own acts on the rotation
+    // target, so clearing the target hands the choice to that one.
+    const effective = next || (gesture === "click" ? this._editorData.target : undefined);
+    if (!effective) return;
     const { action } = GESTURE_FIELDS[gesture];
-    const verbs = this._verbsFor(next);
+    const verbs = this._verbsFor(effective);
     const current =
       gesture === "click"
         ? this._editorChoices.click_action
@@ -2618,10 +2632,10 @@ class IkeaBilresaPanel extends HTMLElement {
     // What was chosen stays while the new target is the same kind and can do
     // it; otherwise the new target brings its own: run for a scene or a script,
     // toggle where there is one, else its first verb.
-    const sameKind = targetKind(previous) === targetKind(next);
+    const sameKind = targetKind(previous) === targetKind(effective);
     if (sameKind && (current === "scenes" || current === "none" || verbs.includes(current))) return;
     const fresh =
-      targetKind(next) !== "other"
+      targetKind(effective) !== "other"
         ? "on"
         : verbs.includes("toggle")
           ? "toggle"
@@ -3304,7 +3318,7 @@ class IkeaBilresaPanel extends HTMLElement {
           value: this._editorChoices.click_action,
           onChoose: (next) => this._chooseGesture("click_action", next),
           help: this._actionHelp(
-            this._editorData.click_target,
+            this._editorData.click_target || this._editorData.target,
             this._editorChoices.click_action,
           ),
         },
