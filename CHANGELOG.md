@@ -70,6 +70,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   script, and *Run* for a scene. "Turn target off" is refused for a scene on
   every gesture, not only the short press.
 
+### Removed
+- **The smooth-dimming blueprint** (`blueprints/automation/ikea_bilresa/`).
+  The control bindings in the panel do the same and more (acceleration, a
+  brightness range, scenes and scripts, every gesture); the YAML example in the
+  events-and-automations guide shows the automation form. An automation already
+  created from the blueprint keeps working, because Home Assistant keeps its own
+  copy of the file.
+
 ### Fixed
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter

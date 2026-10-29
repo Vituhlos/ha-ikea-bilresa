@@ -112,18 +112,6 @@ max: 20
 Zduplikujte s `rotate_down` a záporným krokem pro ztlumení a přidejte spouštěč
 `press` volající `light.toggle` pro tlačítko.
 
-## Blueprint: plynulé stmívání
-
-Pro nastavení přes automatizace je tu blueprint, který jedním kanálem stmívá
-jedno světlo: otáčení mění jas podle počtu cvaknutí (s přechodem, který
-překlenuje dávkové aktualizace kolečka) a jednoduchý stisk světlo přepne.
-Vstupy jsou event entita kanálu, světlo, krok jasu na cvaknutí a přechod.
-
-[![Otevřít vaši instanci Home Assistantu s importem tohoto blueprintu.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FVituhlos%2Fha-ikea-bilresa%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fikea_bilresa%2Fsmooth_dimming.yaml)
-
-Ovládací propojení bez YAML [nepotřebují](bindings.md#gui-ovládací-propojení-ovládání-bez-yaml)
-žádnou automatizaci; blueprint použijte, když ji chcete.
-
 ## Sběrnicová událost `ikea_bilresa_event`
 
 Každá akce se navíc vypálí na sběrnici jako `ikea_bilresa_event` — hodí se pro
