@@ -421,6 +421,7 @@ logger:
      staženou diagnostikou integrace (**Nastavení → Zařízení a služby → IKEA
      BILRESA → ⋮ → Stáhnout diagnostiku**; známé identifikátory skrývá, před
      přiložením ji přesto projděte).
+- **Špatný kanál** — kolečko má fyzický přepínač 3 kanálů; posílá ten aktivní.
 - **Tlačítko v panelu nemá v mém tématu čitelný popisek** — panel vyplňuje
   hlavní tlačítka akcentní barvou, tedy `state-icon-color` tématu, a píše na ně
   barvou `text-primary-color`. Téma, které obě nastaví na stejnou barvu (některá
