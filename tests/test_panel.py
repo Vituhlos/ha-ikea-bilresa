@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -942,3 +943,35 @@ def test_the_community_tool_texts_exist_in_both_languages() -> None:
     # It must say whose tool it is, so it is not read as part of the integration.
     assert "Liquidmasl" in STRINGS["en"]["community_tool_note"]
     assert "Liquidmasl" in STRINGS["cs"]["community_tool_note"]
+
+
+def test_the_accent_and_its_label_have_variables_a_theme_can_set() -> None:
+    """A theme with one colour for icons and text left white on white (GitHub #22)."""
+    asset = _asset()
+
+    assert (
+        "--_accent: var(--bilresa-accent, var(--state-icon-color, #44739e));" in asset
+    )
+    assert (
+        "--_on-accent: var(--bilresa-on-accent, var(--text-primary-color, #fff));"
+        in asset
+    )
+
+
+def test_a_control_filled_with_the_accent_labels_itself_with_the_on_accent_colour() -> (
+    None
+):
+    """Whatever the accent fills and puts a word on must use the label variable."""
+    styles = _asset().split("const STYLES = `", 1)[1].split("`;", 1)[0]
+    filled = []
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", styles):
+        if not re.search(r"background(-color)?:\s*var\(--_accent\)", body):
+            continue
+        label = re.search(r"(?<![-\w])color:\s*([^;]+);", body)
+        if label is None:
+            continue  # a bar, a dot, a line: nothing is written on it
+        filled.append(selector.strip())
+        assert label.group(1).strip() == "var(--_on-accent)", selector.strip()
+
+    # The primary button is the one that was affected; it must be covered.
+    assert any('data-primary="true"' in selector for selector in filled)

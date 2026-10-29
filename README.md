@@ -466,6 +466,21 @@ logger:
      identifiers, but look through it before attaching it).
 - **Wrong channel** — the physical wheel has a 3-position channel selector; the
   active channel is what fires.
+- **A button in the panel has no readable label in my theme** — the panel fills
+  its primary buttons with the accent colour, which is the theme's
+  `state-icon-color`, and writes on them in the theme's `text-primary-color`.
+  A theme that sets both to one colour (some light-on-dark themes do) makes the
+  label as bright as its fill. Set the panel's own variables in the theme, which
+  change nothing else in Home Assistant:
+
+  ```yaml
+  # in your theme
+  bilresa-accent: "#44739e"                # optional: the fill
+  bilresa-on-accent: "rgba(0, 0, 0, 0.85)" # the label on the fill
+  ```
+
+  Both are optional and fall back to `state-icon-color` and
+  `text-primary-color`, so a theme that does not set them looks as before.
 
 ## Roadmap
 
