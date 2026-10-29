@@ -105,7 +105,7 @@ from .const import (
     SIGNAL_CONNECTION,
     STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
-    is_run_target,
+    acts_while_unknown,
     mode_supports_target,
     signal_channel,
     signal_raw_button,
@@ -116,9 +116,10 @@ from .gesture_actions import (
     GESTURE_HOLD,
     GESTURE_SHORT_PRESS,
     GESTURE_TRIPLE_PRESS,
+    action_is_supported,
+    gesture_call,
     passes_variables,
     result_label,
-    target_service,
 )
 from .trace import RotationTrace
 
@@ -1452,9 +1453,12 @@ class LightBinding:
         """Return an available state and log only availability transitions."""
         state = self.hass.states.get(entity_id)
         # A scene that was never activated reports "unknown" and still runs, as
-        # does a script; only a missing or unavailable one is out of reach.
+        # does a script and a button that was never pressed; only a missing or
+        # unavailable one is out of reach.
         unreachable = (
-            ("unavailable",) if is_run_target(entity_id) else ("unknown", "unavailable")
+            ("unavailable",)
+            if acts_while_unknown(entity_id)
+            else ("unknown", "unavailable")
         )
         if state is None or state.state in unreachable:
             if entity_id not in self._unavailable_targets:
@@ -1507,21 +1511,26 @@ class LightBinding:
         if not target:
             self._report_activity("skipped", reason="target_not_configured")
             return
-        call = target_service(target, action)
+        # A verb that needs state (a mute is the opposite of what it is now)
+        # reads it here, once, and is skipped when it cannot be read.
+        state = self.hass.states.get(target)
+        call = gesture_call(target, action, state.attributes if state else None)
         if call is None:
-            self._report_activity("skipped", reason="action_not_supported")
+            reason = (
+                "action_not_supported"
+                if not action_is_supported(target, action)
+                else "state_not_readable"
+            )
+            self._report_activity("skipped", reason=reason)
             return
-        domain, service = call
-        data = (
-            {"variables": self._script_variables(gesture)}
-            if passes_variables(target, action)
-            else None
-        )
+        domain, service, data = call
+        if passes_variables(target, action):
+            data = {**data, "variables": self._script_variables(gesture)}
         self._call_entity(
             domain,
             service,
             target,
-            data=data,
+            data=data or None,
             result={
                 "kind": "entity_action",
                 "action": result_label(target, action),

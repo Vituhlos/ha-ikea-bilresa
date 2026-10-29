@@ -202,6 +202,34 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_script_on": "Run script",
         "click_script_off": "Stop script",
         "click_script_toggle": "Toggle script",
+        "click_play_pause": "Play / pause",
+        "click_play": "Play",
+        "click_pause": "Pause",
+        "click_stop": "Stop",
+        "click_next": "Next track",
+        "click_previous": "Previous track",
+        "click_volume_up": "Volume up",
+        "click_volume_down": "Volume down",
+        "click_mute_toggle": "Mute / unmute",
+        "click_open": "Open",
+        "click_close": "Close",
+        "click_lock": "Lock",
+        "click_start": "Start",
+        "click_return_home": "Return to dock",
+        "click_locate": "Locate",
+        "click_press": "Press the button",
+        "click_trigger": "Run the automation",
+        "click_speed_up": "Speed up",
+        "click_speed_down": "Slow down",
+        "click_next_option": "Next option",
+        "click_previous_option": "Previous option",
+        "click_first_option": "First option",
+        "click_last_option": "Last option",
+        "click_step_up": "Increase",
+        "click_step_down": "Decrease",
+        "cover_open_warning": (
+            "A garage door or a gate opens when this is pressed, with nobody watching."
+        ),
         "script_run_help": (
             "Starts the script and tells it which gesture started it, in the "
             "variables gesture, presses, channel, endpoint and device."
@@ -269,6 +297,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Choose Toggle target or Turn target on."
         ),
         "validation_scenes_required": "Add at least one scene.",
+        "validation_action_not_supported": (
+            "This target cannot do that. Choose one of the actions listed for it."
+        ),
         "validation_mode_target_mismatch": (
             "The selected rotation mode cannot control this entity."
         ),
@@ -302,6 +333,30 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_ramp_up": "Brighten",
         "action_ramp_down": "Dim",
         "action_stop_ramp": "Stop ramp",
+        "action_play_pause": "Play / pause",
+        "action_play": "Play",
+        "action_pause": "Pause",
+        "action_next": "Next track",
+        "action_previous": "Previous track",
+        "action_volume_up": "Volume up",
+        "action_volume_down": "Volume down",
+        "action_mute_toggle": "Mute / unmute",
+        "action_open": "Open",
+        "action_close": "Close",
+        "action_lock": "Lock",
+        "action_start": "Start",
+        "action_return_home": "Return to dock",
+        "action_locate": "Locate",
+        "action_press": "Press the button",
+        "action_trigger": "Run the automation",
+        "action_speed_up": "Speed up",
+        "action_speed_down": "Slow down",
+        "action_next_option": "Next option",
+        "action_previous_option": "Previous option",
+        "action_first_option": "First option",
+        "action_last_option": "Last option",
+        "action_step_up": "Increase",
+        "action_step_down": "Decrease",
         "wheel_missing_title": "BILRESA device no longer available",
         "wheel_missing_body": (
             "The device was removed or the integration reloaded. Return to the "
@@ -618,6 +673,34 @@ STRINGS: dict[str, dict[str, str]] = {
         "click_script_on": "Spustit skript",
         "click_script_off": "Zastavit skript",
         "click_script_toggle": "Přepnout skript",
+        "click_play_pause": "Přehrát / pozastavit",
+        "click_play": "Přehrát",
+        "click_pause": "Pozastavit",
+        "click_stop": "Zastavit",
+        "click_next": "Další skladba",
+        "click_previous": "Předchozí skladba",
+        "click_volume_up": "Hlasitěji",
+        "click_volume_down": "Tišeji",
+        "click_mute_toggle": "Ztlumit / zrušit ztlumení",
+        "click_open": "Otevřít",
+        "click_close": "Zavřít",
+        "click_lock": "Zamknout",
+        "click_start": "Spustit",
+        "click_return_home": "Vrátit do stanice",
+        "click_locate": "Najít",
+        "click_press": "Stisknout tlačítko",
+        "click_trigger": "Spustit automatizaci",
+        "click_speed_up": "Zrychlit",
+        "click_speed_down": "Zpomalit",
+        "click_next_option": "Další možnost",
+        "click_previous_option": "Předchozí možnost",
+        "click_first_option": "První možnost",
+        "click_last_option": "Poslední možnost",
+        "click_step_up": "Zvýšit",
+        "click_step_down": "Snížit",
+        "cover_open_warning": (
+            "Garážová vrata nebo brána se po stisku otevřou, i když se nikdo nedívá."
+        ),
         "script_run_help": (
             "Spustí skript a předá mu, které gesto ho spustilo, v proměnných "
             "gesture, presses, channel, endpoint a device."
@@ -685,6 +768,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Scénu lze jen spustit, ne vypnout. Zvolte Přepnout cíl nebo Zapnout cíl."
         ),
         "validation_scenes_required": "Přidejte alespoň jednu scénu.",
+        "validation_action_not_supported": (
+            "Tento cíl to neumí. Zvolte některou z nabízených akcí."
+        ),
         "validation_mode_target_mismatch": (
             "Vybraný režim otáčení nemůže ovládat tuto entitu."
         ),
@@ -718,6 +804,30 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_ramp_up": "Zesílit",
         "action_ramp_down": "Zeslabit",
         "action_stop_ramp": "Zastavit změnu",
+        "action_play_pause": "Přehrát / pozastavit",
+        "action_play": "Přehrát",
+        "action_pause": "Pozastavit",
+        "action_next": "Další skladba",
+        "action_previous": "Předchozí skladba",
+        "action_volume_up": "Hlasitěji",
+        "action_volume_down": "Tišeji",
+        "action_mute_toggle": "Ztlumit / zrušit ztlumení",
+        "action_open": "Otevřít",
+        "action_close": "Zavřít",
+        "action_lock": "Zamknout",
+        "action_start": "Spustit",
+        "action_return_home": "Vrátit do stanice",
+        "action_locate": "Najít",
+        "action_press": "Stisknout tlačítko",
+        "action_trigger": "Spustit automatizaci",
+        "action_speed_up": "Zrychlit",
+        "action_speed_down": "Zpomalit",
+        "action_next_option": "Další možnost",
+        "action_previous_option": "Předchozí možnost",
+        "action_first_option": "První možnost",
+        "action_last_option": "Poslední možnost",
+        "action_step_up": "Zvýšit",
+        "action_step_down": "Snížit",
         "wheel_missing_title": "Zařízení BILRESA už není dostupné",
         "wheel_missing_body": (
             "Zařízení bylo odebráno nebo se integrace znovu načetla. Vraťte se na "

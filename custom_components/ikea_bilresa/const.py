@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from .gesture_verbs import ACTS_WHILE_UNKNOWN, ALL_VERBS
+from .gesture_verbs import TARGET_DOMAINS as _GESTURE_TARGET_DOMAINS
+
 DOMAIN = "ikea_bilresa"
 
 # Default Matter Server (add-on) WebSocket URL. Overridden by the URL taken
@@ -305,14 +308,15 @@ CLICK_TOGGLE = "toggle"
 CLICK_ON = "on"
 CLICK_OFF = "off"
 CLICK_NONE = "none"
-CLICK_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF, CLICK_NONE]
-# The actions a gesture can carry out on its target; "none" is no gesture at all.
-TARGET_ACTIONS = [CLICK_TOGGLE, CLICK_ON, CLICK_OFF]
+# The verbs a gesture can carry out on its target, from the table in
+# ``gesture_verbs``; "none" is no gesture at all.
+TARGET_ACTIONS = list(ALL_VERBS)
+CLICK_ACTIONS = [*TARGET_ACTIONS, CLICK_NONE]
 DEFAULT_TARGET_ACTION = CLICK_TOGGLE
 
-# Entity domains a press, double press, triple press or hold may act on. A light,
-# a switch or a script is toggled, switched on or off; a scene can only be run.
-PRESS_TARGET_DOMAINS = ("light", "switch", "script", "scene")
+# Entity domains a press, double press, triple press or hold may act on, and
+# what each can do: see ``gesture_verbs``.
+PRESS_TARGET_DOMAINS = _GESTURE_TARGET_DOMAINS
 # Entities whose state is not an on/off answer: a scene reports when it was last
 # activated (``unknown`` before the first time) and a script is idle or running.
 RUN_TARGET_DOMAINS = ("script", "scene")
@@ -323,6 +327,13 @@ def is_run_target(entity_id: str | None) -> bool:
     if not entity_id:
         return False
     return entity_id.split(".", 1)[0] in RUN_TARGET_DOMAINS
+
+
+def acts_while_unknown(entity_id: str | None) -> bool:
+    """Whether a press may act on this entity while its state is ``unknown``."""
+    if not entity_id:
+        return False
+    return entity_id.split(".", 1)[0] in ACTS_WHILE_UNKNOWN
 
 
 def is_scene_target(entity_id: str | None) -> bool:

@@ -415,6 +415,10 @@ def _action_key(action: str, target: str | None) -> str:
         return "action_run"
     if (domain, service) == ("script", "turn_off"):
         return "action_stop"
+    if domain != "homeassistant":
+        # A verb of the entity's own kind ("play_pause", "return_home"): it has
+        # its own words, named after the verb.
+        return f"action_{action}"
     return _CLICK_KEYS.get(action, "action_toggle")
 
 

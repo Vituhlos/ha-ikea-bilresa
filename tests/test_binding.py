@@ -2212,3 +2212,186 @@ def test_a_completed_press_names_the_device_from_its_own_action(monkeypatch) -> 
 
     [(_domain, _service, data)] = _service_calls(binding)
     assert data["variables"]["device"] == "Test wheel"
+
+
+# -- verbs by kind of target -------------------------------------------------
+
+_STATELESS_VERBS = [
+    ("media_player.sonos", "play_pause", "media_player", "media_play_pause"),
+    ("media_player.sonos", "play", "media_player", "media_play"),
+    ("media_player.sonos", "pause", "media_player", "media_pause"),
+    ("media_player.sonos", "stop", "media_player", "media_stop"),
+    ("media_player.sonos", "next", "media_player", "media_next_track"),
+    ("media_player.sonos", "previous", "media_player", "media_previous_track"),
+    ("media_player.sonos", "volume_up", "media_player", "volume_up"),
+    ("media_player.sonos", "volume_down", "media_player", "volume_down"),
+    ("media_player.sonos", "toggle", "homeassistant", "toggle"),
+    ("cover.blind", "toggle", "cover", "toggle"),
+    ("cover.blind", "open", "cover", "open_cover"),
+    ("cover.blind", "close", "cover", "close_cover"),
+    ("cover.blind", "stop", "cover", "stop_cover"),
+    ("lock.door", "lock", "lock", "lock"),
+    ("vacuum.robot", "start", "vacuum", "start"),
+    ("vacuum.robot", "pause", "vacuum", "pause"),
+    ("vacuum.robot", "stop", "vacuum", "stop"),
+    ("vacuum.robot", "return_home", "vacuum", "return_to_base"),
+    ("vacuum.robot", "locate", "vacuum", "locate"),
+    ("valve.water", "close", "valve", "close_valve"),
+    ("valve.water", "stop", "valve", "stop_valve"),
+    ("siren.alarm", "off", "siren", "turn_off"),
+    ("button.doorbell", "press", "button", "press"),
+    ("input_button.go", "press", "input_button", "press"),
+    ("automation.night", "trigger", "automation", "trigger"),
+    ("fan.bedroom", "speed_up", "fan", "increase_speed"),
+    ("fan.bedroom", "speed_down", "fan", "decrease_speed"),
+    ("input_select.mode", "next_option", "input_select", "select_next"),
+    ("input_select.mode", "previous_option", "input_select", "select_previous"),
+    ("input_select.mode", "first_option", "input_select", "select_first"),
+    ("input_select.mode", "last_option", "input_select", "select_last"),
+    ("select.mode", "next_option", "select", "select_next"),
+    ("input_number.level", "step_up", "input_number", "increment"),
+    ("input_number.level", "step_down", "input_number", "decrement"),
+]
+
+
+@pytest.mark.parametrize(
+    "gesture", ["short_press", "double_press", "triple_press", "hold"]
+)
+@pytest.mark.parametrize(
+    ("entity", "verb", "domain", "service"),
+    _STATELESS_VERBS,
+    ids=[f"{e}-{v}" for e, v, _d, _s in _STATELESS_VERBS],
+)
+def test_every_gesture_can_carry_out_a_verb_of_its_kind_of_target(
+    monkeypatch, gesture: str, entity: str, verb: str, domain: str, service: str
+) -> None:
+    binding = _gesture_binding(monkeypatch, gesture, entity, verb)
+
+    _press(binding, gesture)
+
+    assert _service_calls(binding) == [(domain, service, {"entity_id": entity})]
+
+
+@pytest.mark.parametrize(("muted", "asked"), [(False, True), (True, False)])
+def test_mute_asks_for_the_opposite_of_what_the_player_is_now(
+    monkeypatch, muted: bool, asked: bool
+) -> None:
+    binding = _gesture_binding(
+        monkeypatch, "double_press", "media_player.tv", "mute_toggle"
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"is_volume_muted": muted}
+    )
+
+    _press(binding, "double_press")
+
+    assert _service_calls(binding) == [
+        (
+            "media_player",
+            "volume_mute",
+            {"entity_id": "media_player.tv", "is_volume_muted": asked},
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "attributes", [{}, {"is_volume_muted": None}, {"is_volume_muted": "no"}]
+)
+def test_mute_is_skipped_when_the_player_does_not_say_whether_it_is_muted(
+    monkeypatch, attributes: dict
+) -> None:
+    """A mute toggled the wrong way is worse than a press that did nothing."""
+    binding = _gesture_binding(
+        monkeypatch, "double_press", "media_player.tv", "mute_toggle"
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="off", attributes=attributes
+    )
+    binding._report_activity = Mock()
+
+    _press(binding, "double_press")
+
+    assert _service_calls(binding) == []
+    assert binding._report_activity.call_args_list[-1].kwargs["reason"] == (
+        "state_not_readable"
+    )
+
+
+def test_a_verb_the_target_does_not_have_is_skipped(monkeypatch) -> None:
+    """Stored data can predate a check; the runtime must not guess a service."""
+    binding = _gesture_binding(monkeypatch, "double_press", "lock.door", "play_pause")
+    binding._report_activity = Mock()
+
+    _press(binding, "double_press")
+
+    assert _service_calls(binding) == []
+    assert binding._report_activity.call_args_list[-1].kwargs["reason"] == (
+        "action_not_supported"
+    )
+
+
+@pytest.mark.parametrize(
+    ("entity", "verb"),
+    [("lock.door", "toggle"), ("lock.door", "off"), ("siren.alarm", "on")],
+)
+def test_nothing_unlocks_or_sounds_through_the_switchable_words(
+    monkeypatch, entity: str, verb: str
+) -> None:
+    """One stray press must not open a door or sound a siren."""
+    binding = _gesture_binding(monkeypatch, "short_press", entity, verb)
+
+    _press(binding, "short_press")
+
+    assert _service_calls(binding) == []
+
+
+def test_a_button_that_was_never_pressed_still_acts_though_its_state_is_unknown(
+    monkeypatch,
+) -> None:
+    binding = _gesture_binding(monkeypatch, "double_press", "button.doorbell", "press")
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="unknown", attributes={}
+    )
+
+    _press(binding, "double_press")
+
+    assert _service_calls(binding) == [
+        ("button", "press", {"entity_id": "button.doorbell"})
+    ]
+
+
+def test_an_unavailable_target_is_skipped_whatever_the_verb(monkeypatch) -> None:
+    binding = _gesture_binding(
+        monkeypatch, "double_press", "media_player.tv", "play_pause"
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="unavailable", attributes={}
+    )
+
+    _press(binding, "double_press")
+
+    assert _service_calls(binding) == []
+
+
+@pytest.mark.parametrize(
+    ("entity", "verb", "named"),
+    [
+        ("media_player.tv", "play_pause", "play_pause"),
+        ("vacuum.robot", "return_home", "return_home"),
+        ("media_player.tv", "toggle", "toggle"),
+    ],
+)
+def test_the_live_activity_names_a_verb_after_the_verb(
+    monkeypatch, entity: str, verb: str, named: str
+) -> None:
+    binding = _gesture_binding(monkeypatch, "double_press", entity, verb)
+    binding._report_activity = Mock()
+
+    _press(binding, "double_press")
+
+    pending = [
+        call
+        for call in binding._report_activity.call_args_list
+        if call.args and call.args[0] == "pending"
+    ]
+    assert pending[0].kwargs["result"]["action"] == named

@@ -25,6 +25,7 @@ from .const import (
     MODE_TARGET_DOMAINS,
     PRESS_TARGET_DOMAINS,
 )
+from .gesture_verbs import schema_verbs
 
 SCHEMA_VERSION = 1
 
@@ -76,5 +77,6 @@ def panel_schema() -> dict[str, Any]:
             mode: sorted(domains) for mode, domains in MODE_TARGET_DOMAINS.items()
         },
         "press_target_domains": list(PRESS_TARGET_DOMAINS),
+        "gesture_verbs": schema_verbs(),
         "ramp_target_domains": list(RAMP_TARGET_DOMAINS),
     }

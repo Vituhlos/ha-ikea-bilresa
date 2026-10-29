@@ -62,6 +62,7 @@ from .const import (
     RAMP_DIRECTIONS,
     STEP_CURVES,
     TARGET_ACTIONS,
+    is_scene_target,
     mode_supports_target,
 )
 from .gesture_actions import action_is_supported
@@ -275,7 +276,11 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
         )
     for field, target, action in gestures:
         if target and not action_is_supported(target, action):
-            errors[field] = "scene_cannot_turn_off"
+            errors[field] = (
+                "scene_cannot_turn_off"
+                if is_scene_target(target)
+                else "action_not_supported"
+            )
     if is_button:
         if data[CONF_CLICK_ACTION] != CLICK_NONE and not data.get(CONF_CLICK_TARGET):
             errors[CONF_CLICK_TARGET] = "target_required"

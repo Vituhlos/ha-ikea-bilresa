@@ -312,6 +312,13 @@ controls. Record the Home Assistant version, browser, theme and language.
 - [ ] Theme variables (0.7.0-rc.5, GitHub #22): with `bilresa-accent` and
       `bilresa-on-accent` set in a theme the primary button changes; with
       neither set the panel looks as before.
+- [ ] Verbs by kind of target (after 0.7.0-rc.5): in the panel, picking a media
+      player offers play / pause, next / previous track, volume up / down and
+      mute / unmute; a cover open / close / stop; a lock only *Lock*. A double
+      press on a real media player does play / pause (Sonos, GitHub #17);
+      mute / unmute flips the real mute; a player that is off is skipped with
+      the reason in the live activity; a garage door shows the warning beside
+      *Open* and *Toggle*; a button entity that was never pressed still presses.
 - [ ] Scene and script targets (0.7.0-rc.4): a double press, triple press or hold
       aimed at a scene runs it; a short press on a script toggles, turns on or
       turns off; a second press stops a running script; "Turn target off" is

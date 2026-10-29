@@ -53,6 +53,45 @@ configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
 
+## Actions by kind of target
+
+What a gesture can do depends on the target you pick: the action list in the
+panel shows only what that kind of target can carry out. Toggle, turn on and turn
+off exist for everything switchable (light, switch, fan, humidifier, remote,
+climate, input boolean); the rest:
+
+| Target | Actions |
+|---|---|
+| **media player** | play / pause, play, pause, stop, next track, previous track, volume up, volume down, mute / unmute, and toggle, turn on, turn off |
+| **cover** | toggle, open, close, stop |
+| **lock** | lock |
+| **vacuum** | start, pause, stop, return to dock, locate |
+| **fan** | speed up, slow down, and toggle, turn on, turn off |
+| **button, input button** | press the button |
+| **automation** | run the automation |
+| **input select, select** | next, previous, first, last option |
+| **input number** | increase, decrease (by the number's own step) |
+| **valve** | close, stop |
+| **siren** | turn off |
+| script, scene | see below |
+
+Mute / unmute asks the player for the opposite of what it reports when the
+button is pressed; a player that does not say whether it is muted (for example
+one that is off) is skipped. A target that is unavailable is skipped, and the
+live activity says why.
+
+**What is left out on purpose:** unlocking a lock, opening it, or toggling it;
+turning a siren on; opening a valve; disarming an alarm. One stray press on a
+remote that anyone can pick up must not open a door, sound a siren, let water
+run or disarm an alarm; use a script or an automation, where you decide how. For
+a garage door or a gate the panel warns beside *Open* and *Toggle* that it opens
+when the button is pressed, with nobody watching.
+
+A device that does not support a verb (a player without *next track*, say) makes
+Home Assistant write an error to its log; the live activity still says the action
+was accepted, because the call is sent without waiting for the device. A binding
+saved before these actions existed keeps working as it was.
+
 ## Scenes and scripts as targets
 
 Every press gesture (single, double, triple press and hold) takes one action on
