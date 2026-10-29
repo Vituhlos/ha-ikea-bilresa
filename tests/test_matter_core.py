@@ -482,6 +482,16 @@ async def test_a_removed_node_is_dropped_at_once_not_at_the_next_update(
     assert len(source._position_paths) == 39
     assert ("node_removed", 12) in events
 
+    # The whole lifecycle: the client no longer lists the node either, and the
+    # updates that follow neither bring it back nor forward anything for it.
+    client._nodes = [n for n in client._nodes if n.node_data.node_id != 12]
+    events.clear()
+    for _ in range(3):
+        client.callback(FakeEventType("attribute_updated"), 1)
+    assert 12 not in source._position_paths
+    assert (12, "1/59/0") not in source._switch_positions
+    assert not [e for e in events if e[0] == "attribute_updated"]
+
 
 @pytest.mark.asyncio
 async def test_removing_a_node_the_cache_never_saw_is_harmless(monkeypatch) -> None:
