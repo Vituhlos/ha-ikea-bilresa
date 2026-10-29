@@ -589,7 +589,7 @@ gesture targets.
 **Planned, roughly in this order.**
 
 - An action of its own for every gesture, with scripts told which gesture
-  started them (in review).
+  started them: merged after `v0.7.0-rc.4`, not yet in a release.
 - Hold with an action when it starts and another when it ends, for example to
   run a script that changes something while you hold and stop it on release.
 - Full Home Assistant actions (any service, with data) for a gesture, instead of

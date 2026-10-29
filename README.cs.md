@@ -578,7 +578,7 @@ Zigbee2MQTT, vypnuté kanály, které mlčí, a scény a skripty jako cíle gest
 **Plánováno, zhruba v tomto pořadí.**
 
 - Vlastní akce pro každé gesto, skripty dostanou informaci, které gesto je
-  spustilo (v revizi).
+  spustilo: sloučeno po `v0.7.0-rc.4`, zatím v žádném vydání.
 - Podržení s akcí při začátku a jinou při konci, například pro spuštění skriptu,
   který cokoli mění, dokud držíte, a zastavení při uvolnění.
 - Plné akce Home Assistantu (libovolná služba s daty) pro gesto, místo jediné
