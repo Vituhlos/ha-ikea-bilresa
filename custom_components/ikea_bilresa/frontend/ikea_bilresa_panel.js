@@ -1079,6 +1079,26 @@ const STYLES = `
     font-size: var(--ha-font-size-m, 14px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
+  [data-actions] ha-selector { display: block; }
+  .actions-form { display: grid; gap: 12px; }
+  .actions-row {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--divider-color, #ddd);
+    border-radius: 8px;
+  }
+  .actions-fields { display: grid; gap: 8px; }
+  .actions-form input,
+  .actions-form textarea {
+    box-sizing: border-box;
+    inline-size: 100%;
+    font: inherit;
+  }
+  .actions-form textarea {
+    min-block-size: 72px;
+    font-family: var(--code-font-family, monospace);
+  }
   .field ha-selector { display: block; }
   /* Matches the label Home Assistant's entity picker and slider draw above
      their box: same type, same 8 px to the box (4 px here plus the gap). */
@@ -1583,11 +1603,75 @@ const ROTATION_MORE_FIELDS = [
 // scene can only be run, a script is run, stopped or toggled, anything else
 // is toggled, turned on or turned off.
 const GESTURE_FIELDS = {
-  click: { action: "click_action", target: "click_target" },
-  double_press: { action: "double_press_action", target: "double_press_target" },
-  triple_press: { action: "triple_press_action", target: "triple_press_target" },
-  hold: { action: "hold_target_action", target: "hold_target" },
+  click: { action: "click_action", target: "click_target", sequence: "click_sequence" },
+  double_press: {
+    action: "double_press_action",
+    target: "double_press_target",
+    sequence: "double_press_sequence",
+  },
+  triple_press: {
+    action: "triple_press_action",
+    target: "triple_press_target",
+    sequence: "triple_press_sequence",
+  },
+  hold: { action: "hold_target_action", target: "hold_target", sequence: "hold_sequence" },
 };
+
+// Home Assistant's own action editor, the one an automation uses, is a custom
+// element that only exists once the frontend has loaded the automation editor.
+// The frontend offers no documented way to ask for it, so this drives the same
+// route loaders it uses itself (private: they may change with a release), with a
+// time limit at every step, and says whether the editor is there. The panel
+// works without it: see _actionsForm. Loaded once, only when someone opens an
+// editor of actions, never on opening the panel.
+const ACTION_EDITOR_TIMEOUT_MS = 8000;
+let actionEditorLoad;
+
+const loadActionEditor = (hass) => {
+  actionEditorLoad ??= (async () => {
+    const within = (promise) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), ACTION_EDITOR_TIMEOUT_MS),
+        ),
+      ]);
+    try {
+      if (!customElements.get("ha-selector")) {
+        await within(customElements.whenDefined("partial-panel-resolver"));
+        const resolver = document.createElement("partial-panel-resolver");
+        const tmp = resolver._getRoutes?.([
+          { url_path: "tmp", component_name: "config" },
+        ])?.routes?.tmp;
+        await within(tmp.load());
+        await within(customElements.whenDefined("ha-panel-config"));
+        const config = document.createElement("ha-panel-config");
+        await within(config.routerOptions.routes.automation.load());
+      }
+      if (!customElements.get("ha-selector")) return false;
+      // Labels of services, targets and selectors come from these.
+      await Promise.allSettled([
+        hass?.loadBackendTranslation?.("services"),
+        hass?.loadBackendTranslation?.("selector"),
+        hass?.loadBackendTranslation?.("entity_component"),
+        hass?.loadFragmentTranslation?.("config"),
+      ]);
+      return true;
+    } catch (err) {
+      console.warn("ikea_bilresa: the action editor of Home Assistant is not available", err);
+      return false;
+    }
+  })();
+  return actionEditorLoad;
+};
+
+// An action the simple list can show and write back unchanged.
+const SIMPLE_ACTION_KEYS = ["action", "service", "target", "data", "alias", "enabled", "continue_on_error"];
+const isSimpleAction = (item) =>
+  item &&
+  typeof item === "object" &&
+  typeof (item.action ?? item.service) === "string" &&
+  Object.keys(item).every((key) => SIMPLE_ACTION_KEYS.includes(key));
 
 const domainOf = (entityId) => String(entityId || "").split(".", 1)[0];
 
@@ -1689,6 +1773,15 @@ const el = (tag, cls, text) => {
 };
 
 class IkeaBilresaPanel extends HTMLElement {
+  // The loader is memoised for the life of the page; a test needs to ask again.
+  static _loadActionEditor(hass) {
+    return loadActionEditor(hass);
+  }
+
+  static _forgetActionEditor() {
+    actionEditorLoad = undefined;
+  }
+
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -2414,7 +2507,7 @@ class IkeaBilresaPanel extends HTMLElement {
       const shortTarget = this._editorData.click_target || this._editorData.target;
       if (
         shortTarget &&
-        this._editorChoices.click_action !== "none" &&
+        !["none", "run"].includes(this._editorChoices.click_action) &&
         !this._verbsFor(shortTarget).includes(this._editorChoices.click_action)
       ) {
         this._editorChoices.click_action = "none";
@@ -2436,6 +2529,7 @@ class IkeaBilresaPanel extends HTMLElement {
   _storedAction(press) {
     const { action, target } = GESTURE_FIELDS[press];
     const entity = this._editorData[target];
+    if (this._editorData[action] === "run") return "run";
     if (!entity) return "none";
     const stored = actionFor(
       targetKind(entity),
@@ -2541,12 +2635,22 @@ class IkeaBilresaPanel extends HTMLElement {
     if (choices.click_action === "scenes" && !data.scenes?.length) {
       errors.scenes = "scenes_required";
     }
-    const enabled = (press) => choices[press] && choices[press] !== "none";
+    const enabled = (press) =>
+      choices[press] && choices[press] !== "none" && choices[press] !== "run";
     if (enabled("double_press") && !data.double_press_target) {
       errors.double_press_target = "target_required";
     }
     if (enabled("triple_press") && !data.triple_press_target) {
       errors.triple_press_target = "target_required";
+    }
+    // A gesture set to run needs something to run.
+    for (const [choice, key, field] of [
+      [choices.click_action, "click_sequence", "click_action"],
+      [choices.double_press, "double_press_sequence", "double_press_action"],
+      [choices.triple_press, "triple_press_sequence", "triple_press_action"],
+      [data.hold_action, "hold_sequence", "hold_action"],
+    ]) {
+      if (choice === "run" && !data[key]?.length) errors[field] = "actions_required";
     }
     return errors;
   }
@@ -2559,7 +2663,7 @@ class IkeaBilresaPanel extends HTMLElement {
     if (name === "click_action") {
       this._editorChanged("scenes");
       // Neither choice shows the target picker, so the target goes with it.
-      if (next === "scenes" || next === "none") {
+      if (["scenes", "none", "run"].includes(next)) {
         delete this._editorData.click_target;
       }
       if (next === "scenes") return;
@@ -2572,6 +2676,7 @@ class IkeaBilresaPanel extends HTMLElement {
         delete this._editorData[`${name}_action`];
       } else {
         this._editorData[`${name}_action`] = next;
+        if (next === "run") delete this._editorData[`${name}_target`];
       }
     }
   }
@@ -2591,11 +2696,12 @@ class IkeaBilresaPanel extends HTMLElement {
     return this._t(kind === "other" ? `click_${verb}` : `click_${kind}_${verb}`);
   }
 
-  _actionOptions(target, { scenes = false, none = true } = {}) {
+  _actionOptions(target, { scenes = false, none = true, run = true } = {}) {
     const options = this._verbsFor(target).map((action) => ({
       value: action,
       label: this._verbLabel(target, action),
     }));
+    if (run) options.push({ value: "run", label: this._t("click_run") });
     if (scenes) options.push({ value: "scenes", label: this._t("click_scenes") });
     if (none) options.push({ value: "none", label: this._t("click_none") });
     return options;
@@ -2747,6 +2853,212 @@ class IkeaBilresaPanel extends HTMLElement {
   _field(wide) {
     const wrap = el("div", "field");
     if (wide) wrap.dataset.wide = "true";
+    return wrap;
+  }
+
+  // -- the actions a gesture runs ---------------------------------------------
+  // Written the way an automation writes its actions and stored as that list.
+  // Home Assistant's own editor is used when it can be loaded; otherwise a
+  // simple list and a JSON box edit the very same data.
+
+  _sequenceOf(field) {
+    const value = this._editorData[field];
+    return Array.isArray(value) ? value : [];
+  }
+
+  _setSequence(field, actionField, value) {
+    // A copy: the editors change what they are given, and the data must only
+    // change through here.
+    this._editorData[field] = Array.isArray(value) ? JSON.parse(JSON.stringify(value)) : [];
+    this._editorChanged(actionField);
+  }
+
+  // Starts loading Home Assistant's editor the first time someone needs it.
+  _ensureActionEditor() {
+    if (this._actionEditor) return;
+    this._actionEditor = "loading";
+    loadActionEditor(this._hass).then((loaded) => {
+      this._actionEditor = loaded ? "ha" : "form";
+      this._render();
+    });
+  }
+
+  _actionsEditor(field, actionField) {
+    const wrap = this._field(true);
+    wrap.dataset.actions = "true";
+    wrap.appendChild(el("span", "selector-label", this._t("actions_label")));
+    wrap.appendChild(el("p", "field-help", this._t("actions_help")));
+    this._ensureActionEditor();
+    let node = null;
+    if (this._actionEditor === "ha") {
+      node = this._haSelector({
+        id: this._fieldId(field),
+        selector: { action: {} },
+        // The editor changes what it is given in place: it gets a copy. No
+        // re-render on a change, or the editor would be rebuilt under the
+        // person's hands.
+        value: JSON.parse(JSON.stringify(this._sequenceOf(field))),
+        required: false,
+        onChange: (next) => this._setSequence(field, actionField, next),
+      });
+    }
+    if (node) {
+      wrap.appendChild(node);
+    } else if (this._actionEditor === "loading") {
+      wrap.appendChild(el("p", "field-help", this._t("actions_loading")));
+    } else {
+      wrap.appendChild(el("p", "field-help", this._t("actions_fallback")));
+      wrap.appendChild(this._actionsForm(field, actionField));
+    }
+    return wrap;
+  }
+
+  _serviceNames(current) {
+    const names = Object.entries(this._hass?.services || {})
+      .flatMap(([domain, services]) =>
+        Object.keys(services).map((service) => `${domain}.${service}`),
+      )
+      .sort();
+    if (current && !names.includes(current)) names.unshift(current);
+    return names;
+  }
+
+  _actionsForm(field, actionField) {
+    const box = el("div", "actions-form");
+    const items = this._sequenceOf(field);
+    const commit = (next) => {
+      this._setSequence(field, actionField, next);
+      this._render();
+    };
+    if (!items.length) box.appendChild(el("p", "field-help", this._t("actions_empty")));
+    items.forEach((item, index) => {
+      const row = el("div", "actions-row");
+      if (isSimpleAction(item)) {
+        row.appendChild(
+          this._actionRow(field, item, index, (changed) =>
+            commit(items.map((other, at) => (at === index ? changed : other))),
+          ),
+        );
+      } else {
+        row.appendChild(
+          el(
+            "p",
+            "field-help",
+            `${this._t("actions_complex")} ${JSON.stringify(item).slice(0, 160)}`,
+          ),
+        );
+      }
+      const remove = el("button", "action-button", this._t("actions_remove"));
+      remove.type = "button";
+      remove.addEventListener("click", () =>
+        commit(items.filter((_, at) => at !== index)),
+      );
+      row.appendChild(remove);
+      box.appendChild(row);
+    });
+    const add = el("button", "action-button", this._t("actions_add"));
+    add.type = "button";
+    add.addEventListener("click", () =>
+      commit([...items, { action: this._serviceNames()[0] || "homeassistant.toggle" }]),
+    );
+    box.appendChild(add);
+    box.appendChild(this._actionsJson(field, items, commit));
+    return box;
+  }
+
+  // One plain action: which service, on which entities, with what data.
+  _actionRow(field, item, index, change) {
+    const fields = el("div", "actions-fields");
+    const id = `${this._fieldId(field)}-${index}`;
+    const key = "action" in item ? "action" : "service";
+
+    const pick = el("div", "field");
+    this._nativeSelect(
+      pick,
+      `${id}-service`,
+      this._t("actions_service"),
+      undefined,
+      this._serviceNames(item[key]).map((name) => ({ value: name, label: name })),
+      { value: item[key], onChange: (next) => change({ ...item, [key]: next }) },
+    );
+    fields.appendChild(pick);
+
+    const target = el("div", "field");
+    const targetLabel = el("label", null, this._t("actions_target_ids"));
+    targetLabel.htmlFor = `${id}-target`;
+    const targetInput = el("input");
+    targetInput.id = `${id}-target`;
+    targetInput.type = "text";
+    targetInput.value = [].concat(item.target?.entity_id ?? []).join(", ");
+    targetInput.addEventListener("change", () => {
+      const ids = targetInput.value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      // Areas, devices and labels in the target are kept as they are.
+      const next = { ...item };
+      const kept = { ...(item.target || {}) };
+      if (ids.length) kept.entity_id = ids;
+      else delete kept.entity_id;
+      if (Object.keys(kept).length) next.target = kept;
+      else delete next.target;
+      change(next);
+    });
+    target.append(targetLabel, targetInput);
+    fields.appendChild(target);
+
+    const data = el("div", "field");
+    const dataLabel = el("label", null, this._t("actions_data"));
+    dataLabel.htmlFor = `${id}-data`;
+    const dataInput = el("textarea");
+    dataInput.id = `${id}-data`;
+    dataInput.value = item.data ? JSON.stringify(item.data, null, 2) : "";
+    dataInput.addEventListener("change", () => {
+      const text = dataInput.value.trim();
+      let parsed;
+      try {
+        parsed = text ? JSON.parse(text) : undefined;
+        if (parsed !== undefined && (typeof parsed !== "object" || Array.isArray(parsed))) {
+          throw new Error("not an object");
+        }
+      } catch {
+        dataInput.setAttribute("aria-invalid", "true");
+        data.appendChild(el("span", "field-error", this._t("actions_json_invalid")));
+        return;
+      }
+      const next = { ...item };
+      if (parsed && Object.keys(parsed).length) next.data = parsed;
+      else delete next.data;
+      change(next);
+    });
+    data.append(dataLabel, dataInput);
+    fields.appendChild(data);
+    return fields;
+  }
+
+  // The whole list as JSON: the way to write what the simple list cannot (a
+  // delay, a condition, a choice), and to paste actions from an automation.
+  _actionsJson(field, items, commit) {
+    const wrap = el("div", "field");
+    const id = `${this._fieldId(field)}-json`;
+    const label = el("label", null, this._t("actions_json"));
+    label.htmlFor = id;
+    const input = el("textarea");
+    input.id = id;
+    input.value = JSON.stringify(items, null, 2);
+    input.addEventListener("change", () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(input.value.trim() || "[]");
+        if (!Array.isArray(parsed)) throw new Error("not a list");
+      } catch {
+        input.setAttribute("aria-invalid", "true");
+        wrap.appendChild(el("span", "field-error", this._t("actions_json_invalid")));
+        return;
+      }
+      commit(parsed);
+    });
+    wrap.append(label, input);
     return wrap;
   }
 
@@ -3327,6 +3639,8 @@ class IkeaBilresaPanel extends HTMLElement {
     const clickChoice = this._editorChoices.click_action;
     if (clickChoice === "scenes") {
       shortPress.appendChild(this._scenesField());
+    } else if (clickChoice === "run") {
+      shortPress.appendChild(this._actionsEditor("click_sequence", "click_action"));
     } else if (clickChoice !== "none") {
       shortPress.appendChild(
         this._entityField(
@@ -3397,7 +3711,11 @@ class IkeaBilresaPanel extends HTMLElement {
           },
         ),
       );
-      if (this._editorChoices[press] !== "none") {
+      if (this._editorChoices[press] === "run") {
+        card.appendChild(
+          this._actionsEditor(`${press}_sequence`, `${press}_action`),
+        );
+      } else if (this._editorChoices[press] !== "none") {
         card.appendChild(
           this._entityField(
             `${press}_target`,
@@ -3510,7 +3828,7 @@ class IkeaBilresaPanel extends HTMLElement {
       this._selectField(
         "hold_action",
         this._t("gesture_action"),
-        ["toggle", "ramp", "none"].map((action) => ({
+        ["toggle", "ramp", "run", "none"].map((action) => ({
           value: action,
           label: this._t(`hold_${action}`),
         })),
@@ -3519,7 +3837,9 @@ class IkeaBilresaPanel extends HTMLElement {
     // A wheel ramps its rotation target, whatever the hold target says; only
     // a dual button, which has no rotation, ramps the hold target.
     const holdAction = this._editorData.hold_action;
-    if (holdAction !== "none" && (isButton || holdAction !== "ramp")) {
+    if (holdAction === "run") {
+      hold.appendChild(this._actionsEditor("hold_sequence", "hold_action"));
+    } else if (holdAction !== "none" && (isButton || holdAction !== "ramp")) {
       hold.appendChild(
         this._entityField(
           "hold_target",
@@ -3540,7 +3860,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._selectField(
           "hold_target_action",
           this._t("gesture_hold_effect"),
-          this._actionOptions(this._editorData.hold_target, { none: false }),
+          this._actionOptions(this._editorData.hold_target, { none: false, run: false }),
           {
             // A hold with no target yet still shows what it will do.
             value: this._editorData.hold_target_action || "toggle",

@@ -1323,24 +1323,27 @@ test("the choices follow the kind of target: a scene is only run", () => {
     "toggle",
     "on",
     "off",
+    "run",
     "none",
   ]);
   assert.deepEqual(labelsOf(panel._actionOptions("script.a")), [
     "on",
     "off",
     "toggle",
+    "run",
     "none",
   ]);
-  assert.deepEqual(labelsOf(panel._actionOptions("scene.a")), ["on", "none"]);
+  assert.deepEqual(labelsOf(panel._actionOptions("scene.a")), ["on", "run", "none"]);
   assert.deepEqual(
     labelsOf(panel._actionOptions("light.a", { scenes: true, none: false })),
-    ["toggle", "on", "off", "scenes"],
+    ["toggle", "on", "off", "run", "scenes"],
   );
   // No target chosen yet: the words of an ordinary switchable entity.
   assert.deepEqual(labelsOf(panel._actionOptions(undefined)), [
     "toggle",
     "on",
     "off",
+    "run",
     "none",
   ]);
 });
@@ -1355,13 +1358,15 @@ test("the words for a script and a scene are their own", () => {
     "click_script_on",
     "click_script_off",
     "click_script_toggle",
+    "click_run",
     "click_none",
   ]);
-  assert.deepEqual(words("scene.a"), ["click_scene_on", "click_none"]);
+  assert.deepEqual(words("scene.a"), ["click_scene_on", "click_run", "click_none"]);
   assert.deepEqual(words("light.a"), [
     "click_toggle",
     "click_on",
     "click_off",
+    "click_run",
     "click_none",
   ]);
 });
@@ -1495,6 +1500,7 @@ test("the actions on offer are the verbs of the chosen kind of target", () => {
       click_play_pause: "Play / pause",
       click_mute_toggle: "Mute / unmute",
       click_lock: "Lock",
+      click_run: "Run actions",
       click_none: "No action",
     },
   );
@@ -1505,11 +1511,12 @@ test("the actions on offer are the verbs of the chosen kind of target", () => {
       ["toggle", "Toggle target"],
       ["play_pause", "Play / pause"],
       ["mute_toggle", "Mute / unmute"],
+      ["run", "Run actions"],
       ["none", "No action"],
     ],
   );
   assert.deepEqual(
-    panel._actionOptions("lock.door", { none: false }).map((o) => o.value),
+    panel._actionOptions("lock.door", { none: false, run: false }).map((o) => o.value),
     ["lock"],
   );
 });
@@ -1519,7 +1526,7 @@ test("a backend that sends no verbs still offers toggle, on and off", () => {
   panel._panel = { config: { labels: {} } };
 
   assert.deepEqual(
-    panel._actionOptions("light.a", { none: false }).map((o) => o.value),
+    panel._actionOptions("light.a", { none: false, run: false }).map((o) => o.value),
     ["toggle", "on", "off"],
   );
 });
@@ -1605,4 +1612,291 @@ test("clearing the short press target hands the choice to the rotation target", 
 
   assert.equal(panel._editorChoices.click_action, "toggle");
   assert.equal(panel._editorData.click_action, "toggle");
+});
+
+// -- the actions a gesture runs ---------------------------------------------
+
+class FakeNode {
+  constructor(tag) {
+    this.tag = tag;
+    this.children = [];
+    this.dataset = {};
+    this.listeners = {};
+    this.attrs = {};
+    this.className = "";
+    this.textContent = "";
+    this.value = "";
+  }
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+  append(...children) {
+    this.children.push(...children);
+  }
+  addEventListener(name, handler) {
+    this.listeners[name] = handler;
+  }
+  setAttribute(name, value) {
+    this.attrs[name] = value;
+  }
+}
+
+const walk = (node, found = []) => {
+  found.push(node);
+  for (const child of node.children || []) walk(child, found);
+  return found;
+};
+
+const withFakeDom = (run) => {
+  const previous = globalThis.document;
+  globalThis.document = { createElement: (tag) => new FakeNode(tag) };
+  try {
+    return run();
+  } finally {
+    globalThis.document = previous;
+    registry.delete("ha-selector");
+  }
+};
+
+const actionPanel = (data = {}) => {
+  const panel = newPanel();
+  panel._panel = { config: { labels: {} } };
+  panel._hass = {
+    services: {
+      light: { toggle: {}, turn_on: {} },
+      media_player: { media_play_pause: {} },
+    },
+  };
+  panel._loadEditor(false, { target: "light.a", ...data });
+  let renders = 0;
+  panel._render = () => {
+    renders += 1;
+  };
+  return { panel, renders: () => renders };
+};
+
+const PLAY = [
+  { action: "media_player.media_play_pause", target: { entity_id: "media_player.tv" } },
+];
+
+test("a gesture set to run has no target, keeps its actions and is not 'none'", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+    click_action: "run",
+    click_sequence: PLAY,
+  });
+
+  assert.equal(panel._editorChoices.double_press, "run");
+  assert.equal(panel._editorChoices.click_action, "run");
+  assert.deepEqual(panel._editorData.double_press_sequence, PLAY);
+
+  // Leaving run keeps the actions in the form, so switching back finds them.
+  panel._chooseGesture("double_press", "toggle");
+  assert.deepEqual(panel._editorData.double_press_sequence, PLAY);
+  panel._chooseGesture("double_press", "run");
+  assert.equal("double_press_target" in panel._editorData, false);
+  assert.equal(panel._editorData.double_press_action, "run");
+});
+
+test("a gesture that runs actions needs some before it can be saved", () => {
+  const { panel } = actionPanel();
+  panel._chooseGesture("double_press", "run");
+  panel._chooseGesture("click_action", "run");
+  panel._editorData.hold_action = "run";
+
+  assert.deepEqual(panel._choiceErrors(), {
+    click_action: "actions_required",
+    double_press_action: "actions_required",
+    hold_action: "actions_required",
+  });
+
+  panel._editorData.double_press_sequence = PLAY;
+  assert.equal("double_press_action" in panel._choiceErrors(), false);
+});
+
+test("Home Assistant's editor gets a copy and its changes are stored as a copy", () => {
+  const { panel, renders } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  class FakeSelector extends FakeNode {
+    constructor() {
+      super("ha-selector");
+    }
+  }
+  withFakeDom(() => {
+    registry.set("ha-selector", FakeSelector);
+    panel._actionEditor = "ha";
+
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const [editor] = walk(wrap).filter((node) => node.tag === "ha-selector");
+
+    assert.deepEqual(editor.selector, { action: {} });
+    assert.deepEqual(editor.value, PLAY);
+    // Home Assistant's editor changes what it is given in place.
+    editor.value[0].action = "changed.in.place";
+    assert.equal(
+      panel._editorData.double_press_sequence[0].action,
+      "media_player.media_play_pause",
+    );
+
+    const next = [{ action: "light.toggle" }];
+    editor.listeners["value-changed"]({
+      stopPropagation: () => undefined,
+      detail: { value: next },
+    });
+    assert.deepEqual(panel._editorData.double_press_sequence, next);
+    next[0].action = "mutated.after";
+    assert.equal(panel._editorData.double_press_sequence[0].action, "light.toggle");
+    // The editor keeps its own state: rebuilding it under the person's hands
+    // would lose their place.
+    assert.equal(renders(), 0);
+  });
+});
+
+test("without Home Assistant's editor the same actions are edited as a list", () => {
+  const { panel, renders } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const nodes = walk(wrap);
+
+    // One row per action, with a service select, entities and data.
+    const selects = nodes.filter((node) => node.tag === "select");
+    assert.equal(selects.length, 1);
+    const options = walk(selects[0]).filter((node) => node.tag === "option");
+    assert.ok(options.map((o) => o.value).includes("media_player.media_play_pause"));
+
+    const [add] = nodes.filter(
+      (n) => n.tag === "button" && n.textContent === "actions_add",
+    );
+    add.listeners.click();
+    assert.equal(panel._editorData.double_press_sequence.length, 2);
+    assert.equal(renders(), 1);
+
+    // The panel draws again after a change; so does this.
+    const again = walk(
+      panel._actionsEditor("double_press_sequence", "double_press_action"),
+    );
+    const [remove] = again.filter(
+      (n) => n.tag === "button" && n.textContent === "actions_remove",
+    );
+    remove.listeners.click();
+    assert.equal(panel._editorData.double_press_sequence.length, 1);
+  });
+});
+
+test("the JSON box replaces the list, and a mistake changes nothing", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const boxes = walk(wrap).filter((node) => node.tag === "textarea");
+    const json = boxes[boxes.length - 1];
+    assert.deepEqual(JSON.parse(json.value), PLAY);
+
+    json.value = "{ not json";
+    json.listeners.change();
+    assert.deepEqual(panel._editorData.double_press_sequence, PLAY);
+    assert.equal(json.attrs["aria-invalid"], "true");
+
+    // An object is not a list of actions.
+    json.value = JSON.stringify({ action: "light.toggle" });
+    json.listeners.change();
+    assert.deepEqual(panel._editorData.double_press_sequence, PLAY);
+
+    json.value = JSON.stringify([{ delay: { seconds: 1 } }, { action: "light.toggle" }]);
+    json.listeners.change();
+    assert.deepEqual(panel._editorData.double_press_sequence, [
+      { delay: { seconds: 1 } },
+      { action: "light.toggle" },
+    ]);
+  });
+});
+
+test("an action the list cannot show is kept and can be removed", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: [{ delay: { seconds: 2 } }, ...PLAY],
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+
+    // Only the plain action has fields; the delay is shown as a note.
+    assert.equal(walk(wrap).filter((node) => node.tag === "select").length, 1);
+    assert.deepEqual(panel._editorData.double_press_sequence[0], {
+      delay: { seconds: 2 },
+    });
+  });
+});
+
+test("the editor of Home Assistant is loaded once, and only when it is needed", async () => {
+  const previousElements = globalThis.customElements;
+  const loaded = [];
+  const hass = {
+    loadBackendTranslation: async (name) => loaded.push(name),
+    loadFragmentTranslation: async (name) => loaded.push(name),
+  };
+  try {
+    // Already there: nothing to drive.
+    Panel._forgetActionEditor();
+    globalThis.customElements = {
+      get: () => class {},
+      whenDefined: () => {
+        throw new Error("must not be asked");
+      },
+    };
+    assert.equal(await Panel._loadActionEditor(hass), true);
+    assert.deepEqual(loaded.sort(), ["config", "entity_component", "selector", "services"]);
+
+    // Remembered: a second ask does not load again.
+    loaded.length = 0;
+    assert.equal(await Panel._loadActionEditor(hass), true);
+    assert.deepEqual(loaded, []);
+  } finally {
+    globalThis.customElements = previousElements;
+    Panel._forgetActionEditor();
+  }
+});
+
+test("a frontend that cannot be driven leaves the simple list, not an error", async () => {
+  const previousElements = globalThis.customElements;
+  const previousDocument = globalThis.document;
+  const warn = console.warn;
+  console.warn = () => undefined;
+  try {
+    for (const resolver of [
+      {}, // no _getRoutes
+      { _getRoutes: () => ({ routes: {} }) }, // no route to the config panel
+    ]) {
+      Panel._forgetActionEditor();
+      globalThis.customElements = {
+        get: () => undefined,
+        whenDefined: async () => undefined,
+      };
+      globalThis.document = { createElement: () => resolver };
+      assert.equal(await Panel._loadActionEditor({}), false);
+    }
+    // The element never appears.
+    Panel._forgetActionEditor();
+    globalThis.customElements = {
+      get: () => undefined,
+      whenDefined: () => Promise.reject(new Error("never defined")),
+    };
+    assert.equal(await Panel._loadActionEditor({}), false);
+  } finally {
+    console.warn = warn;
+    globalThis.customElements = previousElements;
+    globalThis.document = previousDocument;
+    Panel._forgetActionEditor();
+  }
 });

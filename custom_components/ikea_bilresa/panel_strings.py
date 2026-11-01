@@ -334,6 +334,28 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_stop": "Stop",
         "action_none": "No action",
         "action_run_actions": "Run actions",
+        "click_run": "Run actions",
+        "hold_run": "Run actions",
+        "actions_label": "Actions to run",
+        "actions_help": (
+            "Written as in an automation. The gesture is passed to them as the "
+            "variables gesture, presses, channel, endpoint and device."
+        ),
+        "actions_loading": "Loading the action editor of Home Assistant...",
+        "actions_fallback": (
+            "The action editor of Home Assistant is not available here, so the "
+            "actions are edited as a simple list. It is the same data: nothing "
+            "is lost."
+        ),
+        "actions_empty": "No actions yet.",
+        "actions_add": "Add an action",
+        "actions_remove": "Remove",
+        "actions_service": "Action",
+        "actions_target_ids": "Entities, separated by commas",
+        "actions_data": "Data (JSON)",
+        "actions_json": "All actions as JSON",
+        "actions_json_invalid": "This is not valid.",
+        "actions_complex": "A more complex action; edit it in the JSON below:",
         "action_cycle_scenes": "Cycle scenes",
         "action_ramp": "Ramp target",
         "action_ramp_alternate": "Ramp up or down",
@@ -812,6 +834,28 @@ STRINGS: dict[str, dict[str, str]] = {
         "action_stop": "Zastavit",
         "action_none": "Bez akce",
         "action_run_actions": "Spustit akce",
+        "click_run": "Spustit akce",
+        "hold_run": "Spustit akce",
+        "actions_label": "Akce ke spuštění",
+        "actions_help": (
+            "Zapisují se jako v automatizaci. Gesto se jim předá v proměnných "
+            "gesture, presses, channel, endpoint a device."
+        ),
+        "actions_loading": "Načítá se editor akcí Home Assistantu...",
+        "actions_fallback": (
+            "Editor akcí Home Assistantu tu není dostupný, proto se akce "
+            "upravují v jednoduchém seznamu. Jsou to stejná data: nic se "
+            "neztratí."
+        ),
+        "actions_empty": "Zatím žádné akce.",
+        "actions_add": "Přidat akci",
+        "actions_remove": "Odebrat",
+        "actions_service": "Akce",
+        "actions_target_ids": "Entity, oddělené čárkami",
+        "actions_data": "Data (JSON)",
+        "actions_json": "Všechny akce jako JSON",
+        "actions_json_invalid": "Toto není platné.",
+        "actions_complex": "Složitější akce; upravte ji v JSON níže:",
         "action_cycle_scenes": "Procházet scény",
         "action_ramp": "Plynule měnit cíl",
         "action_ramp_alternate": "Plynule zesílit nebo zeslabit",
