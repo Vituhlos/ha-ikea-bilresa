@@ -2023,3 +2023,75 @@ test("a load that failed is asked again the next time, not remembered", async ()
     Panel._forgetActionEditor();
   }
 });
+
+test("text that was refused blocks Save until it is corrected", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const boxes = walk(wrap).filter((node) => node.tag === "textarea");
+    const json = boxes[boxes.length - 1];
+
+    json.value = "{ not json";
+    json.listeners.change();
+
+    // The old list is still in the draft; saving it would drop what was typed.
+    assert.equal(panel._choiceErrors().double_press_action, "actions_invalid");
+
+    json.value = JSON.stringify(PLAY);
+    json.listeners.change();
+    assert.equal("double_press_action" in panel._choiceErrors(), false);
+  });
+});
+
+test("a box left by clicking Save does not redraw the form under the button", () => {
+  const { panel, renders } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const boxes = walk(wrap).filter((node) => node.tag === "textarea");
+    const json = boxes[boxes.length - 1];
+    json.value = JSON.stringify([{ action: "light.toggle" }]);
+
+    // Focus is on Save, which is in the form.
+    panel._formHasFocus = () => true;
+    json.listeners.change();
+
+    assert.deepEqual(panel._editorData.double_press_sequence, [{ action: "light.toggle" }]);
+    assert.equal(renders(), 0);
+    assert.equal(panel._renderDeferred, true);
+  });
+});
+
+test("a route load that ends without the element is not remembered either", async () => {
+  const previousElements = globalThis.customElements;
+  const previousDocument = globalThis.document;
+  const warn = console.warn;
+  console.warn = () => undefined;
+  let loads = 0;
+  try {
+    Panel._forgetActionEditor();
+    globalThis.customElements = {
+      get: () => undefined,
+      whenDefined: async () => undefined,
+    };
+    const route = { load: async () => (loads += 1) };
+    globalThis.document = {
+      createElement: () => ({
+        _getRoutes: () => ({ routes: { tmp: route } }),
+        routerOptions: { routes: { automation: route } },
+      }),
+    };
+    assert.equal(await Panel._loadActionEditor({}), false);
+    assert.equal(await Panel._loadActionEditor({}), false);
+    assert.equal(loads, 4);
+  } finally {
+    console.warn = warn;
+    globalThis.customElements = previousElements;
+    globalThis.document = previousDocument;
+    Panel._forgetActionEditor();
+  }
+});

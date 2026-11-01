@@ -1648,7 +1648,10 @@ const loadActionEditor = (hass) => {
         const config = document.createElement("ha-panel-config");
         await within(config.routerOptions.routes.automation.load());
       }
-      if (!customElements.get("ha-selector")) return false;
+      if (!customElements.get("ha-selector")) {
+        actionEditorLoad = undefined;
+        return false;
+      }
       // Labels of services, targets and selectors come from these.
       await Promise.allSettled([
         hass?.loadBackendTranslation?.("services"),
@@ -2490,6 +2493,7 @@ class IkeaBilresaPanel extends HTMLElement {
     };
     if (!isButton) this._editorData.scenes = [...(data?.scenes || [])];
     this._actionNodes = {};
+    this._invalidActions = new Set();
     if (this._actionEditor === "form") this._actionEditor = undefined;
     this._editorChoices = {
       click_action: this._editorData.scenes?.length
@@ -2660,7 +2664,8 @@ class IkeaBilresaPanel extends HTMLElement {
     ]) {
       if (choice !== "run") continue;
       const actions = data[key] || [];
-      if (!actions.length) errors[field] = "actions_required";
+      if (this._invalidActions?.has(key)) errors[field] = "actions_invalid";
+      else if (!actions.length) errors[field] = "actions_required";
       // A row added and not yet given an action.
       else if (actions.some((item) => isSimpleAction(item) && !(item.action ?? item.service))) {
         errors[field] = "actions_incomplete";
@@ -2884,7 +2889,14 @@ class IkeaBilresaPanel extends HTMLElement {
     return Array.isArray(value) ? value : [];
   }
 
+  // Text in a box of the simple list that was refused. The list it was meant to
+  // replace is still in the draft, so saving would quietly keep the old one.
+  _refuseActions(field) {
+    (this._invalidActions ??= new Set()).add(field);
+  }
+
   _setSequence(field, actionField, value) {
+    this._invalidActions?.delete(field);
     // A copy: the editors change what they are given, and the data must only
     // change through here.
     this._editorData[field] = Array.isArray(value) ? JSON.parse(JSON.stringify(value)) : [];
@@ -2958,17 +2970,28 @@ class IkeaBilresaPanel extends HTMLElement {
   _actionsForm(field, actionField) {
     const box = el("div", "actions-form");
     const items = this._sequenceOf(field);
-    const commit = (next) => {
+    // A click on a button redraws at once. A change made by leaving a box does
+    // not while focus is still in the form: that leave may be a click on Save,
+    // and a redraw would take the button away before the click arrives.
+    const commit = (next, { fromBox = false } = {}) => {
       this._setSequence(field, actionField, next);
-      this._render();
+      if (fromBox && this._formHasFocus()) this._renderDeferred = true;
+      else this._render();
     };
     if (!items.length) box.appendChild(el("p", "field-help", this._t("actions_empty")));
     items.forEach((item, index) => {
       const row = el("div", "actions-row");
       if (isSimpleAction(item)) {
         row.appendChild(
-          this._actionRow(field, item, index, (changed) =>
-            commit(items.map((other, at) => (at === index ? changed : other))),
+          this._actionRow(
+            field,
+            item,
+            index,
+            (changed) =>
+              commit(items.map((other, at) => (at === index ? changed : other)), {
+                fromBox: true,
+              }),
+            () => this._refuseActions(field),
           ),
         );
       } else {
@@ -2994,12 +3017,14 @@ class IkeaBilresaPanel extends HTMLElement {
       commit([...items, { action: "" }]),
     );
     box.appendChild(add);
-    box.appendChild(this._actionsJson(field, items, commit));
+    box.appendChild(
+      this._actionsJson(field, items, commit, () => this._refuseActions(field)),
+    );
     return box;
   }
 
   // One plain action: which service, on which entities, with what data.
-  _actionRow(field, item, index, change) {
+  _actionRow(field, item, index, change, refuse) {
     const fields = el("div", "actions-fields");
     const id = `${this._fieldId(field)}-${index}`;
     const key = "action" in item ? "action" : "service";
@@ -3062,6 +3087,7 @@ class IkeaBilresaPanel extends HTMLElement {
       } catch {
         dataInput.setAttribute("aria-invalid", "true");
         dataNote.hidden = false;
+        refuse();
         return;
       }
       const next = { ...item };
@@ -3076,7 +3102,7 @@ class IkeaBilresaPanel extends HTMLElement {
 
   // The whole list as JSON: the way to write what the simple list cannot (a
   // delay, a condition, a choice), and to paste actions from an automation.
-  _actionsJson(field, items, commit) {
+  _actionsJson(field, items, commit, refuse) {
     const wrap = el("div", "field");
     const id = `${this._fieldId(field)}-json`;
     const label = el("label", null, this._t("actions_json"));
@@ -3094,9 +3120,10 @@ class IkeaBilresaPanel extends HTMLElement {
       } catch {
         input.setAttribute("aria-invalid", "true");
         note.hidden = false;
+        refuse();
         return;
       }
-      commit(parsed);
+      commit(parsed, { fromBox: true });
     });
     wrap.append(label, input, note);
     return wrap;

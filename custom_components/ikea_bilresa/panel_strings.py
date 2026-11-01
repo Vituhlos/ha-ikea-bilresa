@@ -304,6 +304,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Add at least one action to run, or choose another action."
         ),
         "validation_actions_incomplete": "Choose an action for every row.",
+        "validation_actions_invalid": (
+            "What you typed in the actions is not valid. Correct it or reload."
+        ),
         "validation_scenes_replace_short_press": (
             "Cycling scenes replaces the short press, so it cannot run actions."
         ),
@@ -806,6 +809,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "Přidejte alespoň jednu akci ke spuštění, nebo zvolte jinou akci."
         ),
         "validation_actions_incomplete": "Vyberte akci u každého řádku.",
+        "validation_actions_invalid": (
+            "To, co jste u akcí napsali, není platné. Opravte to, nebo "
+            "stránku znovu načtěte."
+        ),
         "validation_scenes_replace_short_press": (
             "Procházení scén nahrazuje krátký stisk, takže nemůže spouštět akce."
         ),
