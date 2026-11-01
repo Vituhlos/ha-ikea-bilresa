@@ -16,6 +16,7 @@ setting feels consistent across every kind of target.
 
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
@@ -177,8 +178,9 @@ _LIGHT_MODES = frozenset({MODE_BRIGHTNESS, MODE_COLOR_TEMP, MODE_COLOR})
 # Enough dispatched values to cover several delayed batches without keeping an
 # unbounded history.
 _COMMAND_HISTORY = 8
-# How many runs of one gesture's actions may wait behind the one running.
-_MAX_QUEUED_RUNS = 5
+# How many runs of one gesture's actions may exist at once: Home Assistant counts
+# the one running, so five means one running and four waiting.
+_MAX_RUNS = 5
 
 # The largest single rotary batch recorded on the physical E2490 during the
 # uncontrolled fast-scroll stress run (batches of 14, 9, 6 and 14 notches). A
@@ -315,6 +317,10 @@ class LightBinding:
             if data.get(field)
         }
         self._scripts: dict[str, Script] = {}
+        # Two quick first presses must share one script, or their runs would not
+        # queue behind each other; the lock makes the second wait for the first.
+        self._build_lock = asyncio.Lock()
+        self._closed = False
         self._scenes: list[str] = list(data.get(CONF_SCENES) or [])
         self._scene_index = 0
         self._ramp_direction = data.get(CONF_RAMP_DIRECTION, DEFAULT_RAMP_DIRECTION)
@@ -1607,28 +1613,39 @@ class LightBinding:
         """
         script = self._scripts.get(gesture)
         if script is None:
-            try:
-                validated = await async_validate_actions_config(self.hass, sequence)
-                script = Script(
-                    self.hass,
-                    validated,
-                    f"BILRESA {gesture}",
-                    DOMAIN,
-                    script_mode=SCRIPT_MODE_QUEUED,
-                    max_runs=_MAX_QUEUED_RUNS,
-                    logger=_LOGGER,
-                )
-            except (vol.Invalid, HomeAssistantError) as err:
-                _LOGGER.warning(
-                    "BILRESA %s actions are not valid and were not run: %s",
-                    gesture,
-                    err,
-                )
-                self._report_activity(
-                    "failed", result=result, reason="invalid_actions", action=action
-                )
-                return
-            self._scripts[gesture] = script
+            async with self._build_lock:
+                script = self._scripts.get(gesture)
+                if script is None:
+                    try:
+                        validated = await async_validate_actions_config(
+                            self.hass, sequence
+                        )
+                        script = Script(
+                            self.hass,
+                            validated,
+                            f"BILRESA {gesture}",
+                            DOMAIN,
+                            script_mode=SCRIPT_MODE_QUEUED,
+                            max_runs=_MAX_RUNS,
+                            logger=_LOGGER,
+                        )
+                    except (vol.Invalid, HomeAssistantError) as err:
+                        _LOGGER.warning(
+                            "BILRESA %s actions are not valid and were not run: %s",
+                            gesture,
+                            err,
+                        )
+                        self._report_activity(
+                            "failed",
+                            result=result,
+                            reason="invalid_actions",
+                            action=action,
+                        )
+                        return
+                    self._scripts[gesture] = script
+        if self._closed:
+            # Unloaded while the script was being built: nothing may start now.
+            return
         self.hass.async_create_task(
             script.async_run(run_variables=variables, context=Context())
         )
@@ -1637,6 +1654,7 @@ class LightBinding:
     @callback
     def _stop_sequences(self) -> None:
         """Stop whatever the gesture actions are still doing (on unload)."""
+        self._closed = True
         for script in self._scripts.values():
             self.hass.async_create_task(script.async_stop())
         self._scripts.clear()

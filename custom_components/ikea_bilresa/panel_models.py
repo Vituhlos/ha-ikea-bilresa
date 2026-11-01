@@ -33,6 +33,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .binding_config import binding_revision, editor_data
 from .const import (
+    ACTION_RUN,
     CLICK_NONE,
     CLICK_OFF,
     CLICK_ON,
@@ -60,6 +61,7 @@ from .const import (
     DOMAIN,
     HOLD_NONE,
     HOLD_RAMP,
+    HOLD_RUN,
     HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_COLOR,
@@ -405,6 +407,9 @@ def _action_key(action: str, target: str | None) -> str:
     A scene is run whatever was asked, and a script is run, stopped or toggled,
     so the words differ from a light's; ``gesture_actions`` holds the meaning.
     """
+    if action == ACTION_RUN:
+        # The actions a gesture runs belong to no target.
+        return "action_run_actions"
     if action == CLICK_NONE or not target:
         return "action_none"
     call = target_service(target, action)
@@ -545,6 +550,9 @@ def _wheel_gesture_summaries(
             )
         )
         summaries.append(_gesture_summary(hass, language, "release", "action_none"))
+    elif hold_action == HOLD_RUN:
+        summaries.append(_gesture_summary(hass, language, "hold", "action_run_actions"))
+        summaries.append(_gesture_summary(hass, language, "release", "action_none"))
     else:
         # HOLD_NONE and a toggle without a target both execute nothing.
         summaries.append(_gesture_summary(hass, language, "hold", "action_none"))
@@ -611,6 +619,9 @@ def _button_gesture_summaries(
                 hold_target,
             )
         )
+        summaries.append(_gesture_summary(hass, language, "release", "action_none"))
+    elif hold_action == HOLD_RUN:
+        summaries.append(_gesture_summary(hass, language, "hold", "action_run_actions"))
         summaries.append(_gesture_summary(hass, language, "release", "action_none"))
     else:
         summaries.append(_gesture_summary(hass, language, "hold", "action_none"))

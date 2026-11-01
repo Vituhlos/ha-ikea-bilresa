@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   saved (a mistake is refused with a field error) and again when they are built,
   so a device action or condition is resolved too; a sequence that no longer
   validates is reported in the live activity, not raised. Runs of one gesture are
-  queued in order (at most 5 waiting) so two quick presses do not interleave, and
+  queued in order (at most 5 runs at once: one running, four waiting) so two quick presses do not interleave, and
   each run is told `gesture`, `presses`, `channel`, `endpoint` and `device` as
   variables. Running ones are stopped when the binding is unloaded. The native
   form keeps the sequences of a binding it edits or copies. Diagnostics hide them

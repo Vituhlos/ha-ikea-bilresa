@@ -2576,3 +2576,51 @@ def test_a_sequence_on_a_double_press_rules_out_the_instant_response(
     )
 
     assert binding._instant_single is False
+
+
+def test_two_quick_first_presses_share_one_script_so_their_runs_queue(
+    monkeypatch,
+) -> None:
+    """Both would build a script while the first awaits its validation."""
+    import asyncio
+
+    binding = _sequence_binding(monkeypatch, "double_press")
+
+    async def _slow_validate(hass, actions):
+        await asyncio.sleep(0)
+        return actions
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_validate_actions_config",
+        _slow_validate,
+    )
+    _press(binding, "double_press")
+    _press(binding, "double_press")
+
+    async def _both() -> None:
+        first, second = binding.pending
+        binding.pending.clear()
+        await asyncio.gather(first, second)
+
+    asyncio.run(_both())
+    _drain(binding)
+
+    [script] = _FakeScript.built
+    assert len(script.runs) == 2
+
+
+def test_nothing_starts_after_the_binding_was_unloaded_during_a_build(
+    monkeypatch,
+) -> None:
+    binding = _sequence_binding(monkeypatch, "double_press")
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_connect",
+        lambda *_args: Mock(),
+    )
+    unsubscribe = binding.async_attach()
+    _press(binding, "double_press")
+
+    unsubscribe()
+    _drain(binding)
+
+    assert all(not script.runs for script in _FakeScript.built)
