@@ -1900,3 +1900,126 @@ test("a frontend that cannot be driven leaves the simple list, not an error", as
     Panel._forgetActionEditor();
   }
 });
+
+test("run, then cycle scenes: the short press is no longer run, so it can be saved", () => {
+  const { panel } = actionPanel({ click_action: "run", click_sequence: PLAY });
+
+  panel._chooseGesture("click_action", "scenes");
+
+  assert.equal(panel._editorChoices.click_action, "scenes");
+  assert.equal(panel._editorData.click_action, "toggle");
+});
+
+test("a short press that runs actions keeps run next to a scene target", () => {
+  const { panel } = actionPanel({
+    click_action: "run",
+    click_target: "scene.evening",
+    click_sequence: PLAY,
+  });
+
+  assert.equal(panel._editorChoices.click_action, "run");
+  assert.equal(panel._editorData.click_action, "run");
+  assert.deepEqual(panel._editorData.click_sequence, PLAY);
+});
+
+test("Home Assistant's editor is built once per field and kept across redraws", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  class FakeSelector extends FakeNode {
+    constructor() {
+      super("ha-selector");
+    }
+  }
+  withFakeDom(() => {
+    registry.set("ha-selector", FakeSelector);
+    panel._actionEditor = "ha";
+    const pick = () =>
+      walk(panel._actionsEditor("double_press_sequence", "double_press_action")).find(
+        (node) => node.tag === "ha-selector",
+      );
+
+    const first = pick();
+    // An answer from Home Assistant's dialog must find the editor it came from.
+    assert.equal(pick(), first);
+
+    // Another binding brings editors of its own.
+    panel._loadEditor(false, { target: "light.a" });
+    assert.notEqual(pick(), first);
+  });
+});
+
+test("what the server refused about the list is said under the editor", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    panel._editorErrors = { double_press_sequence: "invalid_value" };
+
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+
+    const note = walk(wrap)
+      .filter((node) => node.className === "field-error" && !node.hidden)
+      .at(-1);
+    assert.equal(note.textContent, "validation_invalid_value");
+  });
+});
+
+test("a row added and not given an action cannot be saved", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const [add] = walk(wrap).filter(
+      (n) => n.tag === "button" && n.textContent === "actions_add",
+    );
+    add.listeners.click();
+
+    assert.deepEqual(panel._editorData.double_press_sequence[1], { action: "" });
+    assert.equal(panel._choiceErrors().double_press_action, "actions_incomplete");
+  });
+});
+
+test("only a plain action gets fields: a template target or data stays as written", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: [
+      { action: "light.toggle", target: "{{ states('sensor.x') }}" },
+      { action: "light.toggle", data: "{{ x }}" },
+    ],
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+
+    assert.equal(walk(wrap).filter((node) => node.tag === "select").length, 0);
+    assert.equal(
+      panel._editorData.double_press_sequence[0].target,
+      "{{ states('sensor.x') }}",
+    );
+  });
+});
+
+test("a load that failed is asked again the next time, not remembered", async () => {
+  const previousElements = globalThis.customElements;
+  const warn = console.warn;
+  console.warn = () => undefined;
+  let asked = 0;
+  try {
+    Panel._forgetActionEditor();
+    globalThis.customElements = {
+      get: () => undefined,
+      whenDefined: () => {
+        asked += 1;
+        return Promise.reject(new Error("not yet"));
+      },
+    };
+    assert.equal(await Panel._loadActionEditor({}), false);
+    assert.equal(await Panel._loadActionEditor({}), false);
+    assert.equal(asked, 2);
+  } finally {
+    console.warn = warn;
+    globalThis.customElements = previousElements;
+    Panel._forgetActionEditor();
+  }
+});

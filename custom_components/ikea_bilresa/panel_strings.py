@@ -303,6 +303,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_actions_required": (
             "Add at least one action to run, or choose another action."
         ),
+        "validation_actions_incomplete": "Choose an action for every row.",
         "validation_scenes_replace_short_press": (
             "Cycling scenes replaces the short press, so it cannot run actions."
         ),
@@ -341,9 +342,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "Written as in an automation. The gesture is passed to them as the "
             "variables gesture, presses, channel, endpoint and device."
         ),
-        "actions_loading": "Loading the action editor of Home Assistant...",
+        "actions_loading": "Loading Home Assistant's action editor...",
         "actions_fallback": (
-            "The action editor of Home Assistant is not available here, so the "
+            "Home Assistant's action editor is not available here, so the "
             "actions are edited as a simple list. It is the same data: nothing "
             "is lost."
         ),
@@ -354,7 +355,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "actions_target_ids": "Entities, separated by commas",
         "actions_data": "Data (JSON)",
         "actions_json": "All actions as JSON",
-        "actions_json_invalid": "This is not valid.",
+        "actions_json_invalid": "This is not valid JSON of the expected kind.",
+        "actions_choose": "Choose an action",
         "actions_complex": "A more complex action; edit it in the JSON below:",
         "action_cycle_scenes": "Cycle scenes",
         "action_ramp": "Ramp target",
@@ -803,6 +805,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_actions_required": (
             "Přidejte alespoň jednu akci ke spuštění, nebo zvolte jinou akci."
         ),
+        "validation_actions_incomplete": "Vyberte akci u každého řádku.",
         "validation_scenes_replace_short_press": (
             "Procházení scén nahrazuje krátký stisk, takže nemůže spouštět akce."
         ),
@@ -851,11 +854,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "actions_add": "Přidat akci",
         "actions_remove": "Odebrat",
         "actions_service": "Akce",
-        "actions_target_ids": "Entity, oddělené čárkami",
+        "actions_target_ids": "Entity oddělené čárkami",
         "actions_data": "Data (JSON)",
         "actions_json": "Všechny akce jako JSON",
-        "actions_json_invalid": "Toto není platné.",
-        "actions_complex": "Složitější akce; upravte ji v JSON níže:",
+        "actions_json_invalid": "Neplatný JSON nebo nesprávný tvar.",
+        "actions_choose": "Vyberte akci",
+        "actions_complex": "Složitější akce; upravte ji v JSONu níže:",
         "action_cycle_scenes": "Procházet scény",
         "action_ramp": "Plynule měnit cíl",
         "action_ramp_alternate": "Plynule zesílit nebo zeslabit",

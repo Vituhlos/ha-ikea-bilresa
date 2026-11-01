@@ -312,6 +312,17 @@ controls. Record the Home Assistant version, browser, theme and language.
 - [ ] Theme variables (0.7.0-rc.5, GitHub #22): with `bilresa-accent` and
       `bilresa-on-accent` set in a theme the primary button changes; with
       neither set the panel looks as before.
+- [ ] Run actions (after 0.7.0-rc.5): set a double press to *Run actions* in the
+      panel. Home Assistant's action editor appears (add an action, pick a
+      service and a target, a delay and a condition work) without the panel
+      reloading while you edit; save, reload the page, and the actions are still
+      there. A hold set the same way runs them. A text that is not valid in the
+      JSON box is refused; with the editor unavailable (try a Home Assistant
+      version the editor does not load on) the simple list works and the data
+      survives switching. The actions' variables (`{{ gesture }}`, `{{ device }}`)
+      work in a template. Two quick presses run in order, one after the other;
+      removing the binding or reloading the integration stops a running delay.
+      The diagnostics download does not show the actions.
 - [ ] Verbs by kind of target (after 0.7.0-rc.5): in the panel, picking a media
       player offers play / pause, next / previous track, volume up / down and
       mute / unmute; a cover open / close / stop; a lock only *Lock*. A double

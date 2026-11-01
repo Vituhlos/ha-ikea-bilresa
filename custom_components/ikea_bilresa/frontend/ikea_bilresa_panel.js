@@ -1659,6 +1659,9 @@ const loadActionEditor = (hass) => {
       return true;
     } catch (err) {
       console.warn("ikea_bilresa: the action editor of Home Assistant is not available", err);
+      // Not remembered: a slow start should not cost the editor until the page
+      // is reloaded. The next time an editor of actions is opened it asks again.
+      actionEditorLoad = undefined;
       return false;
     }
   })();
@@ -1667,10 +1670,13 @@ const loadActionEditor = (hass) => {
 
 // An action the simple list can show and write back unchanged.
 const SIMPLE_ACTION_KEYS = ["action", "service", "target", "data", "alias", "enabled", "continue_on_error"];
+const isPlainObject = (value) =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 const isSimpleAction = (item) =>
-  item &&
-  typeof item === "object" &&
+  isPlainObject(item) &&
   typeof (item.action ?? item.service) === "string" &&
+  (item.target === undefined || isPlainObject(item.target)) &&
+  (item.data === undefined || isPlainObject(item.data)) &&
   Object.keys(item).every((key) => SIMPLE_ACTION_KEYS.includes(key));
 
 const domainOf = (entityId) => String(entityId || "").split(".", 1)[0];
@@ -1686,7 +1692,7 @@ const OPENING_COVERS = ["garage", "gate", "door"];
 
 // A scene has no toggle and no off: both read as "run".
 const actionFor = (kind, action) =>
-  kind === "scene" && action !== "none" ? "on" : action;
+  kind === "scene" && !["none", "run"].includes(action) ? "on" : action;
 
 const DISCARD_DOUBLE_CLICK_MS = 500;
 const DISCARD_ARMED_MS = 4000;
@@ -2483,6 +2489,8 @@ class IkeaBilresaPanel extends HTMLElement {
       ...(data || {}),
     };
     if (!isButton) this._editorData.scenes = [...(data?.scenes || [])];
+    this._actionNodes = {};
+    if (this._actionEditor === "form") this._actionEditor = undefined;
     this._editorChoices = {
       click_action: this._editorData.scenes?.length
         ? "scenes"
@@ -2650,7 +2658,13 @@ class IkeaBilresaPanel extends HTMLElement {
       [choices.triple_press, "triple_press_sequence", "triple_press_action"],
       [data.hold_action, "hold_sequence", "hold_action"],
     ]) {
-      if (choice === "run" && !data[key]?.length) errors[field] = "actions_required";
+      if (choice !== "run") continue;
+      const actions = data[key] || [];
+      if (!actions.length) errors[field] = "actions_required";
+      // A row added and not yet given an action.
+      else if (actions.some((item) => isSimpleAction(item) && !(item.action ?? item.service))) {
+        errors[field] = "actions_incomplete";
+      }
     }
     return errors;
   }
@@ -2666,7 +2680,11 @@ class IkeaBilresaPanel extends HTMLElement {
       if (["scenes", "none", "run"].includes(next)) {
         delete this._editorData.click_target;
       }
-      if (next === "scenes") return;
+      if (next === "scenes") {
+        // Cycling scenes replaces the short press, which then cannot run actions.
+        if (this._editorData.click_action === "run") this._editorData.click_action = "toggle";
+        return;
+      }
       this._editorData.click_action = next;
       if (this._editorData.scenes) this._editorData.scenes = [];
     } else {
@@ -2879,7 +2897,11 @@ class IkeaBilresaPanel extends HTMLElement {
     this._actionEditor = "loading";
     loadActionEditor(this._hass).then((loaded) => {
       this._actionEditor = loaded ? "ha" : "form";
-      this._render();
+      if (this._editingChannel !== null && this._formHasFocus()) {
+        this._renderDeferred = true;
+      } else {
+        this._render();
+      }
     });
   }
 
@@ -2891,16 +2913,24 @@ class IkeaBilresaPanel extends HTMLElement {
     this._ensureActionEditor();
     let node = null;
     if (this._actionEditor === "ha") {
-      node = this._haSelector({
-        id: this._fieldId(field),
-        selector: { action: {} },
-        // The editor changes what it is given in place: it gets a copy. No
-        // re-render on a change, or the editor would be rebuilt under the
-        // person's hands.
-        value: JSON.parse(JSON.stringify(this._sequenceOf(field))),
-        required: false,
-        onChange: (next) => this._setSequence(field, actionField, next),
-      });
+      // One editor per field, kept while the form is drawn again: Home Assistant's
+      // "add an action" dialog lives outside this panel, and an answer from it
+      // must find the editor it came from.
+      this._actionNodes ??= {};
+      node = this._actionNodes[field];
+      if (!node) {
+        node = this._haSelector({
+          id: this._fieldId(field),
+          selector: { action: {} },
+          // The editor changes what it is given in place: it gets a copy. No
+          // re-render on a change, or the editor would be rebuilt under the
+          // person's hands.
+          value: JSON.parse(JSON.stringify(this._sequenceOf(field))),
+          required: false,
+          onChange: (next) => this._setSequence(field, actionField, next),
+        });
+        if (node) this._actionNodes[field] = node;
+      }
     }
     if (node) {
       wrap.appendChild(node);
@@ -2910,6 +2940,8 @@ class IkeaBilresaPanel extends HTMLElement {
       wrap.appendChild(el("p", "field-help", this._t("actions_fallback")));
       wrap.appendChild(this._actionsForm(field, actionField));
     }
+    // What the server refused about the list is said under the editor.
+    this._fieldErrorNode(wrap, field, null);
     return wrap;
   }
 
@@ -2959,7 +2991,7 @@ class IkeaBilresaPanel extends HTMLElement {
     const add = el("button", "action-button", this._t("actions_add"));
     add.type = "button";
     add.addEventListener("click", () =>
-      commit([...items, { action: this._serviceNames()[0] || "homeassistant.toggle" }]),
+      commit([...items, { action: "" }]),
     );
     box.appendChild(add);
     box.appendChild(this._actionsJson(field, items, commit));
@@ -2979,7 +3011,11 @@ class IkeaBilresaPanel extends HTMLElement {
       this._t("actions_service"),
       undefined,
       this._serviceNames(item[key]).map((name) => ({ value: name, label: name })),
-      { value: item[key], onChange: (next) => change({ ...item, [key]: next }) },
+      {
+        value: item[key],
+        emptyLabel: this._t("actions_choose"),
+        onChange: (next) => change({ ...item, [key]: next }),
+      },
     );
     fields.appendChild(pick);
 
@@ -3010,6 +3046,8 @@ class IkeaBilresaPanel extends HTMLElement {
     const data = el("div", "field");
     const dataLabel = el("label", null, this._t("actions_data"));
     dataLabel.htmlFor = `${id}-data`;
+    const dataNote = el("span", "field-error", this._t("actions_json_invalid"));
+    dataNote.hidden = true;
     const dataInput = el("textarea");
     dataInput.id = `${id}-data`;
     dataInput.value = item.data ? JSON.stringify(item.data, null, 2) : "";
@@ -3023,7 +3061,7 @@ class IkeaBilresaPanel extends HTMLElement {
         }
       } catch {
         dataInput.setAttribute("aria-invalid", "true");
-        data.appendChild(el("span", "field-error", this._t("actions_json_invalid")));
+        dataNote.hidden = false;
         return;
       }
       const next = { ...item };
@@ -3031,7 +3069,7 @@ class IkeaBilresaPanel extends HTMLElement {
       else delete next.data;
       change(next);
     });
-    data.append(dataLabel, dataInput);
+    data.append(dataLabel, dataInput, dataNote);
     fields.appendChild(data);
     return fields;
   }
@@ -3043,6 +3081,8 @@ class IkeaBilresaPanel extends HTMLElement {
     const id = `${this._fieldId(field)}-json`;
     const label = el("label", null, this._t("actions_json"));
     label.htmlFor = id;
+    const note = el("span", "field-error", this._t("actions_json_invalid"));
+    note.hidden = true;
     const input = el("textarea");
     input.id = id;
     input.value = JSON.stringify(items, null, 2);
@@ -3053,12 +3093,12 @@ class IkeaBilresaPanel extends HTMLElement {
         if (!Array.isArray(parsed)) throw new Error("not a list");
       } catch {
         input.setAttribute("aria-invalid", "true");
-        wrap.appendChild(el("span", "field-error", this._t("actions_json_invalid")));
+        note.hidden = false;
         return;
       }
       commit(parsed);
     });
-    wrap.append(label, input);
+    wrap.append(label, input, note);
     return wrap;
   }
 
