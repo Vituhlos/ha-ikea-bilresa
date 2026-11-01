@@ -9,17 +9,27 @@ from homeassistant.core import HomeAssistant
 
 from . import BilresaConfigEntry
 from .const import (
+    CONF_CLICK_SEQUENCE,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_SEQUENCE,
     CONF_DOUBLE_TARGET,
+    CONF_HOLD_SEQUENCE,
     CONF_HOLD_TARGET,
     CONF_NODE_ID,
     CONF_TARGET,
+    CONF_TRIPLE_SEQUENCE,
     CONF_TRIPLE_TARGET,
     CONF_URL,
 )
 from .device_link import resolve_matter_device, wheel_availability
 
+# The action sequences are the user's own automation: they name entities and may
+# carry tokens or addresses in service data.
 TO_REDACT = {
+    CONF_CLICK_SEQUENCE,
+    CONF_DOUBLE_SEQUENCE,
+    CONF_HOLD_SEQUENCE,
+    CONF_TRIPLE_SEQUENCE,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
     CONF_HOLD_TARGET,

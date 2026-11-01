@@ -993,3 +993,29 @@ def test_the_ledger_names_each_gestures_action_in_its_own_words(monkeypatch) -> 
     assert labels["double_press"] == "Stop"
     assert labels["triple_press"] == "Turn off"
     assert labels["hold"] == "Run"
+
+
+def test_the_ledger_says_a_gesture_runs_actions_though_it_has_no_target(
+    monkeypatch,
+) -> None:
+    """A gesture that runs its own actions is not "No action"."""
+    channel = _click_target_channel(
+        monkeypatch,
+        **{
+            CONF_CLICK_ACTION: "run",
+            "click_sequence": [{"action": "light.toggle"}],
+            CONF_DOUBLE_ACTION: "run",
+            "double_press_sequence": [{"action": "light.toggle"}],
+            CONF_HOLD_ACTION: "run",
+            "hold_sequence": [{"action": "light.toggle"}],
+        },
+    )
+
+    labels = {
+        action["gesture"]: action["action_label"] for action in channel["actions"]
+    }
+
+    assert labels["short_press"] == "Run actions"
+    assert labels["double_press"] == "Run actions"
+    assert labels["hold"] == "Run actions"
+    assert labels["triple_press"] == "No action"

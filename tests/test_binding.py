@@ -2395,3 +2395,232 @@ def test_the_live_activity_names_a_verb_after_the_verb(
         if call.args and call.args[0] == "pending"
     ]
     assert pending[0].kwargs["result"]["action"] == named
+
+
+# -- action sequences --------------------------------------------------------
+
+_PLAY_PAUSE = [
+    {
+        "action": "media_player.media_play_pause",
+        "target": {"entity_id": "media_player.tv"},
+    }
+]
+
+
+class _FakeScript:
+    """Stands in for Home Assistant's Script: records what it was asked."""
+
+    built: list[_FakeScript] = []
+
+    def __init__(self, hass, sequence, name, domain, **options) -> None:
+        self.sequence, self.name, self.options = sequence, name, options
+        self.runs: list[tuple[dict, object]] = []
+        self.stopped = False
+        _FakeScript.built.append(self)
+
+    async def async_run(self, run_variables=None, context=None):
+        self.runs.append((run_variables, context))
+
+    async def async_stop(self):
+        self.stopped = True
+
+
+def _sequence_binding(monkeypatch, gesture: str, sequence=None, **extra):
+    """A binding whose one gesture is set to run ``sequence``; coroutines it
+    schedules are collected so a test can run them."""
+    _FakeScript.built = []
+    validated = []
+
+    async def _validate(hass, actions):
+        validated.append(actions)
+        return actions
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_validate_actions_config",
+        _validate,
+    )
+    monkeypatch.setattr("custom_components.ikea_bilresa.binding.Script", _FakeScript)
+    sequence = _PLAY_PAUSE if sequence is None else sequence
+    overrides = {
+        "short_press": {"click_action": "run", "click_sequence": sequence},
+        "double_press": {
+            "double_press_action": "run",
+            "double_press_sequence": sequence,
+        },
+        "triple_press": {
+            "triple_press_action": "run",
+            "triple_press_sequence": sequence,
+        },
+        "hold": {"hold_action": "run", "hold_sequence": sequence},
+    }[gesture]
+    binding, _i, _w = _binding(monkeypatch, **overrides, **extra)
+    binding.validated = validated
+    binding.pending = []
+    binding.hass.async_create_task = Mock(side_effect=binding.pending.append)
+    binding._report_activity = Mock()
+    return binding
+
+
+def _drain(binding) -> None:
+    """Run every coroutine the binding handed to Home Assistant, in order."""
+    import asyncio
+
+    async def _run() -> None:
+        while binding.pending:
+            await binding.pending.pop(0)
+
+    asyncio.run(_run())
+
+
+def _statuses(binding) -> list[str]:
+    return [call.args[0] for call in binding._report_activity.call_args_list]
+
+
+@pytest.mark.parametrize(
+    ("gesture", "presses"),
+    [("short_press", 1), ("double_press", 2), ("triple_press", 3), ("hold", 0)],
+)
+def test_a_gesture_set_to_run_runs_its_sequence_with_the_gesture_in_it(
+    monkeypatch, gesture: str, presses: int
+) -> None:
+    binding = _sequence_binding(monkeypatch, gesture)
+
+    _press(binding, gesture)
+    _drain(binding)
+
+    [script] = _FakeScript.built
+    assert script.sequence == _PLAY_PAUSE
+    [(variables, context)] = script.runs
+    assert variables["gesture"] == gesture
+    assert variables["channel"] == 1
+    assert variables["device"] == "Test wheel"
+    assert context is not None
+    assert _statuses(binding) == ["pending", "accepted"]
+
+
+def test_runs_are_queued_so_two_quick_presses_keep_their_order(monkeypatch) -> None:
+    from custom_components.ikea_bilresa.binding import SCRIPT_MODE_QUEUED
+
+    binding = _sequence_binding(monkeypatch, "double_press")
+
+    _press(binding, "double_press")
+    _press(binding, "double_press")
+    _drain(binding)
+
+    [script] = _FakeScript.built  # built once, run twice
+    assert len(script.runs) == 2
+    assert script.options["script_mode"] == SCRIPT_MODE_QUEUED
+    assert script.options["max_runs"] == 5
+    assert len(binding.validated) == 1
+
+
+def test_a_sequence_that_no_longer_validates_is_reported_not_raised(
+    monkeypatch,
+) -> None:
+    import voluptuous as vol
+
+    binding = _sequence_binding(monkeypatch, "double_press")
+
+    async def _broken(hass, actions):
+        raise vol.Invalid("the integration was removed")
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_validate_actions_config", _broken
+    )
+
+    _press(binding, "double_press")
+    _drain(binding)
+
+    assert _FakeScript.built == []
+    last = binding._report_activity.call_args_list[-1]
+    assert last.args[0] == "failed"
+    assert last.kwargs["reason"] == "invalid_actions"
+
+
+def test_a_gesture_set_to_run_with_no_sequence_is_skipped(monkeypatch) -> None:
+    binding = _sequence_binding(monkeypatch, "double_press")
+    binding._sequences.clear()
+
+    _press(binding, "double_press")
+
+    assert binding.pending == []
+    last = binding._report_activity.call_args_list[-1]
+    assert (last.args[0], last.kwargs["reason"]) == ("skipped", "actions_missing")
+
+
+def test_unloading_the_binding_stops_what_its_sequences_still_do(monkeypatch) -> None:
+    binding = _sequence_binding(monkeypatch, "double_press")
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_connect",
+        lambda *_args: Mock(),
+    )
+    unsubscribe = binding.async_attach()
+    _press(binding, "double_press")
+    _drain(binding)
+
+    unsubscribe()
+    _drain(binding)
+
+    [script] = _FakeScript.built
+    assert script.stopped
+
+
+def test_a_sequence_on_a_double_press_rules_out_the_instant_response(
+    monkeypatch,
+) -> None:
+    binding = _sequence_binding(
+        monkeypatch,
+        "double_press",
+        button_response="instant",
+        hold_action="none",
+    )
+
+    assert binding._instant_single is False
+
+
+def test_two_quick_first_presses_share_one_script_so_their_runs_queue(
+    monkeypatch,
+) -> None:
+    """Both would build a script while the first awaits its validation."""
+    import asyncio
+
+    binding = _sequence_binding(monkeypatch, "double_press")
+
+    async def _slow_validate(hass, actions):
+        await asyncio.sleep(0)
+        return actions
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_validate_actions_config",
+        _slow_validate,
+    )
+    _press(binding, "double_press")
+    _press(binding, "double_press")
+
+    async def _both() -> None:
+        first, second = binding.pending
+        binding.pending.clear()
+        await asyncio.gather(first, second)
+
+    asyncio.run(_both())
+    _drain(binding)
+
+    [script] = _FakeScript.built
+    assert len(script.runs) == 2
+
+
+def test_nothing_starts_after_the_binding_was_unloaded_during_a_build(
+    monkeypatch,
+) -> None:
+    binding = _sequence_binding(monkeypatch, "double_press")
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_connect",
+        lambda *_args: Mock(),
+    )
+    unsubscribe = binding.async_attach()
+    _press(binding, "double_press")
+
+    unsubscribe()
+    _drain(binding)
+
+    assert all(not script.runs for script in _FakeScript.built)

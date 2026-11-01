@@ -842,3 +842,71 @@ def test_every_push_of_a_subscription_keeps_its_language(monkeypatch) -> None:
     captured[SIGNAL_CONNECTION]()
 
     assert seen == ["en", "en"]
+
+
+_ACTIONS = [{"action": "light.toggle", "target": {"entity_id": "light.office"}}]
+
+
+def _save_with_actions(monkeypatch, data: dict) -> tuple[dict, dict]:
+    hass, _entry = _mutation_hass()
+    connection = _connection()
+    created = {}
+
+    def _subentry(**kwargs):
+        item = SimpleNamespace(subentry_id="new", **kwargs)
+        created["item"] = item
+        return item
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api.ConfigSubentry", _subentry
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api._binding_title",
+        lambda *_args, **_kwargs: "Wheel · Channel 1",
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.panel_api.async_dispatcher_send", MagicMock()
+    )
+    ws_binding_save(
+        hass,
+        connection,
+        {
+            "id": 22,
+            "type": TYPE_BINDING_SAVE,
+            "wheel": wheel_key(NODE_A),
+            "channel": 1,
+            "data": {CONF_TARGET: "light.office", CONF_MODE: "brightness", **data},
+        },
+    )
+    return connection.send_result.call_args.args[1], created
+
+
+def test_the_panel_saves_the_actions_a_gesture_runs_and_sends_them_back(
+    monkeypatch,
+) -> None:
+    result, created = _save_with_actions(
+        monkeypatch,
+        {"double_press_action": "run", "double_press_sequence": _ACTIONS},
+    )
+
+    assert result["ok"] is True
+    assert dict(created["item"].data)["double_press_sequence"] == _ACTIONS
+    assert result["binding"]["data"]["double_press_sequence"] == _ACTIONS
+
+
+def test_the_panel_refuses_a_gesture_set_to_run_without_actions(monkeypatch) -> None:
+    result, created = _save_with_actions(monkeypatch, {"double_press_action": "run"})
+
+    assert result["ok"] is False
+    assert result["fields"] == {"double_press_action": "actions_required"}
+    assert "item" not in created
+
+
+def test_the_panel_refuses_an_action_sequence_that_is_not_valid(monkeypatch) -> None:
+    result, created = _save_with_actions(
+        monkeypatch,
+        {"double_press_action": "run", "double_press_sequence": [{"nope": 1}]},
+    )
+
+    assert result["ok"] is False
+    assert "item" not in created

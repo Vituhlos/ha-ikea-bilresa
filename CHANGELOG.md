@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Added
+- **A gesture can run a Home Assistant action sequence** (stored, validated and
+  run; the editor in the panel follows in the next change, so there is no way to
+  set one in the panel yet). A short press, double press, triple press or hold set
+  to *Run actions* runs a list of actions written the way an automation writes
+  them. They are checked with Home Assistant's own schema when the binding is
+  saved (a mistake is refused with a field error) and again when they are built,
+  so a device action or condition is resolved too; a sequence that no longer
+  validates is reported in the live activity, not raised. Runs of one gesture are
+  queued in order (at most 5 runs at once: one running, four waiting) so two quick presses do not interleave, and
+  each run is told `gesture`, `presses`, `channel`, `endpoint` and `device` as
+  variables. Running ones are stopped when the binding is unloaded. The native
+  form keeps the sequences of a binding it edits or copies. Diagnostics hide them
+  (they may hold tokens). A sequence belongs to its gesture: it is dropped when
+  the gesture is set to something else, and *Run actions* on a short press rules
+  out scene cycling and the fast and instant responses like any double press.
+  Bindings saved before are unchanged. Addresses GitHub #17 and BILRESA-8.
 - **A gesture can do more than toggle, turn on and turn off.** The action list now
   depends on the target: a media player has play / pause, next and previous track,
   volume up and down and mute / unmute; a cover open, close and stop; a vacuum

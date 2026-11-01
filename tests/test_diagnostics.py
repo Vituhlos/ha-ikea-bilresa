@@ -5,11 +5,15 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from custom_components.ikea_bilresa.const import (
+    CONF_CLICK_SEQUENCE,
     CONF_CLICK_TARGET,
+    CONF_DOUBLE_SEQUENCE,
     CONF_DOUBLE_TARGET,
+    CONF_HOLD_SEQUENCE,
     CONF_HOLD_TARGET,
     CONF_NODE_ID,
     CONF_TARGET,
+    CONF_TRIPLE_SEQUENCE,
     CONF_TRIPLE_TARGET,
     CONF_URL,
 )
@@ -32,6 +36,11 @@ def test_household_identifiers_are_redacted() -> None:
         CONF_DOUBLE_TARGET,
         CONF_TRIPLE_TARGET,
         CONF_HOLD_TARGET,
+        # A sequence is the person's own automation and may carry tokens.
+        CONF_CLICK_SEQUENCE,
+        CONF_DOUBLE_SEQUENCE,
+        CONF_TRIPLE_SEQUENCE,
+        CONF_HOLD_SEQUENCE,
         "serial",
         "compressed_fabric_id",
         "name",

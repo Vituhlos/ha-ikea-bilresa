@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from .gesture_verbs import NO_ACTION, verb_for
+from .gesture_verbs import ACTION_RUN, NO_ACTION, verb_for
 
 GESTURE_SHORT_PRESS = "short_press"
 GESTURE_DOUBLE_PRESS = "double_press"
@@ -46,9 +46,10 @@ _SWITCHABLE_WORDS = {"toggle": "toggle", "on": "turn_on", "off": "turn_off"}
 def action_is_supported(entity_id: str | None, action: str) -> bool:
     """Whether this action can be carried out on this entity.
 
-    "none" is no action at all, which every entity accepts.
+    "none" is no action at all and "run" runs the gesture's own actions; every
+    entity accepts both.
     """
-    return action == NO_ACTION or verb_for(entity_id, action) is not None
+    return action in (NO_ACTION, ACTION_RUN) or verb_for(entity_id, action) is not None
 
 
 def target_service(entity_id: str, action: str) -> tuple[str, str] | None:

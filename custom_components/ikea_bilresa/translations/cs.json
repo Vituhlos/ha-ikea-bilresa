@@ -118,7 +118,9 @@
         "target_required": "Vyberte cíl této akce, nebo nastavte Nedělat nic.",
         "scene_cannot_turn_off": "Scénu lze jen spustit, ne vypnout. Pro toto gesto zvolte Přepnout nebo Zapnout.",
         "ramp_requires_light": "Plynulá změna při podržení vyžaduje jako cíl světlo.",
-        "action_not_supported": "Tento cíl to neumí. Zvolte některou z nabízených akcí."
+        "action_not_supported": "Tento cíl to neumí. Zvolte některou z nabízených akcí.",
+        "actions_required": "Akce ke spuštění nastavte nejdřív v panelu BILRESA, nebo zvolte jinou akci.",
+        "scenes_replace_short_press": "Procházení scén nahrazuje krátký stisk, takže nemůže spouštět akce. Vypněte procházení scén, nebo zvolte jinou akci."
       },
       "abort": {
         "no_devices": "Zatím se nenašlo žádné podporované zařízení BILRESA. Ověřte, že zařízení funguje v integraci Matter, a zkuste to znovu."
@@ -156,6 +158,7 @@
         "last_option": "Poslední možnost",
         "step_up": "Zvýšit",
         "step_down": "Snížit",
+        "run": "Spustit akce (nastavují se v panelu BILRESA)",
         "none": "Nedělat nic"
       }
     },
@@ -188,7 +191,8 @@
         "first_option": "První možnost",
         "last_option": "Poslední možnost",
         "step_up": "Zvýšit",
-        "step_down": "Snížit"
+        "step_down": "Snížit",
+        "run": "Spustit akce (nastavují se v panelu BILRESA)"
       }
     },
     "scroll_mode": {
@@ -207,6 +211,7 @@
       "options": {
         "toggle": "Přepnout cíl (scéna se spustí)",
         "ramp": "Plynule měnit cíl při podržení",
+        "run": "Spustit akce (nastavují se v panelu BILRESA)",
         "none": "Nedělat nic"
       }
     },
