@@ -3,11 +3,18 @@
     python tools/pr_watch.py 34            # wait up to 15 minutes
     python tools/pr_watch.py 34 --now      # print the current state, do not wait
 
-Prints one line per check, then every review comment a bot left on the newest
-commit (the ones already answered are marked resolved by the reviewer and are
-left out), trimmed to its first lines. It needs the GitHub CLI (``gh``) signed
-in. Required checks are waited for; the review bots are waited for a little
-longer, because they finish last and CodeRabbit often does not run at all.
+Prints one line per check, which review bots have been seen, and every review
+thread of a bot that is still open, trimmed to its first lines. It needs the
+GitHub CLI (``gh``) signed in.
+
+A thread is open until it is resolved on GitHub or one of its comments says the
+finding was dealt with (Devin writes "Resolved", CodeRabbit "Addressed"). Threads
+of older commits count: a finding stays a finding after the next push.
+
+Exit status: 0 when every check passed, no thread is open and Devin, Codex and
+CodeRabbit have all reviewed; 1 when a check failed or is still pending (or none
+ran) or a thread is open; 2 when that is all fine but a review bot was not seen
+(AGENTS.md: a skipped review is not a passed review).
 """
 
 from __future__ import annotations
@@ -19,10 +26,31 @@ import subprocess
 import sys
 import time
 
-REVIEWERS = ("devin", "codex", "chatgpt-codex", "coderabbit")
-SLOW = ("devin", "coderabbit")  # reviewers that finish after the real checks
+# (name to show, words that identify the bot's login)
+REVIEWERS = (
+    ("devin", ("devin",)),
+    ("codex", ("codex",)),
+    ("coderabbit", ("coderabbit",)),
+)
 POLL_SECONDS = 15
 BODY_LINES = 6
+THREADS = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviews(first: 100) { nodes { author { login } } }
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          comments(first: 50) { nodes { author { login } body } }
+        }
+      }
+    }
+  }
+}
+"""
 
 
 def _gh(*args: str) -> str:
@@ -37,24 +65,9 @@ def _checks(number: str) -> list[dict]:
     return json.loads(raw) if raw.strip() else []
 
 
-def _is_slow(name: str) -> bool:
-    return any(word in name.lower() for word in SLOW)
-
-
-def _settled(checks: list[dict], wait_for_reviewers: bool) -> bool:
-    if not checks:
-        return False
-    return all(
-        check["bucket"] != "pending"
-        for check in checks
-        if wait_for_reviewers or not _is_slow(check["name"])
-    )
-
-
-def _newest_commit_time(number: str) -> str:
-    raw = _gh("pr", "view", number, "--json", "commits")
-    commits = json.loads(raw)["commits"]
-    return max(commit["committedDate"] for commit in commits)
+def _finished(checks: list[dict]) -> bool:
+    """Every check, the review bots' included, has stopped running."""
+    return bool(checks) and all(check["bucket"] != "pending" for check in checks)
 
 
 def _clean(body: str) -> str:
@@ -65,24 +78,76 @@ def _clean(body: str) -> str:
     return " ".join(lines[:BODY_LINES])[:600]
 
 
-def _comments(number: str, since: str) -> list[str]:
-    repo = _gh(
-        "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"
-    ).strip()
-    raw = _gh("api", f"repos/{repo}/pulls/{number}/comments", "--paginate")
+def _reviewer(login: str) -> str | None:
+    lowered = login.lower()
+    for name, words in REVIEWERS:
+        if any(word in lowered for word in words):
+            return name
+    return None
+
+
+def _answered(comment: dict) -> bool:
+    body = comment["body"]
+    return "Resolved**" in body[:60] or "Addressed in commit" in body
+
+
+def _open_threads(threads: list[dict]) -> list[str]:
+    """The bots' threads nobody has resolved or answered, ready to print."""
     found = []
-    for comment in json.loads(raw) if raw.strip() else []:
-        login = comment["user"]["login"].lower()
-        if not any(word in login for word in REVIEWERS):
+    for thread in threads:
+        comments = thread["comments"]["nodes"]
+        if thread["isResolved"] or not comments:
             continue
-        if comment["created_at"] < since or "Resolved" in comment["body"][:40]:
+        first = comments[0]
+        bot = _reviewer((first.get("author") or {}).get("login", ""))
+        if bot is None or any(_answered(comment) for comment in comments):
             continue
-        line = comment.get("line") or comment.get("original_line") or "?"
-        found.append(f"{login} {comment['path']}:{line}\n    {_clean(comment['body'])}")
+        place = f"{thread['path']}:{thread.get('line') or '?'}"
+        found.append(f"{bot} {place}\n    {_clean(first['body'])}")
     return found
 
 
+def _review_data(number: str) -> tuple[list[dict], set[str]]:
+    """Review threads, and which bots have reviewed at all."""
+    repo = _gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+    owner, name = repo.strip().split("/")
+    raw = _gh(
+        "api",
+        "graphql",
+        "-f",
+        f"query={THREADS}",
+        "-F",
+        f"owner={owner}",
+        "-F",
+        f"name={name}",
+        "-F",
+        f"number={number}",
+    )
+    pull = json.loads(raw)["data"]["repository"]["pullRequest"]
+    threads = pull["reviewThreads"]["nodes"]
+    seen = {
+        bot
+        for review in pull["reviews"]["nodes"]
+        if (bot := _reviewer((review.get("author") or {}).get("login", "")))
+    }
+    for thread in threads:
+        for comment in thread["comments"]["nodes"]:
+            if bot := _reviewer((comment.get("author") or {}).get("login", "")):
+                seen.add(bot)
+    return threads, seen
+
+
+def _verdict(checks: list[dict], open_count: int, seen: set[str]) -> int:
+    if not checks or any(check["bucket"] in ("fail", "pending") for check in checks):
+        return 1
+    if open_count:
+        return 1
+    return 0 if {name for name, _words in REVIEWERS} <= seen else 2
+
+
 def main() -> int:
+    # Review comments carry emoji; a Windows console would refuse them.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("number")
     parser.add_argument("--now", action="store_true", help="do not wait")
@@ -91,22 +156,24 @@ def main() -> int:
 
     deadline = time.monotonic() + args.minutes * 60
     checks = _checks(args.number)
-    while not args.now and time.monotonic() < deadline:
-        # Required checks first; the reviewers get the rest of the time.
-        if _settled(checks, wait_for_reviewers=True):
-            break
+    while not args.now and not _finished(checks) and time.monotonic() < deadline:
         time.sleep(POLL_SECONDS)
         checks = _checks(args.number)
 
     for check in sorted(checks, key=lambda item: item["name"]):
         print(f"{check['bucket']:<8} {check['name']}")
-    since = _newest_commit_time(args.number)
-    comments = _comments(args.number, since)
-    print(f"\n{len(comments)} open review comment(s) on the newest commit")
-    for comment in comments:
-        print(f"- {comment}")
-    failed = any(check["bucket"] == "fail" for check in checks)
-    return 1 if failed or comments else 0
+    if not checks:
+        print("no checks have run (yet)")
+    threads, seen = _review_data(args.number)
+    opened = _open_threads(threads)
+    missing = sorted({name for name, _words in REVIEWERS} - seen)
+    print(f"\nreviewed by: {', '.join(sorted(seen)) or 'nobody'}")
+    if missing:
+        print(f"NOT SEEN: {', '.join(missing)} (a skipped review is not a passed one)")
+    print(f"{len(opened)} open review thread(s)")
+    for thread in opened:
+        print(f"- {thread}")
+    return _verdict(checks, len(opened), seen)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,9 @@
 It prints what a person (or an agent) needs to decide "is this green": a status
 and the summary line per gate, and the tail of the output for a gate that
 failed. mypy reports two errors that are known and accepted (see
-PROJECT_STATUS.md); that count is compared, not ignored, so a third one fails.
+PROJECT_STATUS.md); they are told apart by file and message, so any other error,
+even one that replaces a known one, fails. Every gate of docs/DEVELOPMENT.md
+"Gate A" is here except the optional panel preview; pytest is "Gate B".
 """
 
 from __future__ import annotations
@@ -25,7 +27,18 @@ ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 # ruff is installed on its own, not in the project environment.
 RUFF = [shutil.which("ruff") or "ruff"]
-KNOWN_MYPY_ERRORS = 2
+# The two mypy errors that are known and accepted (PROJECT_STATUS.md), told apart
+# by file and message so that one new error cannot hide behind a fixed old one.
+KNOWN_MYPY_ERRORS = (
+    ("legacy_triggers.py", "Generator has incompatible item type"),
+    ("device_link.py", 'Argument 1 to "MatterDeviceLink"'),
+)
+PANEL = "custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js"
+JSON_FILES = [
+    "custom_components/ikea_bilresa/strings.json",
+    "custom_components/ikea_bilresa/translations/en.json",
+    "custom_components/ikea_bilresa/translations/cs.json",
+]
 TAIL_LINES = 25
 
 
@@ -40,6 +53,20 @@ def _pytest_command() -> list[str]:
 def _gates(fast: bool) -> list[tuple[str, list[str]]]:
     targets = ["custom_components", "tests", "tools"]
     gates = [
+        (
+            "json",
+            [
+                PY,
+                "-c",
+                "import json, pathlib, sys; "
+                "[json.loads(pathlib.Path(p).read_text(encoding='utf-8')) "
+                "for p in sys.argv[1:]]",
+                *JSON_FILES,
+            ],
+        ),
+        ("compile", [PY, "-m", "compileall", "-q", "custom_components", "tests"]),
+        ("syntax", ["node", "--check", PANEL]),
+        ("diff", ["git", "diff", "--check"]),
         ("format", [*RUFF, "format", "--check", *targets]),
         ("lint", [*RUFF, "check", *targets]),
         ("mypy", [PY, "-m", "mypy", "custom_components/ikea_bilresa"]),
@@ -61,10 +88,18 @@ def _gates(fast: bool) -> list[tuple[str, list[str]]]:
 def _summary(name: str, output: str, code: int) -> tuple[bool, str]:
     lines = [line for line in output.strip().splitlines() if line.strip()]
     if name == "mypy":
-        found = re.search(r"Found (\d+) errors?", output)
-        count = int(found.group(1)) if found else 0
-        ok = count <= KNOWN_MYPY_ERRORS if found else code == 0
-        return ok, f"{count} errors (known: {KNOWN_MYPY_ERRORS})"
+        errors = [line for line in lines if ": error:" in line]
+        unknown = [
+            line
+            for line in errors
+            if not any(
+                all(part in line for part in known) for known in KNOWN_MYPY_ERRORS
+            )
+        ]
+        # 0 is clean, 1 is "errors found"; anything else is mypy failing to run.
+        ok = code in (0, 1) and not unknown
+        text = f"{len(errors)} errors, {len(unknown)} not known"
+        return ok, text if ok else (unknown[0] if unknown else lines[-1])
     if name == "node":
         passed = re.search(r"ℹ pass (\d+)", output)
         failed = re.search(r"ℹ fail (\d+)", output)
@@ -76,15 +111,18 @@ def _summary(name: str, output: str, code: int) -> tuple[bool, str]:
 def _run(gate: tuple[str, list[str]]) -> tuple[str, bool, str, str, float]:
     name, command = gate
     started = time.monotonic()
-    done = subprocess.run(
-        command,
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    try:
+        done = subprocess.run(
+            command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError as err:  # a tool that is not installed is a red gate
+        return name, False, f"cannot run {command[0]}: {err}", str(err), 0.0
     output = done.stdout + done.stderr
     ok, summary = _summary(name, output, done.returncode)
     return name, ok, summary, output, time.monotonic() - started
