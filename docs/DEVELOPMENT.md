@@ -37,6 +37,12 @@ losing changes. Do not commit or push unless the owner requests it.
 
 ### Gate A: static checks
 
+`python tools/check.py` runs the gates below that apply to code (format, lint,
+mypy, the frontend tests, pytest) in parallel and prints one line each; add
+`--fast` to skip pytest. `python tools/pr_watch.py <number>` waits for a pull
+request's checks and review bots and prints only the failures and the open review
+comments. The commands below are what they run.
+
 Run for every code change:
 
 ```powershell
