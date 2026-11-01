@@ -757,3 +757,45 @@ def test_a_target_with_a_toggle_keeps_the_stored_default(target) -> None:
     assert CONF_DOUBLE_ACTION not in _run_scripts_and_scenes(
         {CONF_DOUBLE_TARGET: target}
     )
+
+
+_RUN_SEQUENCE = [
+    {
+        "action": "media_player.media_play_pause",
+        "target": {"entity_id": "media_player.tv"},
+    }
+]
+
+
+@pytest.mark.parametrize("step_id", ["reconfigure", "user"])
+async def test_the_native_form_keeps_the_actions_a_gesture_runs(step_id: str) -> None:
+    """The form has no field for them; editing or copying must not lose them."""
+    flow = _form_flow()
+    flow._pending_defaults = {
+        CONF_NODE_ID: "101",
+        CONF_DOUBLE_ACTION: "run",
+        "double_press_sequence": _RUN_SEQUENCE,
+    }
+    form = {
+        CONF_CHANNEL: "1",
+        CONF_MODE: MODE_BRIGHTNESS,
+        CONF_TARGET: "light.main",
+        CONF_DOUBLE_ACTION: "run",
+    }
+
+    stored = (await flow._async_step_form(step_id, form))["data"]
+
+    assert stored["double_press_sequence"] == _RUN_SEQUENCE
+    assert stored[CONF_DOUBLE_ACTION] == "run"
+
+
+def test_choosing_run_in_the_native_form_without_actions_is_refused() -> None:
+    """The message tells the person to set the actions in the panel first."""
+    assert BindingSubentryFlowHandler._validate_binding(
+        {
+            CONF_CHANNEL: "1",
+            CONF_MODE: MODE_BRIGHTNESS,
+            CONF_TARGET: "light.main",
+            CONF_DOUBLE_ACTION: "run",
+        }
+    ) == {CONF_DOUBLE_ACTION: "actions_required"}

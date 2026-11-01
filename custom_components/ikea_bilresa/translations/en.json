@@ -118,7 +118,9 @@
         "target_required": "Choose a target for this action, or set the action to Do nothing.",
         "scene_cannot_turn_off": "A scene can only be run, not turned off. Choose Toggle or Turn on for that gesture.",
         "ramp_requires_light": "Hold-to-ramp requires a light target.",
-        "action_not_supported": "This target cannot do that. Choose one of the actions listed for it."
+        "action_not_supported": "This target cannot do that. Choose one of the actions listed for it.",
+        "actions_required": "Set the actions to run in the BILRESA panel first, or choose another action.",
+        "scenes_replace_short_press": "Cycling scenes replaces the short press, so it cannot run actions. Turn scene cycling off or choose another action."
       },
       "abort": {
         "no_devices": "No supported BILRESA devices have been discovered yet. Make sure the device works in the Matter integration, then try again."
@@ -156,6 +158,7 @@
         "last_option": "Last option",
         "step_up": "Increase",
         "step_down": "Decrease",
+        "run": "Run actions (set in the BILRESA panel)",
         "none": "Do nothing"
       }
     },
@@ -188,7 +191,8 @@
         "first_option": "First option",
         "last_option": "Last option",
         "step_up": "Increase",
-        "step_down": "Decrease"
+        "step_down": "Decrease",
+        "run": "Run actions (set in the BILRESA panel)"
       }
     },
     "scroll_mode": {
@@ -207,6 +211,7 @@
       "options": {
         "toggle": "Toggle target (a scene is run)",
         "ramp": "Ramp target while held",
+        "run": "Run actions (set in the BILRESA panel)",
         "none": "Do nothing"
       }
     },

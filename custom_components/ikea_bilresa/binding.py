@@ -24,7 +24,8 @@ import time
 from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.core import Context, HomeAssistant, State, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
     async_dispatcher_send,
@@ -34,6 +35,12 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.script import (
+    SCRIPT_MODE_QUEUED,
+    Script,
+    async_validate_actions_config,
+)
+import voluptuous as vol
 
 from .channel_controls import ScrollAccelerator, perceptual_target
 from .const import (
@@ -41,6 +48,7 @@ from .const import (
     ACTION_PRESS,
     ACTION_RELEASE,
     ACTION_ROTATE,
+    ACTION_RUN,
     BUTTON_RESPONSE_FAST,
     BUTTON_RESPONSE_INSTANT,
     CLICK_NONE,
@@ -48,11 +56,14 @@ from .const import (
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
+    CONF_CLICK_SEQUENCE,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_ACTION,
+    CONF_DOUBLE_SEQUENCE,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
+    CONF_HOLD_SEQUENCE,
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
@@ -66,6 +77,7 @@ from .const import (
     CONF_TARGET,
     CONF_TRANSITION,
     CONF_TRIPLE_ACTION,
+    CONF_TRIPLE_SEQUENCE,
     CONF_TRIPLE_TARGET,
     DEFAULT_ACCELERATION,
     DEFAULT_BUTTON_RESPONSE,
@@ -80,6 +92,7 @@ from .const import (
     DEFAULT_TARGET_ACTION,
     DEFAULT_TRANSITION,
     DIRECTION_UP,
+    DOMAIN,
     EVT_INITIAL_PRESS,
     EVT_MULTI_PRESS_COMPLETE,
     EVT_SHORT_RELEASE,
@@ -87,6 +100,7 @@ from .const import (
     FALLBACK_MIN_KELVIN,
     HOLD_NONE,
     HOLD_RAMP,
+    HOLD_RUN,
     HOLD_TOGGLE,
     MODE_BRIGHTNESS,
     MODE_COLOR,
@@ -163,6 +177,8 @@ _LIGHT_MODES = frozenset({MODE_BRIGHTNESS, MODE_COLOR_TEMP, MODE_COLOR})
 # Enough dispatched values to cover several delayed batches without keeping an
 # unbounded history.
 _COMMAND_HISTORY = 8
+# How many runs of one gesture's actions may wait behind the one running.
+_MAX_QUEUED_RUNS = 5
 
 # The largest single rotary batch recorded on the physical E2490 during the
 # uncontrolled fast-scroll stress run (batches of 14, 9, 6 and 14 notches). A
@@ -286,6 +302,19 @@ class LightBinding:
         self._hold_target_action = data.get(
             CONF_HOLD_TARGET_ACTION, DEFAULT_TARGET_ACTION
         )
+        # The action sequences of the gestures set to "run", and the scripts
+        # built from them the first time they are needed.
+        self._sequences: dict[str, list[dict[str, Any]]] = {
+            gesture: list(data[field])
+            for gesture, field in (
+                (GESTURE_SHORT_PRESS, CONF_CLICK_SEQUENCE),
+                (GESTURE_DOUBLE_PRESS, CONF_DOUBLE_SEQUENCE),
+                (GESTURE_TRIPLE_PRESS, CONF_TRIPLE_SEQUENCE),
+                (GESTURE_HOLD, CONF_HOLD_SEQUENCE),
+            )
+            if data.get(field)
+        }
+        self._scripts: dict[str, Script] = {}
         self._scenes: list[str] = list(data.get(CONF_SCENES) or [])
         self._scene_index = 0
         self._ramp_direction = data.get(CONF_RAMP_DIRECTION, DEFAULT_RAMP_DIRECTION)
@@ -335,6 +364,7 @@ class LightBinding:
             instant_requested
             and self._double_target is None
             and self._triple_target is None
+            and ACTION_RUN not in (self._double_action, self._triple_action)
             and self._hold_action == HOLD_NONE
         )
         if instant_requested and not self._instant_single:
@@ -438,6 +468,7 @@ class LightBinding:
         @callback
         def unsubscribe() -> None:
             self._stop_ramp(change_direction=False)
+            self._stop_sequences()
             self._cancel_pending_command()
             self._fast_press_started = None
             self._reset_latency_trace()
@@ -509,6 +540,8 @@ class LightBinding:
                     self._press_target(
                         GESTURE_HOLD, self._hold_target, self._hold_target_action
                     )
+                elif self._hold_action == HOLD_RUN:
+                    self._run_sequence(GESTURE_HOLD)
                 else:
                     self._report_activity("skipped", reason="hold_not_configured")
             elif action.type == ACTION_RELEASE and self._hold_action == HOLD_RAMP:
@@ -1508,6 +1541,9 @@ class LightBinding:
         What the action means for this kind of entity is decided in
         ``gesture_actions``; this only runs it and tells the activity feed.
         """
+        if action == ACTION_RUN:
+            self._run_sequence(gesture)
+            return
         if not target:
             self._report_activity("skipped", reason="target_not_configured")
             return
@@ -1537,6 +1573,73 @@ class LightBinding:
                 "target": target,
             },
         )
+
+    def _run_sequence(self, gesture: str) -> None:
+        """Run the Home Assistant actions the user set for this gesture."""
+        result = {"kind": "actions", "action": "run"}
+        sequence = self._sequences.get(gesture)
+        if not sequence:
+            self._report_activity("skipped", result=result, reason="actions_missing")
+            return
+        action = self._active_action
+        self._report_activity("pending", result=result, action=action)
+        self.hass.async_create_task(
+            self._async_run_sequence(
+                gesture, sequence, self._script_variables(gesture), result, action
+            )
+        )
+
+    async def _async_run_sequence(
+        self,
+        gesture: str,
+        sequence: list[dict[str, Any]],
+        variables: dict[str, Any],
+        result: dict[str, Any],
+        action: WheelAction | None,
+    ) -> None:
+        """Build the script on first use and start a run of it.
+
+        The sequence is validated as an automation validates its actions, so a
+        device action or condition is resolved too. A sequence that no longer
+        validates (an integration it used was removed) is reported, not raised.
+        Runs are queued, in order, so two quick presses do not interleave; the
+        run itself is Home Assistant's, with its own trace-less logging.
+        """
+        script = self._scripts.get(gesture)
+        if script is None:
+            try:
+                validated = await async_validate_actions_config(self.hass, sequence)
+                script = Script(
+                    self.hass,
+                    validated,
+                    f"BILRESA {gesture}",
+                    DOMAIN,
+                    script_mode=SCRIPT_MODE_QUEUED,
+                    max_runs=_MAX_QUEUED_RUNS,
+                    logger=_LOGGER,
+                )
+            except (vol.Invalid, HomeAssistantError) as err:
+                _LOGGER.warning(
+                    "BILRESA %s actions are not valid and were not run: %s",
+                    gesture,
+                    err,
+                )
+                self._report_activity(
+                    "failed", result=result, reason="invalid_actions", action=action
+                )
+                return
+            self._scripts[gesture] = script
+        self.hass.async_create_task(
+            script.async_run(run_variables=variables, context=Context())
+        )
+        self._report_activity("accepted", result=result, action=action)
+
+    @callback
+    def _stop_sequences(self) -> None:
+        """Stop whatever the gesture actions are still doing (on unload)."""
+        for script in self._scripts.values():
+            self.hass.async_create_task(script.async_stop())
+        self._scripts.clear()
 
     def _script_variables(self, gesture: str) -> dict[str, Any]:
         """What a script started by a gesture is told about it.

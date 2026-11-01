@@ -24,6 +24,9 @@ from typing import Any
 # A gesture that does nothing.
 NO_ACTION = "none"
 
+# A gesture that runs a Home Assistant action sequence instead of a verb.
+ACTION_RUN = "run"
+
 # The words that mean the same on every switchable entity.
 VERB_TOGGLE = "toggle"
 VERB_ON = "on"

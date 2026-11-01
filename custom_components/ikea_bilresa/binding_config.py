@@ -11,9 +11,11 @@ from hashlib import sha256
 import json
 from typing import Any
 
+from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
 from .const import (
+    ACTION_RUN,
     BUTTON_RESPONSE_FAST,
     BUTTON_RESPONSE_INSTANT,
     BUTTON_RESPONSES,
@@ -24,11 +26,14 @@ from .const import (
     CONF_BUTTON_RESPONSE,
     CONF_CHANNEL,
     CONF_CLICK_ACTION,
+    CONF_CLICK_SEQUENCE,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_ACTION,
+    CONF_DOUBLE_SEQUENCE,
     CONF_DOUBLE_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
+    CONF_HOLD_SEQUENCE,
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
@@ -42,6 +47,7 @@ from .const import (
     CONF_TARGET,
     CONF_TRANSITION,
     CONF_TRIPLE_ACTION,
+    CONF_TRIPLE_SEQUENCE,
     CONF_TRIPLE_TARGET,
     DEFAULT_ACCELERATION,
     DEFAULT_BUTTON_RESPONSE,
@@ -58,6 +64,7 @@ from .const import (
     HOLD_ACTIONS,
     HOLD_NONE,
     HOLD_RAMP,
+    HOLD_RUN,
     HOLD_TOGGLE,
     MODES,
     RAMP_DIRECTIONS,
@@ -75,7 +82,23 @@ BINDING_OPTIONAL_FIELDS = (
     CONF_TRIPLE_TARGET,
     CONF_HOLD_TARGET,
     CONF_SCENES,
+    CONF_CLICK_SEQUENCE,
+    CONF_DOUBLE_SEQUENCE,
+    CONF_TRIPLE_SEQUENCE,
+    CONF_HOLD_SEQUENCE,
 )
+
+# Each gesture that can run an action sequence, with the field that says what it
+# does and the field that holds the sequence. A sequence is only kept while its
+# gesture is set to "run".
+_SEQUENCE_GESTURES = (
+    (CONF_CLICK_ACTION, CONF_CLICK_SEQUENCE),
+    (CONF_DOUBLE_ACTION, CONF_DOUBLE_SEQUENCE),
+    (CONF_TRIPLE_ACTION, CONF_TRIPLE_SEQUENCE),
+    (CONF_HOLD_ACTION, CONF_HOLD_SEQUENCE),
+)
+
+SEQUENCE_FIELDS = tuple(sequence for _action, sequence in _SEQUENCE_GESTURES)
 
 BINDING_EDIT_FIELDS = (
     CONF_TARGET,
@@ -97,6 +120,10 @@ BINDING_EDIT_FIELDS = (
     CONF_HOLD_TARGET_ACTION,
     CONF_HOLD_ACTION,
     CONF_SCENES,
+    CONF_CLICK_SEQUENCE,
+    CONF_DOUBLE_SEQUENCE,
+    CONF_TRIPLE_SEQUENCE,
+    CONF_HOLD_SEQUENCE,
 )
 
 BUTTON_BINDING_EDIT_FIELDS = (
@@ -109,9 +136,33 @@ BUTTON_BINDING_EDIT_FIELDS = (
     CONF_HOLD_TARGET_ACTION,
     CONF_HOLD_ACTION,
     CONF_RAMP_DIRECTION,
+    CONF_CLICK_SEQUENCE,
+    CONF_DOUBLE_SEQUENCE,
+    CONF_HOLD_SEQUENCE,
 )
 
 _ENTITY_ID = vol.Match(r"^[a-z0-9_]+\.[a-z0-9_]+$")
+
+_MAX_SEQUENCE_ACTIONS = 50
+
+
+def _sequence(value: Any) -> list[dict[str, Any]]:
+    """Accept a Home Assistant action sequence and keep it as it was written.
+
+    The sequence is checked with Home Assistant's own action schema, so a
+    mistake is refused when the binding is saved. What is stored is the plain
+    data the editor produced (templates stay text), because a config entry
+    holds JSON; the runtime validates it again when it builds the script.
+    """
+    if not isinstance(value, list) or not 1 <= len(value) <= _MAX_SEQUENCE_ACTIONS:
+        raise vol.Invalid("actions must be a list of 1 to 50 actions")
+    try:
+        cv.SCRIPT_SCHEMA(value)
+        json.dumps(value)
+    except (vol.Invalid, TypeError, ValueError) as err:
+        raise vol.Invalid("not a valid action sequence") from err
+    return value
+
 
 _WHEEL_SCHEMA = vol.Schema(
     {
@@ -142,15 +193,19 @@ _WHEEL_SCHEMA = vol.Schema(
             BUTTON_RESPONSES
         ),
         vol.Optional(CONF_CLICK_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_CLICK_SEQUENCE): _sequence,
         vol.Optional(CONF_DOUBLE_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_DOUBLE_SEQUENCE): _sequence,
         vol.Required(CONF_DOUBLE_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
             TARGET_ACTIONS
         ),
         vol.Optional(CONF_TRIPLE_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_TRIPLE_SEQUENCE): _sequence,
         vol.Required(CONF_TRIPLE_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
             TARGET_ACTIONS
         ),
         vol.Optional(CONF_HOLD_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_HOLD_SEQUENCE): _sequence,
         vol.Required(CONF_HOLD_TARGET_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
             TARGET_ACTIONS
         ),
@@ -173,11 +228,14 @@ _BUTTON_SCHEMA = vol.Schema(
             BUTTON_RESPONSES
         ),
         vol.Optional(CONF_CLICK_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_CLICK_SEQUENCE): _sequence,
         vol.Optional(CONF_DOUBLE_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_DOUBLE_SEQUENCE): _sequence,
         vol.Required(CONF_DOUBLE_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
             TARGET_ACTIONS
         ),
         vol.Optional(CONF_HOLD_TARGET): _ENTITY_ID,
+        vol.Optional(CONF_HOLD_SEQUENCE): _sequence,
         vol.Required(CONF_HOLD_TARGET_ACTION, default=DEFAULT_TARGET_ACTION): vol.In(
             TARGET_ACTIONS
         ),
@@ -238,6 +296,9 @@ def normalize_binding_data(
     for field in BINDING_OPTIONAL_FIELDS:
         if candidate.get(field) in (None, "", []):
             candidate.pop(field, None)
+    for action_field, sequence_field in _SEQUENCE_GESTURES:
+        if candidate.get(action_field) != ACTION_RUN:
+            candidate.pop(sequence_field, None)
     return dict((_BUTTON_SCHEMA if is_button else _WHEEL_SCHEMA)(candidate))
 
 
@@ -282,12 +343,21 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
                 if is_scene_target(target) and action == CLICK_OFF
                 else "action_not_supported"
             )
+    # A gesture set to run needs something to run. Scene cycling replaces the
+    # short press, so a sequence on it would never run.
+    for action_field, sequence_field in _SEQUENCE_GESTURES:
+        if data.get(action_field) == ACTION_RUN and not data.get(sequence_field):
+            errors[action_field] = "actions_required"
+    if data.get(CONF_SCENES) and data.get(CONF_CLICK_ACTION) == ACTION_RUN:
+        errors[CONF_CLICK_ACTION] = "scenes_replace_short_press"
     if is_button:
-        if data[CONF_CLICK_ACTION] != CLICK_NONE and not data.get(CONF_CLICK_TARGET):
+        if data[CONF_CLICK_ACTION] not in (CLICK_NONE, ACTION_RUN) and not data.get(
+            CONF_CLICK_TARGET
+        ):
             errors[CONF_CLICK_TARGET] = "target_required"
         hold_action = data[CONF_HOLD_ACTION]
         hold_target = data.get(CONF_HOLD_TARGET)
-        if hold_action != HOLD_NONE and not hold_target:
+        if hold_action not in (HOLD_NONE, HOLD_RUN) and not hold_target:
             errors[CONF_HOLD_TARGET] = "target_required"
         elif hold_action == HOLD_RAMP and not str(hold_target).startswith("light."):
             errors[CONF_HOLD_TARGET] = "ramp_requires_light"
@@ -296,12 +366,16 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
             errors[CONF_TARGET] = "mode_target_mismatch"
         if data[CONF_MIN_BRIGHTNESS] >= data[CONF_MAX_BRIGHTNESS]:
             errors[CONF_MAX_BRIGHTNESS] = "maximum_must_exceed_minimum"
-    if data.get(CONF_BUTTON_RESPONSE) == BUTTON_RESPONSE_FAST and (
-        data.get(CONF_DOUBLE_TARGET) or data.get(CONF_TRIPLE_TARGET)
-    ):
+    multi_press = bool(
+        data.get(CONF_DOUBLE_TARGET)
+        or data.get(CONF_TRIPLE_TARGET)
+        or data.get(CONF_DOUBLE_ACTION) == ACTION_RUN
+        or data.get(CONF_TRIPLE_ACTION) == ACTION_RUN
+    )
+    if data.get(CONF_BUTTON_RESPONSE) == BUTTON_RESPONSE_FAST and multi_press:
         errors[CONF_BUTTON_RESPONSE] = "fast_response_conflicts_with_multi_press"
     if data.get(CONF_BUTTON_RESPONSE) == BUTTON_RESPONSE_INSTANT:
-        if data.get(CONF_DOUBLE_TARGET) or data.get(CONF_TRIPLE_TARGET):
+        if multi_press:
             errors[CONF_BUTTON_RESPONSE] = "instant_response_conflicts_with_multi_press"
         elif data.get(CONF_HOLD_ACTION) != HOLD_NONE:
             errors[CONF_BUTTON_RESPONSE] = "instant_response_conflicts_with_hold"

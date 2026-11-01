@@ -22,7 +22,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .binding_config import binding_errors, normalize_binding_data
+from .binding_config import SEQUENCE_FIELDS, binding_errors, normalize_binding_data
 from .const import (
     BINDING_PROFILE_CLIMATE,
     BINDING_PROFILE_COVER,
@@ -298,7 +298,14 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         errors: dict[str, str] = {}
         normalized: dict[str, Any] | None = None
         if user_input is not None:
-            candidate = {CONF_NODE_ID: self._pending_node_id, **user_input}
+            # The form has no field for the actions a gesture runs, so a binding
+            # that is reconfigured or copied keeps the ones it has.
+            kept = {
+                field: self._pending_defaults[field]
+                for field in SEQUENCE_FIELDS
+                if field in self._pending_defaults
+            }
+            candidate = {CONF_NODE_ID: self._pending_node_id, **kept, **user_input}
             if step_id != "reconfigure":
                 candidate = _run_scripts_and_scenes(candidate)
             normalized, errors = self._normalize_and_validate(candidate)

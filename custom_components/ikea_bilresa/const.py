@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .gesture_verbs import ACTS_WHILE_UNKNOWN, ALL_VERBS
+from .gesture_verbs import ACTION_RUN, ACTS_WHILE_UNKNOWN, ALL_VERBS
 from .gesture_verbs import TARGET_DOMAINS as _GESTURE_TARGET_DOMAINS
 
 DOMAIN = "ikea_bilresa"
@@ -184,6 +184,12 @@ CONF_DOUBLE_ACTION = "double_press_action"
 CONF_TRIPLE_ACTION = "triple_press_action"
 CONF_HOLD_TARGET_ACTION = "hold_target_action"
 CONF_HOLD_ACTION = "hold_action"
+# The actions of a gesture set to "run": a Home Assistant action sequence, as in
+# an automation, stored as the editor wrote it.
+CONF_CLICK_SEQUENCE = "click_sequence"
+CONF_DOUBLE_SEQUENCE = "double_press_sequence"
+CONF_TRIPLE_SEQUENCE = "triple_press_sequence"
+CONF_HOLD_SEQUENCE = "hold_sequence"
 CONF_RAMP_DIRECTION = "ramp_direction"
 CONF_SCENES = "scenes"
 
@@ -209,7 +215,8 @@ BINDING_PROFILES = [
 HOLD_TOGGLE = "toggle"  # toggle the hold target entity (default)
 HOLD_RAMP = "ramp"  # continuously ramp the scroll target while held
 HOLD_NONE = "none"
-HOLD_ACTIONS = [HOLD_TOGGLE, HOLD_RAMP, HOLD_NONE]
+HOLD_RUN = "run"  # run the hold sequence instead of acting on a target
+HOLD_ACTIONS = [HOLD_TOGGLE, HOLD_RAMP, HOLD_NONE, HOLD_RUN]
 DEFAULT_HOLD_ACTION = HOLD_TOGGLE
 
 # A dual-button hold ramp may alternate like the historic wheel behavior or
@@ -309,8 +316,9 @@ CLICK_ON = "on"
 CLICK_OFF = "off"
 CLICK_NONE = "none"
 # The verbs a gesture can carry out on its target, from the table in
-# ``gesture_verbs``; "none" is no gesture at all.
-TARGET_ACTIONS = list(ALL_VERBS)
+# ``gesture_verbs``, and "run", which runs the gesture's action sequence
+# instead of acting on a target; "none" is no gesture at all.
+TARGET_ACTIONS = [*ALL_VERBS, ACTION_RUN]
 CLICK_ACTIONS = [*TARGET_ACTIONS, CLICK_NONE]
 DEFAULT_TARGET_ACTION = CLICK_TOGGLE
 

@@ -395,3 +395,123 @@ def test_a_scene_asked_for_a_verb_it_lacks_is_not_told_it_cannot_be_turned_off()
     )
 
     assert binding_errors(stored) == {CONF_DOUBLE_ACTION: "action_not_supported"}
+
+
+# -- action sequences: the stored shape and the checks ----------------------
+
+_SEQUENCE = [
+    {
+        "action": "media_player.media_play_pause",
+        "target": {"entity_id": "media_player.tv"},
+    }
+]
+
+
+def test_a_gesture_set_to_run_keeps_its_sequence_as_written() -> None:
+    from custom_components.ikea_bilresa.const import (
+        CONF_DOUBLE_SEQUENCE,
+        CONF_HOLD_SEQUENCE,
+    )
+
+    stored = _normalize(
+        **{
+            CONF_DOUBLE_ACTION: "run",
+            CONF_DOUBLE_SEQUENCE: _SEQUENCE,
+            CONF_HOLD_ACTION: "run",
+            CONF_HOLD_SEQUENCE: [{"delay": {"seconds": 1}}],
+        }
+    )
+
+    assert binding_errors(stored) == {}
+    assert stored[CONF_DOUBLE_SEQUENCE] == _SEQUENCE
+    assert editor_data(stored)[CONF_HOLD_SEQUENCE] == [{"delay": {"seconds": 1}}]
+
+
+def test_a_sequence_is_dropped_when_its_gesture_no_longer_runs() -> None:
+    """A hidden sequence would run again the day the choice is switched back."""
+    from custom_components.ikea_bilresa.const import CONF_DOUBLE_SEQUENCE
+
+    stored = _normalize(
+        **{
+            CONF_DOUBLE_ACTION: "toggle",
+            CONF_DOUBLE_TARGET: "light.a",
+            CONF_DOUBLE_SEQUENCE: _SEQUENCE,
+        }
+    )
+
+    assert CONF_DOUBLE_SEQUENCE not in stored
+
+
+def test_a_gesture_set_to_run_without_actions_is_refused() -> None:
+    stored = _normalize(**{CONF_DOUBLE_ACTION: "run"})
+
+    assert binding_errors(stored) == {CONF_DOUBLE_ACTION: "actions_required"}
+
+
+@pytest.mark.parametrize(
+    "sequence",
+    [
+        "not a list",
+        [{"not_an_action": 1}],
+        [{"action": "light.turn_on"}] * 51,
+        [{"action": "light.turn_on", "data": {"x": object()}}],
+    ],
+)
+def test_a_sequence_that_is_not_valid_is_refused(sequence) -> None:
+    from custom_components.ikea_bilresa.const import CONF_DOUBLE_SEQUENCE
+
+    normalized, errors = validate_binding_data(
+        {**_WHEEL, CONF_DOUBLE_ACTION: "run", CONF_DOUBLE_SEQUENCE: sequence},
+        node_id=1,
+        channel=1,
+    )
+
+    assert normalized is None
+    assert errors == {CONF_DOUBLE_SEQUENCE: "invalid_value"} or errors == {
+        CONF_DOUBLE_ACTION: "invalid_value"
+    }
+
+
+def test_the_old_service_key_is_accepted_and_kept() -> None:
+    """Sequences copied from an old automation use ``service``."""
+    from custom_components.ikea_bilresa.const import CONF_DOUBLE_SEQUENCE
+
+    old = [{"service": "light.toggle", "target": {"entity_id": "light.a"}}]
+    stored = _normalize(**{CONF_DOUBLE_ACTION: "run", CONF_DOUBLE_SEQUENCE: old})
+
+    assert binding_errors(stored) == {}
+    assert stored[CONF_DOUBLE_SEQUENCE] == old
+
+
+def test_scene_cycling_leaves_no_room_for_a_short_press_sequence() -> None:
+    from custom_components.ikea_bilresa.const import CONF_CLICK_SEQUENCE
+
+    stored = _normalize(
+        **{
+            CONF_CLICK_ACTION: "run",
+            CONF_CLICK_SEQUENCE: _SEQUENCE,
+            CONF_SCENES: ["scene.a"],
+        }
+    )
+
+    assert binding_errors(stored) == {CONF_CLICK_ACTION: "scenes_replace_short_press"}
+
+
+def test_a_sequence_conflicts_with_the_fast_responses_like_any_double_press() -> None:
+    from custom_components.ikea_bilresa.const import (
+        BUTTON_RESPONSE_FAST,
+        CONF_BUTTON_RESPONSE,
+        CONF_DOUBLE_SEQUENCE,
+    )
+
+    stored = _normalize(
+        **{
+            CONF_DOUBLE_ACTION: "run",
+            CONF_DOUBLE_SEQUENCE: _SEQUENCE,
+            CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST,
+        }
+    )
+
+    assert binding_errors(stored) == {
+        CONF_BUTTON_RESPONSE: "fast_response_conflicts_with_multi_press"
+    }

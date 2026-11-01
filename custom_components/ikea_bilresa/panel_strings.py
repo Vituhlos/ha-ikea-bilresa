@@ -300,6 +300,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_action_not_supported": (
             "This target cannot do that. Choose one of the actions listed for it."
         ),
+        "validation_actions_required": (
+            "Add at least one action to run, or choose another action."
+        ),
+        "validation_scenes_replace_short_press": (
+            "Cycling scenes replaces the short press, so it cannot run actions."
+        ),
         "validation_mode_target_mismatch": (
             "The selected rotation mode cannot control this entity."
         ),
@@ -770,6 +776,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "validation_scenes_required": "Přidejte alespoň jednu scénu.",
         "validation_action_not_supported": (
             "Tento cíl to neumí. Zvolte některou z nabízených akcí."
+        ),
+        "validation_actions_required": (
+            "Přidejte alespoň jednu akci ke spuštění, nebo zvolte jinou akci."
+        ),
+        "validation_scenes_replace_short_press": (
+            "Procházení scén nahrazuje krátký stisk, takže nemůže spouštět akce."
         ),
         "validation_mode_target_mismatch": (
             "Vybraný režim otáčení nemůže ovládat tuto entitu."
