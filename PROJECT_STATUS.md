@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-**External contribution — 2026-11-05 (proposed; not merged or released):**
+**External contribution — 2026-11-05 (upstream PR #39 open; not merged or released):**
 
 - Issue #38 (**partial**): add `input_boolean` to the press/double/triple/
   hold-toggle target choices in the shared panel schema, frontend fallback and
@@ -38,9 +38,13 @@
   selection and require rebase. Scope is limited to `input_boolean` helpers;
   `input_button` needs a distinct service. This contribution does not change
   event decoding, gesture timing, or Matter transport.
-- **Next action:** submit the partial feature as a transparently unverified
-  hardware contribution for maintainer review; resolve feedback and perform
-  applicable real-device binding validation before treating it as release-ready.
+- **Upstream PR:** [#39](https://github.com/Vituhlos/ha-ikea-bilresa/pull/39)
+  is open against `main`. Its initial workflow has conclusion `action_required`
+  (no upstream CI pass yet); the maintainer may need to approve the external
+  contribution's run. The fork's earlier 7/7 CI remains the passing evidence.
+- **Next action:** wait for maintainer review / upstream CI approval, respond
+  to requested changes, and carry out applicable physical BILRESA binding
+  validation before release.
 
 **Current snapshot — reviewed 2026-10-25**
 
