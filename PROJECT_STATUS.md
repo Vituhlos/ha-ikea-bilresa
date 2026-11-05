@@ -2,6 +2,16 @@
 
 **External contribution — 2026-11-05 (upstream PR #39 open; not merged or released):**
 
+- **Review follow-up:** CodeRabbit submitted one low-severity maintainability
+  suggestion: explicitly test native press-target selector domains. Added
+  `test_native_press_target_selectors_offer_input_boolean_helpers` to
+  `tests/test_config_flow.py` (wheel single/double/triple/hold and dual-button
+  single/double/hold). This is a test-only change; runtime behaviour unchanged.
+  **Tests after this new commit have NOT yet been run.** The earlier 7/7 passing
+  CI does not validate the new test. Next run fork CI on the updated head.
+  CodeRabbit also issued advisory checks about incomplete `input_button`
+  coverage (intentional partial #38) and docstring coverage (not yet resolved).
+
 - Issue #38 (**partial**): add `input_boolean` to the press/double/triple/
   hold-toggle target choices in the shared panel schema, frontend fallback and
   native config-flow selectors. Runtime uses Home Assistant's existing
@@ -9,7 +19,7 @@
   implement `input_button.press`; `input_button` remains out of scope.
 - Files changed: `custom_components/ikea_bilresa/{panel_schema.py,config_flow.py,
   frontend/ikea_bilresa_panel.js}`, `tests/{test_binding.py,
-  test_panel_schema.py}`, `README.md`, `README.cs.md`, `CHANGELOG.md`,
+  test_config_flow.py, test_panel_schema.py}`, `README.md`, `README.cs.md`, `CHANGELOG.md`,
   and this handoff file. No translation keys changed, so EN/CS JSON translation
   files were not edited.
 - **CI (Linux; not hardware):** GitHub Actions
@@ -42,9 +52,9 @@
   is open against `main`. Its initial workflow has conclusion `action_required`
   (no upstream CI pass yet); the maintainer may need to approve the external
   contribution's run. The fork's earlier 7/7 CI remains the passing evidence.
-- **Next action:** wait for maintainer review / upstream CI approval, respond
-  to requested changes, and carry out applicable physical BILRESA binding
-  validation before release.
+- **Next action:** re-run the fork's full CI after the CodeRabbit
+  selector regression test; then respond to maintainer feedback / upstream CI
+  approval and perform relevant physical BILRESA validation before release.
 
 **Current snapshot — reviewed 2026-10-25**
 
