@@ -1,5 +1,19 @@
 # Project status and agent handoff
 
+**External contribution draft — 2026-11-05 (not merged or released):**
+
+- Issue #38 (partial): permit `input_boolean` for press/double/triple/hold-toggle
+  targets in the shared panel schema and native subentry entity selectors.
+  Runtime already dispatches `homeassistant.toggle`/`turn_on`/`turn_off` to the
+  selected entity. `input_button` is deliberately out of scope and still needs
+  a distinct press action. Includes a unit regression test and EN/CS docs.
+- Validation before submitting: run `node --check`, panel/node tests, `pytest`,
+  Ruff, mypy and CI on the complete repository; test the selection and single
+  press with a real Home Assistant instance. No hardware verification yet.
+- Known risk: concurrent gesture-action PR #36 may change the target editor;
+  rebase and avoid duplicate work before submission. Next action: verify the
+  patch against latest upstream and run the full verification gates.
+
 **Current snapshot — reviewed 2026-10-25**
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.

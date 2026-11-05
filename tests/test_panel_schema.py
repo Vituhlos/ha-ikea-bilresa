@@ -57,7 +57,7 @@ def test_the_panel_schema_is_plain_json_and_covers_every_mode() -> None:
     }
     # The dial's step is in the dial's own units, so it carries no unit.
     assert schema["settings_numbers"]["step"]["unit"] is None
-    assert schema["press_target_domains"] == ["light", "switch"]
+    assert schema["press_target_domains"] == ["light", "switch", "input_boolean"]
     assert schema["ramp_target_domains"] == ["light"]
 
 
@@ -72,6 +72,8 @@ def test_the_frontend_fallback_matches_the_server_schema() -> None:
     ).read_text(encoding="utf-8")
     block = asset[asset.index("const FALLBACK_SCHEMA = {") :]
     block = block[: block.index("\n};") + 3]
+
+    assert 'press_target_domains: ["light", "switch", "input_boolean"]' in block
 
     for group, fields in (
         ("binding_numbers", BINDING_NUMBERS),

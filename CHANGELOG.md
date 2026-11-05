@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **Button control bindings can now toggle `input_boolean` helpers** in both
+  the native config flow and the BILRESA panel (partial support for #38).
+  This does not add `input_button` press actions.
+
 ### Fixed
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
