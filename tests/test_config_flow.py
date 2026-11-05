@@ -269,7 +269,12 @@ def test_native_press_target_selectors_offer_input_boolean_helpers() -> None:
     for node_id, target_fields in (
         (
             "303",
-            (CONF_CLICK_TARGET, CONF_DOUBLE_TARGET, CONF_HOLD_TARGET, CONF_TRIPLE_TARGET),
+            (
+                CONF_CLICK_TARGET,
+                CONF_DOUBLE_TARGET,
+                CONF_HOLD_TARGET,
+                CONF_TRIPLE_TARGET,
+            ),
         ),
         ("101", (CONF_CLICK_TARGET, CONF_DOUBLE_TARGET, CONF_HOLD_TARGET)),
     ):
