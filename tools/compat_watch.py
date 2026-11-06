@@ -65,7 +65,12 @@ def parse_app_version(config_yaml: str) -> str:
 
 
 def latest() -> dict[str, str]:
-    """The newest stable release of each source."""
+    """The newest stable release of each source.
+
+    The app's version is read from the default branch of the add-ons repository,
+    which is what the Supervisor serves, so a version there is published; a
+    pre-release suffix is ignored by ``news``.
+    """
     config = _gh(
         "api",
         "repos/home-assistant/addons/contents/matter_server/config.yaml",
@@ -111,6 +116,16 @@ def news(found: dict[str, str], tested: dict[str, str]) -> dict[str, tuple[str, 
     return result
 
 
+def _signature(changed: dict[str, tuple[str, str]]) -> str:
+    """What the issue is about, hidden in its body: ticking tasks or a change of a
+    version that is not news must not make the body look different."""
+    return (
+        "<!-- news: "
+        + ";".join(f"{k}={v[1]}" for k, v in sorted(changed.items()))
+        + " -->"
+    )
+
+
 def body(found: dict[str, str], tested: dict[str, str]) -> str:
     """The text of the issue."""
     changed = news(found, tested)
@@ -144,7 +159,7 @@ def body(found: dict[str, str], tested: dict[str, str]) -> str:
         "- [ ] record the result in `docs/MATTERJS_COMPATIBILITY.md` and update "
         "`.github/compat-baseline.json` in the same pull request",
     ]
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + f"\n{_signature(changed)}\n"
 
 
 def _existing_issue() -> tuple[str, str] | None:
@@ -163,10 +178,6 @@ def _existing_issue() -> tuple[str, str] | None:
         if issue["title"] == TITLE:
             return str(issue["number"]), issue["body"]
     return None
-
-
-def _untick(text: str) -> str:
-    return re.sub(r"^- \[[xX]\]", "- [ ]", text, flags=re.M)
 
 
 def who_to_tell() -> str | None:
@@ -197,9 +208,8 @@ def main() -> int:
     elif changed:
         number, old = existing
         # An edit tells nobody; a comment does. Only when the news changed: ticking
-        # a task of the checklist is not news.
-        before = _untick(old).split("\n", 1)[-1]
-        if before != _untick(mention + text).split("\n", 1)[-1]:
+        # a task, or a version that is not news, is not news.
+        if _signature(changed) not in old:
             _gh("issue", "edit", number, "--body", mention + text)
             now = ", ".join(f"{key} {new}" for key, (_old, new) in changed.items())
             _gh(
