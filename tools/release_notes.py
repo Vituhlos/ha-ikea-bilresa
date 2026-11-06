@@ -23,7 +23,7 @@ CHANGELOG = ROOT / "CHANGELOG.md"
 
 def version_of(tag: str) -> str:
     """``v0.7.0-rc.5`` -> ``0.7.0-rc.5``."""
-    if not re.fullmatch(r"v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?", tag):
+    if not re.fullmatch(r"v\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?", tag):
         raise ValueError(f"{tag!r} is not a version tag like v1.2.3 or v1.2.3-rc.1")
     return tag[1:]
 
@@ -35,8 +35,10 @@ def section(changelog: str, version: str) -> str:
     if not found:
         raise ValueError(f"CHANGELOG.md has no section for {version}")
     rest = changelog[found.end() :]
-    following = re.search(r"^## \[|^\[[^\]]+\]: ", rest, flags=re.M)
+    following = re.search(r"^## \[", rest, flags=re.M)
     body = rest[: following.start()] if following else rest
+    # The link references at the very end of the file are not release notes.
+    body = re.sub(r"(\n\[[^\]]+\]: [^\n]*)+\s*$", "", body)
     if not body.strip():
         raise ValueError(f"the CHANGELOG.md section for {version} is empty")
     return body.strip() + "\n"
@@ -48,7 +50,12 @@ def check(tag: str) -> str:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))["version"]
     if manifest != version:
         raise ValueError(f"the tag is {version} but manifest.json says {manifest}")
-    section(CHANGELOG.read_text(encoding="utf-8"), version)
+    text = section(CHANGELOG.read_text(encoding="utf-8"), version)
+    if is_prerelease(tag) and "hardware" not in text.lower():
+        raise ValueError(
+            f"the notes of the pre-release {version} do not say which hardware "
+            "checks are pending"
+        )
     return version
 
 

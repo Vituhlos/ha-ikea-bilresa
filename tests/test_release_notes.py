@@ -24,6 +24,9 @@ CHANGELOG = """\
 
 Candidate text.
 
+### Hardware validation pending
+- Check the thing.
+
 ### Added
 - A thing.
 
@@ -35,10 +38,21 @@ Candidate text.
 """
 
 
+def _repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str, log: str
+) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"version": version}), encoding="utf-8")
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(log, encoding="utf-8")
+    monkeypatch.setattr(release_notes, "MANIFEST", manifest)
+    monkeypatch.setattr(release_notes, "CHANGELOG", changelog)
+
+
 def test_version_of_accepts_only_version_tags() -> None:
     assert release_notes.version_of("v1.2.3") == "1.2.3"
     assert release_notes.version_of("v0.7.0-rc.5") == "0.7.0-rc.5"
-    for bad in ("1.2.3", "v1.2", "release-1", "v1.2.3-"):
+    for bad in ("1.2.3", "v1.2", "release-1", "v1.2.3-", "v1.0.0-.rc", "v1.0.0-rc."):
         with pytest.raises(ValueError):
             release_notes.version_of(bad)
 
@@ -56,6 +70,19 @@ def test_last_section_stops_at_link_references() -> None:
     assert body == "- Older.\n"
 
 
+def test_a_reference_inside_the_notes_is_kept() -> None:
+    text = (
+        "## [1.0.0] - 2026-01-01\n\nSee below.\n\n[the guide]: here.\n\n"
+        "More text.\n\n[1.0.0]: https://example.invalid\n"
+    )
+
+    body = release_notes.section(text, "1.0.0")
+
+    assert "[the guide]: here." in body
+    assert "More text." in body
+    assert "example.invalid" not in body
+
+
 def test_missing_or_empty_section_is_an_error() -> None:
     with pytest.raises(ValueError, match="no section"):
         release_notes.section(CHANGELOG, "9.9.9")
@@ -71,20 +98,25 @@ def test_prerelease_is_a_tag_with_a_suffix() -> None:
 def test_check_requires_tag_manifest_and_changelog_to_agree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    manifest = tmp_path / "manifest.json"
-    manifest.write_text(json.dumps({"version": "0.6.2-rc.2"}), encoding="utf-8")
-    changelog = tmp_path / "CHANGELOG.md"
-    changelog.write_text(CHANGELOG, encoding="utf-8")
-    monkeypatch.setattr(release_notes, "MANIFEST", manifest)
-    monkeypatch.setattr(release_notes, "CHANGELOG", changelog)
+    _repo(tmp_path, monkeypatch, "0.6.2-rc.2", CHANGELOG)
 
     assert release_notes.check("v0.6.2-rc.2") == "0.6.2-rc.2"
     with pytest.raises(ValueError, match="manifest.json says"):
         release_notes.check("v0.6.1")
 
-    manifest.write_text(json.dumps({"version": "0.7.0"}), encoding="utf-8")
+    _repo(tmp_path, monkeypatch, "0.7.0", CHANGELOG)
     with pytest.raises(ValueError, match="no section"):
         release_notes.check("v0.7.0")
+
+
+def test_a_pre_release_must_say_which_hardware_checks_are_pending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log = "## [1.0.0-rc.1] - 2026-01-01\n\n- Generic text.\n"
+    _repo(tmp_path, monkeypatch, "1.0.0-rc.1", log)
+
+    with pytest.raises(ValueError, match="hardware"):
+        release_notes.check("v1.0.0-rc.1")
 
 
 def test_the_real_repository_is_consistent_with_its_own_version() -> None:

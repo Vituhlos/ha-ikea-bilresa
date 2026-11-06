@@ -3,7 +3,8 @@ name: Stale issues
 # Only an issue the maintainer labelled `needs-info` (waiting for the reporter's
 # logs, version or answer) is ever marked stale, and only after three weeks;
 # it is closed two weeks later unless someone answers. Pull requests and
-# every other issue are left alone.
+# every other issue are left alone. After a reporter answers, the maintainer
+# removes `needs-info`; the last step then removes a leftover `stale` label.
 on:
   schedule:
     - cron: "30 5 * * *"
@@ -32,3 +33,10 @@ jobs:
           close-issue-message: >-
             Closed for now because the information asked for did not arrive.
             Please reopen it, or open a new issue, when you can add it.
+      - name: Remove `stale` from issues that no longer wait for information
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue list --state open --label stale --json number,labels \
+            --jq '.[] | select(all(.labels[]; .name != "needs-info")) | .number' |
+            xargs -r -I{} gh issue edit {} --remove-label stale

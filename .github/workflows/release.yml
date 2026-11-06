@@ -1,13 +1,15 @@
 name: Release
 
-# Pushing a version tag (v1.2.3, v1.2.3-rc.1) publishes the GitHub release, with
-# the notes taken from CHANGELOG.md. A tag with a hyphen is a pre-release and is
-# never marked as the latest release. Nothing is published unless the tag, the
-# version in manifest.json and a section of CHANGELOG.md agree. If the release
-# already exists (made by hand) this does nothing.
+# Pushing a pre-release tag (v1.2.3-rc.1) publishes the GitHub pre-release, with
+# the notes taken from CHANGELOG.md, never marked as the latest release. Nothing
+# is published unless the tag, the version in manifest.json and a section of
+# CHANGELOG.md that names the pending hardware checks agree. A stable tag is
+# deliberately not handled here: a stable release is made by hand after the
+# validation recorded in PROJECT_STATUS.md. If the release already exists this
+# does nothing.
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*-*"]
 
 permissions:
   contents: write
@@ -33,7 +35,8 @@ jobs:
           fi
           python tools/release_notes.py notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
           flags=""
-          if [ "$(python tools/release_notes.py prerelease "$GITHUB_REF_NAME")" = "true" ]; then
+          prerelease=$(python tools/release_notes.py prerelease "$GITHUB_REF_NAME")
+          if [ "$prerelease" = "true" ]; then
             flags="--prerelease --latest=false"
           fi
           gh release create "$GITHUB_REF_NAME" --verify-tag \
