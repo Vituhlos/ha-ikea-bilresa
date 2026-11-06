@@ -1019,3 +1019,47 @@ def test_the_ledger_says_a_gesture_runs_actions_though_it_has_no_target(
     assert labels["double_press"] == "Run actions"
     assert labels["hold"] == "Run actions"
     assert labels["triple_press"] == "No action"
+
+
+def _lights_channel(monkeypatch, hass) -> dict:
+    """Return the summary of one channel dimming three lights together."""
+    _patch(monkeypatch, device=SimpleNamespace(id="d", name_by_user="A", area_id=None))
+    entry = _entry(
+        [_wheel(NODE_A)],
+        [
+            _subentry(
+                NODE_A,
+                1,
+                **{
+                    CONF_MODE: MODE_BRIGHTNESS,
+                    CONF_TARGET: ["light.a", "light.b", "light.c"],
+                },
+            )
+        ],
+    )
+    return async_overview_snapshot(hass, entry)["wheels"][0]["channels"][0]
+
+
+def test_a_multi_light_channel_counts_its_lights(monkeypatch) -> None:
+    hass = _hass(
+        {
+            "light.a": _state("on", "A"),
+            "light.b": _state("on", "B"),
+            "light.c": _state("off", "C"),
+        }
+    )
+
+    channel = _lights_channel(monkeypatch, hass)
+
+    assert channel["target_label"] == "3 targets"
+    assert channel["target_state"] == "ok"
+    assert channel["actions"][0]["target_label"] == "3 targets"
+
+
+def test_a_multi_light_channel_names_the_light_that_is_gone(monkeypatch) -> None:
+    hass = _hass({"light.a": _state("on", "A"), "light.c": _state("on", "C")})
+
+    channel = _lights_channel(monkeypatch, hass)
+
+    assert channel["target_state"] == "missing"
+    assert channel["target_label"] == "light.b"

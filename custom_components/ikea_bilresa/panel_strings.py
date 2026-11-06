@@ -162,6 +162,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_editor_button_title": "Edit button {button} binding",
         "field_mode": "Mode",
         "field_target": "Target",
+        "field_target_help": (
+            "Choose several lights to dim them together. They all follow one "
+            "brightness, set by the wheel."
+        ),
         "field_step": "Target change per notch",
         "field_step_help": "How far one notch moves the target.",
         "field_acceleration": "Rotation acceleration",
@@ -312,6 +316,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "validation_mode_target_mismatch": (
             "The selected rotation mode cannot control this entity."
+        ),
+        "validation_multiple_targets_require_light_mode": (
+            "Several targets work only for lights in a dimming, colour "
+            "temperature or colour mode."
         ),
         "validation_maximum_must_exceed_minimum": (
             "Maximum brightness must be greater than minimum brightness."
@@ -664,6 +672,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "binding_editor_button_title": "Upravit propojení tlačítka {button}",
         "field_mode": "Režim",
         "field_target": "Cíl",
+        "field_target_help": (
+            "Vyberte více světel a stmívejte je společně. Všechna drží jeden "
+            "jas, který nastavuje kolečko."
+        ),
         "field_step": "Změna cíle na jedno cvaknutí",
         "field_step_help": "O kolik jedno cvaknutí posune cíl.",
         "field_acceleration": "Zrychlení otáčení",
@@ -818,6 +830,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "validation_mode_target_mismatch": (
             "Vybraný režim otáčení nemůže ovládat tuto entitu."
+        ),
+        "validation_multiple_targets_require_light_mode": (
+            "Více cílů lze použít jen pro světla v režimu stmívání, teploty "
+            "bílé nebo barvy."
         ),
         "validation_maximum_must_exceed_minimum": (
             "Maximální jas musí být vyšší než minimální jas."

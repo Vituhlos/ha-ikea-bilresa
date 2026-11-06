@@ -41,6 +41,7 @@ def test_household_identifiers_are_redacted() -> None:
         CONF_DOUBLE_SEQUENCE,
         CONF_TRIPLE_SEQUENCE,
         CONF_HOLD_SEQUENCE,
+        "targets",
         "serial",
         "compressed_fabric_id",
         "name",

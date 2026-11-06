@@ -110,6 +110,14 @@ Repeat on all three channels:
       there are no stale-level brightness jumps and no steppy dimming. Record
       exact versions and observations; keep Issue #9 open until the reporter
       confirms the result.
+- [ ] **Multi-light binding:** bind one channel to 3–4 individual bulbs
+      (not a group entity) in brightness mode, step 3, transition 0.8. Scroll
+      slow and fast in both directions, pause more than 3 s between gestures,
+      and confirm every bulb follows one level with no jump to a lagging
+      bulb's level. Change one bulb from its own app and confirm the next
+      scroll re-reads the lights. Unplug one bulb, keep scrolling, plug it
+      back in and confirm it rejoins at the next command without moving the
+      others. Check short press with no separate target on a mixed on/off set.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.

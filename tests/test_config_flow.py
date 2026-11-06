@@ -799,3 +799,58 @@ def test_choosing_run_in_the_native_form_without_actions_is_refused() -> None:
             CONF_DOUBLE_ACTION: "run",
         }
     ) == {CONF_DOUBLE_ACTION: "actions_required"}
+
+
+def _wheel_input(**overrides) -> dict:
+    return {
+        CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_MULTI_PRESS,
+        CONF_MODE: MODE_BRIGHTNESS,
+        **overrides,
+    }
+
+
+def test_several_lights_are_one_brightness_binding() -> None:
+    normalized, errors = BindingSubentryFlowHandler._normalize_and_validate(
+        _wheel_input(**{CONF_TARGET: ["light.a", "light.b", "light.a"]})
+    )
+
+    assert errors == {}
+    assert normalized is not None
+    # Duplicates dropped, order kept.
+    assert normalized[CONF_TARGET] == ["light.a", "light.b"]
+
+
+def test_a_single_picked_light_is_stored_as_the_historic_string() -> None:
+    """The entity picker returns a list; one light must save as before."""
+    normalized, errors = BindingSubentryFlowHandler._normalize_and_validate(
+        _wheel_input(**{CONF_TARGET: ["light.a"]})
+    )
+
+    assert errors == {}
+    assert normalized is not None
+    assert normalized[CONF_TARGET] == "light.a"
+
+
+def test_an_empty_target_list_is_rejected() -> None:
+    _normalized, errors = BindingSubentryFlowHandler._normalize_and_validate(
+        _wheel_input(**{CONF_TARGET: []})
+    )
+
+    assert CONF_TARGET in errors
+
+
+def test_several_targets_need_a_light_mode() -> None:
+    assert BindingSubentryFlowHandler._validate_binding(
+        _wheel_input(
+            **{
+                CONF_MODE: MODE_VOLUME,
+                CONF_TARGET: ["media_player.a", "media_player.b"],
+            }
+        )
+    ) == {CONF_TARGET: "multiple_targets_require_light_mode"}
+
+
+def test_every_one_of_several_targets_must_be_a_light() -> None:
+    assert BindingSubentryFlowHandler._validate_binding(
+        _wheel_input(**{CONF_TARGET: ["light.a", "cover.b"]})
+    ) == {CONF_TARGET: "mode_target_mismatch"}

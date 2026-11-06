@@ -87,6 +87,7 @@ from .const import (
     SUBENTRY_BINDING,
     TARGET_ACTIONS,
     TARGET_DOMAINS,
+    binding_targets,
 )
 from .device_link import resolve_matter_device
 from .gesture_verbs import default_verb
@@ -545,10 +546,17 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
+                # Several entities for a multi-light binding; validation
+                # allows more than one only for lights in a light mode, and
+                # stores a single pick as the historic plain string.
                 vol.Required(
-                    CONF_TARGET, default=defaults.get(CONF_TARGET)
+                    CONF_TARGET,
+                    default=binding_targets(defaults.get(CONF_TARGET)) or None,
                 ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=TARGET_DOMAINS)
+                    selector.EntitySelectorConfig(
+                        domain=TARGET_DOMAINS,
+                        multiple=True,
+                    )
                 ),
                 vol.Required(
                     CONF_MODE, default=defaults.get(CONF_MODE, DEFAULT_MODE)

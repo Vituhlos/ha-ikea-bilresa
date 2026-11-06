@@ -65,6 +65,7 @@ def test_the_panel_schema_is_plain_json_and_covers_every_mode() -> None:
     assert "play_pause" in schema["gesture_verbs"]["media_player"]
     assert "unlock" not in schema["gesture_verbs"]["lock"]
     assert schema["ramp_target_domains"] == ["light"]
+    assert schema["multi_target_modes"] == ["brightness", "color_temp", "color"]
 
 
 def test_the_frontend_fallback_matches_the_server_schema() -> None:
