@@ -1,0 +1,28 @@
+name: Compatibility watch
+
+# Once a week: is there a newer Home Assistant, Matter Server app or
+# matterjs-server than the ones the integration was last checked against?
+# If so, one issue says so and lists what to check. It only reports.
+on:
+  schedule:
+    - cron: "40 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: Compare the newest releases with the tested ones
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: python tools/compat_watch.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Assigned and mentioned, so GitHub notifies the owner.
+          COMPAT_NOTIFY: ${{ github.repository_owner }}

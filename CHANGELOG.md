@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   could not be the target of a gesture until now. Addresses GitHub #17.
 
 ### Documentation
+- **A weekly compatibility watch** (`tools/compat_watch.py`, workflow `compat-watch.yml`,
+  `.github/compat-baseline.json`): one issue, "Compatibility watch", is kept open
+  while Home Assistant Core, the Matter Server app or matterjs-server has a newer
+  stable release than the one last checked, with a checklist. It only reports.
 - **Two developer tools** (`tools/check.py`, `tools/pr_watch.py`) and a "Working
   method" section in `AGENTS.md`: all local gates in one command with one line
   each, and a pull request's checks and review comments in one command.
