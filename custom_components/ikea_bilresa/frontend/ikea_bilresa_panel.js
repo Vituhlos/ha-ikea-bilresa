@@ -1079,6 +1079,26 @@ const STYLES = `
     font-size: var(--ha-font-size-m, 14px);
     font-weight: var(--ha-font-weight-medium, 500);
   }
+  [data-actions] ha-selector { display: block; }
+  .actions-form { display: grid; gap: 12px; }
+  .actions-row {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--divider-color, #ddd);
+    border-radius: 8px;
+  }
+  .actions-fields { display: grid; gap: 8px; }
+  .actions-form input,
+  .actions-form textarea {
+    box-sizing: border-box;
+    inline-size: 100%;
+    font: inherit;
+  }
+  .actions-form textarea {
+    min-block-size: 72px;
+    font-family: var(--code-font-family, monospace);
+  }
   .field ha-selector { display: block; }
   /* Matches the label Home Assistant's entity picker and slider draw above
      their box: same type, same 8 px to the box (4 px here plus the gap). */
@@ -1583,11 +1603,92 @@ const ROTATION_MORE_FIELDS = [
 // scene can only be run, a script is run, stopped or toggled, anything else
 // is toggled, turned on or turned off.
 const GESTURE_FIELDS = {
-  click: { action: "click_action", target: "click_target" },
-  double_press: { action: "double_press_action", target: "double_press_target" },
-  triple_press: { action: "triple_press_action", target: "triple_press_target" },
-  hold: { action: "hold_target_action", target: "hold_target" },
+  click: { action: "click_action", target: "click_target", sequence: "click_sequence" },
+  double_press: {
+    action: "double_press_action",
+    target: "double_press_target",
+    sequence: "double_press_sequence",
+  },
+  triple_press: {
+    action: "triple_press_action",
+    target: "triple_press_target",
+    sequence: "triple_press_sequence",
+  },
+  hold: { action: "hold_target_action", target: "hold_target", sequence: "hold_sequence" },
 };
+
+// Home Assistant's own action editor, the one an automation uses, is a custom
+// element that only exists once the frontend has loaded the automation editor.
+// The frontend offers no documented way to ask for it, so this drives the same
+// route loaders it uses itself (private: they may change with a release), with a
+// time limit at every step, and says whether the editor is there. The panel
+// works without it: see _actionsForm. Loaded once, only when someone opens an
+// editor of actions, never on opening the panel.
+const ACTION_EDITOR_TIMEOUT_MS = 8000;
+let actionEditorLoad;
+
+const loadActionEditor = (hass) => {
+  actionEditorLoad ??= (async () => {
+    const within = (promise) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), ACTION_EDITOR_TIMEOUT_MS),
+        ),
+      ]);
+    try {
+      if (!customElements.get("ha-selector")) {
+        await within(customElements.whenDefined("partial-panel-resolver"));
+        const resolver = document.createElement("partial-panel-resolver");
+        const tmp = resolver._getRoutes?.([
+          { url_path: "tmp", component_name: "config" },
+        ])?.routes?.tmp;
+        await within(tmp.load());
+        await within(customElements.whenDefined("ha-panel-config"));
+        const config = document.createElement("ha-panel-config");
+        await within(config.routerOptions.routes.automation.load());
+      }
+      if (!customElements.get("ha-selector")) {
+        actionEditorLoad = undefined;
+        return false;
+      }
+      // Labels of services, targets and selectors come from these.
+      // Labels only: if they stall, the editor still works.
+      await within(
+        Promise.allSettled([
+          hass?.loadBackendTranslation?.("services"),
+          hass?.loadBackendTranslation?.("selector"),
+          hass?.loadBackendTranslation?.("entity_component"),
+          hass?.loadFragmentTranslation?.("config"),
+        ]),
+      ).catch(() => undefined);
+      return true;
+    } catch (err) {
+      console.warn("ikea_bilresa: the action editor of Home Assistant is not available", err);
+      // Not remembered: a slow start should not cost the editor until the page
+      // is reloaded. The next time an editor of actions is opened it asks again.
+      actionEditorLoad = undefined;
+      return false;
+    }
+  })();
+  return actionEditorLoad;
+};
+
+// An action the simple list can show and write back unchanged.
+const SIMPLE_ACTION_KEYS = ["action", "service", "target", "data", "alias", "enabled", "continue_on_error"];
+// Entity ids written out, not a template that happens to contain commas.
+const plainEntityIds = (value) =>
+  value === undefined ||
+  [].concat(value).every((id) => typeof id === "string" && !id.includes("{"));
+const isPlainObject = (value) =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+const isSimpleAction = (item) =>
+  isPlainObject(item) &&
+  typeof (item.action ?? item.service) === "string" &&
+  (item.target === undefined ||
+    (isPlainObject(item.target) && plainEntityIds(item.target.entity_id))) &&
+  (item.data === undefined || isPlainObject(item.data)) &&
+  Object.keys(item).every((key) => SIMPLE_ACTION_KEYS.includes(key));
 
 const domainOf = (entityId) => String(entityId || "").split(".", 1)[0];
 
@@ -1602,7 +1703,7 @@ const OPENING_COVERS = ["garage", "gate", "door"];
 
 // A scene has no toggle and no off: both read as "run".
 const actionFor = (kind, action) =>
-  kind === "scene" && action !== "none" ? "on" : action;
+  kind === "scene" && !["none", "run"].includes(action) ? "on" : action;
 
 const DISCARD_DOUBLE_CLICK_MS = 500;
 const DISCARD_ARMED_MS = 4000;
@@ -1689,6 +1790,15 @@ const el = (tag, cls, text) => {
 };
 
 class IkeaBilresaPanel extends HTMLElement {
+  // The loader is memoised for the life of the page; a test needs to ask again.
+  static _loadActionEditor(hass) {
+    return loadActionEditor(hass);
+  }
+
+  static _forgetActionEditor() {
+    actionEditorLoad = undefined;
+  }
+
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -2390,6 +2500,9 @@ class IkeaBilresaPanel extends HTMLElement {
       ...(data || {}),
     };
     if (!isButton) this._editorData.scenes = [...(data?.scenes || [])];
+    this._actionNodes = {};
+    this._refusedText = new Map();
+    if (this._actionEditor === "form") this._actionEditor = undefined;
     this._editorChoices = {
       click_action: this._editorData.scenes?.length
         ? "scenes"
@@ -2414,7 +2527,7 @@ class IkeaBilresaPanel extends HTMLElement {
       const shortTarget = this._editorData.click_target || this._editorData.target;
       if (
         shortTarget &&
-        this._editorChoices.click_action !== "none" &&
+        !["none", "run"].includes(this._editorChoices.click_action) &&
         !this._verbsFor(shortTarget).includes(this._editorChoices.click_action)
       ) {
         this._editorChoices.click_action = "none";
@@ -2436,6 +2549,7 @@ class IkeaBilresaPanel extends HTMLElement {
   _storedAction(press) {
     const { action, target } = GESTURE_FIELDS[press];
     const entity = this._editorData[target];
+    if (this._editorData[action] === "run") return "run";
     if (!entity) return "none";
     const stored = actionFor(
       targetKind(entity),
@@ -2446,7 +2560,11 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _editorSnapshot() {
-    return JSON.stringify({ data: this._editorData, choices: this._editorChoices });
+    return JSON.stringify({
+      data: this._editorData,
+      choices: this._editorChoices,
+      refused: [...(this._refusedText ?? [])],
+    });
   }
 
   _editorDirty() {
@@ -2541,12 +2659,32 @@ class IkeaBilresaPanel extends HTMLElement {
     if (choices.click_action === "scenes" && !data.scenes?.length) {
       errors.scenes = "scenes_required";
     }
-    const enabled = (press) => choices[press] && choices[press] !== "none";
+    const enabled = (press) =>
+      choices[press] && choices[press] !== "none" && choices[press] !== "run";
     if (enabled("double_press") && !data.double_press_target) {
       errors.double_press_target = "target_required";
     }
     if (enabled("triple_press") && !data.triple_press_target) {
       errors.triple_press_target = "target_required";
+    }
+    // A gesture set to run needs something to run.
+    for (const [choice, key, field] of [
+      [choices.click_action, "click_sequence", "click_action"],
+      [choices.double_press, "double_press_sequence", "double_press_action"],
+      [choices.triple_press, "triple_press_sequence", "triple_press_action"],
+      [data.hold_action, "hold_sequence", "hold_action"],
+    ]) {
+      if (choice !== "run") continue;
+      const actions = data[key] || [];
+      const refused = [...(this._refusedText?.keys() ?? [])].some((k) =>
+        k.startsWith(`${key}|`),
+      );
+      if (refused) errors[field] = "actions_invalid";
+      else if (!actions.length) errors[field] = "actions_required";
+      // A row added and not yet given an action.
+      else if (actions.some((item) => isSimpleAction(item) && !(item.action ?? item.service))) {
+        errors[field] = "actions_incomplete";
+      }
     }
     return errors;
   }
@@ -2559,10 +2697,14 @@ class IkeaBilresaPanel extends HTMLElement {
     if (name === "click_action") {
       this._editorChanged("scenes");
       // Neither choice shows the target picker, so the target goes with it.
-      if (next === "scenes" || next === "none") {
+      if (["scenes", "none", "run"].includes(next)) {
         delete this._editorData.click_target;
       }
-      if (next === "scenes") return;
+      if (next === "scenes") {
+        // Cycling scenes replaces the short press, which then cannot run actions.
+        if (this._editorData.click_action === "run") this._editorData.click_action = "toggle";
+        return;
+      }
       this._editorData.click_action = next;
       if (this._editorData.scenes) this._editorData.scenes = [];
     } else {
@@ -2572,6 +2714,7 @@ class IkeaBilresaPanel extends HTMLElement {
         delete this._editorData[`${name}_action`];
       } else {
         this._editorData[`${name}_action`] = next;
+        if (next === "run") delete this._editorData[`${name}_target`];
       }
     }
   }
@@ -2591,11 +2734,12 @@ class IkeaBilresaPanel extends HTMLElement {
     return this._t(kind === "other" ? `click_${verb}` : `click_${kind}_${verb}`);
   }
 
-  _actionOptions(target, { scenes = false, none = true } = {}) {
+  _actionOptions(target, { scenes = false, none = true, run = true } = {}) {
     const options = this._verbsFor(target).map((action) => ({
       value: action,
       label: this._verbLabel(target, action),
     }));
+    if (run) options.push({ value: "run", label: this._t("click_run") });
     if (scenes) options.push({ value: "scenes", label: this._t("click_scenes") });
     if (none) options.push({ value: "none", label: this._t("click_none") });
     return options;
@@ -2747,6 +2891,326 @@ class IkeaBilresaPanel extends HTMLElement {
   _field(wide) {
     const wrap = el("div", "field");
     if (wide) wrap.dataset.wide = "true";
+    return wrap;
+  }
+
+  // -- the actions a gesture runs ---------------------------------------------
+  // Written the way an automation writes its actions and stored as that list.
+  // Home Assistant's own editor is used when it can be loaded; otherwise a
+  // simple list and a JSON box edit the very same data.
+
+  _sequenceOf(field) {
+    const value = this._editorData[field];
+    return Array.isArray(value) ? value : [];
+  }
+
+  // Text in a box of the simple list that was refused. The list it was meant to
+  // replace is still in the draft, so saving would quietly keep the old one:
+  // the text is kept and put back whenever the form is drawn, until it is
+  // corrected, and saving is refused meanwhile.
+  _refuse(key, text) {
+    (this._refusedText ??= new Map()).set(key, text);
+  }
+
+  _shiftRefused(field, removed) {
+    const prefix = `${field}|data|`;
+    const kept = [...(this._refusedText ?? [])].filter(([key]) => !key.startsWith(prefix));
+    const moved = [...(this._refusedText ?? [])]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, text]) => [Number(key.slice(prefix.length)), text])
+      .filter(([at]) => at !== removed)
+      .map(([at, text]) => [`${prefix}${at > removed ? at - 1 : at}`, text]);
+    this._refusedText = new Map([...kept, ...moved]);
+  }
+
+  // Draws again a moment later, after a click that may be on its way.
+  _renderLater() {
+    clearTimeout(this._renderLaterTimer);
+    this._renderLaterTimer = setTimeout(() => {
+      // Someone already moved into another box: drawing now would take the text
+      // typed there. The form draws when the focus leaves it.
+      if (this._editingChannel !== null && this._formHasFocus()) {
+        this._renderDeferred = true;
+      } else {
+        this._render();
+      }
+    }, 300);
+  }
+
+  _clearRefused(prefix) {
+    for (const key of [...(this._refusedText?.keys() ?? [])]) {
+      if (key.startsWith(prefix)) this._refusedText.delete(key);
+    }
+  }
+
+  _setSequence(field, actionField, value) {
+    // The editor of Home Assistant may answer after this one was closed.
+    if (!this._editorData) return;
+    // The server's verdict on the old list says nothing about the new one.
+    this._editorChanged(field);
+    // A copy: the editors change what they are given, and the data must only
+    // change through here.
+    this._editorData[field] = Array.isArray(value) ? JSON.parse(JSON.stringify(value)) : [];
+    this._editorChanged(actionField);
+  }
+
+  // Starts loading Home Assistant's editor the first time someone needs it.
+  _ensureActionEditor() {
+    if (this._actionEditor) return;
+    this._actionEditor = "loading";
+    loadActionEditor(this._hass).then((loaded) => {
+      this._actionEditor = loaded ? "ha" : "form";
+      if (this._editingChannel !== null && this._formHasFocus()) {
+        this._renderDeferred = true;
+      } else {
+        this._render();
+      }
+    });
+  }
+
+  _actionsEditor(field, actionField) {
+    const wrap = this._field(true);
+    wrap.dataset.actions = "true";
+    wrap.appendChild(el("span", "selector-label", this._t("actions_label")));
+    wrap.appendChild(el("p", "field-help", this._t("actions_help")));
+    this._ensureActionEditor();
+    let node = null;
+    if (this._actionEditor === "ha") {
+      // One editor per field, kept while the form is drawn again: Home Assistant's
+      // "add an action" dialog lives outside this panel, and an answer from it
+      // must find the editor it came from.
+      this._actionNodes ??= {};
+      node = this._actionNodes[field];
+      if (!node) {
+        node = this._haSelector({
+          id: this._fieldId(field),
+          selector: { action: {} },
+          // The editor changes what it is given in place: it gets a copy. No
+          // re-render on a change, or the editor would be rebuilt under the
+          // person's hands.
+          value: JSON.parse(JSON.stringify(this._sequenceOf(field))),
+          required: false,
+          onChange: (next) => this._setSequence(field, actionField, next),
+        });
+        if (node) this._actionNodes[field] = node;
+      }
+    }
+    if (node) {
+      wrap.appendChild(node);
+    } else if (this._actionEditor === "loading") {
+      wrap.appendChild(el("p", "field-help", this._t("actions_loading")));
+    } else {
+      wrap.appendChild(el("p", "field-help", this._t("actions_fallback")));
+      wrap.appendChild(this._actionsForm(field, actionField));
+    }
+    // What the server refused about the list is said under the editor.
+    this._fieldErrorNode(wrap, field, null);
+    return wrap;
+  }
+
+  _serviceNames(current) {
+    const names = Object.entries(this._hass?.services || {})
+      .flatMap(([domain, services]) =>
+        Object.keys(services).map((service) => `${domain}.${service}`),
+      )
+      .sort();
+    if (current && !names.includes(current)) names.unshift(current);
+    return names;
+  }
+
+  _actionsForm(field, actionField) {
+    const box = el("div", "actions-form");
+    const items = this._sequenceOf(field);
+    // What the rows show is stale once the JSON box replaced the list: a click
+    // on a row then only shows the real list and the person clicks again.
+    let stale = false;
+    // Everything below changes the list as it is now, never the list as it was
+    // when this was drawn. A click on a button redraws at once. A change made by
+    // leaving a box does not redraw at all (the box already shows it), and the
+    // JSON box redraws a little later: leaving a box may be a click on Save, and
+    // a redraw before that click arrives would take the button away.
+    const commit = (next, { replace = false, removed = null, redraw = true } = {}) => {
+      if (!replace && stale) {
+        this._render();
+        return;
+      }
+      if (replace) {
+        this._clearRefused(`${field}|`);
+        stale = true;
+      }
+      if (removed !== null) this._shiftRefused(field, removed);
+      this._setSequence(field, actionField, next);
+      if (!redraw) return;
+      if (replace) this._renderLater();
+      else this._render();
+    };
+    if (!items.length) box.appendChild(el("p", "field-help", this._t("actions_empty")));
+    items.forEach((item, index) => {
+      const row = el("div", "actions-row");
+      if (isSimpleAction(item)) {
+        row.appendChild(
+          this._actionRow(
+            field,
+            item,
+            index,
+            (changed) =>
+              commit(
+                this._sequenceOf(field).map((other, at) =>
+                  at === index ? changed : other,
+                ),
+                { redraw: false },
+              ),
+          ),
+        );
+      } else {
+        row.appendChild(
+          el(
+            "p",
+            "field-help",
+            `${this._t("actions_complex")} ${JSON.stringify(item).slice(0, 160)}`,
+          ),
+        );
+      }
+      const remove = el("button", "action-button", this._t("actions_remove"));
+      remove.type = "button";
+      remove.addEventListener("click", () =>
+        commit(
+          this._sequenceOf(field).filter((_, at) => at !== index),
+          { removed: index },
+        ),
+      );
+      row.appendChild(remove);
+      box.appendChild(row);
+    });
+    const add = el("button", "action-button", this._t("actions_add"));
+    add.type = "button";
+    add.addEventListener("click", () =>
+      commit([...this._sequenceOf(field), { action: "" }]),
+    );
+    box.appendChild(add);
+    box.appendChild(this._actionsJson(field, items, commit));
+    return box;
+  }
+
+  // One plain action: which service, on which entities, with what data.
+  _actionRow(field, drawnItem, index, change) {
+    const fields = el("div", "actions-fields");
+    // The row as it is now: an edit made in another box of the row before the
+    // form was drawn again is part of it.
+    const current = () => this._sequenceOf(field)[index] ?? drawnItem;
+    const item = drawnItem;
+    const id = `${this._fieldId(field)}-${index}`;
+    const key = "action" in item ? "action" : "service";
+
+    const pick = el("div", "field");
+    this._nativeSelect(
+      pick,
+      `${id}-service`,
+      this._t("actions_service"),
+      undefined,
+      this._serviceNames(item[key]).map((name) => ({ value: name, label: name })),
+      {
+        value: item[key],
+        emptyLabel: this._t("actions_choose"),
+        onChange: (next) => change({ ...current(), [key]: next }),
+      },
+    );
+    fields.appendChild(pick);
+
+    const target = el("div", "field");
+    const targetLabel = el("label", null, this._t("actions_target_ids"));
+    targetLabel.htmlFor = `${id}-target`;
+    const targetInput = el("input");
+    targetInput.id = `${id}-target`;
+    targetInput.type = "text";
+    targetInput.value = [].concat(item.target?.entity_id ?? []).join(", ");
+    targetInput.addEventListener("change", () => {
+      const ids = targetInput.value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      // Areas, devices and labels in the target are kept as they are.
+      const base = current();
+      const next = { ...base };
+      const kept = { ...(base.target || {}) };
+      if (ids.length) kept.entity_id = ids;
+      else delete kept.entity_id;
+      if (Object.keys(kept).length) next.target = kept;
+      else delete next.target;
+      change(next);
+    });
+    target.append(targetLabel, targetInput);
+    fields.appendChild(target);
+
+    const data = el("div", "field");
+    const dataLabel = el("label", null, this._t("actions_data"));
+    dataLabel.htmlFor = `${id}-data`;
+    const dataKey = `${field}|data|${index}`;
+    const refusedData = this._refusedText?.get(dataKey);
+    const dataNote = el("span", "field-error", this._t("actions_json_invalid"));
+    dataNote.hidden = refusedData === undefined;
+    const dataInput = el("textarea");
+    dataInput.id = `${id}-data`;
+    dataInput.value =
+      refusedData ?? (item.data ? JSON.stringify(item.data, null, 2) : "");
+    if (refusedData !== undefined) dataInput.setAttribute("aria-invalid", "true");
+    dataInput.addEventListener("change", () => {
+      const text = dataInput.value.trim();
+      let parsed;
+      try {
+        parsed = text ? JSON.parse(text) : undefined;
+        if (
+          parsed !== undefined &&
+          (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+        ) {
+          throw new Error("not an object");
+        }
+      } catch {
+        dataInput.setAttribute("aria-invalid", "true");
+        dataNote.hidden = false;
+        this._refuse(dataKey, dataInput.value);
+        return;
+      }
+      this._refusedText?.delete(dataKey);
+      const next = { ...current() };
+      if (parsed && Object.keys(parsed).length) next.data = parsed;
+      else delete next.data;
+      change(next);
+    });
+    data.append(dataLabel, dataInput, dataNote);
+    fields.appendChild(data);
+    return fields;
+  }
+
+  // The whole list as JSON: the way to write what the simple list cannot (a
+  // delay, a condition, a choice), and to paste actions from an automation.
+  _actionsJson(field, items, commit) {
+    const wrap = el("div", "field");
+    const id = `${this._fieldId(field)}-json`;
+    const label = el("label", null, this._t("actions_json"));
+    label.htmlFor = id;
+    const jsonKey = `${field}|json`;
+    const refusedJson = this._refusedText?.get(jsonKey);
+    const note = el("span", "field-error", this._t("actions_json_invalid"));
+    note.hidden = refusedJson === undefined;
+    const input = el("textarea");
+    input.id = id;
+    input.value = refusedJson ?? JSON.stringify(items, null, 2);
+    if (refusedJson !== undefined) input.setAttribute("aria-invalid", "true");
+    input.addEventListener("change", () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(input.value.trim() || "[]");
+        if (!Array.isArray(parsed)) throw new Error("not a list");
+      } catch {
+        input.setAttribute("aria-invalid", "true");
+        note.hidden = false;
+        this._refuse(jsonKey, input.value);
+        return;
+      }
+      commit(parsed, { replace: true });
+    });
+    wrap.append(label, input, note);
     return wrap;
   }
 
@@ -3327,6 +3791,8 @@ class IkeaBilresaPanel extends HTMLElement {
     const clickChoice = this._editorChoices.click_action;
     if (clickChoice === "scenes") {
       shortPress.appendChild(this._scenesField());
+    } else if (clickChoice === "run") {
+      shortPress.appendChild(this._actionsEditor("click_sequence", "click_action"));
     } else if (clickChoice !== "none") {
       shortPress.appendChild(
         this._entityField(
@@ -3397,7 +3863,11 @@ class IkeaBilresaPanel extends HTMLElement {
           },
         ),
       );
-      if (this._editorChoices[press] !== "none") {
+      if (this._editorChoices[press] === "run") {
+        card.appendChild(
+          this._actionsEditor(`${press}_sequence`, `${press}_action`),
+        );
+      } else if (this._editorChoices[press] !== "none") {
         card.appendChild(
           this._entityField(
             `${press}_target`,
@@ -3510,7 +3980,7 @@ class IkeaBilresaPanel extends HTMLElement {
       this._selectField(
         "hold_action",
         this._t("gesture_action"),
-        ["toggle", "ramp", "none"].map((action) => ({
+        ["toggle", "ramp", "run", "none"].map((action) => ({
           value: action,
           label: this._t(`hold_${action}`),
         })),
@@ -3519,7 +3989,9 @@ class IkeaBilresaPanel extends HTMLElement {
     // A wheel ramps its rotation target, whatever the hold target says; only
     // a dual button, which has no rotation, ramps the hold target.
     const holdAction = this._editorData.hold_action;
-    if (holdAction !== "none" && (isButton || holdAction !== "ramp")) {
+    if (holdAction === "run") {
+      hold.appendChild(this._actionsEditor("hold_sequence", "hold_action"));
+    } else if (holdAction !== "none" && (isButton || holdAction !== "ramp")) {
       hold.appendChild(
         this._entityField(
           "hold_target",
@@ -3540,7 +4012,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._selectField(
           "hold_target_action",
           this._t("gesture_hold_effect"),
-          this._actionOptions(this._editorData.hold_target, { none: false }),
+          this._actionOptions(this._editorData.hold_target, { none: false, run: false }),
           {
             // A hold with no target yet still shows what it will do.
             value: this._editorData.hold_target_action || "toggle",

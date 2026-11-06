@@ -8,9 +8,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Added
-- **A gesture can run a Home Assistant action sequence** (stored, validated and
-  run; the editor in the panel follows in the next change, so there is no way to
-  set one in the panel yet). A short press, double press, triple press or hold set
+- **A gesture can run Home Assistant actions, set in the panel.** *Run actions*
+  is a choice for a short press, double press, triple press and hold. The panel
+  shows Home Assistant's own action editor (the one automations use) when it can
+  load it, the first time one is opened, and otherwise a simple list (an action, its
+  entities, its data as JSON, and the whole list as JSON) that edits the same
+  data. A gesture set to run with no actions cannot be saved. See the bindings
+  guide. Below is how they run. A short press, double press, triple press or hold set
   to *Run actions* runs a list of actions written the way an automation writes
   them. They are checked with Home Assistant's own schema when the binding is
   saved (a mistake is refused with a field error) and again when they are built,
