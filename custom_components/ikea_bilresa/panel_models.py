@@ -68,6 +68,7 @@ from .const import (
     ROLE_BUTTON,
     SUBENTRY_BINDING,
     SUBENTRY_WHEEL,
+    binding_targets,
 )
 from .device_link import WheelAvailability, resolve_matter_device, wheel_availability
 from .model import BilresaWheel
@@ -254,6 +255,31 @@ def _worst_target_state(states: Iterable[str]) -> str:
     return max(states, key=_TARGET_SEVERITY.index, default=TARGET_OK)
 
 
+def _targets_state(hass: HomeAssistant, value: Any) -> str:
+    """The worst state among one target or the lights of a multi-light binding."""
+    return _worst_target_state(
+        _target_state(hass, entity_id) for entity_id in binding_targets(value)
+    )
+
+
+def _targets_label(hass: HomeAssistant, value: Any, language: str | None) -> str | None:
+    """Name one target, or count several while naming one that is in trouble.
+
+    A multi-light binding reads as "3 targets" while every light is fine. When
+    one of them is missing or unavailable, the label names that light, so the
+    warning the panel appends to it points at the light that needs attention.
+    """
+    targets = binding_targets(value)
+    if len(targets) <= 1:
+        return _entity_label(hass, targets[0] if targets else None)
+    states = {entity_id: _target_state(hass, entity_id) for entity_id in targets}
+    worst = _worst_target_state(states.values())
+    if worst != TARGET_OK:
+        culprit = next(e for e, state in states.items() if state == worst)
+        return _entity_label(hass, culprit)
+    return localize(language, "multiple_targets", count=len(targets))
+
+
 def _as_int(value: Any) -> int | None:
     """Coerce a stored selector value to int, or None if it is not one.
 
@@ -399,15 +425,15 @@ def _gesture_summary(
     language: str | None,
     gesture: str,
     action_key: str,
-    target: str | None = None,
+    target: str | list[str] | None = None,
 ) -> GestureSummary:
     """Build one localized read-only gesture row."""
-    state = _target_state(hass, target)
+    state = _targets_state(hass, target)
     return GestureSummary(
         gesture=gesture,
         gesture_label=localize(language, f"binding_gesture_{gesture}"),
         action_label=localize(language, action_key),
-        target_label=_entity_label(hass, target),
+        target_label=_targets_label(hass, target, language),
         target_state=state,
         target_missing=state == TARGET_MISSING,
     )
@@ -627,8 +653,8 @@ def _channel_summaries(
         actions = _wheel_gesture_summaries(hass, data, language)
         state = _worst_target_state(
             [
-                _target_state(hass, target),
-                _target_state(hass, click_target),
+                _targets_state(hass, target),
+                _targets_state(hass, click_target),
                 *(action.target_state for action in actions),
             ]
         )
@@ -640,7 +666,7 @@ def _channel_summaries(
                 # The stored scroll mode. CONF_BINDING_PROFILE is not persisted.
                 profile=data.get(CONF_MODE),
                 behaviour=_behaviour_label(data, language),
-                target_label=_entity_label(hass, target),
+                target_label=_targets_label(hass, target, language),
                 target_state=state,
                 target_missing=state == TARGET_MISSING,
                 actions=actions,

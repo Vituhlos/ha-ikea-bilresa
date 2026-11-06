@@ -163,7 +163,8 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
 - a starting profile (light, media, cover, climate, scenes, or custom), or copy
   an existing binding as a starting point,
 - the **Wheel** and **Channel** to use,
-- the **target entity** controlled by scrolling,
+- the **target entity** controlled by scrolling — or **several lights** in a
+  brightness, colour-temperature or colour mode (see below),
 - **Brightness change per notch** (%), **Minimum brightness** (%, `0` lets a
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
@@ -195,6 +196,28 @@ the recovered entity's real state. Rotate-up from an off light starts at the
 configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
+
+#### Several lights on one channel
+
+A brightness, colour-temperature or colour binding can drive several lights at
+once: pick them all as the rotation target. The binding keeps **one** level and
+sends that same value to every light in a single call, so the lights cannot
+drift apart and a slow bulb cannot pull the others back:
+
+- the lights are read only when the binding has nothing tracked yet (the first
+  scroll, or after a change made elsewhere). Then they count as on if any is
+  on, at the mean level of the lit ones, as a Home Assistant light group would;
+- a bulb that acknowledges late, mid-fade, is treated as catching up and never
+  resets the level. Only a light that settles somewhere the binding did not
+  send it counts as an outside change, and the next scroll re-reads the lights;
+- an unavailable light is left out of commands and brought back in line by the
+  next one;
+- without a separate short-press target, a short press switches all of them
+  together: off while any of them is on, on otherwise.
+
+Other modes (media player, cover, climate, fan, number) take a single target.
+An existing Home Assistant or Zigbee2MQTT group entity can still be used as a
+single target.
 
 For a dual button, the same flow first selects Button 1 or Button 2 and then
 shows only supported actions: independent single/double-press targets and

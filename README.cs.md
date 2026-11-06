@@ -159,7 +159,8 @@ Nechcete psát automatizace? U položky **IKEA BILRESA**
 - výchozí profil (světlo, média, kryt, klimatizace, scény nebo vlastní), případně
   zkopírujte existující propojení jako výchozí nastavení,
 - **Kolečko** a **Kanál**,
-- **cílovou entitu**, kterou otáčení ovládá,
+- **cílovou entitu**, kterou otáčení ovládá — nebo **více světel** v režimu
+  jasu, teploty bílé či barvy (viz níže),
 - **Změnu jasu na jedno cvaknutí** (%), **Minimální jas** (%, `0` = otočením dolů lze
   světlo vypnout) a **Přechod** (s),
 - **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
@@ -191,6 +192,28 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 (nebo prvním použitelném kroku, když je minimum nula). Externí změna v HA
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
+
+#### Více světel na jednom kanálu
+
+Propojení v režimu jasu, teploty bílé nebo barvy může ovládat více světel
+najednou: stačí je všechna vybrat jako cíl otáčení. Propojení drží **jednu**
+úroveň a stejnou hodnotu posílá všem světlům jedním voláním, takže se světla
+nerozjedou a pomalá žárovka ostatní nestáhne zpět:
+
+- světla se načtou jen tehdy, když propojení zatím nic nesleduje (první otočení
+  nebo po změně provedené jinde). Pak platí za zapnutá, svítí-li kterékoli z
+  nich, s průměrnou úrovní rozsvícených — stejně jako skupina světel v Home
+  Assistantu;
+- žárovka, která se ozve se zpožděním uprostřed přechodu, jen dohání a úroveň
+  nikdy neresetuje. Za vnější změnu se považuje jen světlo, které se ustálí
+  jinde, než kam ho propojení poslalo; další otočení pak světla načte znovu;
+- nedostupné světlo se z příkazů vynechá a další příkaz ho srovná s ostatními;
+- bez samostatného cíle krátkého stisku přepne krátký stisk všechna světla
+  společně: vypne je, svítí-li kterékoli z nich, jinak je zapne.
+
+Ostatní režimy (přehrávač médií, kryt, klimatizace, ventilátor, číslo) mají
+jediný cíl. Existující skupinu z Home Assistantu nebo Zigbee2MQTT lze dál použít
+jako jediný cíl.
 
 U dvoutlačítka stejný průvodce nejdřív vybere Tlačítko 1 nebo Tlačítko 2 a pak
 zobrazí jen podporované akce: nezávislý cíl jednoduchého/dvojitého stisku a

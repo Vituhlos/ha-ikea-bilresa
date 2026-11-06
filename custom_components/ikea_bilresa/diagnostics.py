@@ -27,6 +27,8 @@ TO_REDACT = {
     CONF_TARGET,
     CONF_TRIPLE_TARGET,
     CONF_URL,
+    # A multi-light binding's trace config lists every light it drives.
+    "targets",
     "compressed_fabric_id",
     "name",
     "serial",

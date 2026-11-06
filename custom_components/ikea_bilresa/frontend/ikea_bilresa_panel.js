@@ -74,7 +74,13 @@ const FALLBACK_SCHEMA = {
   mode_domains: MODE_DOMAINS,
   press_target_domains: ["light", "switch"],
   ramp_target_domains: ["light"],
+  // A backend older than multi-light bindings stores one target only.
+  multi_target_modes: [],
 };
+
+// A rotation target is one entity id or, for a multi-light binding, a list.
+const targetList = (value) =>
+  (Array.isArray(value) ? value : value ? [value] : []).filter(Boolean);
 
 // Material Design Icons remain the standard chrome. Product identity and
 // gestures use the separately approved BILRESA / Material Rounded geometry.
@@ -1207,6 +1213,16 @@ const STYLES = `
     line-height: var(--ha-line-height-normal, 1.6);
   }
   .field-help { color: var(--_ink-dim); }
+  .field-checklist {
+    display: grid;
+    gap: var(--_space-1, 4px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    max-height: 16rem;
+    overflow-y: auto;
+  }
+  .field-check { display: flex; align-items: center; gap: var(--_space-2, 8px); }
   .field-error {
     color: var(--error-color, var(--_ink));
     font-weight: var(--ha-font-weight-medium, 500);
@@ -2463,9 +2479,10 @@ class IkeaBilresaPanel extends HTMLElement {
     return { select: { options, mode: "dropdown" } };
   }
 
-  _entitySelector(domains, exclude) {
+  _entitySelector(domains, exclude, multiple = false) {
     const entity = { domain: [...domains] };
     if (exclude?.length) entity.exclude_entities = [...exclude];
+    if (multiple) entity.multiple = true;
     return { entity };
   }
 
@@ -2523,6 +2540,34 @@ class IkeaBilresaPanel extends HTMLElement {
     return select;
   }
 
+  // The panel's own several-entity picker, used when Home Assistant's is not
+  // available: one checkbox per entity. Not a native multi-select, which
+  // hides its selection behind a modifier key.
+  _nativeChecklist(wrap, id, label, help, options, { value, onChange }) {
+    const group = el("fieldset", "field-checklist");
+    group.id = id;
+    group.appendChild(el("legend", null, label));
+    if (help) group.appendChild(el("span", "field-help", help));
+    const chosen = new Set(targetList(value));
+    const boxes = [];
+    for (const option of options) {
+      const row = el("label", "field-check");
+      const box = el("input");
+      box.type = "checkbox";
+      box.value = option.value;
+      box.checked = chosen.has(option.value);
+      box.addEventListener("change", () =>
+        onChange(boxes.filter((item) => item.checked).map((item) => item.value)),
+      );
+      boxes.push(box);
+      row.appendChild(box);
+      row.appendChild(document.createTextNode(` ${option.label}`));
+      group.appendChild(row);
+    }
+    wrap.appendChild(group);
+    return group;
+  }
+
   _selectField(name, label, options, { help, wide = false } = {}) {
     const wrap = this._field(wide);
     const id = this._fieldId(name);
@@ -2550,23 +2595,40 @@ class IkeaBilresaPanel extends HTMLElement {
   // emptyLabel names what an empty optional target does. The native dropdown
   // shows it as its empty option; Home Assistant's picker has no such option,
   // so there the same fact goes under the field as emptyHelp.
+  //
+  // multiple lets the field hold several entities. The draft then stores one
+  // entity as a plain string and several as a list, the same shapes the
+  // server stores, so an untouched single-light binding saves unchanged.
   _entityField(
     name,
     label,
     domains,
-    { optional = false, help, wide = false, emptyLabel, emptyHelp } = {},
+    { optional = false, help, wide = false, emptyLabel, emptyHelp, multiple = false } = {},
   ) {
     const wrap = this._field(wide);
     const id = this._fieldId(name);
-    const current = this._editorData[name];
+    const stored = this._editorData[name];
+    // A list left over from a light mode shows its first entity in a
+    // single-entity field; saving it as is lets the server explain why.
+    const current = multiple
+      ? targetList(stored)
+      : Array.isArray(stored)
+        ? stored[0]
+        : stored;
     const onChange = (next) => {
-      this._editorData[name] = next || undefined;
+      if (multiple) {
+        const picked = [...new Set(targetList(next))];
+        this._editorData[name] =
+          picked.length > 1 ? picked : picked[0] || undefined;
+      } else {
+        this._editorData[name] = next || undefined;
+      }
       this._editorChanged(name);
       this._render();
     };
     let control = this._haSelector({
       id,
-      selector: this._entitySelector(domains),
+      selector: this._entitySelector(domains, undefined, multiple),
       value: current,
       label,
       helper: help || (optional ? emptyHelp : undefined),
@@ -2580,14 +2642,21 @@ class IkeaBilresaPanel extends HTMLElement {
         value: state.entity_id,
         label: `${state.attributes?.friendly_name || state.entity_id} · ${state.entity_id}`,
       }));
-      if (current && !options.some((option) => option.value === current)) {
-        options.unshift({ value: current, label: current });
+      for (const entityId of targetList(current).reverse()) {
+        if (!options.some((option) => option.value === entityId)) {
+          options.unshift({ value: entityId, label: entityId });
+        }
       }
-      control = this._nativeSelect(wrap, id, label, help, options, {
-        emptyLabel: optional ? emptyLabel || this._t("target_none") : undefined,
-        value: current,
-        onChange,
-      });
+      control = multiple
+        ? this._nativeChecklist(wrap, id, label, help, options, {
+            value: current,
+            onChange,
+          })
+        : this._nativeSelect(wrap, id, label, help, options, {
+            emptyLabel: optional ? emptyLabel || this._t("target_none") : undefined,
+            value: current,
+            onChange,
+          });
     }
     this._fieldErrorNode(wrap, name, control);
     return wrap;
@@ -2926,11 +2995,18 @@ class IkeaBilresaPanel extends HTMLElement {
           })),
         ),
       );
+      const multiTarget = (this._schema().multi_target_modes || []).includes(
+        this._editorData.mode,
+      );
       rotation.appendChild(
         this._entityField(
           "target",
           this._t("field_target"),
           this._schema().mode_domains[this._editorData.mode] || [],
+          {
+            multiple: multiTarget,
+            help: multiTarget ? this._t("field_target_help") : undefined,
+          },
         ),
       );
       rotation.appendChild(

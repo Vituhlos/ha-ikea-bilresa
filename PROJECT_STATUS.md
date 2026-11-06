@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-**Current snapshot — reviewed 2026-10-25**
+**Current snapshot — reviewed 2026-10-25** (multi-light bindings proposed in a contributor pull request, 2026-11-06 — see the first dated entry)
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.
 - **Issue #9 fix:** PR [#14](https://github.com/Vituhlos/ha-ikea-bilresa/pull/14) is merged. Its fixes are included in `v0.6.2-rc.1`; physical validation against the reporter's Zigbee2MQTT group is still pending.
@@ -17,6 +17,49 @@ The dated entries below are preserved as a historical implementation and testing
 
 ---
 
+
+## Multi-light bindings: one tracked level for several lights (2026-11-05)
+
+Status: **contributed by @cdegut on branch `feat/multi-light-binding` (from `main` at `6176206`), proposed as a pull request; not merged, not released. Static + unit verified; informally tried by the contributor on their own install (see below); the hardware checklist item is NOT yet recorded as passed.** Related to Issue #9 (the group-jump family), but a separate feature: Issue #9 itself (a Zigbee2MQTT *group entity* as a single target) is untouched by this change and stays open.
+
+Goal (contributor's request): a binding accepts several lights and dimming works for all of them. The underlying requirement: brightness is tracked **once per binding** and applied to every light, instead of being read back from each light's reported state, because stale or lagging bulb state is what makes a group jump.
+
+What changed:
+
+- `const.py`: `MULTI_TARGET_MODES` (brightness, color_temp, color), `MAX_BINDING_TARGETS = 20`, `binding_targets()` (reads the stored target as a list from either shape).
+- Storage: `target` stays a **string** for one entity (every existing binding, unchanged); a **list** only for several. No config-entry version bump or migration. `binding_config.py` accepts both, de-duplicates, and stores a one-item list as the string. New error `multiple_targets_require_light_mode`; every member must pass `mode_supports_target`.
+- `binding.py` (`self._multi` gates every new path; single-target code paths are unchanged, so all 522 pre-existing tests pass untouched):
+  - `_target_state()` reads the lights as one when nothing is tracked, with light-group semantics: on if any is on; mean brightness and mean kelvin of the lit ones; kelvin range intersected; hue from the first lit one.
+  - `_resync()`: a multi-light binding does **not** expire its tracked value after `_RESYNC_AFTER`. Only `_forget_target` makes it re-read.
+  - `_last_reported` is now per entity (`dict`). New `_is_settling()`: after the transition window, a member report on *its own* path (its last report → newest command, ±1 % of span) is an echo (`echo_ignored` trace row), not `outside_scroll_authority`. A member settling elsewhere still forgets, as before.
+  - Member unavailable: it is left out of the payload, and the tracked value is kept. All members unavailable keeps the old full reset. A returning member's first report only seeds its path (new `member_rejoined` trace row) and does not resync the others.
+  - `_dispatch_call` sends `entity_id` as the list of available members. Short press with no explicit click target → `_press_all_targets`: `toggle` becomes `turn_off` if any member is on, else `turn_on`. An explicit click target behaves as before.
+  - The trace `state` rows of a multi-light binding carry `member` (an index, not an entity id). `trace_config()` adds `targets`, which `diagnostics.py` redacts.
+- Config flow: target `EntitySelector(multiple=True)`.
+- Panel: schema `multi_target_modes`. The rotation target field is multi-select in those modes, with help text. The native fallback is a checkbox list, because the existing frontend test forbids `select.multiple`. Labels show "N targets", or name the missing/unavailable light.
+- EN/CS: `strings.json`, `translations/{en,cs}.json`, `panel_strings.py`, `README.md`/`README.cs.md` section, `CHANGELOG.md` `[Unreleased] Added`, a new open item in `docs/HARDWARE_TEST.md` C.
+
+Validation (Linux, `.venv` = uv CPython 3.14.8, `requirements-test.txt`):
+
+- `.venv/bin/python -m pytest -q` — **542 passed** (522 on `main`; +20). New tests: `tests/test_binding.py` (multi-light block, 13 tests; the end-to-end lagging-bulb test is `test_a_lagging_light_does_not_make_the_next_gesture_jump`), `tests/test_config_flow.py` (5), `tests/test_panel_models.py` (2), and assertions in `test_panel_schema.py` and `test_diagnostics.py`. The rejoining-light rule was added after `test_an_unavailable_light_is_left_out_without_a_jump` failed: a power-cycled bulb at 255 resynced the whole set.
+- `ruff format --check custom_components tests tools`, `ruff check custom_components tests tools` — clean.
+- `mypy custom_components/ikea_bilresa` — only the 2 pre-existing errors (`device_link.py:256`, `legacy_triggers.py:68`).
+- `node --check` on the panel JS; `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs` — 47 passed.
+- `json.tool` on the three string files, `compileall`, `tools/panel_preview/build.py`, `git diff --check` — clean.
+
+Not run: GitHub CI; a real Home Assistant (config flow and panel picker not seen in a browser); hardware.
+
+Known risks / assumptions:
+
+1. The first gesture of a multi-light binding (or the first after an outside change) aligns every light to the mean of the lit ones, plus one step. Lights at very different levels visibly converge. This is intended, but worth a feel check.
+2. An outside change that lands exactly on a member's own path to the newest command is indistinguishable from catching up and is ignored. The path collapses once the bulb settles, so the window is short.
+3. With no time-based expiry, a light that never reports a change made elsewhere is never re-read. This is the trade-off the contributor asked for.
+4. `tests/replay.py` cannot replay a multi-light capture yet (it builds a single simulated target). Capture rows carry `member` so this can be added.
+5. HA's `ha-selector` multiple-entity UI and the payload it returns were not checked in a live browser.
+
+Contributor test (2026-11-06): the contributor copied this branch's `custom_components/ikea_bilresa` (manifest `0.6.2-rc.2`) over a manual `v0.6.1` install on their own Home Assistant 2026.11.0 (Raspberry Pi), backed up the previous copy first and restarted. Existing single-target bindings loaded unchanged. The contributor configured a multi-light binding in the panel and reported that it "works great". This is an informal positive result. It is not a recorded pass of the `docs/HARDWARE_TEST.md` C "Multi-light binding" item, whose individual checks (pause >3 s, change from a bulb's own app, unplug/replug, mixed on/off short press) were not reported one by one, so that item stays open. Rollback note: 0.6.1 cannot read a list target, so a multi-light binding must be reduced to one light or deleted before downgrading.
+
+Single best next action: maintainer review of the PR and CI. Before merge or any release, run the `docs/HARDWARE_TEST.md` C "Multi-light binding" item with 3–4 individual bulbs (step 3, transition 0.8), including the >3 s pause, the unplug/replug and the change-from-the-app cases, and record the results.
 
 ## Issue #21: the event loop freezes on Matter attribute updates (2026-10-29)
 
