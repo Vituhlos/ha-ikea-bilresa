@@ -90,6 +90,56 @@ Home Assistant zapíše chybu do protokolu; živá aktivita přesto řekne, že 
 přijata, protože volání se posílá bez čekání na zařízení. Propojení uložené před
 touto změnou funguje beze změny.
 
+## Spouštění akcí Home Assistantu
+
+Když nestačí jedna akce na jednom cíli, nastavte gesto (jednoduchý, dvojitý,
+trojitý stisk nebo podržení) na **Spustit akce**. Panel pak ukáže stejný editor
+akcí, jaký používá automatizace: libovolnou službu s daty, prodlevy, podmínky,
+*choose* a další. Nepotřebujete k tomu skript ani automatizaci.
+
+```yaml
+- action: light.toggle
+  target:
+    entity_id: light.example
+- delay:
+    seconds: 2
+- action: light.turn_off
+  target:
+    entity_id: light.example
+```
+
+Co kdy použít:
+
+| Chcete | Použijte |
+|---|---|
+| přepnout, zapnout či vypnout, nebo jednu z akcí cíle (přehrát / pozastavit, otevřít, ...) | cíl a jeho akci |
+| víc věcí, prodlevu, podmínku, službu s daty | **Spustit akce** |
+| stejné akce z více tlačítek nebo odjinud | skript spuštěný jako cíl |
+| reagovat i na něco jiného, nebo na gesto spolu s dalšími spouštěči | automatizaci na [spouštěčích](events-and-automations.md#spouštěče) |
+
+Akce se dozvědí, které gesto je spustilo, v proměnných `gesture`
+(`short_press`, `double_press`, `triple_press` nebo `hold`), `presses`, `channel`,
+`endpoint` a `device`, takže je můžete použít v šablonách, třeba `{{ gesture }}`.
+
+**Jak běží.** Akce jednoho gesta běží jedna po druhé: druhý stisk, dokud běží
+první, počká (nejvýš pět běhů najednou včetně toho běžícího; další se zahodí s
+varováním v protokolu). Kontrolují se při uložení propojení a znovu při prvním
+spuštění, takže akce zařízení nebo integrace, která už neexistuje, se v živé
+aktivitě ohlásí jako neúspěšná, ne jako nic. Při vypnutí integrace se to, co
+ještě běží, zastaví. Akce jsou vaše vlastní automatizace, mohou tedy obsahovat
+tokeny nebo adresy: stažená diagnostika je skrývá.
+
+**Editor.** Panel si o editor akcí Home Assistantu řekne při prvním otevření.
+Když není dostupný (frontend některých verzí Home Assistantu to nedovolí),
+dostanete jednoduchý seznam: akci, její entity a data jako JSON na řádek, a celý
+seznam jako JSON pro to, co řádky neukážou, třeba prodlevu nebo podmínku. Jsou to
+stejná data, přepnutí mezi nimi nic neztratí.
+
+Spuštění akcí nahrazuje u gesta cíl. Dvojitý nebo trojitý stisk na ně nastavený
+vylučuje rychlou a okamžitou odezvu, jako každý dvojitý či trojitý stisk;
+podržení na ně nastavené vylučuje okamžitou odezvu, jako každé podržení; krátký
+stisk na ně nastavený vylučuje procházení scén.
+
 ## Scény a skripty jako cíle
 
 Každé gesto stisku (jednoduchý, dvojitý, trojitý stisk a podržení) provede jednu

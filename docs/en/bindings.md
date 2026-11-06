@@ -92,6 +92,59 @@ Home Assistant write an error to its log; the live activity still says the actio
 was accepted, because the call is sent without waiting for the device. A binding
 saved before these actions existed keeps working as it was.
 
+## Running Home Assistant actions
+
+When one action on one target is not enough, set a gesture (short press, double
+press, triple press or hold) to **Run actions**. The panel then shows the same
+action editor an automation uses: any service with its data, delays, conditions,
+*choose* and so on. You need no script and no automation for it.
+
+```yaml
+- action: light.toggle
+  target:
+    entity_id: light.example
+- delay:
+    seconds: 2
+- action: light.turn_off
+  target:
+    entity_id: light.example
+```
+
+What to use when:
+
+| You want | Use |
+|---|---|
+| to toggle, turn on or off, or one of the verbs of a target (play / pause, open, ...) | the target and its action |
+| several things, a delay, a condition, a service with data | **Run actions** |
+| the same actions from several buttons or from elsewhere | a script, run as a target |
+| to react to something else as well, or to a gesture together with other triggers | an automation on the [triggers](events-and-automations.md#triggers) |
+
+The actions are told which gesture ran them, in the variables `gesture`
+(`short_press`, `double_press`, `triple_press` or `hold`), `presses`, `channel`,
+`endpoint` and `device`, so they can use them in templates, for example
+`{{ gesture }}`.
+
+**How they run.** The actions of one gesture run one after the other: a second
+press while the first run is still going waits for it (at most five runs at once,
+the running one included; more are dropped with a warning in the log). They are
+checked when you save the binding, and again when they first run, so an action of
+a device or integration that is gone is reported in the live activity as failed
+instead of doing nothing. Unloading the integration stops what is still running.
+The actions are your own automation, so they may hold tokens or addresses: the
+diagnostics download hides them.
+
+**The editor.** The panel asks Home Assistant for its own action editor the first
+time you open one. If it is not available (the frontend of some Home Assistant
+versions does not allow it), you get a simple list instead: an action, its
+entities and its data as JSON per row, and the whole list as JSON for anything
+the rows cannot show, such as a delay or a condition. It is the same data, so
+switching between the two loses nothing.
+
+Running actions takes the place of the target for that gesture. A double or
+triple press set to it rules out the fast and instant responses, like any double
+or triple press; a hold set to it rules out the instant one, like any hold; a
+short press set to it rules out cycling scenes.
+
 ## Scenes and scripts as targets
 
 Every press gesture (single, double, triple press and hold) takes one action on
