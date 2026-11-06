@@ -121,7 +121,7 @@ def _signature(changed: dict[str, tuple[str, str]]) -> str:
     version that is not news must not make the body look different."""
     return (
         "<!-- news: "
-        + ";".join(f"{k}={v[1]}" for k, v in sorted(changed.items()))
+        + ";".join(f"{k}={v[0]}>{v[1]}" for k, v in sorted(changed.items()))
         + " -->"
     )
 
