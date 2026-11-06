@@ -37,6 +37,14 @@ losing changes. Do not commit or push unless the owner requests it.
 
 ### Gate A: static checks
 
+`python tools/check.py` runs all of Gate A (JSON, compileall, `node --check`,
+`git diff --check`, format, lint, mypy, the frontend tests; not the optional
+preview) and, unless `--fast`, the pytest run of Gate B, in parallel, and prints
+one line each. `python tools/pr_watch.py <number>` waits for a pull request's
+checks and review bots and prints the open review threads; it exits 0 only when
+the checks passed, no thread is open and Devin, Codex and CodeRabbit all
+reviewed. The commands below are what they run.
+
 Run for every code change:
 
 ```powershell

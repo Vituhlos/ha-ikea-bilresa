@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   could not be the target of a gesture until now. Addresses GitHub #17.
 
 ### Documentation
+- **Two developer tools** (`tools/check.py`, `tools/pr_watch.py`) and a "Working
+  method" section in `AGENTS.md`: all local gates in one command with one line
+  each, and a pull request's checks and review comments in one command.
 - **The scroll limitation is explained plainly** (how-it-works guide, English and
   Czech): the wheel sends a running total about every 0.5–1 s, what the
   transition does and does not hide, and that the cap of 8 notches belongs to

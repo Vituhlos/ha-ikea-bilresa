@@ -62,6 +62,31 @@ These instructions apply to the entire repository and to every coding agent.
   link reference), both READMEs and `PROJECT_STATUS.md` in one commit.
   `tests/test_version_consistency.py` fails when they disagree.
 
+## Working method (cost and quality)
+
+- **One command for the gates:** `python tools/check.py` runs format, lint, mypy
+  (two known errors), the frontend tests and pytest in parallel and prints one
+  line each, with the tail only for a gate that failed. `--fast` skips pytest.
+  Use it instead of running the five tools by hand and reading their output.
+- **One command for a pull request:** `python tools/pr_watch.py <number>` waits
+  for the checks and the review bots and prints the checks and only the review
+  comments left on the newest commit. Read nothing else from the PR.
+- **Read less, not more:** `PROJECT_STATUS.md`, the changelog and the archive are
+  long. Search them (`grep`) for the item at hand; read a file in ranges; do not
+  re-read a file you just wrote.
+- **Use a stronger model for what is expensive to get wrong or to read:**
+  research that needs many files or external sources (HA core, the frontend, a
+  third-party project), and an independent review of a finished change before it
+  is pushed, in a read-only agent with a self-contained prompt that names the
+  files and the question and asks for a short, cited answer. Check its claims
+  against the code before relying on them. Keep the writing of code in the main
+  session, one writer per set of files.
+- **Review before the bots do:** a read-only review of the diff for races,
+  stored-data compatibility, strings in both languages and missing tests saves a
+  round of fix commits; the bots still run.
+- **Record what was decided, not what was said:** the tracker item and
+  `PROJECT_STATUS.md` hold decisions, results and what was not verified.
+
 ## Required handoff
 
 Before ending a coding session, update `PROJECT_STATUS.md` in the same working
