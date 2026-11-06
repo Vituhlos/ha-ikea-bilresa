@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **Button control bindings can now toggle `input_boolean` helpers** in both
+  the native config flow and the BILRESA panel (partial support for #38).
+  This does not add `input_button` press actions.
 ### Changed
 - **Compatibility watch and test setup (repository tooling, no change to the
   integration).** A weekly compatibility watch (`tools/compat_watch.py`) keeps one issue open while Home Assistant Core,

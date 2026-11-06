@@ -164,7 +164,9 @@ Nechcete psát automatizace? U položky **IKEA BILRESA**
   světlo vypnout) a **Přechod** (s),
 - **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
   **cíl tlačítka** — takže stisk může ovládat *jinou* entitu než stmívané světlo
-  (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači),
+  (např. stmíváš žárovku, ale přepínáš její Shelly ve vypínači nebo pomocníka
+  `input_boolean`). Funguje i dvojitý/trojitý stisk a přepnutí podržením;
+  pomocníci `input_button` zde nejsou podporováni,
 - **odezvu tlačítka**: okamžitě při prvním stisku, rychle po krátkém uvolnění,
   nebo přesné rozpoznání jednoho, dvou či tří stisků,
 - volitelný seřazený seznam **scén**, které jednoduché stisky postupně aktivují

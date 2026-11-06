@@ -168,7 +168,9 @@ Prefer not to write automations? On the **IKEA BILRESA** entry
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
   **button target entity** — so a press can act on a *different* entity than the
-  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch),
+  dimmed light (e.g. dim a bulb, but toggle its Shelly wall switch or an
+  `input_boolean` helper). Double/triple presses and hold-to-toggle also work.
+  `input_button` helpers are not supported by these toggle targets,
 - the **button response**: instant initial press, fast short release, or exact
   single/double/triple recognition for multi-press bindings,
 - an optional ordered list of **scenes** to cycle on single presses (this takes

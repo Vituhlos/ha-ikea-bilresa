@@ -1,5 +1,61 @@
 # Project status and agent handoff
 
+**External contribution — 2026-11-05 (upstream PR #39 open; not merged or released):**
+
+- **Review follow-up:** CodeRabbit submitted one low-severity maintainability
+  suggestion: explicitly test native press-target selector domains. Added
+  `test_native_press_target_selectors_offer_input_boolean_helpers` to
+  `tests/test_config_flow.py` (wheel single/double/triple/hold and dual-button
+  single/double/hold). This is a test-only change; runtime behaviour unchanged.
+  **Tests after this new commit have NOT yet been run.** The earlier 7/7 passing
+  CI does not validate the new test. Next run fork CI on the updated head.
+  CodeRabbit also issued advisory checks about incomplete `input_button`
+  coverage (intentional partial #38) and docstring coverage (not yet resolved).
+
+- Issue #38 (**partial**): add `input_boolean` to the press/double/triple/
+  hold-toggle target choices in the shared panel schema, frontend fallback and
+  native config-flow selectors. Runtime uses Home Assistant's existing
+  `homeassistant.toggle`/`turn_on`/`turn_off` dispatch. This does **not**
+  implement `input_button.press`; `input_button` remains out of scope.
+- Files changed: `custom_components/ikea_bilresa/{panel_schema.py,config_flow.py,
+  frontend/ikea_bilresa_panel.js}`, `tests/{test_binding.py,
+  test_config_flow.py, test_panel_schema.py}`, `README.md`, `README.cs.md`, `CHANGELOG.md`,
+  and this handoff file. No translation keys changed, so EN/CS JSON translation
+  files were not edited.
+- **CI (Linux; not hardware):** GitHub Actions
+  [run 42103875591](https://github.com/Hinrixx3026/ha-ikea-bilresa/actions/runs/42103875591),
+  for the contribution branch at commit `738bcaf2c0eaeb72b8c42d662c25f54f30a73cc0`,
+  completed successfully: 7/7 jobs green. Steps included `ruff check` via
+  `astral-sh/ruff-action@v3`, `mypy` (no errors in 27 source files),
+  `pytest -q --cov=custom_components/ikea_bilresa --cov-report=term-missing
+  --cov-report=xml` (523 passed), `node --check
+  custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`,
+  `node --test tests/panel_frontend.test.mjs
+  tests/iconset_frontend.test.mjs`, hassfest and HACS validation.
+  The CI job with the newest Home Assistant pre-release also passed `pytest -q`.
+- **Not independently run:** local `ruff format --check custom_components tests`,
+  `python -m compileall -q custom_components tests`, explicit
+  `python -m json.tool` checks, and `git diff --check`; local clone was
+  unavailable due lack of network access. The exact manual `ruff check
+  custom_components tests` and `mypy custom_components/ikea_bilresa`
+  commands were not run separately; the corresponding CI lint/type gates passed.
+- **Hardware / live Home Assistant: NOT TESTED.** No physical BILRESA, real
+  `input_boolean` press, or native/panel target-picker validation was performed
+  against this change. Do not claim release readiness. Before release, run the
+  applicable `docs/HARDWARE_TEST.md` binding checks on a physical device and
+  record versions/results there.
+- **Known risks:** open upstream action-editor PR #36 may alter panel target
+  selection and require rebase. Scope is limited to `input_boolean` helpers;
+  `input_button` needs a distinct service. This contribution does not change
+  event decoding, gesture timing, or Matter transport.
+- **Upstream PR:** [#39](https://github.com/Vituhlos/ha-ikea-bilresa/pull/39)
+  is open against `main`. Its initial workflow has conclusion `action_required`
+  (no upstream CI pass yet); the maintainer may need to approve the external
+  contribution's run. The fork's earlier 7/7 CI remains the passing evidence.
+- **Next action:** re-run the fork's full CI after the CodeRabbit
+  selector regression test; then respond to maintainer feedback / upstream CI
+  approval and perform relevant physical BILRESA validation before release.
+
 **Current snapshot — reviewed 2026-10-25**
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.

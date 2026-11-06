@@ -28,7 +28,7 @@ from .const import (
 SCHEMA_VERSION = 1
 
 # Entity domains a press, double press, triple press or hold may toggle.
-PRESS_TARGET_DOMAINS = ("light", "switch")
+PRESS_TARGET_DOMAINS = ("light", "switch", "input_boolean")
 # A hold that ramps changes brightness, so it needs a light.
 RAMP_TARGET_DOMAINS = ("light",)
 
