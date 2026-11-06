@@ -187,3 +187,27 @@ def test_only_a_review_of_the_current_head_counts(monkeypatch) -> None:
 
     assert seen == {"codex", "coderabbit"}  # devin reviewed the old commit only
     assert len(threads) == 2  # the second page was read as well
+
+
+def test_an_inline_comment_on_the_head_counts_as_a_review(monkeypatch) -> None:
+    thread = _thread("finding", login="coderabbitai[bot]")
+    thread["comments"]["nodes"][0]["originalCommit"] = {"oid": "new"}
+    stale = _thread("old finding", login="codex")
+    stale["comments"]["nodes"][0]["originalCommit"] = {"oid": "old"}
+    pull = {
+        "headRefOid": "new",
+        "reviews": {"nodes": []},
+        "reviewThreads": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [thread, stale],
+        },
+    }
+
+    def fake_gh(*args: str) -> str:
+        if args[0] == "repo":
+            return "o/r"
+        return json.dumps({"data": {"repository": {"pullRequest": pull}}})
+
+    monkeypatch.setattr(pr_watch, "_gh", fake_gh)
+
+    assert pr_watch._review_data("5")[1] == {"coderabbit"}

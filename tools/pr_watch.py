@@ -41,14 +41,14 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       headRefOid
-      reviews(first: 100) { nodes { author { login } commit { oid } } }
+      reviews(last: 100) { nodes { author { login } commit { oid } } }
       reviewThreads(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
         nodes {
           isResolved
           path
           line
-          comments(first: 50) { nodes { author { login } body } }
+          comments(first: 50) { nodes { author { login } body originalCommit { oid } } }
         }
       }
     }
@@ -141,6 +141,15 @@ def _review_data(number: str) -> tuple[list[dict], set[str]]:
             for review in pull["reviews"]["nodes"]
             if (review.get("commit") or {}).get("oid") == pull["headRefOid"]
             if (bot := _reviewer((review.get("author") or {}).get("login", "")))
+        }
+        # An inline comment can come without a review: it counts when it was
+        # made on the current head.
+        seen |= {
+            bot
+            for thread in pull["reviewThreads"]["nodes"]
+            for comment in thread["comments"]["nodes"]
+            if (comment.get("originalCommit") or {}).get("oid") == pull["headRefOid"]
+            if (bot := _reviewer((comment.get("author") or {}).get("login", "")))
         }
         page = pull["reviewThreads"]["pageInfo"]
         if not page["hasNextPage"]:
