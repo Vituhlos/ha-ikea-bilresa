@@ -2493,7 +2493,7 @@ class IkeaBilresaPanel extends HTMLElement {
     };
     if (!isButton) this._editorData.scenes = [...(data?.scenes || [])];
     this._actionNodes = {};
-    this._invalidActions = new Set();
+    this._refusedText = new Map();
     if (this._actionEditor === "form") this._actionEditor = undefined;
     this._editorChoices = {
       click_action: this._editorData.scenes?.length
@@ -2664,7 +2664,10 @@ class IkeaBilresaPanel extends HTMLElement {
     ]) {
       if (choice !== "run") continue;
       const actions = data[key] || [];
-      if (this._invalidActions?.has(key)) errors[field] = "actions_invalid";
+      const refused = [...(this._refusedText?.keys() ?? [])].some((k) =>
+        k.startsWith(`${key}|`),
+      );
+      if (refused) errors[field] = "actions_invalid";
       else if (!actions.length) errors[field] = "actions_required";
       // A row added and not yet given an action.
       else if (actions.some((item) => isSimpleAction(item) && !(item.action ?? item.service))) {
@@ -2890,13 +2893,22 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   // Text in a box of the simple list that was refused. The list it was meant to
-  // replace is still in the draft, so saving would quietly keep the old one.
-  _refuseActions(field) {
-    (this._invalidActions ??= new Set()).add(field);
+  // replace is still in the draft, so saving would quietly keep the old one:
+  // the text is kept and put back whenever the form is drawn, until it is
+  // corrected, and saving is refused meanwhile.
+  _refuse(key, text) {
+    (this._refusedText ??= new Map()).set(key, text);
+  }
+
+  _clearRefused(prefix) {
+    for (const key of [...(this._refusedText?.keys() ?? [])]) {
+      if (key.startsWith(prefix)) this._refusedText.delete(key);
+    }
   }
 
   _setSequence(field, actionField, value) {
-    this._invalidActions?.delete(field);
+    // The server's verdict on the old list says nothing about the new one.
+    this._editorChanged(field);
     // A copy: the editors change what they are given, and the data must only
     // change through here.
     this._editorData[field] = Array.isArray(value) ? JSON.parse(JSON.stringify(value)) : [];
@@ -2970,10 +2982,20 @@ class IkeaBilresaPanel extends HTMLElement {
   _actionsForm(field, actionField) {
     const box = el("div", "actions-form");
     const items = this._sequenceOf(field);
+    const drawn = JSON.stringify(items);
     // A click on a button redraws at once. A change made by leaving a box does
     // not while focus is still in the form: that leave may be a click on Save,
     // and a redraw would take the button away before the click arrives.
-    const commit = (next, { fromBox = false } = {}) => {
+    // The list may have been replaced since this was drawn (the JSON box, whose
+    // redraw waited): then the click is on a picture that is gone, so it only
+    // shows the real list and the person clicks again.
+    const commit = (next, { fromBox = false, replace = false, structural = false } = {}) => {
+      if (!replace && JSON.stringify(this._sequenceOf(field)) !== drawn) {
+        this._render();
+        return;
+      }
+      if (replace) this._clearRefused(`${field}|`);
+      else if (structural) this._clearRefused(`${field}|data|`);
       this._setSequence(field, actionField, next);
       if (fromBox && this._formHasFocus()) this._renderDeferred = true;
       else this._render();
@@ -2991,7 +3013,6 @@ class IkeaBilresaPanel extends HTMLElement {
               commit(items.map((other, at) => (at === index ? changed : other)), {
                 fromBox: true,
               }),
-            () => this._refuseActions(field),
           ),
         );
       } else {
@@ -3006,7 +3027,10 @@ class IkeaBilresaPanel extends HTMLElement {
       const remove = el("button", "action-button", this._t("actions_remove"));
       remove.type = "button";
       remove.addEventListener("click", () =>
-        commit(items.filter((_, at) => at !== index)),
+        commit(
+          items.filter((_, at) => at !== index),
+          { structural: true },
+        ),
       );
       row.appendChild(remove);
       box.appendChild(row);
@@ -3014,17 +3038,15 @@ class IkeaBilresaPanel extends HTMLElement {
     const add = el("button", "action-button", this._t("actions_add"));
     add.type = "button";
     add.addEventListener("click", () =>
-      commit([...items, { action: "" }]),
+      commit([...items, { action: "" }], { structural: true }),
     );
     box.appendChild(add);
-    box.appendChild(
-      this._actionsJson(field, items, commit, () => this._refuseActions(field)),
-    );
+    box.appendChild(this._actionsJson(field, items, commit));
     return box;
   }
 
   // One plain action: which service, on which entities, with what data.
-  _actionRow(field, item, index, change, refuse) {
+  _actionRow(field, item, index, change) {
     const fields = el("div", "actions-fields");
     const id = `${this._fieldId(field)}-${index}`;
     const key = "action" in item ? "action" : "service";
@@ -3071,11 +3093,15 @@ class IkeaBilresaPanel extends HTMLElement {
     const data = el("div", "field");
     const dataLabel = el("label", null, this._t("actions_data"));
     dataLabel.htmlFor = `${id}-data`;
+    const dataKey = `${field}|data|${index}`;
+    const refusedData = this._refusedText?.get(dataKey);
     const dataNote = el("span", "field-error", this._t("actions_json_invalid"));
-    dataNote.hidden = true;
+    dataNote.hidden = refusedData === undefined;
     const dataInput = el("textarea");
     dataInput.id = `${id}-data`;
-    dataInput.value = item.data ? JSON.stringify(item.data, null, 2) : "";
+    dataInput.value =
+      refusedData ?? (item.data ? JSON.stringify(item.data, null, 2) : "");
+    if (refusedData !== undefined) dataInput.setAttribute("aria-invalid", "true");
     dataInput.addEventListener("change", () => {
       const text = dataInput.value.trim();
       let parsed;
@@ -3087,9 +3113,10 @@ class IkeaBilresaPanel extends HTMLElement {
       } catch {
         dataInput.setAttribute("aria-invalid", "true");
         dataNote.hidden = false;
-        refuse();
+        this._refuse(dataKey, dataInput.value);
         return;
       }
+      this._refusedText?.delete(dataKey);
       const next = { ...item };
       if (parsed && Object.keys(parsed).length) next.data = parsed;
       else delete next.data;
@@ -3102,16 +3129,19 @@ class IkeaBilresaPanel extends HTMLElement {
 
   // The whole list as JSON: the way to write what the simple list cannot (a
   // delay, a condition, a choice), and to paste actions from an automation.
-  _actionsJson(field, items, commit, refuse) {
+  _actionsJson(field, items, commit) {
     const wrap = el("div", "field");
     const id = `${this._fieldId(field)}-json`;
     const label = el("label", null, this._t("actions_json"));
     label.htmlFor = id;
+    const jsonKey = `${field}|json`;
+    const refusedJson = this._refusedText?.get(jsonKey);
     const note = el("span", "field-error", this._t("actions_json_invalid"));
-    note.hidden = true;
+    note.hidden = refusedJson === undefined;
     const input = el("textarea");
     input.id = id;
-    input.value = JSON.stringify(items, null, 2);
+    input.value = refusedJson ?? JSON.stringify(items, null, 2);
+    if (refusedJson !== undefined) input.setAttribute("aria-invalid", "true");
     input.addEventListener("change", () => {
       let parsed;
       try {
@@ -3120,10 +3150,10 @@ class IkeaBilresaPanel extends HTMLElement {
       } catch {
         input.setAttribute("aria-invalid", "true");
         note.hidden = false;
-        refuse();
+        this._refuse(jsonKey, input.value);
         return;
       }
-      commit(parsed, { fromBox: true });
+      commit(parsed, { fromBox: true, replace: true });
     });
     wrap.append(label, input, note);
     return wrap;

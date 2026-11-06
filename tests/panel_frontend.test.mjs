@@ -2095,3 +2095,79 @@ test("a route load that ends without the element is not remembered either", asyn
     Panel._forgetActionEditor();
   }
 });
+
+test("refused text stays on screen and keeps blocking Save until it is corrected", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const draw = () => {
+      const boxes = walk(
+        panel._actionsEditor("double_press_sequence", "double_press_action"),
+      ).filter((node) => node.tag === "textarea");
+      return boxes[boxes.length - 1];
+    };
+    let json = draw();
+    json.value = "{ not json";
+    json.listeners.change();
+
+    // Another field of the list changes, and the form is drawn again.
+    const [row] = walk(
+      panel._actionsEditor("double_press_sequence", "double_press_action"),
+    ).filter((node) => node.tag === "input");
+    row.value = "light.a";
+    row.listeners.change();
+
+    // The refused text is put back, and saving is still refused.
+    json = draw();
+    assert.equal(json.value, "{ not json");
+    assert.equal(json.attrs["aria-invalid"], "true");
+    assert.equal(panel._choiceErrors().double_press_action, "actions_invalid");
+
+    json.value = JSON.stringify(PLAY);
+    json.listeners.change();
+    assert.equal("double_press_action" in panel._choiceErrors(), false);
+    assert.equal(draw().value, JSON.stringify(PLAY, null, 2));
+  });
+});
+
+test("a click on a list that was replaced meanwhile only shows the real list", () => {
+  const { panel, renders } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const boxes = walk(wrap).filter((node) => node.tag === "textarea");
+    const json = boxes[boxes.length - 1];
+    const [add] = walk(wrap).filter(
+      (n) => n.tag === "button" && n.textContent === "actions_add",
+    );
+
+    // The JSON box is changed and its redraw waits because focus is in the form.
+    panel._formHasFocus = () => true;
+    const typed = [{ action: "light.toggle" }, { action: "light.turn_on" }];
+    json.value = JSON.stringify(typed);
+    json.listeners.change();
+    assert.deepEqual(panel._editorData.double_press_sequence, typed);
+
+    // Add was drawn before that: it must not write the old list back.
+    add.listeners.click();
+    assert.deepEqual(panel._editorData.double_press_sequence, typed);
+    assert.equal(renders(), 1);
+  });
+});
+
+test("changing the actions clears the server's old verdict on them", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  panel._editorErrors = {
+    double_press_sequence: "invalid_value",
+    double_press_action: "actions_required",
+  };
+
+  panel._setSequence("double_press_sequence", "double_press_action", [
+    { action: "light.toggle" },
+  ]);
+
+  assert.deepEqual(panel._editorErrors, {});
+});
