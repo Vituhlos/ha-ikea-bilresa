@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+- **Repository tooling only, no change to the integration.** Quieter CodeRabbit
+  reviews, weekly Dependabot updates, CodeQL code scanning, a release workflow
+  that publishes the GitHub release from the matching changelog section of a
+  version tag, and a stale-issue workflow for issues waiting for information.
+
 ### Fixed
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
