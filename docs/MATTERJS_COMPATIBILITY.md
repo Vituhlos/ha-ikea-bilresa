@@ -112,3 +112,27 @@ initial/runtime fallback. Those are implemented safeguards, not evidence that
 items 1–7 have passed.
 
 Passing static checks or fake-client tests does not satisfy these gates.
+
+## Audit of Home Assistant 2026.11 and Matter Server 9.2.0 / 9.3.0 (2026-11-06)
+
+Read from the sources and changelogs, and the test suite run against Home
+Assistant 2026.11.0 in a separate environment (953 passed on the development line, 532 on `main`). **Not run on a real
+instance, a real Matter Server or a physical wheel**, so items 1–7 above are
+still open for these versions.
+
+- Add-on 9.2.0 runs matterjs-server 1.4.0 (WebSocket schema 13) and 9.3.0 runs
+  1.5.5 (schema 14). Both keep 11 as the minimum supported client schema, so the
+  schema-11 profile above holds. Claiming a newer client schema would give BILRESA
+  nothing and would only turn away older servers; the number is the oldest server
+  the integration accepts, not the newest it knows.
+- Core's Matter integration moved to matter-python-client 1.5.5. What this
+  integration reads from it (the client of the loaded entry, `subscribe_events`,
+  `get_nodes`, `node_removed`, `attribute_updated`) is unchanged. A node's
+  availability follows its connection, without the former three-minute grace; an
+  attribute a device removes arrives as `attribute_updated` with `null` (read as an
+  invalid switch position); node data gains `endpoint_parents`, which the parser
+  ignores. The Switch cluster events are unchanged in the changelogs, but no
+  runtime capture from 1.4.0 or 1.5.5 exists yet.
+- The tests run against 2026.11 need Home Assistant's own test package
+  (`pytest-homeassistant`); the community package stopped at 2026.10.4. The tests
+  import the helpers through `tests/ha_common.py` and `tests/ha_typing.py`.

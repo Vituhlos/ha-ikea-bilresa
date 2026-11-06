@@ -1,0 +1,4 @@
+# Everything is reviewed by the maintainer; GitHub asks for the review itself.
+*                                   @Vituhlos
+# The workflows can publish and open issues: always the maintainer.
+/.github/                           @Vituhlos

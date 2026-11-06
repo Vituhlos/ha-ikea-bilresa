@@ -8,7 +8,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ikea_bilresa.const import DOMAIN, ISSUE_LEGACY_DEVICE_TRIGGERS
 from custom_components.ikea_bilresa.legacy_triggers import (
@@ -16,6 +15,7 @@ from custom_components.ikea_bilresa.legacy_triggers import (
     async_setup_legacy_trigger_notice,
     uses_legacy_device_trigger,
 )
+from tests.ha_common import MockConfigEntry
 
 LEGACY = {
     "platform": "device",
