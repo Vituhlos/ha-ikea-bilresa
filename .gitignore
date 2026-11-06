@@ -21,3 +21,6 @@ coverage.xml
 
 # Local panel preview output
 tools/panel_preview/out/
+
+# Created by the test run of Home Assistant 2026.11 and newer
+tests/testing_config/
