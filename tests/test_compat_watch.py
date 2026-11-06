@@ -134,3 +134,32 @@ def test_a_further_release_edits_the_issue_and_comments(monkeypatch) -> None:
         "edit",
         "comment",
     ]
+
+
+def test_a_version_that_is_not_news_does_not_rewrite_the_issue(monkeypatch) -> None:
+    newer = {**TESTED, "home_assistant": "2026.12.0"}
+    issue = _open_issue(newer)
+    # Another source moves to a pre-release: still nothing new, so nothing to say.
+    pre = {**newer, "matter_server_app": "9.4.0b1"}
+
+    assert _run(monkeypatch, pre, issue).verbs() == ["list"]
+
+
+def test_a_new_baseline_below_the_latest_release_rewrites_the_issue(
+    monkeypatch, tmp_path
+) -> None:
+    newest = {**TESTED, "home_assistant": "2026.12.1"}
+    issue = {
+        "number": 7,
+        "title": compat_watch.TITLE,
+        "body": compat_watch.body(newest, TESTED),
+    }
+    # The baseline moved up to 2026.12.0, but 2026.12.1 is still newer: the table
+    # shows the tested version, so the issue must show the new one.
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps({**TESTED, "home_assistant": "2026.12.0"}), encoding="utf-8"
+    )
+    monkeypatch.setattr(compat_watch, "BASELINE", baseline)
+
+    assert _run(monkeypatch, newest, issue).verbs() == ["list", "edit", "comment"]
