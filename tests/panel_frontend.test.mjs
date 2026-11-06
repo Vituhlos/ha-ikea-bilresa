@@ -2066,6 +2066,35 @@ test("a box left by clicking Save does not redraw the form under the button", ()
   });
 });
 
+test("the delayed redraw waits while another box of the form has the focus", async () => {
+  const { panel, renders } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  panel._editingChannel = 1;
+  await withFakeDom(async () => {
+    panel._actionEditor = "form";
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const boxes = walk(wrap).filter((node) => node.tag === "textarea");
+    const json = boxes[boxes.length - 1];
+    json.value = JSON.stringify([{ action: "light.toggle" }]);
+    json.listeners.change();
+
+    // The person already moved on and is typing in another box.
+    panel._formHasFocus = () => true;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    assert.equal(renders(), 0);
+    assert.equal(panel._renderDeferred, true);
+
+    // Nobody is typing: it draws.
+    panel._renderDeferred = false;
+    panel._formHasFocus = () => false;
+    json.listeners.change();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    assert.equal(renders(), 1);
+  });
+});
+
 test("a route load that ends without the element is not remembered either", async () => {
   const previousElements = globalThis.customElements;
   const previousDocument = globalThis.document;

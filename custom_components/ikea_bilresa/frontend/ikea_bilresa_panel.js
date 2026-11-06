@@ -2926,7 +2926,15 @@ class IkeaBilresaPanel extends HTMLElement {
   // Draws again a moment later, after a click that may be on its way.
   _renderLater() {
     clearTimeout(this._renderLaterTimer);
-    this._renderLaterTimer = setTimeout(() => this._render(), 300);
+    this._renderLaterTimer = setTimeout(() => {
+      // Someone already moved into another box: drawing now would take the text
+      // typed there. The form draws when the focus leaves it.
+      if (this._editingChannel !== null && this._formHasFocus()) {
+        this._renderDeferred = true;
+      } else {
+        this._render();
+      }
+    }, 300);
   }
 
   _clearRefused(prefix) {
