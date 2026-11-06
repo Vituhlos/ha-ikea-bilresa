@@ -158,8 +158,7 @@ def main() -> int:
     found = latest()
     changed = news(found, tested)
     text = body(found, tested)
-    print(text if changed else "Nothing is newer than the tested versions.
-")
+    print(text if changed else "Nothing is newer than the tested versions.")
     if args.dry_run:
         return 0
     number = _existing_issue()
