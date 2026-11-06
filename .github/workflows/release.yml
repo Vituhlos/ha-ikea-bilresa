@@ -1,0 +1,40 @@
+name: Release
+
+# Pushing a version tag (v1.2.3, v1.2.3-rc.1) publishes the GitHub release, with
+# the notes taken from CHANGELOG.md. A tag with a hyphen is a pre-release and is
+# never marked as the latest release. Nothing is published unless the tag, the
+# version in manifest.json and a section of CHANGELOG.md agree. If the release
+# already exists (made by hand) this does nothing.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish the release of the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: The tag, the manifest and the changelog agree
+        run: python tools/release_notes.py check "$GITHUB_REF_NAME"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "The release of $GITHUB_REF_NAME exists already."
+            exit 0
+          fi
+          python tools/release_notes.py notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          flags=""
+          if [ "$(python tools/release_notes.py prerelease "$GITHUB_REF_NAME")" = "true" ]; then
+            flags="--prerelease --latest=false"
+          fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" $flags

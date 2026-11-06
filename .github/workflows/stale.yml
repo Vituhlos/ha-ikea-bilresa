@@ -1,0 +1,34 @@
+name: Stale issues
+
+# Only an issue the maintainer labelled `needs-info` (waiting for the reporter's
+# logs, version or answer) is ever marked stale, and only after three weeks;
+# it is closed two weeks later unless someone answers. Pull requests and
+# every other issue are left alone.
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          only-labels: needs-info
+          days-before-stale: 21
+          days-before-close: 14
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          remove-stale-when-updated: true
+          stale-issue-message: >-
+            Still waiting for the information asked for above. If you can
+            provide it, please add a comment and this issue stays open;
+            otherwise it will be closed in two weeks. It can be reopened any time.
+          close-issue-message: >-
+            Closed for now because the information asked for did not arrive.
+            Please reopen it, or open a new issue, when you can add it.

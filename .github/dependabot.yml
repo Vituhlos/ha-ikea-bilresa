@@ -1,0 +1,27 @@
+# Keeps the actions in the workflows and the test tools up to date, one pull
+# request per group a week, so a bump is a small reviewed change and not a
+# surprise. The Home Assistant version the tests are pinned to is part of the
+# test tools group: its pull request shows whether the suite still passes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore"
+    open-pull-requests-limit: 3
+    groups:
+      test-tools:
+        patterns: ["*"]
