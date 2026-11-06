@@ -8,10 +8,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Changed
+- **Compatibility watch and test setup (repository tooling, no change to the
+  integration).** A weekly compatibility watch (`tools/compat_watch.py`) keeps one issue open while Home Assistant Core,
+  the Matter Server app or matterjs-server has a newer stable release than the one
+  last checked, and the weekly pre-release test job uses the test package that Home
+  Assistant publishes itself from 2026.11.
 - **Repository tooling only, no change to the integration.** Quieter CodeRabbit
   reviews, weekly Dependabot updates, CodeQL code scanning, a release workflow
-  that publishes the GitHub release from the matching changelog section of a
-  version tag, and a stale-issue workflow for issues waiting for information.
+  that publishes the GitHub pre-release from the matching changelog section of
+  a pre-release tag, and a stale-issue workflow for issues waiting for information.
 
 ### Fixed
 - **A Matter attribute update no longer scans every node.** With Home Assistant's

@@ -12,17 +12,17 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.loader import async_get_integration
 from homeassistant.setup import ATTR_COMPONENT, async_setup_component
 import pytest
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    MockEntityPlatform,
-    async_capture_events,
-)
-from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.ikea_bilresa.const import DOMAIN, WHEEL_EVENT_TYPES
 from custom_components.ikea_bilresa.device_link import MatterDeviceLink
 from custom_components.ikea_bilresa.event import BilresaChannelEvent
 from custom_components.ikea_bilresa.trigger import GESTURES, TRIGGERS
+from tests.ha_common import (
+    MockConfigEntry,
+    MockEntityPlatform,
+    async_capture_events,
+)
+from tests.ha_typing import WebSocketGenerator
 
 pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 

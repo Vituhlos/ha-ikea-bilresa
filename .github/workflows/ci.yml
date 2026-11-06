@@ -82,9 +82,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-      # Each release of the test helper pins the Home Assistant version it was
-      # built for, betas included, so its newest release brings the newest
-      # Home Assistant pre-release together with matching pytest plugins.
-      - run: pip install --upgrade pytest-homeassistant-custom-component
+      # Home Assistant publishes its test helpers itself from 2026.11
+      # (pytest-homeassistant, versioned like Home Assistant, betas included).
+      # Each release pins the Home Assistant version it was built for, so its
+      # newest release brings the newest Home Assistant (pre-)release together
+      # with matching pytest plugins. The older community package stopped at
+      # 2026.10.4 and is what the pinned job above still uses.
+      - run: pip install --upgrade --pre pytest-homeassistant
       - run: pip list | grep -i -E "^homeassistant |pytest-homeassistant"
-      - run: pytest -q
+      - run: pytest -q -p no:respx
