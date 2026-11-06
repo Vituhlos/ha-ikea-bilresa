@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -132,7 +133,8 @@ def body(found: dict[str, str], tested: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _existing_issue() -> str | None:
+def _existing_issue() -> tuple[str, str] | None:
+    """The open watch issue: its number and its body."""
     raw = _gh(
         "issue",
         "list",
@@ -141,12 +143,17 @@ def _existing_issue() -> str | None:
         "--search",
         f'"{TITLE}" in:title',
         "--json",
-        "number,title",
+        "number,title,body",
     )
     for issue in json.loads(raw or "[]"):
         if issue["title"] == TITLE:
-            return str(issue["number"])
+            return str(issue["number"]), issue["body"]
     return None
+
+
+def who_to_tell() -> str | None:
+    """The login to assign and mention: GitHub tells an assignee by itself."""
+    return os.environ.get("COMPAT_NOTIFY") or None
 
 
 def main() -> int:
@@ -161,13 +168,35 @@ def main() -> int:
     print(text if changed else "Nothing is newer than the tested versions.")
     if args.dry_run:
         return 0
-    number = _existing_issue()
-    if changed and number:
-        _gh("issue", "edit", number, "--body", text)
+    existing = _existing_issue()
+    person = who_to_tell()
+    mention = f"@{person} " if person else ""
+    if changed and existing is None:
+        command = ["issue", "create", "--title", TITLE, "--body", mention + text]
+        if person:
+            command += ["--assignee", person]
+        _gh(*command)
     elif changed:
-        _gh("issue", "create", "--title", TITLE, "--body", text)
-    elif number:
-        _gh("issue", "close", number, "--comment", "Everything is checked: closing.")
+        number, old = existing
+        # An edit tells nobody; a comment does. Only when the news changed.
+        if old.split("\n", 1)[-1] != (mention + text).split("\n", 1)[-1]:
+            _gh("issue", "edit", number, "--body", mention + text)
+            now = ", ".join(f"{key} {new}" for key, (_old, new) in changed.items())
+            _gh(
+                "issue",
+                "comment",
+                number,
+                "--body",
+                f"{mention}Newer than tested: {now}.",
+            )
+    elif existing:
+        _gh(
+            "issue",
+            "close",
+            existing[0],
+            "--comment",
+            "Everything is checked: closing.",
+        )
     return 0
 
 

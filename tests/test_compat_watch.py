@@ -54,3 +54,10 @@ def test_the_version_of_an_app_is_read_from_its_config() -> None:
 
     assert compat_watch.parse_app_version(config) == "9.3.0"
     assert compat_watch.parse_app_version("version: 9.4.0b1\n") == "9.4.0b1"
+
+
+def test_the_owner_is_told_through_the_environment(monkeypatch) -> None:
+    monkeypatch.delenv("COMPAT_NOTIFY", raising=False)
+    assert compat_watch.who_to_tell() is None
+    monkeypatch.setenv("COMPAT_NOTIFY", "someone")
+    assert compat_watch.who_to_tell() == "someone"
