@@ -140,3 +140,17 @@ def test_the_frontend_does_not_hard_code_user_facing_english() -> None:
         "Recommended action",
     ):
         assert f'"{phrase}"' not in body, f"hard-coded in the frontend: {phrase}"
+
+
+def test_every_label_the_panel_asks_for_by_name_exists() -> None:
+    """A missing key shows up on screen as its own name."""
+    asset = (
+        Path(__file__).parents[1]
+        / "custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js"
+    ).read_text(encoding="utf-8")
+    asked = set(re.findall(r'\b_t\(\s*"([a-z0-9_]+)"', asset))
+
+    assert asked, "no labels found; the pattern is out of date"
+    for language, strings in STRINGS.items():
+        missing = sorted(asked - set(strings))
+        assert not missing, f"{language} lacks: {missing}"
