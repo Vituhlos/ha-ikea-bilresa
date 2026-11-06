@@ -11,6 +11,8 @@ A thread is open until it is resolved on GitHub or one of its comments says the
 finding was dealt with (Devin writes "Resolved", CodeRabbit "Addressed"). Threads
 of older commits count: a finding stays a finding after the next push.
 
+Reviews of an older commit do not count as seen.
+
 Exit status: 0 when every check passed, no thread is open and Devin, Codex and
 CodeRabbit have all reviewed; 1 when a check failed or is still pending (or none
 ran) or a thread is open; 2 when that is all fine but a review bot was not seen
@@ -35,11 +37,13 @@ REVIEWERS = (
 POLL_SECONDS = 15
 BODY_LINES = 6
 THREADS = """
-query($owner: String!, $name: String!, $number: Int!) {
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      reviews(first: 100) { nodes { author { login } } }
-      reviewThreads(first: 100) {
+      headRefOid
+      reviews(first: 100) { nodes { author { login } commit { oid } } }
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           isResolved
           path
@@ -108,37 +112,57 @@ def _open_threads(threads: list[dict]) -> list[str]:
 
 
 def _review_data(number: str) -> tuple[list[dict], set[str]]:
-    """Review threads, and which bots have reviewed at all."""
+    """Every review thread, and which bots have reviewed the current head."""
     repo = _gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
     owner, name = repo.strip().split("/")
-    raw = _gh(
-        "api",
-        "graphql",
-        "-f",
-        f"query={THREADS}",
-        "-F",
-        f"owner={owner}",
-        "-F",
-        f"name={name}",
-        "-F",
-        f"number={number}",
-    )
-    pull = json.loads(raw)["data"]["repository"]["pullRequest"]
-    threads = pull["reviewThreads"]["nodes"]
-    seen = {
-        bot
-        for review in pull["reviews"]["nodes"]
-        if (bot := _reviewer((review.get("author") or {}).get("login", "")))
+    threads: list[dict] = []
+    seen: set[str] = set()
+    after = None
+    while True:
+        command = [
+            "api",
+            "graphql",
+            "-f",
+            f"query={THREADS}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={number}",
+        ]
+        if after:
+            command += ["-F", f"after={after}"]
+        pull = json.loads(_gh(*command))["data"]["repository"]["pullRequest"]
+        threads += pull["reviewThreads"]["nodes"]
+        # A review of an older commit says nothing about the code now pushed.
+        seen |= {
+            bot
+            for review in pull["reviews"]["nodes"]
+            if (review.get("commit") or {}).get("oid") == pull["headRefOid"]
+            if (bot := _reviewer((review.get("author") or {}).get("login", "")))
+        }
+        page = pull["reviewThreads"]["pageInfo"]
+        if not page["hasNextPage"]:
+            return threads, seen
+        after = page["endCursor"]
+
+
+def _awaited(checks: list[dict], seen: set[str]) -> set[str]:
+    """The bots still worth waiting for: not yet seen and not skipped by CI."""
+    skipped = {
+        name
+        for name, words in REVIEWERS
+        for check in checks
+        if check["bucket"] == "skipping"
+        and any(word in check["name"].lower() for word in words)
     }
-    for thread in threads:
-        for comment in thread["comments"]["nodes"]:
-            if bot := _reviewer((comment.get("author") or {}).get("login", "")):
-                seen.add(bot)
-    return threads, seen
+    return {name for name, _words in REVIEWERS} - seen - skipped
 
 
 def _verdict(checks: list[dict], open_count: int, seen: set[str]) -> int:
-    if not checks or any(check["bucket"] in ("fail", "pending") for check in checks):
+    # Only a pass or a skip is fine: a cancelled job never passed.
+    if not checks or any(c["bucket"] not in ("pass", "skipping") for c in checks):
         return 1
     if open_count:
         return 1
@@ -156,15 +180,22 @@ def main() -> int:
 
     deadline = time.monotonic() + args.minutes * 60
     checks = _checks(args.number)
-    while not args.now and not _finished(checks) and time.monotonic() < deadline:
+    threads, seen = _review_data(args.number)
+    # Waits for the checks and for every bot to review the head: CI may finish
+    # before a bot has said anything.
+    while (
+        not args.now
+        and not (_finished(checks) and not _awaited(checks, seen))
+        and time.monotonic() < deadline
+    ):
         time.sleep(POLL_SECONDS)
         checks = _checks(args.number)
+        threads, seen = _review_data(args.number)
 
     for check in sorted(checks, key=lambda item: item["name"]):
         print(f"{check['bucket']:<8} {check['name']}")
     if not checks:
         print("no checks have run (yet)")
-    threads, seen = _review_data(args.number)
     opened = _open_threads(threads)
     missing = sorted({name for name, _words in REVIEWERS} - seen)
     print(f"\nreviewed by: {', '.join(sorted(seen)) or 'nobody'}")

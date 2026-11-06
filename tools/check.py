@@ -89,13 +89,18 @@ def _summary(name: str, output: str, code: int) -> tuple[bool, str]:
     lines = [line for line in output.strip().splitlines() if line.strip()]
     if name == "mypy":
         errors = [line for line in lines if ": error:" in line]
-        unknown = [
-            line
-            for line in errors
-            if not any(
-                all(part in line for part in known) for known in KNOWN_MYPY_ERRORS
+        # Each known error excuses one reported error, not every look-alike.
+        unused = list(KNOWN_MYPY_ERRORS)
+        unknown = []
+        for line in errors:
+            match = next(
+                (known for known in unused if all(part in line for part in known)),
+                None,
             )
-        ]
+            if match:
+                unused.remove(match)
+            else:
+                unknown.append(line)
         # 0 is clean, 1 is "errors found"; anything else is mypy failing to run.
         ok = code in (0, 1) and not unknown
         text = f"{len(errors)} errors, {len(unknown)} not known"

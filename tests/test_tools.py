@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 
@@ -117,3 +118,72 @@ def test_waiting_ends_only_when_every_check_has_stopped() -> None:
     assert not pr_watch._finished(running)
     assert not pr_watch._finished([])
     assert pr_watch._finished([{"name": "Unit tests", "bucket": "pass"}])
+
+
+def test_a_look_alike_error_is_not_excused_by_a_known_one() -> None:
+    twice = f"{LEGACY}\n{LEGACY}\n{LINK}\nFound 3 errors in 2 files"
+
+    assert check._summary("mypy", twice, 1)[0] is False
+
+
+def test_a_cancelled_job_never_passes() -> None:
+    everyone = {"devin", "codex", "coderabbit"}
+    cancelled = [{"name": "Unit tests", "bucket": "cancel"}]
+    skipped = [
+        {"name": "Unit tests", "bucket": "pass"},
+        {"name": "CodeRabbit", "bucket": "skipping"},
+    ]
+
+    assert pr_watch._verdict(cancelled, 0, everyone) == 1
+    assert pr_watch._verdict(skipped, 0, everyone) == 0
+
+
+def test_waiting_goes_on_for_a_bot_that_has_not_reviewed_yet() -> None:
+    done = [{"name": "Unit tests", "bucket": "pass"}]
+    skipped = [*done, {"name": "CodeRabbit", "bucket": "skipping"}]
+
+    assert pr_watch._awaited(done, {"devin"}) == {"codex", "coderabbit"}
+    # CI itself says CodeRabbit will not review: no point in waiting for it.
+    assert pr_watch._awaited(skipped, {"devin", "codex"}) == set()
+
+
+def test_only_a_review_of_the_current_head_counts(monkeypatch) -> None:
+    def page(reviews: list, after_cursor: str | None, more: bool) -> str:
+        return json.dumps(
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "headRefOid": "new",
+                            "reviews": {"nodes": reviews},
+                            "reviewThreads": {
+                                "pageInfo": {"hasNextPage": more, "endCursor": "c"},
+                                "nodes": [_thread(f"finding {after_cursor}")],
+                            },
+                        }
+                    }
+                }
+            }
+        )
+
+    def review(login: str, oid: str) -> dict:
+        return {"author": {"login": login}, "commit": {"oid": oid}}
+
+    calls: list[tuple] = []
+
+    def fake_gh(*args: str) -> str:
+        calls.append(args)
+        if args[0] == "repo":
+            return "o/r"
+        first = not any("after=" in part for part in args)
+        if first:
+            old = [review("devin-ai-bot", "old"), review("codex", "new")]
+            return page(old, "1", True)
+        return page([review("coderabbitai[bot]", "new")], "2", False)
+
+    monkeypatch.setattr(pr_watch, "_gh", fake_gh)
+
+    threads, seen = pr_watch._review_data("5")
+
+    assert seen == {"codex", "coderabbit"}  # devin reviewed the old commit only
+    assert len(threads) == 2  # the second page was read as well
