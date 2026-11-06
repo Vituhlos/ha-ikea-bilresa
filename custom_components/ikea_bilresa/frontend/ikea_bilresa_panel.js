@@ -2982,7 +2982,7 @@ class IkeaBilresaPanel extends HTMLElement {
   _actionsForm(field, actionField) {
     const box = el("div", "actions-form");
     const items = this._sequenceOf(field);
-    const drawn = JSON.stringify(items);
+    let drawn = JSON.stringify(items);
     // A click on a button redraws at once. A change made by leaving a box does
     // not while focus is still in the form: that leave may be a click on Save,
     // and a redraw would take the button away before the click arrives.
@@ -2997,6 +2997,7 @@ class IkeaBilresaPanel extends HTMLElement {
       if (replace) this._clearRefused(`${field}|`);
       else if (structural) this._clearRefused(`${field}|data|`);
       this._setSequence(field, actionField, next);
+      drawn = JSON.stringify(this._sequenceOf(field));
       if (fromBox && this._formHasFocus()) this._renderDeferred = true;
       else this._render();
     };
@@ -3010,9 +3011,12 @@ class IkeaBilresaPanel extends HTMLElement {
             item,
             index,
             (changed) =>
-              commit(items.map((other, at) => (at === index ? changed : other)), {
-                fromBox: true,
-              }),
+              commit(
+                this._sequenceOf(field).map((other, at) =>
+                  at === index ? changed : other,
+                ),
+                { fromBox: true },
+              ),
           ),
         );
       } else {
@@ -3038,7 +3042,7 @@ class IkeaBilresaPanel extends HTMLElement {
     const add = el("button", "action-button", this._t("actions_add"));
     add.type = "button";
     add.addEventListener("click", () =>
-      commit([...items, { action: "" }], { structural: true }),
+      commit([...this._sequenceOf(field), { action: "" }]),
     );
     box.appendChild(add);
     box.appendChild(this._actionsJson(field, items, commit));
@@ -3046,8 +3050,12 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   // One plain action: which service, on which entities, with what data.
-  _actionRow(field, item, index, change) {
+  _actionRow(field, drawnItem, index, change) {
     const fields = el("div", "actions-fields");
+    // The row as it is now: an edit made in another box of the row before the
+    // form was drawn again is part of it.
+    const current = () => this._sequenceOf(field)[index] ?? drawnItem;
+    const item = drawnItem;
     const id = `${this._fieldId(field)}-${index}`;
     const key = "action" in item ? "action" : "service";
 
@@ -3061,7 +3069,7 @@ class IkeaBilresaPanel extends HTMLElement {
       {
         value: item[key],
         emptyLabel: this._t("actions_choose"),
-        onChange: (next) => change({ ...item, [key]: next }),
+        onChange: (next) => change({ ...current(), [key]: next }),
       },
     );
     fields.appendChild(pick);
@@ -3079,8 +3087,9 @@ class IkeaBilresaPanel extends HTMLElement {
         .map((part) => part.trim())
         .filter(Boolean);
       // Areas, devices and labels in the target are kept as they are.
-      const next = { ...item };
-      const kept = { ...(item.target || {}) };
+      const base = current();
+      const next = { ...base };
+      const kept = { ...(base.target || {}) };
       if (ids.length) kept.entity_id = ids;
       else delete kept.entity_id;
       if (Object.keys(kept).length) next.target = kept;
@@ -3117,7 +3126,7 @@ class IkeaBilresaPanel extends HTMLElement {
         return;
       }
       this._refusedText?.delete(dataKey);
-      const next = { ...item };
+      const next = { ...current() };
       if (parsed && Object.keys(parsed).length) next.data = parsed;
       else delete next.data;
       change(next);

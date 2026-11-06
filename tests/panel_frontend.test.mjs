@@ -2130,7 +2130,7 @@ test("refused text stays on screen and keeps blocking Save until it is corrected
   });
 });
 
-test("a click on a list that was replaced meanwhile only shows the real list", () => {
+test("a click on a list that was replaced meanwhile acts on the real list", () => {
   const { panel, renders } = actionPanel({
     double_press_action: "run",
     double_press_sequence: PLAY,
@@ -2151,9 +2151,10 @@ test("a click on a list that was replaced meanwhile only shows the real list", (
     json.listeners.change();
     assert.deepEqual(panel._editorData.double_press_sequence, typed);
 
-    // Add was drawn before that: it must not write the old list back.
+    // Add was drawn before that: it adds to the list as it is now and must not
+    // write the old one back.
     add.listeners.click();
-    assert.deepEqual(panel._editorData.double_press_sequence, typed);
+    assert.deepEqual(panel._editorData.double_press_sequence, [...typed, { action: "" }]);
     assert.equal(renders(), 1);
   });
 });
@@ -2170,4 +2171,38 @@ test("changing the actions clears the server's old verdict on them", () => {
   ]);
 
   assert.deepEqual(panel._editorErrors, {});
+});
+
+test("successive edits of one row keep each other, and adding keeps refused text", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: PLAY,
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    // The form is drawn once; focus stays in it, so no redraw happens between edits.
+    panel._formHasFocus = () => true;
+    const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
+    const nodes = walk(wrap);
+    const target = nodes.find((n) => n.tag === "input");
+    const [data] = nodes.filter((n) => n.tag === "textarea");
+
+    target.value = "light.a, light.b";
+    target.listeners.change();
+    data.value = JSON.stringify({ brightness: 5 });
+    data.listeners.change();
+
+    assert.deepEqual(panel._editorData.double_press_sequence[0], {
+      action: "media_player.media_play_pause",
+      target: { entity_id: ["light.a", "light.b"] },
+      data: { brightness: 5 },
+    });
+
+    // Refused data is still refused after a row is added at the end.
+    data.value = "{ nope";
+    data.listeners.change();
+    const [add] = nodes.filter((n) => n.tag === "button" && n.textContent === "actions_add");
+    add.listeners.click();
+    assert.equal(panel._choiceErrors().double_press_action, "actions_invalid");
+  });
 });
