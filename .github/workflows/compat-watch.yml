@@ -8,6 +8,10 @@ on:
     - cron: "40 6 * * 1"
   workflow_dispatch:
 
+# One run at a time: two runs must not both create the issue.
+concurrency:
+  group: compat-watch
+
 permissions:
   contents: read
   issues: write
