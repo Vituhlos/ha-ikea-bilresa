@@ -36,7 +36,8 @@ jobs:
       - name: Remove `stale` from issues that no longer wait for information
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh issue list --state open --label stale --json number,labels \
+          gh issue list --state open --label stale --limit 1000 --json number,labels \
             --jq '.[] | select(all(.labels[]; .name != "needs-info")) | .number' |
             xargs -r -I{} gh issue edit {} --remove-label stale
