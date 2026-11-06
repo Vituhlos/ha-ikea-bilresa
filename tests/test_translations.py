@@ -17,10 +17,6 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 import pytest
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    MockEntityPlatform,
-)
 import yaml
 
 from custom_components.ikea_bilresa import event, number, switch
@@ -37,6 +33,10 @@ from custom_components.ikea_bilresa.event import BilresaButtonEvent, BilresaChan
 from custom_components.ikea_bilresa.number import BilresaChannelDial
 from custom_components.ikea_bilresa.switch import BilresaChannelButtonSwitch
 from custom_components.ikea_bilresa.trigger import GESTURES
+from tests.ha_common import (
+    MockConfigEntry,
+    MockEntityPlatform,
+)
 
 COMPONENT = Path(__file__).parent.parent / "custom_components" / "ikea_bilresa"
 LANGUAGES = sorted(path.stem for path in (COMPONENT / "translations").glob("*.json"))

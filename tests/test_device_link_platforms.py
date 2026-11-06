@@ -15,10 +15,6 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import Entity
 import pytest
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    MockEntityPlatform,
-)
 
 from custom_components.ikea_bilresa import event, number, switch
 from custom_components.ikea_bilresa.const import (
@@ -29,6 +25,10 @@ from custom_components.ikea_bilresa.const import (
 )
 from custom_components.ikea_bilresa.coordinator import BilresaCoordinator
 from custom_components.ikea_bilresa.model import BilresaWheel, SwitchEndpoint
+from tests.ha_common import (
+    MockConfigEntry,
+    MockEntityPlatform,
+)
 
 pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 
