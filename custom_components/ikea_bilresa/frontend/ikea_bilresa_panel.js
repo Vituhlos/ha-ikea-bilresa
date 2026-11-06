@@ -1653,12 +1653,15 @@ const loadActionEditor = (hass) => {
         return false;
       }
       // Labels of services, targets and selectors come from these.
-      await Promise.allSettled([
-        hass?.loadBackendTranslation?.("services"),
-        hass?.loadBackendTranslation?.("selector"),
-        hass?.loadBackendTranslation?.("entity_component"),
-        hass?.loadFragmentTranslation?.("config"),
-      ]);
+      // Labels only: if they stall, the editor still works.
+      await within(
+        Promise.allSettled([
+          hass?.loadBackendTranslation?.("services"),
+          hass?.loadBackendTranslation?.("selector"),
+          hass?.loadBackendTranslation?.("entity_component"),
+          hass?.loadFragmentTranslation?.("config"),
+        ]),
+      ).catch(() => undefined);
       return true;
     } catch (err) {
       console.warn("ikea_bilresa: the action editor of Home Assistant is not available", err);
@@ -1673,12 +1676,17 @@ const loadActionEditor = (hass) => {
 
 // An action the simple list can show and write back unchanged.
 const SIMPLE_ACTION_KEYS = ["action", "service", "target", "data", "alias", "enabled", "continue_on_error"];
+// Entity ids written out, not a template that happens to contain commas.
+const plainEntityIds = (value) =>
+  value === undefined ||
+  [].concat(value).every((id) => typeof id === "string" && !id.includes("{"));
 const isPlainObject = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 const isSimpleAction = (item) =>
   isPlainObject(item) &&
   typeof (item.action ?? item.service) === "string" &&
-  (item.target === undefined || isPlainObject(item.target)) &&
+  (item.target === undefined ||
+    (isPlainObject(item.target) && plainEntityIds(item.target.entity_id))) &&
   (item.data === undefined || isPlainObject(item.data)) &&
   Object.keys(item).every((key) => SIMPLE_ACTION_KEYS.includes(key));
 
@@ -2552,7 +2560,11 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _editorSnapshot() {
-    return JSON.stringify({ data: this._editorData, choices: this._editorChoices });
+    return JSON.stringify({
+      data: this._editorData,
+      choices: this._editorChoices,
+      refused: [...(this._refusedText ?? [])],
+    });
   }
 
   _editorDirty() {
@@ -2900,6 +2912,23 @@ class IkeaBilresaPanel extends HTMLElement {
     (this._refusedText ??= new Map()).set(key, text);
   }
 
+  _shiftRefused(field, removed) {
+    const prefix = `${field}|data|`;
+    const kept = [...(this._refusedText ?? [])].filter(([key]) => !key.startsWith(prefix));
+    const moved = [...(this._refusedText ?? [])]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, text]) => [Number(key.slice(prefix.length)), text])
+      .filter(([at]) => at !== removed)
+      .map(([at, text]) => [`${prefix}${at > removed ? at - 1 : at}`, text]);
+    this._refusedText = new Map([...kept, ...moved]);
+  }
+
+  // Draws again a moment later, after a click that may be on its way.
+  _renderLater() {
+    clearTimeout(this._renderLaterTimer);
+    this._renderLaterTimer = setTimeout(() => this._render(), 300);
+  }
+
   _clearRefused(prefix) {
     for (const key of [...(this._refusedText?.keys() ?? [])]) {
       if (key.startsWith(prefix)) this._refusedText.delete(key);
@@ -2907,6 +2936,8 @@ class IkeaBilresaPanel extends HTMLElement {
   }
 
   _setSequence(field, actionField, value) {
+    // The editor of Home Assistant may answer after this one was closed.
+    if (!this._editorData) return;
     // The server's verdict on the old list says nothing about the new one.
     this._editorChanged(field);
     // A copy: the editors change what they are given, and the data must only
@@ -2982,23 +3013,27 @@ class IkeaBilresaPanel extends HTMLElement {
   _actionsForm(field, actionField) {
     const box = el("div", "actions-form");
     const items = this._sequenceOf(field);
-    let drawn = JSON.stringify(items);
-    // A click on a button redraws at once. A change made by leaving a box does
-    // not while focus is still in the form: that leave may be a click on Save,
-    // and a redraw would take the button away before the click arrives.
-    // The list may have been replaced since this was drawn (the JSON box, whose
-    // redraw waited): then the click is on a picture that is gone, so it only
-    // shows the real list and the person clicks again.
-    const commit = (next, { fromBox = false, replace = false, structural = false } = {}) => {
-      if (!replace && JSON.stringify(this._sequenceOf(field)) !== drawn) {
+    // What the rows show is stale once the JSON box replaced the list: a click
+    // on a row then only shows the real list and the person clicks again.
+    let stale = false;
+    // Everything below changes the list as it is now, never the list as it was
+    // when this was drawn. A click on a button redraws at once. A change made by
+    // leaving a box does not redraw at all (the box already shows it), and the
+    // JSON box redraws a little later: leaving a box may be a click on Save, and
+    // a redraw before that click arrives would take the button away.
+    const commit = (next, { replace = false, removed = null, redraw = true } = {}) => {
+      if (!replace && stale) {
         this._render();
         return;
       }
-      if (replace) this._clearRefused(`${field}|`);
-      else if (structural) this._clearRefused(`${field}|data|`);
+      if (replace) {
+        this._clearRefused(`${field}|`);
+        stale = true;
+      }
+      if (removed !== null) this._shiftRefused(field, removed);
       this._setSequence(field, actionField, next);
-      drawn = JSON.stringify(this._sequenceOf(field));
-      if (fromBox && this._formHasFocus()) this._renderDeferred = true;
+      if (!redraw) return;
+      if (replace) this._renderLater();
       else this._render();
     };
     if (!items.length) box.appendChild(el("p", "field-help", this._t("actions_empty")));
@@ -3015,7 +3050,7 @@ class IkeaBilresaPanel extends HTMLElement {
                 this._sequenceOf(field).map((other, at) =>
                   at === index ? changed : other,
                 ),
-                { fromBox: true },
+                { redraw: false },
               ),
           ),
         );
@@ -3032,8 +3067,8 @@ class IkeaBilresaPanel extends HTMLElement {
       remove.type = "button";
       remove.addEventListener("click", () =>
         commit(
-          items.filter((_, at) => at !== index),
-          { structural: true },
+          this._sequenceOf(field).filter((_, at) => at !== index),
+          { removed: index },
         ),
       );
       row.appendChild(remove);
@@ -3116,7 +3151,10 @@ class IkeaBilresaPanel extends HTMLElement {
       let parsed;
       try {
         parsed = text ? JSON.parse(text) : undefined;
-        if (parsed !== undefined && (typeof parsed !== "object" || Array.isArray(parsed))) {
+        if (
+          parsed !== undefined &&
+          (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+        ) {
           throw new Error("not an object");
         }
       } catch {
@@ -3162,7 +3200,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._refuse(jsonKey, input.value);
         return;
       }
-      commit(parsed, { fromBox: true, replace: true });
+      commit(parsed, { replace: true });
     });
     wrap.append(label, input, note);
     return wrap;

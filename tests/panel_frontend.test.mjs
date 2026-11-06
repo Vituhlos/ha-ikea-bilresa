@@ -2056,13 +2056,13 @@ test("a box left by clicking Save does not redraw the form under the button", ()
     const json = boxes[boxes.length - 1];
     json.value = JSON.stringify([{ action: "light.toggle" }]);
 
-    // Focus is on Save, which is in the form.
-    panel._formHasFocus = () => true;
     json.listeners.change();
 
     assert.deepEqual(panel._editorData.double_press_sequence, [{ action: "light.toggle" }]);
+    // Drawn a moment later, not now: a click on Save may be on its way.
     assert.equal(renders(), 0);
-    assert.equal(panel._renderDeferred, true);
+    assert.notEqual(panel._renderLaterTimer, undefined);
+    clearTimeout(panel._renderLaterTimer);
   });
 });
 
@@ -2144,17 +2144,17 @@ test("a click on a list that was replaced meanwhile acts on the real list", () =
       (n) => n.tag === "button" && n.textContent === "actions_add",
     );
 
-    // The JSON box is changed and its redraw waits because focus is in the form.
-    panel._formHasFocus = () => true;
+    // The JSON box is changed and its redraw waits.
     const typed = [{ action: "light.toggle" }, { action: "light.turn_on" }];
     json.value = JSON.stringify(typed);
     json.listeners.change();
+    clearTimeout(panel._renderLaterTimer);
     assert.deepEqual(panel._editorData.double_press_sequence, typed);
 
-    // Add was drawn before that: it adds to the list as it is now and must not
-    // write the old one back.
+    // Add was drawn before that: it only shows the real list, and writes nothing
+    // back.
     add.listeners.click();
-    assert.deepEqual(panel._editorData.double_press_sequence, [...typed, { action: "" }]);
+    assert.deepEqual(panel._editorData.double_press_sequence, typed);
     assert.equal(renders(), 1);
   });
 });
@@ -2180,8 +2180,7 @@ test("successive edits of one row keep each other, and adding keeps refused text
   });
   withFakeDom(() => {
     panel._actionEditor = "form";
-    // The form is drawn once; focus stays in it, so no redraw happens between edits.
-    panel._formHasFocus = () => true;
+    // The form is drawn once: a row edit does not redraw it.
     const wrap = panel._actionsEditor("double_press_sequence", "double_press_action");
     const nodes = walk(wrap);
     const target = nodes.find((n) => n.tag === "input");
@@ -2205,4 +2204,89 @@ test("successive edits of one row keep each other, and adding keeps refused text
     add.listeners.click();
     assert.equal(panel._choiceErrors().double_press_action, "actions_invalid");
   });
+});
+
+test("removing a row keeps what was edited in the others", () => {
+  const second = { action: "light.toggle", target: { entity_id: "light.a" } };
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: [...PLAY, second],
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const nodes = walk(panel._actionsEditor("double_press_sequence", "double_press_action"));
+    const inputs = nodes.filter((n) => n.tag === "input");
+    const removes = nodes.filter((n) => n.tag === "button" && n.textContent === "actions_remove");
+
+    inputs[1].value = "light.b";
+    inputs[1].listeners.change();
+    removes[0].listeners.click();
+
+    assert.deepEqual(panel._editorData.double_press_sequence, [
+      { action: "light.toggle", target: { entity_id: ["light.b"] } },
+    ]);
+  });
+});
+
+test("refused data keeps its row when another row goes", () => {
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: [
+      ...PLAY,
+      { action: "light.toggle" },
+      { action: "light.turn_on" },
+    ],
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const nodes = walk(panel._actionsEditor("double_press_sequence", "double_press_action"));
+    const data = nodes.filter((n) => n.tag === "textarea");
+    data[2].value = "{ nope";
+    data[2].listeners.change();
+    const [remove] = nodes.filter((n) => n.tag === "button" && n.textContent === "actions_remove");
+
+    remove.listeners.click();
+
+    // The third row is the second now, and its refused text went with it.
+    assert.deepEqual([...panel._refusedText.keys()], ["double_press_sequence|data|1"]);
+    assert.equal(panel._choiceErrors().double_press_action, "actions_invalid");
+  });
+});
+
+test("null is not data, and a templated target is left to the JSON box", () => {
+  const templated = { action: "light.toggle", target: { entity_id: "{{ a }}, {{ b }}" } };
+  const { panel } = actionPanel({
+    double_press_action: "run",
+    double_press_sequence: [...PLAY, templated],
+  });
+  withFakeDom(() => {
+    panel._actionEditor = "form";
+    const nodes = walk(panel._actionsEditor("double_press_sequence", "double_press_action"));
+
+    // Only the first action has fields.
+    assert.equal(nodes.filter((n) => n.tag === "select").length, 1);
+
+    const data = nodes.filter((n) => n.tag === "textarea")[0];
+    data.value = "null";
+    data.listeners.change();
+    assert.equal(panel._choiceErrors().double_press_action, "actions_invalid");
+  });
+});
+
+test("text that was refused counts as an unsaved change", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  const before = panel._editorSnapshot();
+
+  panel._refuse("double_press_sequence|json", "{ nope");
+
+  assert.notEqual(panel._editorSnapshot(), before);
+});
+
+test("an answer from Home Assistant's editor after the form was closed does nothing", () => {
+  const { panel } = actionPanel({ double_press_action: "run", double_press_sequence: PLAY });
+  panel._editorData = null;
+
+  assert.doesNotThrow(() =>
+    panel._setSequence("double_press_sequence", "double_press_action", []),
+  );
 });
