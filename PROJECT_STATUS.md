@@ -18,6 +18,10 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## Backport of the compatibility watch and the 2026.11 CI to `main` (2026-11-06)
+
+Copied from the development line (PR #40 and PR #41), because scheduled workflows run only from `main`: `compat-watch.yml` with `tools/compat_watch.py` and `.github/compat-baseline.json` (Home Assistant 2026.11.0, Matter Server app 9.3.0, matterjs-server v1.5.5), the pre-release job of `ci.yml` on the new `pytest-homeassistant`, `tests/ha_common.py` and `tests/ha_typing.py`, and the import changes in six test files. Validated: `pytest` 532 passed on Home Assistant 2026.9.4 (old package) and on 2026.11.0 (`pytest-homeassistant`, `-p no:respx`), ruff clean, mypy only the two known errors. Not run: the workflows on GitHub, and nothing on a real instance. The baseline says what was *tested*, so update it only in a pull request that records a check of a newer version. The garbled-Czech test and the tools of the development line are not backported.
+
 ## Issue #21: the event loop freezes on Matter attribute updates (2026-10-29)
 
 Status: **fix on branch `fix/matter-core-scan-cost`, in a pull request to `main`; not merged, not released.** Tracker: BILRESA-26.
