@@ -88,13 +88,27 @@ def latest() -> dict[str, str]:
     }
 
 
+def _numbers(version: str) -> tuple[int, ...] | None:
+    """``v1.5.5`` -> (1, 5, 5); None for a pre-release or anything unusual."""
+    match = re.fullmatch(r"v?(\d+(?:\.\d+)*)", version.strip())
+    return tuple(int(part) for part in match.group(1).split(".")) if match else None
+
+
 def news(found: dict[str, str], tested: dict[str, str]) -> dict[str, tuple[str, str]]:
-    """What differs from the tested versions: key -> (tested, found)."""
-    return {
-        key: (tested.get(key, "not recorded"), version)
-        for key, version in found.items()
-        if version != tested.get(key)
-    }
+    """What is newer than the tested versions: key -> (tested, found).
+
+    A pre-release is never news, and neither is a release older than the tested one
+    (a release that was withdrawn, or a mirror that lags).
+    """
+    result = {}
+    for key, version in found.items():
+        new = _numbers(version)
+        if new is None:
+            continue
+        old = _numbers(tested.get(key, ""))
+        if old is None or new > old:
+            result[key] = (tested.get(key, "not recorded"), version)
+    return result
 
 
 def body(found: dict[str, str], tested: dict[str, str]) -> str:
@@ -122,8 +136,8 @@ def body(found: dict[str, str], tested: dict[str, str]) -> str:
         "helper, `panel_custom` and the frontend loaders, the Matter client of the "
         "core integration and its events)",
         "- [ ] the server's WebSocket schema bounds still admit client schema 11",
-        "- [ ] `python tools/check.py` against the new Home Assistant "
-        "(the weekly CI job already runs the newest pre-release)",
+        "- [ ] the checks of `docs/DEVELOPMENT.md` (Verification gates) against the "
+        "new Home Assistant (the weekly CI job already runs the newest pre-release)",
         "- [ ] on a real instance: every press and the rotation fire once, the "
         "panel and its action editor load, the integration stays installed and "
         "updatable",
@@ -149,6 +163,10 @@ def _existing_issue() -> tuple[str, str] | None:
         if issue["title"] == TITLE:
             return str(issue["number"]), issue["body"]
     return None
+
+
+def _untick(text: str) -> str:
+    return re.sub(r"^- \[[xX]\]", "- [ ]", text, flags=re.M)
 
 
 def who_to_tell() -> str | None:
@@ -178,8 +196,10 @@ def main() -> int:
         _gh(*command)
     elif changed:
         number, old = existing
-        # An edit tells nobody; a comment does. Only when the news changed.
-        if old.split("\n", 1)[-1] != (mention + text).split("\n", 1)[-1]:
+        # An edit tells nobody; a comment does. Only when the news changed: ticking
+        # a task of the checklist is not news.
+        before = _untick(old).split("\n", 1)[-1]
+        if before != _untick(mention + text).split("\n", 1)[-1]:
             _gh("issue", "edit", number, "--body", mention + text)
             now = ", ".join(f"{key} {new}" for key, (_old, new) in changed.items())
             _gh(
