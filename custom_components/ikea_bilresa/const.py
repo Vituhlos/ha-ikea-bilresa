@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 DOMAIN = "ikea_bilresa"
 
 # Default Matter Server (add-on) WebSocket URL. Overridden by the URL taken
@@ -283,6 +285,28 @@ def mode_supports_target(mode: str, entity_id: str) -> bool:
     """Return whether a scroll mode supports the target entity domain."""
     domain, separator, _object_id = entity_id.partition(".")
     return bool(separator and domain in MODE_TARGET_DOMAINS.get(mode, frozenset()))
+
+
+# Modes in which one binding may drive several lights at once. Every member
+# receives the same value from one tracked target, so only modes whose value
+# means the same thing on every light qualify.
+MULTI_TARGET_MODES = (MODE_BRIGHTNESS, MODE_COLOR_TEMP, MODE_COLOR)
+# Bounded so a single service call stays reasonable for any light integration.
+MAX_BINDING_TARGETS = 20
+
+
+def binding_targets(value: Any) -> list[str]:
+    """Return a stored rotation target as an ordered, de-duplicated list.
+
+    A binding with one target stores it as a plain string — every binding made
+    before multi-light support, and every single-light binding since. Several
+    targets are stored as a list. Every reader goes through this function so
+    the two shapes can never be handled differently.
+    """
+    if not value:
+        return []
+    items = [value] if isinstance(value, str) else list(value)
+    return list(dict.fromkeys(str(item) for item in items if item))
 
 
 # Entity domains a binding can target (its scroll control adapts to the mode).

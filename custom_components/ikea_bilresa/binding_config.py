@@ -53,9 +53,12 @@ from .const import (
     HOLD_ACTIONS,
     HOLD_NONE,
     HOLD_RAMP,
+    MAX_BINDING_TARGETS,
     MODES,
+    MULTI_TARGET_MODES,
     RAMP_DIRECTIONS,
     STEP_CURVES,
+    binding_targets,
     mode_supports_target,
 )
 from .panel_schema import BINDING_NUMBERS
@@ -98,12 +101,18 @@ BUTTON_BINDING_EDIT_FIELDS = (
 )
 
 _ENTITY_ID = vol.Match(r"^[a-z0-9_]+\.[a-z0-9_]+$")
+# The rotation target: one entity id, or a list of them for a multi-light
+# binding. Normalization below stores a single entity as a plain string.
+_TARGETS = vol.Any(
+    _ENTITY_ID,
+    vol.All([_ENTITY_ID], vol.Length(min=1, max=MAX_BINDING_TARGETS)),
+)
 
 _WHEEL_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NODE_ID): vol.All(str, vol.Length(min=1)),
         vol.Required(CONF_CHANNEL): vol.In(("1", "2", "3")),
-        vol.Required(CONF_TARGET): _ENTITY_ID,
+        vol.Required(CONF_TARGET): _TARGETS,
         vol.Required(CONF_MODE, default=DEFAULT_MODE): vol.In(MODES),
         vol.Required(CONF_STEP, default=DEFAULT_STEP): BINDING_NUMBERS[
             CONF_STEP
@@ -209,6 +218,12 @@ def normalize_binding_data(
     for field in BINDING_OPTIONAL_FIELDS:
         if candidate.get(field) in (None, "", []):
             candidate.pop(field, None)
+    if not is_button and isinstance(candidate.get(CONF_TARGET), list | tuple):
+        # One entity keeps the historic string shape, so a binding saved with
+        # a single light reads exactly like one saved before multi-light
+        # support. Duplicates are dropped; an empty list stays invalid.
+        targets = binding_targets(candidate[CONF_TARGET])
+        candidate[CONF_TARGET] = targets[0] if len(targets) == 1 else targets
     return dict((_BUTTON_SCHEMA if is_button else _WHEEL_SCHEMA)(candidate))
 
 
@@ -226,7 +241,10 @@ def binding_errors(data: dict[str, Any]) -> dict[str, str]:
         elif hold_action == HOLD_RAMP and not str(hold_target).startswith("light."):
             errors[CONF_HOLD_TARGET] = "ramp_requires_light"
     else:
-        if not mode_supports_target(data[CONF_MODE], data[CONF_TARGET]):
+        targets = binding_targets(data[CONF_TARGET])
+        if len(targets) > 1 and data[CONF_MODE] not in MULTI_TARGET_MODES:
+            errors[CONF_TARGET] = "multiple_targets_require_light_mode"
+        elif not all(mode_supports_target(data[CONF_MODE], t) for t in targets):
             errors[CONF_TARGET] = "mode_target_mismatch"
         if data[CONF_MIN_BRIGHTNESS] >= data[CONF_MAX_BRIGHTNESS]:
             errors[CONF_MAX_BRIGHTNESS] = "maximum_must_exceed_minimum"

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- **One binding can dim several lights.** In a brightness, colour-temperature
+  or colour binding, the rotation target accepts several lights, in the
+  configuration flow and in the panel editor. The binding keeps one level and
+  sends that same value to every light in one call. The lights are read back
+  only when nothing is tracked yet, as a light group would read them (on while
+  any is on, at the mean level of the lit ones). A light that reports late on
+  its way to the value sent is treated as catching up, so a slow bulb no longer
+  makes the next scroll jump to its level. Only a light that settles somewhere
+  else counts as an outside change. An unavailable light is left out and
+  brought back in line by the next command. Without a separate short-press
+  target, a short press switches all the lights together. A binding with one
+  target is stored and behaves exactly as before. (Related to Issue #9)
+
 ### Fixed
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter

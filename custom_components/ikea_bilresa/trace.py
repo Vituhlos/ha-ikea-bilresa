@@ -20,9 +20,9 @@ capture of a real defect therefore becomes a permanent regression test, and two
 candidate fixes can be compared on identical input instead of on two different
 turns of a wheel.
 
-Household identifiers are not special-cased here: rows carry ``node_id`` and
-``target`` under exactly those keys, and ``diagnostics.py`` redacts them by key
-along with everything else.
+Household identifiers are not special-cased here: rows carry ``node_id``,
+``target`` and ``targets`` under exactly those keys, and ``diagnostics.py``
+redacts them by key along with everything else.
 """
 
 from __future__ import annotations
