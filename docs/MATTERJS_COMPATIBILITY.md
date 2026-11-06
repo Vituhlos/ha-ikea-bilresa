@@ -116,7 +116,7 @@ Passing static checks or fake-client tests does not satisfy these gates.
 ## Audit of Home Assistant 2026.11 and Matter Server 9.2.0 / 9.3.0 (2026-11-06)
 
 Read from the sources and changelogs, and the test suite run against Home
-Assistant 2026.11.0 in a separate environment (954 passed). **Not run on a real
+Assistant 2026.11.0 in a separate environment (953 passed, re-run on 2026-11-06). **Not run on a real
 instance, a real Matter Server or a physical wheel**, so items 1–7 above are
 still open for these versions.
 
