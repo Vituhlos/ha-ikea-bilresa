@@ -600,6 +600,11 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
     def _button_action_fields(
         defaults: dict[str, Any], *, wheel: bool
     ) -> dict[Any, Any]:
+        """Build press-action selectors for wheel and dual-button bindings.
+
+        Wheel bindings also offer triple-press targets and scenes, while
+        dual-button bindings offer a ramp-direction selector.
+        """
         fields: dict[Any, Any] = {
             vol.Required(
                 CONF_CLICK_ACTION,
