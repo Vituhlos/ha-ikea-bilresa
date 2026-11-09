@@ -87,6 +87,37 @@ These instructions apply to the entire repository and to every coding agent.
 - **Record what was decided, not what was said:** the tracker item and
   `PROJECT_STATUS.md` hold decisions, results and what was not verified.
 
+## Replying on GitHub (issues and pull requests)
+
+Nothing is posted without the owner's approval of the text. A reply to a
+contributor is written like the ones to @amodig on PR #5 and #23:
+
+- **Language and voice:** English (the project's language), warm and specific.
+  Answer what this person wrote, thank them for something concrete, and say what
+  was done with their idea instead of a generic "thanks for the report".
+- **First line, in italics:** `*🤖 Agent-assisted: this reply was written by
+  Claude, an AI assistant working on this repository with the maintainer
+  (@Vituhlos), who read and approved it before it was posted.*` Then a greeting
+  with the person's `@login` and a 👋.
+- **Bold lead sentences** that carry the point of each paragraph (what was
+  decided, what works today, what is coming). A reader who only reads the bold
+  text still gets the answer.
+- **A few emoji as markers, not decoration:** ✅ already out, 🔜 coming,
+  🧪 what has not been verified, ❓ questions, 🙏 a thank-you or a request for
+  help. At most one or two per paragraph.
+- **A small table** when it shows a mapping (helper to actions, gesture to
+  action, variable to colour); `<details>` for side material such as setup steps.
+- **Always say what is not verified,** in its own paragraph. Never claim hardware
+  success from tests or CI. Name versions exactly and say whether a feature is in
+  a release, a pre-release or only on the development line. Promise no dates.
+- **Numbered questions** at the end, specific to the person (which device, what
+  behaviour they expect), so the reply is useful to answer.
+- **Last line:** `🤖 Agent-authored: Claude Code, model ` followed by the model
+  id in backticks.
+- Keep the issue open until the change is in a release (or the reporter
+  confirms). Do not paste anything from the owner's own Home Assistant (names,
+  ids, paths): documents and replies stay generic.
+
 ## Required handoff
 
 Before ending a coding session, update `PROJECT_STATUS.md` in the same working
