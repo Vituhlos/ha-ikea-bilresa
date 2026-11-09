@@ -89,7 +89,8 @@ Zigbee2MQTT lze dál použít jako jediný cíl.
 
 - Stisk, který ovládá otáčený cíl, aktivace scény i spuštění akcí zruší
   otočení, které ještě čeká na odeslání, takže později nepřepíše novou akci.
-  Platí to pro propojení s jedním cílem i s více světly.
+  Platí to pro propojení s jedním cílem i s více světly. Zruší také otočení,
+  které ještě čeká u jiného propojení ovládajícího stejné světlo.
 - Když jsou všechna světla vypnutá, otočení nahoru u jasu je zapne a otočení
   dolů nedělá nic; barva a teplota bílé potřebují rozsvícená světla, stejně jako
   u jediného světla.

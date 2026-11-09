@@ -90,7 +90,8 @@ Assistant or Zigbee2MQTT group entity can still be used as a single target.
 
 - For both single-target and multi-light bindings, a press acting on a rotation
   target, a scene activation, or a configured action sequence cancels any
-  queued rotation so it cannot override the new action later.
+  queued rotation so it cannot override the new action later. It also cancels
+  a rotation still queued by another binding that controls the same light.
 - When every light is off, scrolling a brightness binding up switches them on
   and scrolling down does nothing; colour and colour temperature need lit
   lights, as for a single light.
