@@ -9,7 +9,7 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 
 - **Stable line:** `v0.6.1` is the latest stable release on `main`. Stable releases stay deferred until the hardware checks pass (`AGENTS.md`).
 - **Development line:** branch `agent/panel-0.6.1` carries the redesigned panel, the binding editor, actions by kind of target, action sequences with the panel editor, one binding for several lights and everything on `main` up to the Issue #21 fix. It becomes **0.7.0**. The newest pre-release is `v0.7.0-rc.6` (2026-11-09, tag on `3e95790`); the earlier candidates are `v0.7.0-rc.1` to `rc.5` and, on `main`, `v0.6.2-rc.1` and `rc.2`.
-- **Nearest step:** the owner tries `v0.7.0-rc.6` in his Home Assistant (2026.11, installed through the Marketplace, where HACS has moved) and reports what the panel, the action editor and the new actions do; the hardware checks stay open and postponed by the owner (tracker BILRESA-12, `docs/HARDWARE_TEST.md`).
+- **Nearest step:** the owner tries `v0.7.0-rc.6` in the owner's Home Assistant (2026.11, installed through the Marketplace, where HACS has moved) and reports what the panel, the action editor and the new actions do; the hardware checks stay open and postponed by the owner (tracker BILRESA-12, `docs/HARDWARE_TEST.md`).
 - **Do not** install `0.6.2-rc.*` or `0.6.1` on the owner's instance: they have the old panel layout. Do not deploy, tag or release without the owner's explicit word.
 
 ## Done
