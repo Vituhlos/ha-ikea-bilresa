@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Documentation
+- **Installation through the Marketplace.** From Home Assistant 2026.11 HACS is part
+  of Home Assistant and is called the Marketplace. The getting started guides and
+  both READMEs describe the Marketplace and keep the HACS steps for older
+  versions, including how to pick a pre-release or an earlier version.
+
 ## [0.7.0-rc.6] - 2026-11-09
 
 Pre-release candidate for testing, not a stable release. It adds actions by kind
