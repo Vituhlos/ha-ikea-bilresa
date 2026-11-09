@@ -34,7 +34,32 @@ and configuration is validated.
 
 
 
-### HACS (recommended)
+### Marketplace (Home Assistant 2026.11 and newer, recommended)
+
+From Home Assistant 2026.11 HACS is part of Home Assistant itself and is called
+the **Marketplace** (**Settings → Marketplace**). An existing HACS installation
+moves there by itself on the first start, with its custom repositories.
+
+1. **Settings → Marketplace** → add
+   `https://github.com/Vituhlos/ha-ikea-bilresa` from a link (a custom
+   repository).
+2. Install **IKEA BILRESA**.
+3. **Restart Home Assistant.**
+
+**Choosing a version.** Open **IKEA BILRESA** in the Marketplace and use the ⋮
+menu in the top right corner:
+
+- **Install another version** lists every release; a pre-release is marked as
+  one. Pick a version and install it.
+- **Exclude pre-releases** (or its opposite, when pre-releases are excluded)
+  decides whether pre-releases such as a test candidate are offered at all. Stable
+  releases are always offered.
+- **Reinstall** installs the selected version again.
+
+Restart Home Assistant after every change of version. To go back to an earlier
+version the Marketplace itself recommends restoring a backup as the safer way.
+
+### HACS (Home Assistant before 2026.11)
 
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 
@@ -45,8 +70,11 @@ Or add it manually:
 2. Install **IKEA BILRESA**.
 3. **Restart Home Assistant.**
 
-The integration is not in the default HACS store yet — the custom-repository
-step above is required. Upgrading from 0.5.x has breaking changes; read the
+**Choosing a version.** HACS → **IKEA BILRESA** → ⋮ → **Redownload**, switch on
+**Show beta versions** to see the pre-releases, pick a version and download it.
+
+The integration is not in the default store yet, in the Marketplace or in HACS
+— the custom-repository step above is required. Upgrading from 0.5.x has breaking changes; read the
 [CHANGELOG.md](../../CHANGELOG.md) and take a backup first.
 
 ### Manual

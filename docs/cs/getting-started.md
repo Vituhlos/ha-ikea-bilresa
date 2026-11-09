@@ -34,7 +34,31 @@ a nastavení ověřené.
 
 
 
-### HACS (doporučeno)
+### Marketplace (Home Assistant 2026.11 a novější, doporučeno)
+
+Od Home Assistantu 2026.11 je HACS součástí samotného Home Assistantu a jmenuje
+se **Marketplace** (**Nastavení → Marketplace**). Stávající instalace HACS se tam
+při prvním startu přesune sama, i s vlastními repozitáři.
+
+1. **Nastavení → Marketplace** → přidejte
+   `https://github.com/Vituhlos/ha-ikea-bilresa` odkazem (vlastní repozitář).
+2. Nainstalujte **IKEA BILRESA**.
+3. **Restartujte Home Assistant.**
+
+**Výběr verze.** V Marketplace otevřete **IKEA BILRESA** a použijte nabídku ⋮
+vpravo nahoře:
+
+- **Nainstalovat jinou verzi** ukáže všechna vydání, předběžné vydání je tak
+  označené. Vyberte verzi a nainstalujte ji.
+- **Exclude pre-releases** (nebo opačná volba, když jsou předběžná vydání
+  vyloučená) rozhoduje, jestli se předběžná vydání, například testovací
+  kandidát, vůbec nabízejí. Stabilní vydání se nabízejí vždy.
+- **Přeinstalovat** nainstaluje vybranou verzi znovu.
+
+Po každé změně verze restartujte Home Assistant. Pro návrat k dřívější verzi
+Marketplace sám doporučuje jako bezpečnější obnovení ze zálohy.
+
+### HACS (Home Assistant před 2026.11)
 
 [![Otevře váš Home Assistant a zobrazí tento repozitář v HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 
@@ -45,8 +69,11 @@ Nebo ručně:
 2. Nainstalujte **IKEA BILRESA**.
 3. **Restartujte Home Assistant.**
 
-Integrace zatím není ve výchozím katalogu HACS — výše uvedený krok s vlastním
-repozitářem je potřeba. Přechod z 0.5.x obsahuje breaking changes; přečtěte si
+**Výběr verze.** HACS → **IKEA BILRESA** → ⋮ → **Přeinstalovat**, zapněte **Zobrazit
+beta verze**, aby se ukázala předběžná vydání, vyberte verzi a stáhněte ji.
+
+Integrace zatím není ve výchozím katalogu, v Marketplace ani v HACS — výše
+uvedený krok s vlastním repozitářem je potřeba. Přechod z 0.5.x obsahuje breaking changes; přečtěte si
 [CHANGELOG.md](../../CHANGELOG.md) a nejdřív udělejte zálohu.
 
 ### Ručně

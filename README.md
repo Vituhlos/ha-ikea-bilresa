@@ -55,9 +55,12 @@ entirely optional.
 1. **Check** that you have Home Assistant 2026.8 or newer, a Matter Server with
    your BILRESA already paired, and a Thread network the Matter integration can
    reach.
-2. **Install** through HACS: add `https://github.com/Vituhlos/ha-ikea-bilresa` as
-   a custom repository (category *Integration*), install **IKEA BILRESA** and
-   restart Home Assistant.
+2. **Install** through the Marketplace (Home Assistant 2026.11 and newer, where
+   HACS has moved) or through HACS (older versions): add
+   `https://github.com/Vituhlos/ha-ikea-bilresa` as a custom repository
+   (category *Integration*), install **IKEA BILRESA** and restart Home Assistant.
+   Both ways, and how to pick a pre-release or an earlier version, are in the
+   [getting started guide](docs/en/getting-started.md).
    [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 3. **Add the integration** in **Settings → Devices & Services → Add Integration →
    IKEA BILRESA**, then open **IKEA BILRESA** in the sidebar, choose a device and
