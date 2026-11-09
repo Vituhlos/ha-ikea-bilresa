@@ -40,8 +40,14 @@ Od Home Assistantu 2026.11 je HACS součástí samotného Home Assistantu a jmen
 se **Marketplace** (**Nastavení → Marketplace**). Stávající instalace HACS se tam
 při prvním startu přesune sama, i s vlastními repozitáři.
 
-1. **Nastavení → Marketplace** → přidejte
-   `https://github.com/Vituhlos/ha-ikea-bilresa` odkazem (vlastní repozitář).
+[![Otevře váš Home Assistant a zobrazí tento repozitář v Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+Pokud jste tuto integraci už měli v HACS, v Marketplace už je (**Nastavení →
+Marketplace → Nainstalované**) a nic se nepřidává. Jinak:
+
+1. Klikněte na odznak výše, který otevře tento repozitář v Marketplace, nebo tam
+   přidejte `https://github.com/Vituhlos/ha-ikea-bilresa` ručně (**Nastavení →
+   Marketplace**, přidat z odkazu, kategorie **Integration**).
 2. Nainstalujte **IKEA BILRESA**.
 3. **Restartujte Home Assistant.**
 

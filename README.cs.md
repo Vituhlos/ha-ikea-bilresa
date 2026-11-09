@@ -58,7 +58,10 @@ dobrovolné.
    `https://github.com/Vituhlos/ha-ikea-bilresa` jako vlastní repozitář (kategorie
    *Integrace*), nainstalujte **IKEA BILRESA** a restartujte Home Assistant. Oba
    postupy a výběr předběžného nebo dřívějšího vydání jsou v
-   [průvodci prvními kroky](docs/cs/getting-started.md).
+   [průvodci prvními kroky](docs/cs/getting-started.md). Home Assistant 2026.11 a
+   novější:
+   [![Otevřít vaši instanci Home Assistantu a tento repozitář v Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+   Starší verze:
    [![Otevřít vaši instanci Home Assistantu a tento repozitář v obchodě HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 3. **Přidejte integraci** v **Nastavení → Zařízení a služby → Přidat integraci →
    IKEA BILRESA**, pak v postranním menu otevřete **IKEA BILRESA**, vyberte

@@ -40,9 +40,14 @@ From Home Assistant 2026.11 HACS is part of Home Assistant itself and is called
 the **Marketplace** (**Settings → Marketplace**). An existing HACS installation
 moves there by itself on the first start, with its custom repositories.
 
-1. **Settings → Marketplace** → add
-   `https://github.com/Vituhlos/ha-ikea-bilresa` from a link (a custom
-   repository).
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+If you already had this integration in HACS it is in the Marketplace already
+(**Settings → Marketplace → Installed**); there is nothing to add. Otherwise:
+
+1. Click the badge above, which opens this repository in the Marketplace, or
+   add `https://github.com/Vituhlos/ha-ikea-bilresa` there by hand
+   (**Settings → Marketplace**, add from a link, category **Integration**).
 2. Install **IKEA BILRESA**.
 3. **Restart Home Assistant.**
 

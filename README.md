@@ -60,7 +60,10 @@ entirely optional.
    `https://github.com/Vituhlos/ha-ikea-bilresa` as a custom repository
    (category *Integration*), install **IKEA BILRESA** and restart Home Assistant.
    Both ways, and how to pick a pre-release or an earlier version, are in the
-   [getting started guide](docs/en/getting-started.md).
+   [getting started guide](docs/en/getting-started.md). Home Assistant 2026.11 and
+   newer:
+   [![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+   Older versions:
    [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
 3. **Add the integration** in **Settings → Devices & Services → Add Integration →
    IKEA BILRESA**, then open **IKEA BILRESA** in the sidebar, choose a device and
