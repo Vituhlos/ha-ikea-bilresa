@@ -446,3 +446,30 @@ def test_a_multi_light_capture_is_refused_not_replayed_as_one_light(
 
     with pytest.raises(NotImplementedError, match="multi-light"):
         replay(capture, monkeypatch, initial_value=255)
+
+
+def test_a_capture_with_member_rows_but_no_targets_is_refused(monkeypatch) -> None:
+    capture = {
+        "capture_version": CAPTURE_VERSION,
+        "bindings": {"14:channel:1": {"step": 3, "transition": 0.0}},
+        "rows": _rows(
+            {
+                "t": 0.0,
+                "kind": "state",
+                "binding": "14:channel:1",
+                "state": "on",
+                "value": 200,
+                "member": 1,
+            },
+            {
+                "t": 0.1,
+                "kind": "rotate",
+                "binding": "14:channel:1",
+                "notches": 1,
+                "direction": "down",
+            },
+        ),
+    }
+
+    with pytest.raises(NotImplementedError, match="multi-light"):
+        replay(capture, monkeypatch, initial_value=255)

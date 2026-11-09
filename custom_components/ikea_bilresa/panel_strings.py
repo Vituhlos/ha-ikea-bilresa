@@ -163,8 +163,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "field_mode": "Mode",
         "field_target": "Target",
         "field_target_help": (
-            "Choose several lights to dim them together. They all follow one "
-            "brightness, set by the wheel."
+            "Choose several lights to control them together. They all receive "
+            "the same value, set by the wheel."
         ),
         "field_step": "Target change per notch",
         "field_step_help": "How far one notch moves the target.",
@@ -673,8 +673,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "field_mode": "Režim",
         "field_target": "Cíl",
         "field_target_help": (
-            "Vyberte více světel a stmívejte je společně. Všechna drží jeden "
-            "jas, který nastavuje kolečko."
+            "Vyberte více světel a ovládejte je společně. Všechna dostanou "
+            "stejnou hodnotu, kterou nastavuje kolečko."
         ),
         "field_step": "Změna cíle na jedno cvaknutí",
         "field_step_help": "O kolik jedno cvaknutí posune cíl.",

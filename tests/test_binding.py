@@ -3311,3 +3311,38 @@ def test_a_hue_half_way_round_is_on_the_path_either_way(monkeypatch) -> None:
     report("light.a", {"hs_color": [90.0, 80.0]})
 
     assert binding._tracked == pytest.approx(180.0)
+
+
+def test_every_light_going_off_cancels_a_rotation_still_queued(monkeypatch) -> None:
+    binding, now, report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._min_command_interval = 5.0
+    binding._rotate_by(1, False)
+    binding._rotate_by(1, False)
+    assert binding._pending_command is not None
+
+    now[0] = 2.0
+    for entity_id in _LIGHTS:
+        report(entity_id, None)
+
+    assert binding._pending_command is None
+
+
+def test_a_failed_call_keeps_the_level_while_a_newer_one_is_queued(
+    monkeypatch,
+) -> None:
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._min_command_interval = 5.0
+    binding._rotate_by(1, False)
+    sent = binding._command_seq
+    binding._rotate_by(1, False)  # queued, not dispatched: the seq is unchanged
+
+    async def _rejected() -> None:
+        raise RuntimeError("rejected")
+
+    asyncio.run(
+        binding._async_dispatch_service(
+            "light", "turn_on", _rejected(), result={}, action=None, seq=sent
+        )
+    )
+
+    assert binding._tracked is not None

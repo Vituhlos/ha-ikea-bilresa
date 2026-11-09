@@ -155,8 +155,10 @@ class _Target:
         )
 
 
-def _binding_data(config: dict[str, Any], node_id: int, channel: int) -> dict[str, Any]:
-    if len(config.get("targets") or ()) > 1:
+def _binding_data(
+    config: dict[str, Any], node_id: int, channel: int, rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    if len(config.get("targets") or ()) > 1 or any("member" in row for row in rows):
         # The simulated target is one light; feeding it every member's reports
         # would replay a trajectory no real set of lights followed.
         raise NotImplementedError(
@@ -338,7 +340,7 @@ def replay(
     trace = RotationTrace(clock=clock)
     trace.set_enabled(True)
     binding = LightBinding(
-        hass, _binding_data(config, int(node_id), int(address)), trace=trace
+        hass, _binding_data(config, int(node_id), int(address), rows), trace=trace
     )
 
     for row in rows:

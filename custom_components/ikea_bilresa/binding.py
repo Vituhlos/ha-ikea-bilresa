@@ -758,7 +758,7 @@ class LightBinding:
             self._off_intent_until = 0.0
         if (
             self._multi
-            and self._tracked is not None
+            and (self._tracked is not None or self._pending_command is not None)
             and new_state.state == "off"
             and not self._any_member_on()
         ):
@@ -767,7 +767,7 @@ class LightBinding:
             # off report is not a bulb catching up.
             if observed is not None:
                 self._last_reported[entity_id] = observed
-            self._forget_target("all_lights_off", observed)
+            self._invalidate_tracking("all_lights_off")
             return
         own_echo = self._is_own_echo(new_state, entity_id)
         settling = self._multi and self._is_settling(observed, entity_id)
@@ -2263,7 +2263,11 @@ class LightBinding:
                 service,
                 type(err).__name__,
             )
-            if self._multi and (seq is None or seq == self._command_seq):
+            if (
+                self._multi
+                and self._pending_command is None
+                and (seq is None or seq == self._command_seq)
+            ):
                 # The lights never got the tracked level; reading them again
                 # beats carrying a value none of them has. A newer call has
                 # replaced that level, so only the newest one decides.
