@@ -82,8 +82,10 @@ Assistant or Zigbee2MQTT group entity can still be used as a single target.
   is sent and the live activity says so.
 - An unavailable light is left out of commands and brought back in line by the
   next one, also when it was already unavailable as the binding started.
-- Without a separate short-press target, a short press switches all of them
-  together: off while any of them is on, on otherwise. Until the lights report
+- **New with several lights:** without a separate short-press target, a short
+  press switches all of them together: off while any of them is on, on
+  otherwise. A separate short-press target still wins, and a binding with one
+  target presses that one target exactly as before. Until the lights report
   it, a scroll right after such a press treats them as off, and a press or a run
   of actions also cancels a rotation still queued.
 - When every light is off, scrolling a brightness binding up switches them on

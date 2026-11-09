@@ -124,6 +124,10 @@ Repeat on all three channels:
       (it still joins); colour temperature with two bulbs of different Kelvin
       ranges, and with ranges that do not overlap (nothing is sent); colour
       mode with bulbs at different hues and saturations. Status: pending.
+- [ ] **Multi-light short press:** with 3–4 individual bulbs bound to one channel
+      and no separate short-press target, a short press switches all of them off
+      while any is on and all on otherwise (also on a mixed on/off set); with a
+      separate short-press target only that target changes. Status: pending.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.

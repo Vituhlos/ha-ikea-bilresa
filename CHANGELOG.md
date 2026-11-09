@@ -24,8 +24,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   value suits them all), and in colour mode every light gets the same hue and
   saturation, starting from the mean of the lit ones. An unavailable light is
   left out and realigned by the next command, also when it was already
-  unavailable at start. Without a separate short-press target a short press
-  switches all the lights together. A binding with one target is stored and
+  unavailable at start. **New behaviour of multi-light bindings:** without a
+  separate short-press target a short press switches all the lights together
+  (off while any is on, otherwise on); a separate target still wins and a
+  binding with one target is unchanged. A binding with one target is stored and
   behaves as before. Based on a proposal by @cdegut (pull request #45); related
   to GitHub #9, but a group entity as a single target is untouched. **Downgrade
   note:** a binding with several lights is stored as a list, which `0.6.1` and
