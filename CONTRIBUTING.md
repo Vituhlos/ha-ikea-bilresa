@@ -30,6 +30,12 @@ agents.
    the status file is the live source of truth for what is implemented and
    how far it has been validated.
 2. Work on a short-lived feature branch; never commit directly to `main`.
+   **Choose the base branch first:** new features go to the development line,
+   `agent/panel-0.6.1` (the 0.7 pre-releases). `main` is the stable 0.6.x line
+   and takes bug fixes of what is in the stable release, and dependency
+   updates by Dependabot. A fix of something that exists only on the
+   development line, even one that changes behaviour, goes to the development
+   line. When in doubt, ask in the issue before you write code.
 3. Keep one coherent change per pull request. Do not mix refactors with
    behavior changes.
 4. Before opening the PR, run the checks for what you touched (full commands
