@@ -66,9 +66,7 @@ Marketplace sám doporučuje jako bezpečnější obnovení ze zálohy.
 
 ### HACS (Home Assistant před 2026.11)
 
-[![Otevře váš Home Assistant a zobrazí tento repozitář v HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
-
-Nebo ručně:
+[Otevřít v HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration), nebo ručně:
 
 1. HACS → ⋮ → **Vlastní repozitáře** → přidejte
    `https://github.com/Vituhlos/ha-ikea-bilresa`, kategorie **Integration**.

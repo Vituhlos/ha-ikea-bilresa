@@ -53,16 +53,16 @@ dobrovolné.
 
 1. **Zkontrolujte**, že máte Home Assistant 2026.8 nebo novější, Matter Server s
    už spárovaným BILRESA a síť Thread, kterou integrace Matter dosáhne.
-2. **Nainstalujte** přes Marketplace (Home Assistant 2026.11 a novější, kam se
-   HACS přesunul) nebo přes HACS (starší verze): přidejte
-   `https://github.com/Vituhlos/ha-ikea-bilresa` jako vlastní repozitář (kategorie
-   *Integrace*), nainstalujte **IKEA BILRESA** a restartujte Home Assistant. Oba
-   postupy a výběr předběžného nebo dřívějšího vydání jsou v
-   [průvodci prvními kroky](docs/cs/getting-started.md). Home Assistant 2026.11 a
-   novější:
+2. **Nainstalujte** integraci a restartujte Home Assistant. Od Home
+   Assistantu 2026.11, kam se HACS přesunul jako **Marketplace**, otevřete
+   repozitář tam:
+
    [![Otevřít vaši instanci Home Assistantu a tento repozitář v Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
-   Starší verze:
-   [![Otevřít vaši instanci Home Assistantu a tento repozitář v obchodě HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
+
+   Starší verze používají HACS ([otevřít v HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)): přidejte
+   `https://github.com/Vituhlos/ha-ikea-bilresa` jako vlastní repozitář (kategorie
+   *Integrace*). Oba postupy a výběr předběžného nebo dřívějšího vydání jsou v
+   [průvodci prvními kroky](docs/cs/getting-started.md).
 3. **Přidejte integraci** v **Nastavení → Zařízení a služby → Přidat integraci →
    IKEA BILRESA**, pak v postranním menu otevřete **IKEA BILRESA**, vyberte
    zařízení a u kanálu stiskněte **Upravit propojení** (ve stabilní verzi v0.6.1 nabízí kanál
