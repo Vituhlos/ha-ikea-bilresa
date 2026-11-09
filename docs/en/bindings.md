@@ -15,7 +15,8 @@ binding**, pick:
 - a starting profile (light, media, cover, climate, scenes, or custom), or copy
   an existing binding as a starting point,
 - the **Wheel** and **Channel** to use,
-- the **target entity** controlled by scrolling,
+- the **target entity** controlled by scrolling (several lights in a light mode,
+  see [Several lights on one channel](#several-lights-on-one-channel)),
 - **Brightness change per notch** (%), **Minimum brightness** (%, `0` lets a
   downward scroll switch the light off) and **Transition** (s),
 - the **single-press action** (toggle / on / off / nothing) and an optional
@@ -52,6 +53,44 @@ the recovered entity's real state. Rotate-up from an off light starts at the
 configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
+
+## Several lights on one channel
+
+A brightness, colour-temperature or colour binding can drive several lights
+at once: pick them all as the **target entity**. The binding keeps **one**
+level and sends that same value to every light in a single call, so the lights
+cannot drift apart and a slow bulb cannot pull the others back. Other modes
+(media player, cover, climate, fan, number) take a single target, and the
+setup form offers one picker only in the light modes. An existing Home
+Assistant or Zigbee2MQTT group entity can still be used as a single target.
+
+- The lights are read back only when the binding has nothing tracked: the first
+  scroll, a pause longer than 30 seconds, or after a change made elsewhere.
+  Then they count as on if any is on, at the mean level of the lit ones, as a
+  Home Assistant light group would. In colour mode the starting hue is the
+  circular mean of the lit lights and the saturation their mean, and every
+  light is given the same hue and saturation.
+- A bulb that acknowledges late, mid-fade, is treated as catching up and never
+  resets the level. A light that settles somewhere the binding did not send it
+  counts as an outside change, and the next scroll re-reads the lights. So does
+  every light being switched off, and any press that acts on one of the lights.
+- Scrolling up or down sends the value to **every available light, including
+  one that is off**, which switches it on, as a light group does. A light that
+  is off also joins the others when the level sits at its maximum.
+- In colour-temperature mode the value stays within the range **every**
+  available light supports, lit or not. When the ranges do not overlap, nothing
+  is sent and the live activity says so.
+- An unavailable light is left out of commands and brought back in line by the
+  next one, also when it was already unavailable as the binding started.
+- **New with several lights:** without a separate short-press target, a short
+  press switches all of them together: off while any of them is on, on
+  otherwise. A separate short-press target still wins, and a binding with one
+  target presses that one target exactly as before. Until the lights report
+  it, a scroll right after such a press treats them as off, and a press or a run
+  of actions also cancels a rotation still queued.
+- When every light is off, scrolling a brightness binding up switches them on
+  and scrolling down does nothing; colour and colour temperature need lit
+  lights, as for a single light.
 
 ## Actions by kind of target
 

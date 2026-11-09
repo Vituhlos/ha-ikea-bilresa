@@ -52,6 +52,8 @@ from custom_components.ikea_bilresa.const import (
     HOLD_RAMP,
     HOLD_TOGGLE,
     MODE_BRIGHTNESS,
+    MODE_COLOR,
+    MODE_COLOR_TEMP,
     MODE_COVER,
     MODE_TEMPERATURE,
     MODE_VOLUME,
@@ -799,3 +801,101 @@ def test_choosing_run_in_the_native_form_without_actions_is_refused() -> None:
             CONF_DOUBLE_ACTION: "run",
         }
     ) == {CONF_DOUBLE_ACTION: "actions_required"}
+
+
+def _wheel_input(**overrides) -> dict:
+    return {
+        CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_MULTI_PRESS,
+        CONF_MODE: MODE_BRIGHTNESS,
+        **overrides,
+    }
+
+
+def test_several_lights_are_one_brightness_binding() -> None:
+    normalized, errors = BindingSubentryFlowHandler._normalize_and_validate(
+        _wheel_input(**{CONF_TARGET: ["light.a", "light.b", "light.a"]})
+    )
+
+    assert errors == {}
+    assert normalized is not None
+    # Duplicates dropped, order kept.
+    assert normalized[CONF_TARGET] == ["light.a", "light.b"]
+
+
+def test_a_single_picked_light_is_stored_as_the_historic_string() -> None:
+    """The entity picker returns a list; one light must save as before."""
+    normalized, errors = BindingSubentryFlowHandler._normalize_and_validate(
+        _wheel_input(**{CONF_TARGET: ["light.a"]})
+    )
+
+    assert errors == {}
+    assert normalized is not None
+    assert normalized[CONF_TARGET] == "light.a"
+
+
+def test_an_empty_target_list_is_rejected() -> None:
+    _normalized, errors = BindingSubentryFlowHandler._normalize_and_validate(
+        _wheel_input(**{CONF_TARGET: []})
+    )
+
+    assert CONF_TARGET in errors
+
+
+def test_several_targets_need_a_light_mode() -> None:
+    assert BindingSubentryFlowHandler._validate_binding(
+        _wheel_input(
+            **{
+                CONF_MODE: MODE_VOLUME,
+                CONF_TARGET: ["media_player.a", "media_player.b"],
+            }
+        )
+    ) == {CONF_TARGET: "multiple_targets_require_light_mode"}
+
+
+def test_every_one_of_several_targets_must_be_a_light() -> None:
+    assert BindingSubentryFlowHandler._validate_binding(
+        _wheel_input(**{CONF_TARGET: ["light.a", "cover.b"]})
+    ) == {CONF_TARGET: "mode_target_mismatch"}
+
+
+@pytest.mark.parametrize(
+    ("mode", "several"),
+    [
+        (MODE_BRIGHTNESS, True),
+        (MODE_COLOR_TEMP, True),
+        (MODE_COLOR, True),
+        (MODE_VOLUME, False),
+        (MODE_COVER, False),
+        (MODE_TEMPERATURE, False),
+    ],
+)
+def test_the_form_offers_several_targets_only_in_the_light_modes(
+    mode: str, several: bool
+) -> None:
+    flow = _device_flow()
+
+    schema = flow._schema({CONF_NODE_ID: "303", CONF_MODE: mode})
+
+    [marker] = [m for m in schema.schema if str(m.schema) == CONF_TARGET]
+    assert schema.schema[marker].config["multiple"] is several
+
+
+async def test_changing_the_mode_redraws_the_target_picker() -> None:
+    """A form started for a cover takes one target; brightness takes several."""
+    flow = _device_flow()
+    flow._pending_node_id = "303"
+    flow._pending_defaults = {CONF_NODE_ID: "303", CONF_MODE: MODE_COVER}
+    shown: list[dict] = []
+    flow.async_show_form = lambda **kwargs: shown.append(kwargs) or {"type": "form"}
+    await flow._async_step_form("user", None)
+    assert flow._shown_multiple is False
+
+    result = await flow._async_step_form(
+        "user", {CONF_MODE: MODE_BRIGHTNESS, CONF_CHANNEL: "1", CONF_TARGET: "light.a"}
+    )
+
+    assert result == {"type": "form"}
+    assert shown[-1]["errors"] == {}
+    [marker] = [m for m in shown[-1]["data_schema"].schema if m == CONF_TARGET]
+    assert shown[-1]["data_schema"].schema[marker].config["multiple"] is True
+    assert flow._shown_multiple is True

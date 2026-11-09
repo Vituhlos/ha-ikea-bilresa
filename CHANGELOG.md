@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ## [Unreleased]
 
 ### Added
+- **One binding can dim several lights.** In a brightness, colour-temperature or
+  colour binding the rotation target accepts several lights, in the panel and in
+  the setup form (which offers the several-entity picker only in a light mode).
+  The binding keeps one level and sends that same value to every light in one
+  call; the lights are read back only when nothing is tracked, as a light group
+  would read them (on while any is on, the mean level of the lit ones). A bulb
+  that reports late, mid-fade, is treated as catching up, so a slow bulb no
+  longer makes the next scroll jump to its level; a light that settles somewhere
+  else is an outside change. The tracked level also ends after 30 seconds
+  idle, when every light is switched off, after a press that acts on one of the
+  lights and when the lights rejected a command. Scrolling also switches on a
+  light of the set that is off (as a light group does), colour temperature stays
+  within the range every available light supports (nothing is sent when no
+  value suits them all), and in colour mode every light gets the same hue and
+  saturation, starting from the mean of the lit ones. An unavailable light is
+  left out and realigned by the next command, also when it was already
+  unavailable at start. **New behaviour of multi-light bindings:** without a
+  separate short-press target a short press switches all the lights together
+  (off while any is on, otherwise on); a separate target still wins and a
+  binding with one target is unchanged. A binding with one target is stored and
+  behaves as before. Based on a proposal by @cdegut (pull request #45); related
+  to GitHub #9, but a group entity as a single target is untouched. **Downgrade
+  note:** a binding with several lights is stored as a list, which `0.6.1` and
+  earlier do not read; remove or edit such a binding before going back.
+  Colour temperature at its limit also switches on a light that is off, a light
+  without Kelvin bounds counts with the fallback range, colour mode keeps the
+  saturation it started with while the lights acknowledge, the setup form
+  redraws its target picker when the mode changes to or from a light mode, and
+  the overview names the short press of such a binding instead of "No action".
+  A press or a run of actions cancels a rotation still queued and, after a
+  press that switches the lights off, a quick scroll no longer relights them; a
+  failed older call no longer discards a newer level, a light at another level
+  still gets the value at a limit, one light off its path takes over even in the
+  middle of a scroll, and a hue half way round counts on the path either way.
 - **A gesture can run Home Assistant actions, set in the panel.** *Run actions*
   is a choice for a short press, double press, triple press and hold. The panel
   shows Home Assistant's own action editor (the one automations use) when it can

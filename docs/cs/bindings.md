@@ -15,7 +15,8 @@ vyberte:
 - výchozí profil (světlo, média, kryt, klimatizace, scény nebo vlastní), případně
   zkopírujte existující propojení jako výchozí nastavení,
 - **Kolečko** a **Kanál**,
-- **cílovou entitu**, kterou otáčení ovládá,
+- **cílovou entitu**, kterou otáčení ovládá (ve světelných režimech i více světel,
+  viz [Více světel na jednom kanálu](#více-světel-na-jednom-kanálu)),
 - **Změnu jasu na jedno cvaknutí** (%), **Minimální jas** (%, `0` = otočením dolů lze
   světlo vypnout) a **Přechod** (s),
 - **akci jednoduchého stisku** (přepnout / zapnout / vypnout / nic) a volitelný
@@ -51,6 +52,44 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 (nebo prvním použitelném kroku, když je minimum nula). Externí změna v HA
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
+
+## Více světel na jednom kanálu
+
+Propojení jasu, teploty bílé nebo barvy může ovládat několik světel najednou:
+vyberte je všechna jako **cílovou entitu**. Propojení drží **jednu** úroveň a
+stejnou hodnotu posílá všem světlům jedním voláním, takže se světla nerozejdou
+a pomalá žárovka ostatní nestáhne zpět. Ostatní režimy (přehrávač, kryt,
+klimatizace, ventilátor, číslo) mají jediný cíl a formulář nabízí výběr více
+entit jen ve světelných režimech. Existující skupinu Home Assistantu nebo
+Zigbee2MQTT lze dál použít jako jediný cíl.
+
+- Světla se čtou zpět jen tehdy, když propojení nic nesleduje: při prvním
+  otočení, po pauze delší než 30 sekund nebo po změně provedené jinde. Pak
+  platí za zapnutá, je-li zapnuté kterékoli, s průměrnou úrovní rozsvícených,
+  jako ve světelné skupině Home Assistantu. V barevném režimu je výchozí odstín
+  kruhový průměr rozsvícených světel a sytost jejich průměr; všechna světla pak
+  dostanou stejný odstín i sytost.
+- Žárovka, která potvrdí pozdě, uprostřed přechodu, se bere jako dobíhající a
+  úroveň nikdy neresetuje. Světlo, které se ustálí jinde, než kam ho propojení
+  poslalo, je vnější změna a další otočení světla přečte znovu. Stejně tak
+  vypnutí všech světel a každý stisk, který některé z nich ovládá.
+- Otočení nahoru i dolů posílá hodnotu **každému dostupnému světlu, i vypnutému**,
+  které tím zapne, jako to dělá světelná skupina. Vypnuté světlo se k ostatním
+  přidá i tehdy, když úroveň stojí na maximu.
+- V režimu teploty bílé zůstává hodnota v rozsahu, který podporují **všechna**
+  dostupná světla, zapnutá i vypnutá. Když se rozsahy nepřekrývají, nic se
+  neposílá a živá aktivita to řekne.
+- Nedostupné světlo se z příkazů vynechá a další příkaz ho srovná, i když bylo
+  nedostupné už při startu propojení.
+- **Nově u více světel:** bez samostatného cíle krátkého stisku stisk přepne
+  všechna světla společně: vypne je, je-li některé zapnuté, jinak je zapne.
+  Samostatný cíl krátkého stisku má přednost a propojení s jedním cílem stiskne
+  tento cíl přesně jako dřív. Dokud světla nenahlásí
+  výsledek, bere otočení hned po takovém stisku světla jako vypnutá a stisk i
+  spuštění akcí zruší ještě nepoložené otočení.
+- Když jsou všechna světla vypnutá, otočení nahoru u jasu je zapne a otočení
+  dolů nedělá nic; barva a teplota bílé potřebují rozsvícená světla, stejně jako
+  u jediného světla.
 
 ## Akce podle druhu cíle
 

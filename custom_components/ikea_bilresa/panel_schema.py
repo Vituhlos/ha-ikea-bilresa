@@ -23,6 +23,7 @@ from .const import (
     CONF_STEP,
     CONF_TRANSITION,
     MODE_TARGET_DOMAINS,
+    MULTI_TARGET_MODES,
     PRESS_TARGET_DOMAINS,
 )
 from .gesture_verbs import schema_verbs
@@ -79,4 +80,6 @@ def panel_schema() -> dict[str, Any]:
         "press_target_domains": list(PRESS_TARGET_DOMAINS),
         "gesture_verbs": schema_verbs(),
         "ramp_target_domains": list(RAMP_TARGET_DOMAINS),
+        # Modes whose rotation target may list several lights.
+        "multi_target_modes": list(MULTI_TARGET_MODES),
     }
