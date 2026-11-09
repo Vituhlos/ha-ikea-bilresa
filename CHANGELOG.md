@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.6] - 2026-11-09
+
+Pre-release candidate for testing, not a stable release. It adds actions by kind
+of target (helpers, covers, media players, locks, vacuums and more), a gesture
+that runs a whole list of Home Assistant actions set in the panel with Home
+Assistant's own action editor, and one binding that dims several lights from one
+tracked level (based on a proposal by @cdegut). Everything else is as in
+`0.7.0-rc.5`.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware and has not been
+seen in a real Home Assistant 2026.11 (the automated tests pass on 2026.9.4 and
+2026.11.0). The checks of the earlier candidates remain open, and these are new:
+
+- **Run actions:** a double press set to *Run actions* shows Home Assistant's
+  action editor in the panel (or the simple list when it cannot load), the
+  actions survive a page reload, and a hold set the same way runs them.
+- **Actions by kind of target:** a media player offers play / pause, next /
+  previous, volume and mute; a cover open, close and stop; an `input_boolean` on,
+  off and toggle; an `input_button` press. Try them on the real devices.
+- **One binding, several lights:** 3-4 individual bulbs on one channel follow one
+  level without jumping to a lagging bulb's level (details in
+  `docs/HARDWARE_TEST.md`).
+- **Short press of a multi-light binding:** with no short-press target of its
+  own, a short press switches all the lights together.
+
 ### Added
 - **One binding can dim several lights.** In a brightness, colour-temperature or
   colour binding the rotation target accepts several lights, in the panel and in
@@ -1418,7 +1445,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.5...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.6...HEAD
+[0.7.0-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.5...v0.7.0-rc.6
 [0.7.0-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.4...v0.7.0-rc.5
 [0.7.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.3...v0.7.0-rc.4
 [0.7.0-rc.3]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.2...v0.7.0-rc.3

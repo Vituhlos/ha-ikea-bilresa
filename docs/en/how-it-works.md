@@ -89,18 +89,18 @@ cycling and hold-to-ramp, the dual button, the BILRESA panel, reuse of Home
 Assistant's Matter client with a read-only WebSocket fallback, English and
 Czech.
 
-**In pre-release, not hardware-validated** (up to `v0.7.0-rc.5`). The
+**In pre-release, not hardware-validated** (up to `v0.7.0-rc.6`). The
 redesigned panel and its binding editor, the `short_release` event, Zigbee2MQTT
 light-group fixes, disabled channels that stay silent, scenes and scripts as
 gesture targets, an action of its own for every gesture (scripts are told which
-gesture started them), and the fix for the freeze on Matter attribute updates.
+gesture started them), the fix for the freeze on Matter attribute updates,
+actions by kind of target, Home Assistant actions set in the panel, and one
+binding that dims several lights.
 
 **Planned, roughly in this order.**
 
 - Hold with an action when it starts and another when it ends, for example to
   run a script that changes something while you hold and stop it on release.
-- Full Home Assistant actions (any service, with data) for a gesture, instead of
-  a single entity.
 - A rotation mode that steps through a list of scenes.
 - The remaining hardware validation, and then the brand icon in
   `home-assistant/brands` and the default HACS store.

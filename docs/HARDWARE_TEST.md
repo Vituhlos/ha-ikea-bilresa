@@ -110,7 +110,7 @@ Repeat on all three channels:
       there are no stale-level brightness jumps and no steppy dimming. Record
       exact versions and observations; keep Issue #9 open until the reporter
       confirms the result.
-- [ ] **Multi-light binding:** bind one channel to 3–4 individual bulbs
+- [ ] **Multi-light binding (0.7.0-rc.6):** bind one channel to 3–4 individual bulbs
       (not a group entity) in brightness mode, step 3, transition 0.8. Scroll
       slow and fast in both directions, pause more than 3 s between gestures,
       and confirm every bulb follows one level with no jump to a lagging
@@ -124,7 +124,7 @@ Repeat on all three channels:
       (it still joins); colour temperature with two bulbs of different Kelvin
       ranges, and with ranges that do not overlap (nothing is sent); colour
       mode with bulbs at different hues and saturations. Status: pending.
-- [ ] **Multi-light short press:** with 3–4 individual bulbs bound to one channel
+- [ ] **Multi-light short press (0.7.0-rc.6):** with 3–4 individual bulbs bound to one channel
       and no separate short-press target, a short press switches all of them off
       while any is on and all on otherwise (also on a mixed on/off set); with a
       separate short-press target only that target changes. Status: pending.
@@ -330,7 +330,7 @@ controls. Record the Home Assistant version, browser, theme and language.
 - [ ] Theme variables (0.7.0-rc.5, GitHub #22): with `bilresa-accent` and
       `bilresa-on-accent` set in a theme the primary button changes; with
       neither set the panel looks as before.
-- [ ] Run actions (after 0.7.0-rc.5): set a double press to *Run actions* in the
+- [ ] Run actions (0.7.0-rc.6): set a double press to *Run actions* in the
       panel. Home Assistant's action editor appears (add an action, pick a
       service and a target, a delay and a condition work) without the panel
       reloading while you edit; save, reload the page, and the actions are still
@@ -341,7 +341,7 @@ controls. Record the Home Assistant version, browser, theme and language.
       work in a template. Two quick presses run in order, one after the other;
       removing the binding or reloading the integration stops a running delay.
       The diagnostics download does not show the actions.
-- [ ] Verbs by kind of target (after 0.7.0-rc.5): in the panel, picking a media
+- [ ] Verbs by kind of target (0.7.0-rc.6): in the panel, picking a media
       player offers play / pause, next / previous track, volume up / down and
       mute / unmute; a cover open / close / stop; a lock only *Lock*. A double
       press on a real media player does play / pause (Sonos, GitHub #17);
