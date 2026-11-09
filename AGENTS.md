@@ -87,6 +87,14 @@ These instructions apply to the entire repository and to every coding agent.
 - **Record what was decided, not what was said:** the tracker item and
   `PROJECT_STATUS.md` hold decisions, results and what was not verified.
 
+## Which branch a contribution goes to
+
+New features and changes of behaviour go to the development line `agent/panel-0.6.1`;
+`main` (the stable 0.6.x line) takes only bug fixes, and so does an invitation to a
+contributor: never invite a feature pull request against `main`. A contributor's pull
+request to the wrong base is answered with thanks and a pointer to the right branch,
+not with a merge.
+
 ## Replying on GitHub (issues and pull requests)
 
 **Every comment an agent posts on GitHub says that an agent wrote it,** not only
