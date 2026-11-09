@@ -118,6 +118,12 @@ Repeat on all three channels:
       scroll re-reads the lights. Unplug one bulb, keep scrolling, plug it
       back in and confirm it rejoins at the next command without moving the
       others. Check short press with no separate target on a mixed on/off set.
+      Also: wait 30 s between gestures and confirm the lights are read again;
+      scroll down, press quickly to switch them off and scroll down again (they
+      must stay off); scroll up with one bulb off (it joins) and at the maximum
+      (it still joins); colour temperature with two bulbs of different Kelvin
+      ranges, and with ranges that do not overlap (nothing is sent); colour
+      mode with bulbs at different hues and saturations. Status: pending.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.

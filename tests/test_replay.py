@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from custom_components.ikea_bilresa.trace import CAPTURE_VERSION
 
 from .replay import ReplayResult, perceptual, replay, simulate_target
@@ -416,3 +418,31 @@ def test_an_eager_notch_followed_by_a_batch_scores_as_uneven() -> None:
 
 def test_smoothness_of_an_empty_run_does_not_divide_by_zero() -> None:
     assert ReplayResult().smoothness().cv == 0.0
+
+
+def test_a_multi_light_capture_is_refused_not_replayed_as_one_light(
+    monkeypatch,
+) -> None:
+    capture = {
+        "capture_version": CAPTURE_VERSION,
+        "bindings": {
+            "14:channel:1": {
+                "step": 3,
+                "transition": 0.0,
+                "target": "light.a",
+                "targets": ["light.a", "light.b"],
+            }
+        },
+        "rows": _rows(
+            {
+                "t": 0.0,
+                "kind": "rotate",
+                "binding": "14:channel:1",
+                "notches": 1,
+                "direction": "down",
+            },
+        ),
+    }
+
+    with pytest.raises(NotImplementedError, match="multi-light"):
+        replay(capture, monkeypatch, initial_value=255)

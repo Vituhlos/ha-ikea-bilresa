@@ -52,6 +52,8 @@ from custom_components.ikea_bilresa.const import (
     HOLD_RAMP,
     HOLD_TOGGLE,
     MODE_BRIGHTNESS,
+    MODE_COLOR,
+    MODE_COLOR_TEMP,
     MODE_COVER,
     MODE_TEMPERATURE,
     MODE_VOLUME,
@@ -854,3 +856,25 @@ def test_every_one_of_several_targets_must_be_a_light() -> None:
     assert BindingSubentryFlowHandler._validate_binding(
         _wheel_input(**{CONF_TARGET: ["light.a", "cover.b"]})
     ) == {CONF_TARGET: "mode_target_mismatch"}
+
+
+@pytest.mark.parametrize(
+    ("mode", "several"),
+    [
+        (MODE_BRIGHTNESS, True),
+        (MODE_COLOR_TEMP, True),
+        (MODE_COLOR, True),
+        (MODE_VOLUME, False),
+        (MODE_COVER, False),
+        (MODE_TEMPERATURE, False),
+    ],
+)
+def test_the_form_offers_several_targets_only_in_the_light_modes(
+    mode: str, several: bool
+) -> None:
+    flow = _device_flow()
+
+    schema = flow._schema({CONF_NODE_ID: "303", CONF_MODE: mode})
+
+    [marker] = [m for m in schema.schema if str(m.schema) == CONF_TARGET]
+    assert schema.schema[marker].config["multiple"] is several

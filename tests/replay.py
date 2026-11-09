@@ -156,6 +156,12 @@ class _Target:
 
 
 def _binding_data(config: dict[str, Any], node_id: int, channel: int) -> dict[str, Any]:
+    if len(config.get("targets") or ()) > 1:
+        # The simulated target is one light; feeding it every member's reports
+        # would replay a trajectory no real set of lights followed.
+        raise NotImplementedError(
+            "replay cannot reproduce a capture of a multi-light binding yet"
+        )
     return {
         CONF_NODE_ID: node_id,
         CONF_CHANNEL: channel,

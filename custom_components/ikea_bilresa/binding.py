@@ -21,6 +21,7 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 import logging
+import math
 import time
 from typing import Any
 
@@ -154,6 +155,9 @@ _UNAVAILABLE = (None, "unknown", "unavailable")
 
 # How long our tracked target stays authoritative before we resync from state.
 _RESYNC_AFTER = 3.0
+# A multi-light binding waits for the bulbs' late acknowledgements, so it keeps
+# its tracked level longer; past this it reads the lights again.
+_MULTI_RESYNC_AFTER = 30.0
 _STATE_ECHO_MARGIN = 0.25
 
 # A missing gesture boundary must not suppress rotation indefinitely.
@@ -221,6 +225,37 @@ _RAMP_WATCHDOG_SECONDS = 30
 
 def _pct_to_units(pct: float) -> int:
     return round(pct / 100 * 255)
+
+
+def _hue_offset(value: float, origin: float) -> float:
+    """Signed distance from ``origin`` to ``value`` on the hue circle."""
+    return (value - origin + 180) % 360 - 180
+
+
+def _on_hue_arc(
+    observed: float, start: float | None, end: float, tolerance: float
+) -> bool:
+    """Whether ``observed`` lies on the shorter arc from ``start`` to ``end``.
+
+    A bulb fading between two hues reports the hues in between, so checking
+    the two ends alone would call every intermediate report an outside change.
+    """
+    if abs(_hue_offset(observed, end)) <= tolerance:
+        return True
+    if start is None:
+        return False
+    length = _hue_offset(end, start)
+    travelled = _hue_offset(observed, start)
+    if abs(travelled) <= tolerance:
+        return True
+    return travelled * length > 0 and abs(travelled) <= abs(length)
+
+
+def _mean_hue(hues: list[float]) -> float:
+    """The circular mean of hues in degrees; an arithmetic mean breaks at 0°."""
+    x = sum(math.cos(math.radians(hue)) for hue in hues)
+    y = sum(math.sin(math.radians(hue)) for hue in hues)
+    return math.degrees(math.atan2(y, x)) % 360
 
 
 def _as_float(value: Any) -> float | None:
@@ -480,6 +515,7 @@ class LightBinding:
         connection_unsub = async_dispatcher_connect(
             self.hass, SIGNAL_CONNECTION, self._handle_connection_change
         )
+        self._seed_rejoining()
         state_unsub = (
             async_track_state_change_event(
                 self.hass, list(self._targets), self._handle_target_state_change
@@ -597,7 +633,7 @@ class LightBinding:
         # Across a reconnect nothing is known about where the target got to.
         self._commanded.clear()
         self._last_reported.clear()
-        self._rejoining.clear()
+        self._seed_rejoining()
         self._cancel_pending_command()
         self._command_authoritative_until = 0.0
         self._last_direction = None
@@ -609,13 +645,26 @@ class LightBinding:
         self._reset_velocity()
         self._stop_ramp(change_direction=False)
 
+    def _seed_rejoining(self) -> None:
+        """Mark the lights that are out of reach now as ones that will rejoin.
+
+        A light that is already unavailable when the binding starts, or after a
+        reconnect, sends no "went away" event, so without this its first report
+        back would be taken for an outside change of the whole set.
+        """
+        self._rejoining.clear()
+        if self._multi:
+            self._rejoining.update(
+                member for member in self._targets if self._member_state(member) is None
+            )
+
     @callback
     def _handle_target_state_change(self, event) -> None:
         """Rebase the next action after a genuine external target change."""
-        if self._click_target == self._target or self._click_target in self._targets:
+        entity_id = self._event_entity_id(event)
+        if entity_id == self._click_target:
             self._handle_latency_target_state_change(event)
         new_state = event.data.get("new_state")
-        entity_id = self._event_entity_id(event)
         # An input row: a replay needs the target's own reports, with their
         # timing, to reproduce what the binding was reacting to.
         if self._trace.enabled:
@@ -694,6 +743,19 @@ class LightBinding:
                 reported=observed,
             )
             return
+        if (
+            self._multi
+            and self._tracked is not None
+            and new_state.state == "off"
+            and not self._any_member_on()
+        ):
+            # Every light is off, so nothing is left to follow the tracked
+            # level. This holds inside the scroll-authority window too: an
+            # off report is not a bulb catching up.
+            if observed is not None:
+                self._last_reported[entity_id] = observed
+            self._forget_target("all_lights_off", observed)
+            return
         own_echo = self._is_own_echo(new_state, entity_id)
         settling = self._multi and self._is_settling(observed, entity_id)
         # Recorded after the decision, so the next report is judged against
@@ -762,14 +824,10 @@ class LightBinding:
             return False
         newest, span = self._commanded[-1]
         tolerance = span * _ECHO_MATCH_FRACTION
-        values = [newest]
-        if (previous := self._last_reported.get(entity_id)) is not None:
-            values.append(previous)
+        previous = self._last_reported.get(entity_id)
         if self._mode == MODE_COLOR:
-            return any(
-                min(abs(observed - value), span - abs(observed - value)) <= tolerance
-                for value in values
-            )
+            return _on_hue_arc(observed, previous, newest, tolerance)
+        values = [newest] if previous is None else [newest, previous]
         return min(values) - tolerance <= observed <= max(values) + tolerance
 
     def _scroll_authoritative(self, now: float) -> bool:
@@ -1106,9 +1164,14 @@ class LightBinding:
         before: float | int,
         after: float | int,
         result: dict[str, Any],
+        force: bool = False,
     ) -> bool:
-        """Dispatch a bounded value only when its service payload can change."""
-        if before == after:
+        """Dispatch a bounded value only when its service payload can change.
+
+        ``force`` sends it anyway, for a value that stays put while a light of
+        a multi-light binding is not yet at it.
+        """
+        if before == after and not force:
             self._report_activity(
                 "completed",
                 result=result,
@@ -1298,17 +1361,17 @@ class LightBinding:
     def _resync(self, current: float | None, fallback: float) -> float:
         """Return the tracked target, resyncing from reality when idle.
 
-        A multi-light binding keeps its tracked value for as long as nothing
-        external invalidates it: the lights were all sent this value, and
+        A multi-light binding keeps its tracked value for longer
+        (`_MULTI_RESYNC_AFTER`): the lights were all sent this value, and
         reading it back from bulbs that acknowledge at different times is
-        exactly what made the level jump. Only `_forget_target` — a light
-        settling somewhere we did not send it, all of them going away, a
-        reconnect — makes the next gesture read the lights again.
+        exactly what made the level jump. `_forget_target` — a light settling
+        somewhere we did not send it, all of them switched off, a press that
+        changes them, a reconnect — makes the next gesture read the lights
+        again sooner.
         """
         now = time.monotonic()
-        recent = self._tracked is not None and (
-            self._multi or (now - self._last) < _RESYNC_AFTER
-        )
+        window = _MULTI_RESYNC_AFTER if self._multi else _RESYNC_AFTER
+        recent = self._tracked is not None and (now - self._last) < window
         self._last = now
         if recent and self._tracked is not None:
             # Recorded for the trace: which of these two branches ran is the
@@ -1437,6 +1500,9 @@ class LightBinding:
             before=round(tracked),
             after=round(target),
             result=result,
+            # At a limit the value no longer changes, but a light that is off
+            # still has to join the others.
+            force=self._multi and not self._all_members_on(),
         )
 
     @callback
@@ -1444,8 +1510,19 @@ class LightBinding:
         state = self._lit_state()
         if state is None:
             return False
-        min_k = state.attributes.get(ATTR_MIN_KELVIN, FALLBACK_MIN_KELVIN)
-        max_k = state.attributes.get(ATTR_MAX_KELVIN, FALLBACK_MAX_KELVIN)
+        if self._multi:
+            limits = self._shared_kelvin_range()
+            if limits is None:
+                _LOGGER.warning(
+                    "BILRESA lights %s have no colour temperature in common",
+                    ", ".join(self._targets),
+                )
+                self._report_activity("skipped", reason="kelvin_ranges_do_not_overlap")
+                return False
+            min_k, max_k = limits
+        else:
+            min_k = state.attributes.get(ATTR_MIN_KELVIN, FALLBACK_MIN_KELVIN)
+            max_k = state.attributes.get(ATTR_MAX_KELVIN, FALLBACK_MAX_KELVIN)
         tracked = self._resync(
             state.attributes.get(ATTR_COLOR_TEMP_KELVIN), (min_k + max_k) / 2
         )
@@ -1624,9 +1701,11 @@ class LightBinding:
 
         One target is read as it is. Several lights are read as one, the way a
         Home Assistant light group reads its members: on while any of them is
-        on, at the mean brightness and colour temperature of the lit ones.
-        This is read only when the binding has nothing tracked — the first
-        gesture, or after an external change — never mid-scroll.
+        on, at the mean brightness and colour temperature of the lit ones and
+        at their mean hue and saturation. The values seed the tracked level
+        only when nothing is tracked; a tracked level is not read back, though
+        this is still called on every gesture to tell whether any light can be
+        reached.
         """
         if not self._multi:
             return self._available_state(self._target)
@@ -1656,26 +1735,56 @@ class LightBinding:
         ]
         if kelvin:
             attributes[ATTR_COLOR_TEMP_KELVIN] = round(sum(kelvin) / len(kelvin))
-        # The range every lit light can actually reach.
+        colours = [
+            (float(colour[0]), float(colour[1]))
+            for state in lit
+            if (colour := state.attributes.get(ATTR_HS_COLOR))
+        ]
+        if colours:
+            attributes[ATTR_HS_COLOR] = [
+                _mean_hue([hue for hue, _saturation in colours]),
+                sum(saturation for _hue, saturation in colours) / len(colours),
+            ]
+        return State(self._target, "on", attributes)
+
+    def _shared_kelvin_range(self) -> tuple[float, float] | None:
+        """The colour temperatures every light that gets the command can reach.
+
+        Taken over every available light, lit or not, because the command goes
+        to all of them. ``None`` when their ranges do not overlap: no single
+        value suits them all, so the caller must not send one.
+        """
+        states = [self._member_state(member) for member in self._targets]
         mins = [
             value
-            for state in lit
-            if (value := _as_float(state.attributes.get(ATTR_MIN_KELVIN))) is not None
+            for state in states
+            if state is not None
+            and (value := _as_float(state.attributes.get(ATTR_MIN_KELVIN))) is not None
         ]
         maxs = [
             value
-            for state in lit
-            if (value := _as_float(state.attributes.get(ATTR_MAX_KELVIN))) is not None
+            for state in states
+            if state is not None
+            and (value := _as_float(state.attributes.get(ATTR_MAX_KELVIN))) is not None
         ]
-        if mins and maxs and max(mins) < min(maxs):
-            attributes[ATTR_MIN_KELVIN] = max(mins)
-            attributes[ATTR_MAX_KELVIN] = min(maxs)
-        # Hue has no meaningful mean across a wrap; follow the first lit light.
-        for state in lit:
-            if hs_color := state.attributes.get(ATTR_HS_COLOR):
-                attributes[ATTR_HS_COLOR] = hs_color
-                break
-        return State(self._target, "on", attributes)
+        low = max(mins, default=FALLBACK_MIN_KELVIN)
+        high = min(maxs, default=FALLBACK_MAX_KELVIN)
+        return (low, high) if low <= high else None
+
+    def _any_member_on(self) -> bool:
+        """Whether any reachable light of this binding is on."""
+        return any(
+            (state := self._member_state(member)) is not None and state.state == "on"
+            for member in self._targets
+        )
+
+    def _all_members_on(self) -> bool:
+        """Whether every reachable light is on (``True`` when none is)."""
+        return all(
+            state.state == "on"
+            for member in self._targets
+            if (state := self._member_state(member)) is not None
+        )
 
     def _member_state(self, entity_id: str) -> State | None:
         """Read one light of a multi-light binding without logging it."""
@@ -1759,6 +1868,10 @@ class LightBinding:
         if not target:
             self._report_activity("skipped", reason="target_not_configured")
             return
+        if self._multi and target in self._targets:
+            # The press changes a light this binding rotates, so the level it
+            # tracked is no longer where the lights are.
+            self._forget_target("press_changed_target")
         if (
             self._multi
             and gesture == GESTURE_SHORT_PRESS
@@ -2091,6 +2204,10 @@ class LightBinding:
                 service,
                 type(err).__name__,
             )
+            if self._multi:
+                # The lights never got the tracked level; reading them again
+                # beats carrying a value none of them has.
+                self._forget_target("service_dispatch_failed")
             self._report_activity(
                 "failed",
                 result=result,

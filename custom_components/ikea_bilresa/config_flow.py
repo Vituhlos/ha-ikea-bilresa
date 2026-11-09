@@ -80,6 +80,7 @@ from .const import (
     MODE_TEMPERATURE,
     MODE_VOLUME,
     MODES,
+    MULTI_TARGET_MODES,
     PRESS_TARGET_DOMAINS,
     RAMP_DIRECTIONS,
     ROLE_BUTTON,
@@ -519,6 +520,13 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
             return self._button_schema(node_id, defaults, device_options=device_options)
         return self._wheel_schema(defaults, device_options=device_options)
 
+    @staticmethod
+    def _target_default(defaults: dict[str, Any], multiple: bool) -> Any:
+        targets = binding_targets(defaults.get(CONF_TARGET))
+        if multiple:
+            return targets or None
+        return targets[0] if targets else None
+
     @callback
     def _wheel_schema(
         self,
@@ -527,6 +535,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
         device_options: list[selector.SelectOptionDict] | None = None,
     ) -> vol.Schema:
         schema: dict[Any, Any] = {}
+        multiple = defaults.get(CONF_MODE, DEFAULT_MODE) in MULTI_TARGET_MODES
         if device_options is not None:
             schema[vol.Required(CONF_NODE_ID, default=str(defaults[CONF_NODE_ID]))] = (
                 selector.SelectSelector(
@@ -546,16 +555,15 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                # Several entities for a multi-light binding; validation
-                # allows more than one only for lights in a light mode, and
-                # stores a single pick as the historic plain string.
+                # Several entities only where a binding can drive several
+                # lights (the chosen profile sets the mode); validation stores
+                # a single pick as the historic plain string.
                 vol.Required(
-                    CONF_TARGET,
-                    default=binding_targets(defaults.get(CONF_TARGET)) or None,
+                    CONF_TARGET, default=self._target_default(defaults, multiple)
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain=TARGET_DOMAINS,
-                        multiple=True,
+                        multiple=multiple,
                     )
                 ),
                 vol.Required(

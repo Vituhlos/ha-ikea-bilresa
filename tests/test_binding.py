@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from types import SimpleNamespace
 from typing import Any
@@ -47,6 +48,8 @@ from custom_components.ikea_bilresa.const import (
     HOLD_NONE,
     HOLD_RAMP,
     HOLD_TOGGLE,
+    MODE_BRIGHTNESS,
+    MODE_COLOR,
     MODE_COLOR_TEMP,
     MODE_COVER,
     MODE_VOLUME,
@@ -2652,8 +2655,16 @@ def _lights_binding(monkeypatch, levels: dict[str, Any], **overrides):
     del binding._rotate_by  # the real rotation path, not the helper's mock
     states: dict[str, Any] = {}
 
-    def _set(entity_id: str, level: int | str | None) -> SimpleNamespace:
-        if level is None or isinstance(level, str):
+    def _set(entity_id: str, level: Any) -> SimpleNamespace:
+        if isinstance(level, tuple):
+            state = SimpleNamespace(
+                entity_id=entity_id, state=level[0], attributes=dict(level[1])
+            )
+        elif isinstance(level, dict):
+            state = SimpleNamespace(
+                entity_id=entity_id, state="on", attributes=dict(level)
+            )
+        elif level is None or isinstance(level, str):
             state = SimpleNamespace(
                 entity_id=entity_id, state=level or "off", attributes={}
             )
@@ -2672,7 +2683,7 @@ def _lights_binding(monkeypatch, levels: dict[str, Any], **overrides):
         "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
     )
 
-    def report(entity_id: str, level: int | str | None) -> None:
+    def report(entity_id: str, level: Any) -> None:
         state = _set(entity_id, level)
         binding._handle_target_state_change(
             SimpleNamespace(data={"entity_id": entity_id, "new_state": state})
@@ -2749,10 +2760,22 @@ def test_the_tracked_level_outlives_an_idle_pause(monkeypatch) -> None:
     tracked = binding._tracked
 
     # Every light still claims the old level, as stale state would.
-    now[0] = 60.0
+    now[0] = 20.0
     binding._rotate_by(1, False)
 
     assert _last_payload(binding)["brightness"] == round(tracked - 7.65)
+
+
+def test_the_tracked_level_does_not_outlive_a_long_pause(monkeypatch) -> None:
+    """After half a minute nothing vouches for it, so the lights are read again."""
+    binding, now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._rotate_by(1, False)
+
+    now[0] = 60.0
+    binding._rotate_by(1, False)
+
+    # The lights still report 200: read again, not 7.65 below the tracked 192.
+    assert _last_payload(binding)["brightness"] == round(200 - 7.65)
 
 
 def test_a_light_changed_elsewhere_still_takes_over(monkeypatch) -> None:
@@ -2879,3 +2902,234 @@ def test_a_multi_light_trace_describes_every_light(monkeypatch) -> None:
 
     assert config["target"] == "light.left"
     assert config["targets"] == _LIGHTS
+
+
+def _press_once(binding: LightBinding) -> None:
+    binding._handle_action(_action(ACTION_PRESS, presses=1))
+
+
+def test_a_short_press_that_switches_the_lights_off_resets_the_level(
+    monkeypatch,
+) -> None:
+    """The next scroll down must not relight what the press switched off."""
+    binding, now, report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_by(1, False)
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "multi_press_complete", 2)
+
+    now[0] = 0.4  # inside the scroll-authority grace
+    _press_once(binding)
+    assert binding._tracked is None
+    for entity_id in _LIGHTS:
+        report(entity_id, None)  # off, reported while the scroll still owns it
+
+    calls = binding.hass.services.async_call.call_count
+    now[0] = 5.0
+    binding._rotate_by(1, False)
+
+    assert binding.hass.services.async_call.call_count == calls
+
+
+def test_every_light_going_off_is_honoured_inside_the_scroll_window(
+    monkeypatch,
+) -> None:
+    binding, now, report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_by(1, False)
+
+    now[0] = 0.2
+    for entity_id in _LIGHTS:
+        report(entity_id, None)
+
+    assert binding._tracked is None
+
+
+def _colour_lights(monkeypatch, hues: dict[str, tuple[float, float]], **overrides):
+    return _lights_binding(
+        monkeypatch,
+        {entity_id: {"hs_color": list(colour)} for entity_id, colour in hues.items()},
+        **{CONF_MODE: MODE_COLOR, CONF_STEP: 10, **overrides},
+    )
+
+
+def test_a_hue_between_the_last_report_and_the_command_is_catching_up(
+    monkeypatch,
+) -> None:
+    binding, now, report = _colour_lights(
+        monkeypatch, {"light.a": (0.0, 80.0), "light.b": (0.0, 80.0)}
+    )
+    binding._rotate_by(1, True)  # sends hue 36 to both
+    assert binding._tracked == pytest.approx(36.0)
+
+    now[0] = 6.0  # past the transition and the scroll window
+    report("light.a", {"hs_color": [18.0, 80.0]})
+
+    assert binding._tracked == pytest.approx(36.0)
+
+
+def test_a_hue_off_the_path_still_counts_as_an_outside_change(monkeypatch) -> None:
+    binding, now, report = _colour_lights(
+        monkeypatch, {"light.a": (0.0, 80.0), "light.b": (0.0, 80.0)}
+    )
+    binding._rotate_by(1, True)
+
+    now[0] = 6.0
+    report("light.a", {"hs_color": [200.0, 80.0]})
+
+    assert binding._tracked is None
+
+
+def test_a_hue_across_the_wrap_is_on_the_path(monkeypatch) -> None:
+    binding, now, report = _colour_lights(
+        monkeypatch, {"light.a": (350.0, 80.0), "light.b": (350.0, 80.0)}
+    )
+    binding._rotate_by(1, True)  # 350 -> 26, through 0
+
+    now[0] = 6.0
+    report("light.a", {"hs_color": [5.0, 80.0]})
+
+    assert binding._tracked == pytest.approx(26.0)
+
+
+def test_the_starting_hue_is_the_mean_of_the_lit_lights(monkeypatch) -> None:
+    """Not the first light's hue: 350 and 10 average to 0, not to 350 or 180."""
+    binding, _now, _report = _colour_lights(
+        monkeypatch, {"light.a": (350.0, 40.0), "light.b": (10.0, 80.0)}
+    )
+
+    binding._rotate_by(1, True)
+
+    hue, saturation = _last_payload(binding)["hs_color"]
+    assert hue == pytest.approx(36.0)  # mean 0 plus one 36-degree notch
+    assert saturation == pytest.approx(60.0)
+
+
+def _kelvin(low: int, high: int, now: int | None = None) -> dict[str, Any]:
+    attributes: dict[str, Any] = {
+        "min_color_temp_kelvin": low,
+        "max_color_temp_kelvin": high,
+    }
+    if now is not None:
+        attributes["color_temp_kelvin"] = now
+    return attributes
+
+
+def test_an_off_light_limits_the_shared_colour_temperature(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(
+        monkeypatch,
+        {
+            "light.a": _kelvin(2700, 6500, 3900),
+            "light.b": ("off", _kelvin(2000, 4000)),
+        },
+        **{CONF_MODE: MODE_COLOR_TEMP, CONF_STEP: 50},
+    )
+
+    binding._rotate_by(1, True)
+
+    payload = _last_payload(binding)
+    assert payload["entity_id"] == ["light.a", "light.b"]
+    assert payload["color_temp_kelvin"] == 4000  # the lower of the two maxima
+
+
+def test_lights_with_no_colour_temperature_in_common_are_not_commanded(
+    monkeypatch, caplog
+) -> None:
+    binding, _now, _report = _lights_binding(
+        monkeypatch,
+        {
+            "light.a": _kelvin(2000, 3000, 2500),
+            "light.b": _kelvin(4000, 6500, 5000),
+        },
+        **{CONF_MODE: MODE_COLOR_TEMP},
+    )
+
+    binding._rotate_by(1, True)
+
+    assert binding.hass.services.async_call.call_count == 0
+    assert "no colour temperature in common" in caplog.text
+
+
+def test_a_light_that_is_off_joins_the_others_at_the_maximum(monkeypatch) -> None:
+    """At the limit the value no longer changes, but the dark light must follow."""
+    binding, _now, _report = _lights_binding(
+        monkeypatch,
+        {"light.a": 255, "light.b": None},
+        **{CONF_MODE: MODE_BRIGHTNESS},
+    )
+
+    binding._rotate_by(1, True)
+
+    payload = _last_payload(binding)
+    assert payload["entity_id"] == ["light.a", "light.b"]
+    assert payload["brightness"] == 255
+
+
+def test_lights_all_at_the_maximum_are_not_commanded_again(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(
+        monkeypatch, {"light.a": 255, "light.b": 255}
+    )
+
+    binding._rotate_by(1, True)
+
+    assert binding.hass.services.async_call.call_count == 0
+
+
+def test_a_light_unavailable_at_start_does_not_move_the_others(monkeypatch) -> None:
+    binding, now, report = _lights_binding(
+        monkeypatch, {"light.a": 200, "light.b": "unavailable"}
+    )
+    binding._seed_rejoining()
+    binding._rotate_by(1, False)
+    tracked = binding._tracked
+
+    now[0] = 6.0
+    report("light.b", 30)  # it wakes up somewhere else entirely
+
+    assert binding._tracked == tracked
+
+
+def test_attaching_marks_the_lights_that_are_already_unavailable(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(
+        monkeypatch, {"light.a": 200, "light.b": "unavailable"}
+    )
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_connect",
+        lambda *_args: Mock(),
+    )
+
+    unsubscribe = binding.async_attach()
+
+    assert binding._rejoining == {"light.b"}
+    unsubscribe()
+
+
+def test_a_rejected_dispatch_makes_the_next_gesture_read_the_lights(
+    monkeypatch,
+) -> None:
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._rotate_by(1, False)
+    assert binding._tracked is not None
+
+    async def _rejected() -> None:
+        raise RuntimeError("rejected")
+
+    asyncio.run(
+        binding._async_dispatch_service(
+            "light", "turn_on", _rejected(), result={}, action=None
+        )
+    )
+
+    assert binding._tracked is None
+
+
+def test_only_the_click_targets_reports_time_the_latency_trace(monkeypatch) -> None:
+    binding, _now, report = _lights_binding(
+        monkeypatch, dict.fromkeys(_LIGHTS, 200), **{CONF_CLICK_TARGET: "light.right"}
+    )
+    binding._handle_latency_target_state_change = Mock()
+
+    report("light.left", 200)
+    report("light.right", 200)
+
+    assert binding._handle_latency_target_state_change.call_count == 1
