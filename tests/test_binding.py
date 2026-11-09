@@ -170,6 +170,20 @@ def test_button_bindings_keep_endpoints_devices_and_targets_independent(
     )
 
 
+def test_input_boolean_helper_can_be_toggled_by_single_press(monkeypatch) -> None:
+    """An input_boolean helper is a valid button toggle target (#38)."""
+    binding, _interval, _watchdog = _button_binding(
+        monkeypatch, node_id=101, endpoint_id=1, target="input_boolean.guest_mode"
+    )
+
+    binding._handle_dispatched_action(_button_action(101, 1, ACTION_PRESS, presses=1))
+
+    binding.hass.services.async_call.assert_called_once()
+    assert binding.hass.services.async_call.call_args.args[:3] == (
+        "homeassistant", "toggle", {"entity_id": "input_boolean.guest_mode"}
+    )
+
+
 def test_button_fast_response_filters_shared_raw_signal_by_endpoint(
     monkeypatch,
 ) -> None:
