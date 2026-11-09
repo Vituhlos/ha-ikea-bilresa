@@ -23,7 +23,7 @@ analogové plynulé posouvání.
 > přechodem z 0.5.x udělejte zálohu a přečtěte si poznámky k přechodu v
 > [CHANGELOGu](CHANGELOG.md).
 >
-> **Testovací kandidát:** předběžné vydání **v0.7.0-rc.6** má přepracovaný panel
+> **Testovací kandidát:** předběžné vydání **v0.7.0-rc.7** má přepracovaný panel
 > a editor propojení, které stabilní vydání nemá, akci pro každé gesto, akce
 > podle typu cíle, akce Home Assistantu nastavené v panelu, jedno propojení pro
 > víc světel, opravu zamrzání při Matter aktualizacích (GitHub #21) a opravy z

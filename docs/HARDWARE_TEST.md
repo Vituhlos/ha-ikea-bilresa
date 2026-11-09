@@ -129,7 +129,11 @@ Repeat on all three channels:
       while any is on and all on otherwise (also on a mixed on/off set); with a
       separate short-press target only that target changes. Status: pending.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
-- [ ] **Two bindings on one light (issue #63):** bind the same light to two
+- [ ] **A press after a scroll, one light (0.7.0-rc.7, pull request #59):** scroll the
+      brightness quickly and press at once to switch the light off, or to
+      activate a scene or run actions that change it: the light stays as the
+      press left it (no late brightness command switches it on). Status: pending.
+- [ ] **Two bindings on one light (0.7.0-rc.7, issue #63):** bind the same light to two
       channels (or two wheels), scroll one quickly and press the other at once
       to switch the light off; the light stays off. Repeat with the press set
       to a scene and to *Run actions* that switch the light (or its area) off.

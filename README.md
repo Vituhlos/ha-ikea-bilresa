@@ -23,7 +23,7 @@ scrolling.
 > take a backup and read the upgrade notes in the [CHANGELOG](CHANGELOG.md)
 > before upgrading from 0.5.x.
 >
-> **Test candidate:** the pre-release **v0.7.0-rc.6** has a redesigned panel and
+> **Test candidate:** the pre-release **v0.7.0-rc.7** has a redesigned panel and
 > binding editor that the stable release does not have, an action for every
 > gesture, actions by kind of target, Home Assistant actions set in the panel,
 > one binding for several lights, the fix for the Matter freeze (GitHub #21),

@@ -87,7 +87,7 @@ scén a plynulou změnou při podržení, dvoutlačítko, panel BILRESA, využit
 Matter klienta Home Assistantu s WebSocketem jen pro čtení jako zálohou, česky a
 anglicky.
 
-**V předběžném vydání, bez ověření na hardwaru** (až `v0.7.0-rc.6`). Přepracovaný
+**V předběžném vydání, bez ověření na hardwaru** (až `v0.7.0-rc.7`). Přepracovaný
 panel a jeho editor propojení, událost `short_release`, opravy světelných skupin
 Zigbee2MQTT, vypnuté kanály, které mlčí, scény a skripty jako cíle gest, vlastní
 akce pro každé gesto (skripty se dozvědí, které gesto je spustilo) a oprava
