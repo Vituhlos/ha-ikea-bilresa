@@ -42,8 +42,8 @@ losing changes. Do not commit or push unless the owner requests it.
 preview) and, unless `--fast`, the pytest run of Gate B, in parallel, and prints
 one line each. `python tools/pr_watch.py <number>` waits for a pull request's
 checks and review bots and prints the open review threads; it exits 0 only when
-the checks passed, no thread is open and Devin, Codex and CodeRabbit all
-reviewed. The commands below are what they run.
+the checks passed, no thread is open and Codex and CodeRabbit have both
+reviewed (Devin is no longer required; its comments still count). The commands below are what they run.
 
 Run for every code change:
 

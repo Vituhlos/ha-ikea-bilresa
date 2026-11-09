@@ -13,8 +13,8 @@ of older commits count: a finding stays a finding after the next push.
 
 Reviews of an older commit do not count as seen.
 
-Exit status: 0 when every check passed, no thread is open and Devin, Codex and
-CodeRabbit have all reviewed; 1 when a check failed or is still pending (or none
+Exit status: 0 when every check passed, no thread is open and Codex and
+CodeRabbit have both reviewed; 1 when a check failed or is still pending (or none
 ran) or a thread is open; 2 when that is all fine but a review bot was not seen
 (AGENTS.md: a skipped review is not a passed review).
 """
@@ -28,12 +28,14 @@ import subprocess
 import sys
 import time
 
-# (name to show, words that identify the bot's login)
+# (name to show, words that identify the bot's login): the bots a pull request
+# must have been reviewed by.
 REVIEWERS = (
-    ("devin", ("devin",)),
     ("codex", ("codex",)),
     ("coderabbit", ("coderabbit",)),
 )
+# Still read when they comment (their open threads count), but not required.
+OPTIONAL_REVIEWERS = (("devin", ("devin",)),)
 POLL_SECONDS = 15
 BODY_LINES = 6
 THREADS = """
@@ -84,7 +86,7 @@ def _clean(body: str) -> str:
 
 def _reviewer(login: str) -> str | None:
     lowered = login.lower()
-    for name, words in REVIEWERS:
+    for name, words in (*REVIEWERS, *OPTIONAL_REVIEWERS):
         if any(word in lowered for word in words):
             return name
     return None
