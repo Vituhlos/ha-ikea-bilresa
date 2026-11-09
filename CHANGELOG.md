@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.7.0-rc.7] - 2026-11-09
+
+Pre-release candidate for testing, not a stable release. It fixes two cases in
+which a rotation still waiting to be sent switched a light back on after a press
+(one binding on one light, and two bindings on one light), and has the
+installation guides for the Marketplace of Home Assistant 2026.11. Everything
+else is as in `0.7.0-rc.6`.
+
+### Hardware validation pending
+
+This candidate has **not** been validated on physical hardware and has not been
+seen in a real Home Assistant. The checks of the earlier candidates remain open,
+and these are new:
+
+- **A press after a scroll, one light:** scroll the brightness quickly and press
+  at once to switch the light off, or to activate a scene or run actions that
+  change it: the light stays as the press left it.
+- **Two bindings on one light:** a press of one binding right after a scroll of
+  the other keeps the light off (details in `docs/HARDWARE_TEST.md`).
+
 ### Documentation
 - **Installation through the Marketplace.** From Home Assistant 2026.11 HACS is part
   of Home Assistant and is called the Marketplace. The getting started guides and
@@ -14,6 +34,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   versions, including how to pick a pre-release or an earlier version.
 
 ### Fixed
+- **A press no longer loses to a rotation still waiting to be sent, on a binding
+  with one light.** A fast scroll can leave a brightness command queued for a
+  moment; a press that switched the light off, a scene or a run of actions could
+  be followed by that command, which switched the light on again. A press that is
+  really sent, a scene or a configured sequence now cancels the queued rotation;
+  a press that cannot run leaves it alone, and a mute or playback press keeps a
+  queued volume. Thanks to @Hinrixx3026 (pull request #59).
 - **A press no longer loses to another binding's queued scroll.** When two
   bindings control the same light (two channels of one wheel, or two wheels), a
   press, a scene or a run of actions of one of them right after a scroll of the
@@ -1468,7 +1495,8 @@ cannot be undone without a backup. Take a backup first.
 - Single-instance config flow with automatic Matter Server URL detection.
 - English and Czech translations.
 
-[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.6...HEAD
+[Unreleased]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.7...HEAD
+[0.7.0-rc.7]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.6...v0.7.0-rc.7
 [0.7.0-rc.6]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.5...v0.7.0-rc.6
 [0.7.0-rc.5]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.4...v0.7.0-rc.5
 [0.7.0-rc.4]: https://github.com/Vituhlos/ha-ikea-bilresa/compare/v0.7.0-rc.3...v0.7.0-rc.4
