@@ -33,6 +33,14 @@ seen in a real Home Assistant 2026.11 (the automated tests pass on 2026.9.4 and
   `docs/HARDWARE_TEST.md`).
 - **Short press of a multi-light binding:** with no short-press target of its
   own, a short press switches all the lights together.
+- **Cover and helper actions:** a cover opens, closes and stops, an
+  `input_boolean` turns on, off and toggles, an `input_button` is pressed.
+
+**Downgrade note.** A binding that runs actions (or one with several lights)
+is stored in a form that `0.7.0-rc.5` and earlier do not read in full: if you
+go back to `rc.5` and save such a binding there, its list of actions is
+dropped and cannot be restored by upgrading again. Write the actions down (or
+keep a backup) before going back, and do not edit those bindings on `rc.5`.
 
 ### Added
 - **One binding can dim several lights.** In a brightness, colour-temperature or

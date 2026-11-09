@@ -68,9 +68,10 @@ nebo `script.turn_on`, na zvolené entitě. Přes Matter integrace nic neposíl�
     takže rychlé otáčení neořízne.
 - Cílová světla jdou přes Home Assistant (ne přímý Matter/Zigbee bind), což přidá
   malou, obvykle nepostřehnutelnou LAN latenci.
-- Gesto působí na jednu entitu, nebo spustí jednu scénu či jeden skript. Pro víc
-  věcí naráz ho zaměřte na skript (nebo scénu), který je udělá; skript spuštěný
-  akcí *Spustit skript* se navíc dozví, které gesto ho spustilo.
+- Gesto působí na jednu entitu (akcemi, které jí sedí), spustí jednu scénu či
+  jeden skript, nebo spustí seznam akcí Home Assistantu nastavený v panelu
+  (*Spustit akce*). Skript spuštěný akcí *Spustit skript* i každé spuštění
+  seznamu se navíc dozví, které gesto je spustilo.
 - Panel je pro administrátory; ostatní uživatelé ho nevidí. Event entity,
   spouštěče a propojení na něm nezávisí.
 

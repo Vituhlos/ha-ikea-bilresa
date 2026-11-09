@@ -341,6 +341,12 @@ controls. Record the Home Assistant version, browser, theme and language.
       work in a template. Two quick presses run in order, one after the other;
       removing the binding or reloading the integration stops a running delay.
       The diagnostics download does not show the actions.
+- [ ] Helper and cover actions (0.7.0-rc.6): an `input_boolean` turns on,
+      turns off and toggles from a short press and a double press; an
+      `input_button` is pressed (its state is the time of the last press, and
+      a button never pressed still presses); a real cover opens, closes and
+      stops, and the panel's warning shows beside *Open* and *Toggle* for a
+      garage door. Status: pending.
 - [ ] Verbs by kind of target (0.7.0-rc.6): in the panel, picking a media
       player offers play / pause, next / previous track, volume up / down and
       mute / unmute; a cover open / close / stop; a lock only *Lock*. A double

@@ -71,9 +71,10 @@ sends nothing over Matter.
     counter instead, so a fast scroll is not cut off.
 - Target lights round-trip through Home Assistant (rather than a direct
   Matter/Zigbee bind), adding small, usually imperceptible LAN latency.
-- A gesture acts on one entity, or runs one scene or one script. For several
-  things at once, point it at a script (or a scene) that does them; a script
-  started with *Run script* also learns which gesture started it.
+- A gesture acts on one entity (with the actions that suit its kind), runs one
+  scene or one script, or runs a list of Home Assistant actions you set in the
+  panel (*Run actions*). A script started with *Run script*, and each run of a
+  list, also learns which gesture started it.
 - The panel is for administrators; other users do not see it. The event
   entities, triggers and bindings do not depend on it.
 
