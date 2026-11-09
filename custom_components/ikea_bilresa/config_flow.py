@@ -85,6 +85,7 @@ from .const import (
 from .device_link import resolve_matter_device
 from .matter_ws import MatterWSIncompatible, validate_server_info
 from .model import BilresaWheel
+from .panel_schema import PRESS_TARGET_DOMAINS
 from .presentation import generated_binding_title, generated_button_binding_title
 
 
@@ -599,6 +600,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
     def _button_action_fields(
         defaults: dict[str, Any], *, wheel: bool
     ) -> dict[Any, Any]:
+        """Build action selectors for wheel and dual-button press gestures."""
         fields: dict[Any, Any] = {
             vol.Required(
                 CONF_CLICK_ACTION,
@@ -626,19 +628,19 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 CONF_CLICK_TARGET,
                 description={"suggested_value": defaults.get(CONF_CLICK_TARGET)},
             ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Optional(
                 CONF_DOUBLE_TARGET,
                 description={"suggested_value": defaults.get(CONF_DOUBLE_TARGET)},
             ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Optional(
                 CONF_HOLD_TARGET,
                 description={"suggested_value": defaults.get(CONF_HOLD_TARGET)},
             ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             ),
             vol.Required(
                 CONF_HOLD_ACTION,
@@ -658,7 +660,7 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                     description={"suggested_value": defaults.get(CONF_TRIPLE_TARGET)},
                 )
             ] = selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["light", "switch"])
+                selector.EntitySelectorConfig(domain=list(PRESS_TARGET_DOMAINS))
             )
             fields[
                 vol.Optional(
