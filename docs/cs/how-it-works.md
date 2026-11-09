@@ -68,9 +68,10 @@ nebo `script.turn_on`, na zvolené entitě. Přes Matter integrace nic neposíl�
     takže rychlé otáčení neořízne.
 - Cílová světla jdou přes Home Assistant (ne přímý Matter/Zigbee bind), což přidá
   malou, obvykle nepostřehnutelnou LAN latenci.
-- Gesto působí na jednu entitu, nebo spustí jednu scénu či jeden skript. Pro víc
-  věcí naráz ho zaměřte na skript (nebo scénu), který je udělá; skript spuštěný
-  akcí *Spustit skript* se navíc dozví, které gesto ho spustilo.
+- Gesto působí na jednu entitu (akcemi, které jí sedí), spustí jednu scénu či
+  jeden skript, nebo spustí seznam akcí Home Assistantu nastavený v panelu
+  (*Spustit akce*). Skript spuštěný akcí *Spustit skript* i každé spuštění
+  seznamu se navíc dozví, které gesto je spustilo.
 - Panel je pro administrátory; ostatní uživatelé ho nevidí. Event entity,
   spouštěče a propojení na něm nezávisí.
 
@@ -86,18 +87,17 @@ scén a plynulou změnou při podržení, dvoutlačítko, panel BILRESA, využit
 Matter klienta Home Assistantu s WebSocketem jen pro čtení jako zálohou, česky a
 anglicky.
 
-**V předběžném vydání, bez ověření na hardwaru** (až `v0.7.0-rc.5`). Přepracovaný
+**V předběžném vydání, bez ověření na hardwaru** (až `v0.7.0-rc.6`). Přepracovaný
 panel a jeho editor propojení, událost `short_release`, opravy světelných skupin
 Zigbee2MQTT, vypnuté kanály, které mlčí, scény a skripty jako cíle gest, vlastní
 akce pro každé gesto (skripty se dozvědí, které gesto je spustilo) a oprava
-zamrzání při Matter aktualizacích.
+zamrzání při Matter aktualizacích, akce podle typu cíle, akce Home Assistantu
+nastavené v panelu a jedno propojení, které stmívá víc světel.
 
 **Plánováno, zhruba v tomto pořadí.**
 
 - Podržení s akcí při začátku a jinou při konci, například pro spuštění skriptu,
   který cokoli mění, dokud držíte, a zastavení při uvolnění.
-- Plné akce Home Assistantu (libovolná služba s daty) pro gesto, místo jediné
-  entity.
 - Režim otáčení, který prochází seznamem scén.
 - Zbývající hardwarové ověření a potom ikona značky v `home-assistant/brands` a
   výchozí obchod HACS.
