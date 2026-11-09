@@ -1542,6 +1542,8 @@ class LightBinding:
             before=round(tracked),
             after=round(target),
             result=result,
+            # At a limit a light that is off still has to join the others.
+            force=self._multi and not self._all_members_on(),
         )
 
     @callback
@@ -1550,9 +1552,12 @@ class LightBinding:
         if state is None:
             return False
         hs_color = state.attributes.get(ATTR_HS_COLOR)
-        if hs_color:
-            self._saturation = float(hs_color[1])
         tracked = self._resync(hs_color[0] if hs_color else None, 0.0)
+        # A multi-light binding keeps the saturation it started with: the
+        # lights' mean changes as they acknowledge at different times, and
+        # taking it again each notch would drift the colour.
+        if hs_color and (not self._multi or self._trace_source == "state"):
+            self._saturation = float(hs_color[1])
         hue = (tracked + self._delta(self._step, 360, notches, up)) % 360
         self._set_target(hue, 360)
         self._call(
@@ -1755,17 +1760,15 @@ class LightBinding:
         value suits them all, so the caller must not send one.
         """
         states = [self._member_state(member) for member in self._targets]
+        # A light that names no bound is assumed to have the fallback one.
+        reachable = [state for state in states if state is not None]
         mins = [
-            value
-            for state in states
-            if state is not None
-            and (value := _as_float(state.attributes.get(ATTR_MIN_KELVIN))) is not None
+            _as_float(state.attributes.get(ATTR_MIN_KELVIN)) or FALLBACK_MIN_KELVIN
+            for state in reachable
         ]
         maxs = [
-            value
-            for state in states
-            if state is not None
-            and (value := _as_float(state.attributes.get(ATTR_MAX_KELVIN))) is not None
+            _as_float(state.attributes.get(ATTR_MAX_KELVIN)) or FALLBACK_MAX_KELVIN
+            for state in reachable
         ]
         low = max(mins, default=FALLBACK_MIN_KELVIN)
         high = min(maxs, default=FALLBACK_MAX_KELVIN)

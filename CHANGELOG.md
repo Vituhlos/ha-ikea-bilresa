@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   to GitHub #9, but a group entity as a single target is untouched. **Downgrade
   note:** a binding with several lights is stored as a list, which `0.6.1` and
   earlier do not read; remove or edit such a binding before going back.
+  Colour temperature at its limit also switches on a light that is off, a light
+  without Kelvin bounds counts with the fallback range, colour mode keeps the
+  saturation it started with while the lights acknowledge, the setup form
+  redraws its target picker when the mode changes to or from a light mode, and
+  the overview names the short press of such a binding instead of "No action".
 - **A gesture can run Home Assistant actions, set in the panel.** *Run actions*
   is a choice for a short press, double press, triple press and hold. The panel
   shows Home Assistant's own action editor (the one automations use) when it can

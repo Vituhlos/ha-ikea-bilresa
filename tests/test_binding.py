@@ -3133,3 +3133,54 @@ def test_only_the_click_targets_reports_time_the_latency_trace(monkeypatch) -> N
     report("light.right", 200)
 
     assert binding._handle_latency_target_state_change.call_count == 1
+
+
+def test_a_light_that_is_off_joins_at_the_colour_temperature_limit(
+    monkeypatch,
+) -> None:
+    binding, _now, _report = _lights_binding(
+        monkeypatch,
+        {
+            "light.a": _kelvin(2700, 6500, 6500),
+            "light.b": ("off", _kelvin(2700, 6500)),
+        },
+        **{CONF_MODE: MODE_COLOR_TEMP},
+    )
+
+    binding._rotate_by(1, True)
+
+    payload = _last_payload(binding)
+    assert payload["entity_id"] == ["light.a", "light.b"]
+    assert payload["color_temp_kelvin"] == 6500
+
+
+def test_late_reports_do_not_drift_the_saturation(monkeypatch) -> None:
+    binding, now, report = _colour_lights(
+        monkeypatch, {"light.a": (0.0, 80.0), "light.b": (0.0, 40.0)}
+    )
+    binding._rotate_by(1, True)
+    first = _last_payload(binding)["hs_color"][1]
+    assert first == pytest.approx(60.0)
+
+    now[0] = 1.0
+    report("light.a", {"hs_color": [36.0, 60.0]})  # one acknowledged, one did not
+    binding._rotate_by(1, True)
+
+    assert _last_payload(binding)["hs_color"][1] == pytest.approx(60.0)
+
+
+def test_a_light_without_kelvin_bounds_keeps_the_fallback_range(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(
+        monkeypatch,
+        {
+            "light.a": {"color_temp_kelvin": 5000},
+            "light.b": _kelvin(2000, 9000, 5000),
+        },
+        **{CONF_MODE: MODE_COLOR_TEMP, CONF_STEP: 100},
+    )
+
+    binding._rotate_by(1, True)
+
+    from custom_components.ikea_bilresa.binding import FALLBACK_MAX_KELVIN
+
+    assert _last_payload(binding)["color_temp_kelvin"] <= FALLBACK_MAX_KELVIN

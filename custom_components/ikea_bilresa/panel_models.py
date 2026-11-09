@@ -427,7 +427,7 @@ _CLICK_KEYS = {
 }
 
 
-def _action_key(action: str, target: str | None) -> str:
+def _action_key(action: str, target: str | list[str] | None) -> str:
     """The label key for what a press does to its target.
 
     A scene is run whatever was asked, and a script is run, stopped or toggled,
@@ -438,7 +438,8 @@ def _action_key(action: str, target: str | None) -> str:
         return "action_run_actions"
     if action == CLICK_NONE or not target:
         return "action_none"
-    call = target_service(target, action)
+    # A multi-light binding presses every light the same way: judge by the first.
+    call = target_service(binding_targets(target)[0], action)
     if call is None:
         return "action_none"
     domain, service = call

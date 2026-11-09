@@ -244,6 +244,9 @@ class BilresaConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
 class BindingSubentryFlowHandler(ConfigSubentryFlow):
     """Add or reconfigure a wheel channel or button endpoint binding."""
 
+    # Whether the form last shown took several targets (it follows the mode).
+    _shown_multiple: bool | None = None
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
@@ -299,6 +302,16 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         errors: dict[str, str] = {}
         normalized: dict[str, Any] | None = None
+        if (
+            user_input is not None
+            and self._shown_multiple is not None
+            and CONF_MODE in user_input
+            and (user_input[CONF_MODE] in MULTI_TARGET_MODES) != self._shown_multiple
+        ):
+            # The mode changed to or from a light mode, which changes whether
+            # the target picker takes several entities: draw it again with
+            # what has been entered so far instead of saving or failing.
+            return self._show_form(step_id, user_input, errors)
         if user_input is not None:
             # The form has no field for the actions a gesture runs, so a binding
             # that is reconfigured or copied keeps the ones it has.
@@ -332,10 +345,21 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 )
             return self.async_create_entry(title=title, data=normalized)
 
+        return self._show_form(step_id, user_input, errors)
+
+    def _show_form(
+        self,
+        step_id: str,
+        user_input: dict[str, Any] | None,
+        errors: dict[str, str],
+    ) -> SubentryFlowResult:
         defaults = (
             {CONF_NODE_ID: self._pending_node_id, **user_input}
             if user_input is not None
             else self._pending_defaults
+        )
+        self._shown_multiple = (
+            defaults.get(CONF_MODE, DEFAULT_MODE) in MULTI_TARGET_MODES
         )
         return self.async_show_form(
             step_id=step_id,

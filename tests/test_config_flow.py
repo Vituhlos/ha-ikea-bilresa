@@ -878,3 +878,24 @@ def test_the_form_offers_several_targets_only_in_the_light_modes(
 
     [marker] = [m for m in schema.schema if str(m.schema) == CONF_TARGET]
     assert schema.schema[marker].config["multiple"] is several
+
+
+async def test_changing_the_mode_redraws_the_target_picker() -> None:
+    """A form started for a cover takes one target; brightness takes several."""
+    flow = _device_flow()
+    flow._pending_node_id = "303"
+    flow._pending_defaults = {CONF_NODE_ID: "303", CONF_MODE: MODE_COVER}
+    shown: list[dict] = []
+    flow.async_show_form = lambda **kwargs: shown.append(kwargs) or {"type": "form"}
+    await flow._async_step_form("user", None)
+    assert flow._shown_multiple is False
+
+    result = await flow._async_step_form(
+        "user", {CONF_MODE: MODE_BRIGHTNESS, CONF_CHANNEL: "1", CONF_TARGET: "light.a"}
+    )
+
+    assert result == {"type": "form"}
+    assert shown[-1]["errors"] == {}
+    [marker] = [m for m in shown[-1]["data_schema"].schema if m == CONF_TARGET]
+    assert shown[-1]["data_schema"].schema[marker].config["multiple"] is True
+    assert flow._shown_multiple is True

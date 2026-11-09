@@ -1063,3 +1063,22 @@ def test_a_multi_light_channel_names_the_light_that_is_gone(monkeypatch) -> None
 
     assert channel["target_state"] == "missing"
     assert channel["target_label"] == "light.b"
+
+
+def test_the_ledger_names_the_short_press_of_a_multi_light_binding(
+    monkeypatch,
+) -> None:
+    """No click target: the press acts on every light, so it is not 'No action'."""
+    channel = _click_target_channel(
+        monkeypatch,
+        **{
+            CONF_TARGET: ["light.ok", "light.two"],
+            CONF_CLICK_TARGET: None,
+            CONF_CLICK_ACTION: "toggle",
+        },
+    )
+
+    labels = {
+        action["gesture"]: action["action_label"] for action in channel["actions"]
+    }
+    assert labels["short_press"] == "Toggle"
