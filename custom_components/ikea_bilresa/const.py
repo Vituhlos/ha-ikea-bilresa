@@ -383,6 +383,8 @@ SIGNAL_CONNECTION = f"{DOMAIN}_connection"
 SIGNAL_BINDINGS_UPDATED = f"{DOMAIN}_bindings_updated"
 SIGNAL_BINDING_ACTIVITY = f"{DOMAIN}_binding_activity"
 SIGNAL_SETTINGS_UPDATED = f"{DOMAIN}_settings_updated"
+# A press or a run of actions of one binding is changing these entities.
+SIGNAL_TARGETS_COMMANDED = f"{DOMAIN}_targets_commanded"
 
 # --- repair issues ------------------------------------------------------
 ISSUE_CANNOT_CONNECT = "cannot_connect"

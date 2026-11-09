@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   both READMEs describe the Marketplace and keep the HACS steps for older
   versions, including how to pick a pre-release or an earlier version.
 
+### Fixed
+- **A press no longer loses to another binding's queued scroll.** When two
+  bindings control the same light (two channels of one wheel, or two wheels), a
+  press, a scene or a run of actions of one of them right after a scroll of the
+  other could be followed by the other's last queued brightness, which switched
+  the light back on (GitHub issue #63). Such a press now also cancels a rotation
+  another binding still has queued for that light; a mute or playback press
+  keeps a queued volume, and two bindings scrolling one light behave as before.
+
 ## [0.7.0-rc.6] - 2026-11-09
 
 Pre-release candidate for testing, not a stable release. It adds actions by kind

@@ -129,6 +129,11 @@ Repeat on all three channels:
       while any is on and all on otherwise (also on a mixed on/off set); with a
       separate short-press target only that target changes. Status: pending.
 - [ ] Button press followed by trailing scroll does not turn the target back on.
+- [ ] **Two bindings on one light (issue #63):** bind the same light to two
+      channels (or two wheels), scroll one quickly and press the other at once
+      to switch the light off; the light stays off. Repeat with the press set
+      to a scene and to *Run actions* that switch the light (or its area) off.
+      Status: pending.
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.
 - [ ] Media-player volume clamps to 0–100%.

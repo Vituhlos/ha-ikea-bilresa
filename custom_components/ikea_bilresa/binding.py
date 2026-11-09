@@ -18,14 +18,20 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import timedelta
 import logging
 import math
 import time
 from typing import Any
 
-from homeassistant.const import ATTR_ENTITY_ID
+from homeassistant.const import (
+    ATTR_AREA_ID,
+    ATTR_DEVICE_ID,
+    ATTR_ENTITY_ID,
+    ATTR_FLOOR_ID,
+    ATTR_LABEL_ID,
+)
 from homeassistant.core import Context, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import (
@@ -41,6 +47,10 @@ from homeassistant.helpers.script import (
     SCRIPT_MODE_QUEUED,
     Script,
     async_validate_actions_config,
+)
+from homeassistant.helpers.target import (
+    TargetSelection,
+    async_extract_referenced_entity_ids,
 )
 import voluptuous as vol
 
@@ -120,6 +130,7 @@ from .const import (
     ROLE_SCROLL_UP,
     SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
+    SIGNAL_TARGETS_COMMANDED,
     STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
     acts_while_unknown,
@@ -526,6 +537,9 @@ class LightBinding:
         connection_unsub = async_dispatcher_connect(
             self.hass, SIGNAL_CONNECTION, self._handle_connection_change
         )
+        commanded_unsub = async_dispatcher_connect(
+            self.hass, SIGNAL_TARGETS_COMMANDED, self._handle_targets_commanded
+        )
         self._seed_rejoining()
         state_unsub = (
             async_track_state_change_event(
@@ -557,6 +571,7 @@ class LightBinding:
                 trace_state_unsub()
             if state_unsub is not None:
                 state_unsub()
+            commanded_unsub()
             connection_unsub()
             raw_button_unsub()
             action_unsub()
@@ -1806,6 +1821,68 @@ class LightBinding:
         self._cancel_pending_command()
         self._forget_target(reason)
 
+    def _keeps_volume(self, domain: str | None, service: str | None) -> bool:
+        """Whether a call leaves this volume binding's queued level valid.
+
+        Playback and mute leave volume_level untouched. The power actions go
+        through homeassistant and cancel queued volume.
+        """
+        return (
+            self._mode == MODE_VOLUME
+            and domain == "media_player"
+            and service not in ("volume_set", "volume_up", "volume_down")
+        )
+
+    @callback
+    def _signal_targets_commanded(
+        self, entity_ids: Iterable[str], domain: str | None, service: str | None
+    ) -> None:
+        """Tell the other bindings which entities a press is about to change."""
+        async_dispatcher_send(
+            self.hass,
+            SIGNAL_TARGETS_COMMANDED,
+            self,
+            self._with_members(entity_ids),
+            domain,
+            service,
+        )
+
+    def _with_members(self, entity_ids: Iterable[str]) -> set[str]:
+        """Add the members of every scene or group, nested ones included."""
+        found: set[str] = set()
+        todo = list(entity_ids)
+        while todo:
+            entity_id = todo.pop()
+            if entity_id in found:
+                continue
+            found.add(entity_id)
+            state = self.hass.states.get(entity_id)
+            members = state.attributes.get(ATTR_ENTITY_ID) if state else None
+            if isinstance(members, (list, tuple)):
+                todo.extend(members)
+        return found
+
+    @callback
+    def _handle_targets_commanded(
+        self,
+        sender: LightBinding,
+        entity_ids: set[str],
+        domain: str | None,
+        service: str | None,
+    ) -> None:
+        """Drop a rotation still queued here for a light another binding changed.
+
+        Two bindings may control one light; without this, the older queued
+        value of one would undo the other's press. A rotation of the other
+        binding sends no signal, so two wheels dimming one light behave as
+        before.
+        """
+        if sender is self or self._keeps_volume(domain, service):
+            return
+        # A rotated group also changes when one of its lights is pressed.
+        if not self._with_members(self._targets).isdisjoint(entity_ids):
+            self._invalidate_tracking("other_binding_changed_target")
+
     def _members_aligned(self, attribute: str, target: float, span: float) -> bool:
         """Whether every reachable light is on and at ``target``.
 
@@ -2049,10 +2126,35 @@ class LightBinding:
         if self._closed:
             # Unloaded while the script was being built: nothing may start now.
             return
+        self._signal_targets_commanded(self._sequence_entities(script), None, None)
         self.hass.async_create_task(
             script.async_run(run_variables=variables, context=Context())
         )
         self._report_activity("accepted", result=result, action=action)
+
+    def _sequence_entities(self, script: Script) -> set[str]:
+        """The entities a run of actions names, and those of its areas,
+        devices, floors and labels.
+
+        shortcut: an entity a template picks at run time is not known here;
+        resolve the run's own service calls if that is ever needed.
+        """
+        selected = async_extract_referenced_entity_ids(
+            self.hass,
+            TargetSelection(
+                {
+                    ATTR_AREA_ID: list(script.referenced_areas),
+                    ATTR_DEVICE_ID: list(script.referenced_devices),
+                    ATTR_FLOOR_ID: list(script.referenced_floors),
+                    ATTR_LABEL_ID: list(script.referenced_labels),
+                }
+            ),
+        )
+        return (
+            script.referenced_entities
+            | selected.referenced
+            | selected.indirectly_referenced
+        )
 
     @callback
     def _stop_sequences(self) -> None:
@@ -2219,14 +2321,11 @@ class LightBinding:
         # Only discard queued rotation once the press can actually be sent.
         # A skipped/unavailable target must not erase a pending command.
         dispatched_targets = entity_id if isinstance(entity_id, list) else [entity_id]
-        if any(target in self._targets for target in dispatched_targets) and not (
-            self._mode == MODE_VOLUME
-            and domain == "media_player"
-            and service not in ("volume_set", "volume_up", "volume_down")
-        ):
-            # Playback and mute leave volume_level untouched. The power
-            # actions go through homeassistant and cancel queued volume.
+        if any(
+            target in self._targets for target in dispatched_targets
+        ) and not self._keeps_volume(domain, service):
             self._invalidate_tracking("press_changed_target")
+        self._signal_targets_commanded(dispatched_targets, domain, service)
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
         self._command_seq += 1

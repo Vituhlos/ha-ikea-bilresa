@@ -538,7 +538,7 @@ def test_unload_clears_guard_and_unsubscribes_raw_signal(monkeypatch) -> None:
     binding, _interval_unsub, _watchdog_unsub = _binding(
         monkeypatch, **{CONF_BUTTON_RESPONSE: BUTTON_RESPONSE_FAST}
     )
-    unsubscribers = [Mock(), Mock(), Mock()]
+    unsubscribers = [Mock(), Mock(), Mock(), Mock()]
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.binding.async_dispatcher_connect",
         Mock(side_effect=unsubscribers),
@@ -2420,6 +2420,11 @@ class _FakeScript:
         self.sequence, self.name, self.options = sequence, name, options
         self.runs: list[tuple[dict, object]] = []
         self.stopped = False
+        targets = [step.get("target", {}) for step in sequence]
+        self.referenced_entities = {t["entity_id"] for t in targets if "entity_id" in t}
+        self.referenced_areas = {t["area_id"] for t in targets if "area_id" in t}
+        self.referenced_devices = self.referenced_floors = set()
+        self.referenced_labels = set()
         _FakeScript.built.append(self)
 
     async def async_run(self, run_variables=None, context=None):
@@ -3403,6 +3408,294 @@ def test_media_power_off_cancels_but_mute_preserves_queued_volume(
     else:
         assert binding._pending_command == pending
         assert binding._tracked == tracked
+
+
+# -- two bindings on one light -------------------------------------------------
+#
+# A press of one binding must also cancel a rotation another binding still has
+# queued for the same light, or the older value relights it (issue #63).
+
+
+def _signal_bus(monkeypatch) -> dict[str, list]:
+    """Deliver dispatcher signals between bindings, as Home Assistant does.
+
+    Install it after the bindings are made: ``_binding`` mocks the sender.
+    """
+    targets: dict[str, list] = {}
+
+    def connect(_hass, signal, target):
+        targets.setdefault(signal, []).append(target)
+        return lambda: targets[signal].remove(target)
+
+    def send(_hass, signal, *args):
+        for target in list(targets.get(signal, [])):
+            target(*args)
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_connect", connect
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_dispatcher_send", send
+    )
+    return targets
+
+
+def _clock(monkeypatch) -> list[float]:
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    return now
+
+
+def _queue_rotation(binding, now: list[float], rotate: str, state) -> None:
+    """Send one rotation at once and queue a second one behind it."""
+    binding._min_command_interval = 5.0
+    binding.hass.states.get.return_value = state
+    getattr(binding, rotate)(1, up=False)
+    now[0] += 0.05
+    getattr(binding, rotate)(1, up=False)
+    assert binding._pending_command is not None
+
+
+_LIT = SimpleNamespace(state="on", attributes={"brightness": 200})
+
+
+def test_a_press_of_another_binding_cancels_a_rotation_still_queued(
+    monkeypatch,
+) -> None:
+    """Wheel A dims, wheel B turns the same light off; A must not relight it."""
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    switch, _i2, _w2 = _binding(monkeypatch, **{CONF_CHANNEL: 2, "click_action": "off"})
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    switch.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+    switch.hass.states.get.return_value = _LIT
+
+    switch._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(switch)[-1][:2] == ("homeassistant", "turn_off")
+    assert dimmer._pending_command is None
+    assert dimmer._tracked is None
+    calls = len(_service_calls(dimmer))
+    dimmer._flush_pending_command()
+    assert len(_service_calls(dimmer)) == calls
+
+
+@pytest.mark.parametrize(
+    ("acted_on", "cancels"), [("light.test", True), ("light.other", False)]
+)
+def test_actions_of_another_binding_cancel_a_rotation_only_for_their_light(
+    monkeypatch, acted_on: str, cancels: bool
+) -> None:
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    runner = _sequence_binding(
+        monkeypatch,
+        "short_press",
+        [{"action": "light.turn_off", "target": {"entity_id": acted_on}}],
+        **{CONF_CHANNEL: 2, CONF_TARGET: "light.elsewhere"},
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    runner.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+    pending = dimmer._pending_command
+
+    _press(runner, "short_press")
+    _drain(runner)
+
+    assert _FakeScript.built[0].runs
+    assert dimmer._pending_command == (None if cancels else pending)
+
+
+def test_a_binding_ignores_its_own_signal(monkeypatch) -> None:
+    """A press on a group holding the light keeps this binding's queue, as before.
+
+    Only another binding's press cancels through the signal; the binding's own
+    presses keep the rules of issue #59.
+    """
+    now = _clock(monkeypatch)
+    binding, _i, _w = _binding(monkeypatch, **{CONF_DOUBLE_TARGET: "light.group"})
+    _signal_bus(monkeypatch)
+    binding.async_attach()
+    _queue_rotation(binding, now, "_rotate_brightness", _LIT)
+    pending = binding._pending_command
+    group = SimpleNamespace(state="on", attributes={"entity_id": ["light.test"]})
+    binding.hass.states.get = Mock(
+        side_effect=lambda entity: group if entity == "light.group" else _LIT
+    )
+
+    binding._handle_action(_action(ACTION_PRESS, presses=2))
+
+    assert _service_calls(binding)[-1][:2] == ("homeassistant", "toggle")
+    assert binding._pending_command == pending
+
+
+def test_a_press_of_another_binding_on_another_light_keeps_the_queue(
+    monkeypatch,
+) -> None:
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    switch, _i2, _w2 = _binding(
+        monkeypatch,
+        **{CONF_CHANNEL: 2, CONF_TARGET: "light.other", "click_action": "off"},
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    switch.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+    pending, tracked = dimmer._pending_command, dimmer._tracked
+    switch.hass.states.get.return_value = _LIT
+
+    switch._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(switch)[-1] == (
+        "homeassistant",
+        "turn_off",
+        {"entity_id": "light.other"},
+    )
+    assert dimmer._pending_command == pending
+    assert dimmer._tracked == tracked
+
+
+def test_a_press_on_a_nested_group_of_the_light_cancels_the_queue(
+    monkeypatch,
+) -> None:
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    switch, _i2, _w2 = _binding(
+        monkeypatch,
+        **{CONF_CHANNEL: 2, CONF_CLICK_TARGET: "light.house", "click_action": "off"},
+    )
+    groups = {
+        # A group listing itself must not loop.
+        "light.house": ["light.house", "light.room"],
+        "light.room": ["light.test"],
+    }
+    switch.hass.states.get = Mock(
+        side_effect=lambda entity: SimpleNamespace(
+            state="on", attributes={"entity_id": groups.get(entity, [])}
+        )
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    switch.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+
+    switch._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(switch)[-1][2] == {"entity_id": "light.house"}
+    assert dimmer._pending_command is None
+
+
+def test_a_press_on_a_light_of_a_rotated_group_cancels_the_queue(
+    monkeypatch,
+) -> None:
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch, **{CONF_TARGET: "light.group"})
+    switch, _i2, _w2 = _binding(
+        monkeypatch,
+        **{CONF_CHANNEL: 2, CONF_CLICK_TARGET: "light.test", "click_action": "off"},
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    switch.async_attach()
+    group = SimpleNamespace(
+        state="on",
+        attributes={"brightness": 200, "entity_id": ["light.test", "light.two"]},
+    )
+    _queue_rotation(dimmer, now, "_rotate_brightness", group)
+    switch.hass.states.get.return_value = _LIT
+
+    switch._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert dimmer._pending_command is None
+
+
+def test_actions_on_an_area_of_the_light_cancel_the_queue(monkeypatch) -> None:
+    from homeassistant.helpers.target import SelectedEntities
+
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    runner = _sequence_binding(
+        monkeypatch,
+        "short_press",
+        [{"action": "light.turn_off", "target": {"area_id": "living_room"}}],
+        **{CONF_CHANNEL: 2, CONF_TARGET: "light.elsewhere"},
+    )
+    areas = {"living_room": {"light.test"}}
+
+    def _extract(_hass, selection):
+        return SelectedEntities(
+            indirectly_referenced=set().union(
+                *(areas.get(area, set()) for area in selection.area_ids)
+            )
+        )
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_extract_referenced_entity_ids",
+        _extract,
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    runner.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+
+    _press(runner, "short_press")
+    _drain(runner)
+
+    assert dimmer._pending_command is None
+
+
+@pytest.mark.parametrize(
+    ("press_action", "cancels"), [("mute_toggle", False), ("off", True)]
+)
+def test_another_binding_mutes_without_cancelling_queued_volume(
+    monkeypatch, press_action: str, cancels: bool
+) -> None:
+    now = _clock(monkeypatch)
+    playing = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.5, "is_volume_muted": False}
+    )
+    volume, _i, _w = _binding(
+        monkeypatch, **{CONF_TARGET: "media_player.test", CONF_MODE: MODE_VOLUME}
+    )
+    remote, _i2, _w2 = _binding(
+        monkeypatch,
+        **{
+            CONF_CHANNEL: 2,
+            CONF_TARGET: "light.other",
+            CONF_CLICK_TARGET: "media_player.test",
+            "click_action": press_action,
+        },
+    )
+    _signal_bus(monkeypatch)
+    volume.async_attach()
+    remote.async_attach()
+    _queue_rotation(volume, now, "_rotate_volume", playing)
+    pending = volume._pending_command
+    remote.hass.states.get.return_value = playing
+
+    remote._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(remote)
+    assert volume._pending_command == (None if cancels else pending)
+
+
+def test_unloading_a_binding_releases_its_command_signal(monkeypatch) -> None:
+    from custom_components.ikea_bilresa.const import SIGNAL_TARGETS_COMMANDED
+
+    binding, _i, _w = _binding(monkeypatch)
+    bus = _signal_bus(monkeypatch)
+    unsubscribe = binding.async_attach()
+    assert bus[SIGNAL_TARGETS_COMMANDED] == [binding._handle_targets_commanded]
+
+    unsubscribe()
+
+    assert bus[SIGNAL_TARGETS_COMMANDED] == []
 
 
 def test_a_press_cancels_a_rotation_still_queued(monkeypatch) -> None:
