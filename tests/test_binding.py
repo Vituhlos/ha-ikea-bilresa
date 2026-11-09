@@ -2420,9 +2420,11 @@ class _FakeScript:
         self.sequence, self.name, self.options = sequence, name, options
         self.runs: list[tuple[dict, object]] = []
         self.stopped = False
-        self.referenced_entities = {
-            step["target"]["entity_id"] for step in sequence if "target" in step
-        }
+        targets = [step.get("target", {}) for step in sequence]
+        self.referenced_entities = {t["entity_id"] for t in targets if "entity_id" in t}
+        self.referenced_areas = {t["area_id"] for t in targets if "area_id" in t}
+        self.referenced_devices = self.referenced_floors = set()
+        self.referenced_labels = set()
         _FakeScript.built.append(self)
 
     async def async_run(self, run_variables=None, context=None):
@@ -3557,6 +3559,95 @@ def test_a_press_of_another_binding_on_another_light_keeps_the_queue(
     )
     assert dimmer._pending_command == pending
     assert dimmer._tracked == tracked
+
+
+def test_a_press_on_a_nested_group_of_the_light_cancels_the_queue(
+    monkeypatch,
+) -> None:
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    switch, _i2, _w2 = _binding(
+        monkeypatch,
+        **{CONF_CHANNEL: 2, CONF_CLICK_TARGET: "light.house", "click_action": "off"},
+    )
+    groups = {
+        # A group listing itself must not loop.
+        "light.house": ["light.house", "light.room"],
+        "light.room": ["light.test"],
+    }
+    switch.hass.states.get = Mock(
+        side_effect=lambda entity: SimpleNamespace(
+            state="on", attributes={"entity_id": groups.get(entity, [])}
+        )
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    switch.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+
+    switch._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert _service_calls(switch)[-1][2] == {"entity_id": "light.house"}
+    assert dimmer._pending_command is None
+
+
+def test_a_press_on_a_light_of_a_rotated_group_cancels_the_queue(
+    monkeypatch,
+) -> None:
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch, **{CONF_TARGET: "light.group"})
+    switch, _i2, _w2 = _binding(
+        monkeypatch,
+        **{CONF_CHANNEL: 2, CONF_CLICK_TARGET: "light.test", "click_action": "off"},
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    switch.async_attach()
+    group = SimpleNamespace(
+        state="on",
+        attributes={"brightness": 200, "entity_id": ["light.test", "light.two"]},
+    )
+    _queue_rotation(dimmer, now, "_rotate_brightness", group)
+    switch.hass.states.get.return_value = _LIT
+
+    switch._handle_action(_action(ACTION_PRESS, presses=1))
+
+    assert dimmer._pending_command is None
+
+
+def test_actions_on_an_area_of_the_light_cancel_the_queue(monkeypatch) -> None:
+    from homeassistant.helpers.target import SelectedEntities
+
+    now = _clock(monkeypatch)
+    dimmer, _i, _w = _binding(monkeypatch)
+    runner = _sequence_binding(
+        monkeypatch,
+        "short_press",
+        [{"action": "light.turn_off", "target": {"area_id": "living_room"}}],
+        **{CONF_CHANNEL: 2, CONF_TARGET: "light.elsewhere"},
+    )
+    areas = {"living_room": {"light.test"}}
+
+    def _extract(_hass, selection):
+        return SelectedEntities(
+            indirectly_referenced=set().union(
+                *(areas.get(area, set()) for area in selection.area_ids)
+            )
+        )
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_extract_referenced_entity_ids",
+        _extract,
+    )
+    _signal_bus(monkeypatch)
+    dimmer.async_attach()
+    runner.async_attach()
+    _queue_rotation(dimmer, now, "_rotate_brightness", _LIT)
+
+    _press(runner, "short_press")
+    _drain(runner)
+
+    assert dimmer._pending_command is None
 
 
 @pytest.mark.parametrize(

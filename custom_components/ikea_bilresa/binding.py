@@ -25,7 +25,13 @@ import math
 import time
 from typing import Any
 
-from homeassistant.const import ATTR_ENTITY_ID
+from homeassistant.const import (
+    ATTR_AREA_ID,
+    ATTR_DEVICE_ID,
+    ATTR_ENTITY_ID,
+    ATTR_FLOOR_ID,
+    ATTR_LABEL_ID,
+)
 from homeassistant.core import Context, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import (
@@ -41,6 +47,10 @@ from homeassistant.helpers.script import (
     SCRIPT_MODE_QUEUED,
     Script,
     async_validate_actions_config,
+)
+from homeassistant.helpers.target import (
+    TargetSelection,
+    async_extract_referenced_entity_ids,
 )
 import voluptuous as vol
 
@@ -1827,19 +1837,30 @@ class LightBinding:
     def _signal_targets_commanded(
         self, entity_ids: Iterable[str], domain: str | None, service: str | None
     ) -> None:
-        """Tell the other bindings which entities a press is about to change.
+        """Tell the other bindings which entities a press is about to change."""
+        async_dispatcher_send(
+            self.hass,
+            SIGNAL_TARGETS_COMMANDED,
+            self,
+            self._with_members(entity_ids),
+            domain,
+            service,
+        )
 
-        A scene or a group changes its members too, so they are named as well.
-        """
-        affected = set(entity_ids)
-        for entity_id in entity_ids:
+    def _with_members(self, entity_ids: Iterable[str]) -> set[str]:
+        """Add the members of every scene or group, nested ones included."""
+        found: set[str] = set()
+        todo = list(entity_ids)
+        while todo:
+            entity_id = todo.pop()
+            if entity_id in found:
+                continue
+            found.add(entity_id)
             state = self.hass.states.get(entity_id)
             members = state.attributes.get(ATTR_ENTITY_ID) if state else None
             if isinstance(members, (list, tuple)):
-                affected.update(members)
-        async_dispatcher_send(
-            self.hass, SIGNAL_TARGETS_COMMANDED, self, affected, domain, service
-        )
+                todo.extend(members)
+        return found
 
     @callback
     def _handle_targets_commanded(
@@ -1858,7 +1879,8 @@ class LightBinding:
         """
         if sender is self or self._keeps_volume(domain, service):
             return
-        if any(target in entity_ids for target in self._targets):
+        # A rotated group also changes when one of its lights is pressed.
+        if not self._with_members(self._targets).isdisjoint(entity_ids):
             self._invalidate_tracking("other_binding_changed_target")
 
     def _members_aligned(self, attribute: str, target: float, span: float) -> bool:
@@ -2104,13 +2126,35 @@ class LightBinding:
         if self._closed:
             # Unloaded while the script was being built: nothing may start now.
             return
-        # shortcut: names only the entities the actions list, not the members
-        # of an area or device target; resolve those if a user needs it.
-        self._signal_targets_commanded(script.referenced_entities, None, None)
+        self._signal_targets_commanded(self._sequence_entities(script), None, None)
         self.hass.async_create_task(
             script.async_run(run_variables=variables, context=Context())
         )
         self._report_activity("accepted", result=result, action=action)
+
+    def _sequence_entities(self, script: Script) -> set[str]:
+        """The entities a run of actions names, and those of its areas,
+        devices, floors and labels.
+
+        shortcut: an entity a template picks at run time is not known here;
+        resolve the run's own service calls if that is ever needed.
+        """
+        selected = async_extract_referenced_entity_ids(
+            self.hass,
+            TargetSelection(
+                {
+                    ATTR_AREA_ID: list(script.referenced_areas),
+                    ATTR_DEVICE_ID: list(script.referenced_devices),
+                    ATTR_FLOOR_ID: list(script.referenced_floors),
+                    ATTR_LABEL_ID: list(script.referenced_labels),
+                }
+            ),
+        )
+        return (
+            script.referenced_entities
+            | selected.referenced
+            | selected.indirectly_referenced
+        )
 
     @callback
     def _stop_sequences(self) -> None:
