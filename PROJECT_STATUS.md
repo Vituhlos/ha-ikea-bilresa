@@ -99,7 +99,7 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 ## Git / build / test
 
 - Repo: the `ha-ikea-bilresa` working copy, GitHub `Vituhlos/ha-ikea-bilresa`.
-- Branch `agent/panel-0.6.1` (pushed; `v0.7.0-rc.4` is on `a28c384`, later commits are the merges of PR #25 and #20 and docs). `agent/pr11-integration` is merged into it and can be deleted. `main` at `6176206` (PR #24; tag `v0.6.2-rc.2` is on `176cfc3`; merged into this line on 2026-10-29); latest stable `v0.6.1`. `main` is protected: one approving review required, administrators may bypass.
+- Branches: only `main` and `agent/panel-0.6.1` are kept on GitHub; merged branches are deleted when their pull request is merged. `agent/panel-0.6.1` carries the 0.7 line: the newest pre-release is `v0.7.0-rc.7` (tag on `67639e1`, merge of PR #65), the earlier ones are `v0.7.0-rc.1` to `rc.6` (see the entries above for their commits). `main` is the stable 0.6.x line: newest stable `v0.6.1`, newest pre-release `v0.6.2-rc.2`; it takes bug fixes of the stable release and Dependabot updates, and `main` is protected (one approving review; the author of a pull request cannot approve it, so changes go in with an administrator merge and the owner's explicit yes). Features go to `agent/panel-0.6.1` (`CONTRIBUTING.md`).
 - Gates (Windows, stand-ins in `.venv`; `ruff` is the global one):
   - `ruff format --check custom_components tests tools`
   - `ruff check custom_components tests tools`
