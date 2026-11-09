@@ -89,8 +89,26 @@ These instructions apply to the entire repository and to every coding agent.
 
 ## Replying on GitHub (issues and pull requests)
 
-Nothing is posted without the owner's approval of the text. A reply to a
-contributor is written like the ones to @amodig on PR #5 and #23:
+**Every comment an agent posts on GitHub says that an agent wrote it,** not only
+replies to contributors: also short ones (a review request such as `@codex review`,
+"fixed in <commit>", a status note, an answer to a review thread) and review
+replies. They are posted under the owner's account, so without the line they look
+as if the owner wrote them. A short comment gets the short form:
+
+```
+*🤖 Agent-assisted: this comment was written by Claude, an AI assistant working on this repository with the maintainer (@Vituhlos), who asked for it.*
+```
+
+at the top and the signature line at the end. A comment that is a bot command (for
+example `@codex review`) starts with the command and carries the lines after it, so
+the bot still recognises it. Name the agent that really wrote it. Pull request
+descriptions end with `🤖 Generated with [<agent>](<its link>)` naming the agent that
+wrote them (`[Claude Code](https://claude.com/claude-code)` for Claude Code).
+
+The rest of this section is about a longer reply to a contributor.
+Short comments on our own pull requests (review requests, "fixed in <commit>",
+status notes) need no approval of the text. A reply to a contributor is posted only
+after the owner approved the text. It is written like the ones to @amodig on PR #5 and #23:
 
 - **Language and voice:** English (the project's language), warm and specific.
   Answer what this person wrote, thank them for something concrete, and say what
