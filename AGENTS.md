@@ -102,11 +102,13 @@ as if the owner wrote them. A short comment gets the short form:
 at the top and the signature line at the end. A comment that is a bot command (for
 example `@codex review`) starts with the command and carries the lines after it, so
 the bot still recognises it. Name the agent that really wrote it. Pull request
-descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+descriptions end with `🤖 Generated with [<agent>](<its link>)` naming the agent that
+wrote them (`[Claude Code](https://claude.com/claude-code)` for Claude Code).
 
 The rest of this section is about a longer reply to a contributor.
-Nothing of that kind is posted without the owner's approval of the text. It is
-written like the ones to @amodig on PR #5 and #23:
+Short comments on our own pull requests (review requests, "fixed in <commit>",
+status notes) need no approval of the text. A reply to a contributor is posted only
+after the owner approved the text. It is written like the ones to @amodig on PR #5 and #23:
 
 - **Language and voice:** English (the project's language), warm and specific.
   Answer what this person wrote, thank them for something concrete, and say what
