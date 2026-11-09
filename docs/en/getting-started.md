@@ -66,9 +66,7 @@ version the Marketplace itself recommends restoring a backup as the safer way.
 
 ### HACS (Home Assistant before 2026.11)
 
-[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration)
-
-Or add it manually:
+[Open it in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vituhlos&repository=ha-ikea-bilresa&category=integration), or add it manually:
 
 1. HACS → ⋮ → **Custom repositories** → add
    `https://github.com/Vituhlos/ha-ikea-bilresa`, category **Integration**.
