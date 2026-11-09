@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import timedelta
 import logging
 import math
@@ -120,6 +120,7 @@ from .const import (
     ROLE_SCROLL_UP,
     SIGNAL_BINDING_ACTIVITY,
     SIGNAL_CONNECTION,
+    SIGNAL_TARGETS_COMMANDED,
     STEP_CURVE_PERCEPTUAL,
     SWITCH_EVENT_NAMES,
     acts_while_unknown,
@@ -526,6 +527,9 @@ class LightBinding:
         connection_unsub = async_dispatcher_connect(
             self.hass, SIGNAL_CONNECTION, self._handle_connection_change
         )
+        commanded_unsub = async_dispatcher_connect(
+            self.hass, SIGNAL_TARGETS_COMMANDED, self._handle_targets_commanded
+        )
         self._seed_rejoining()
         state_unsub = (
             async_track_state_change_event(
@@ -557,6 +561,7 @@ class LightBinding:
                 trace_state_unsub()
             if state_unsub is not None:
                 state_unsub()
+            commanded_unsub()
             connection_unsub()
             raw_button_unsub()
             action_unsub()
@@ -1806,6 +1811,56 @@ class LightBinding:
         self._cancel_pending_command()
         self._forget_target(reason)
 
+    def _keeps_volume(self, domain: str | None, service: str | None) -> bool:
+        """Whether a call leaves this volume binding's queued level valid.
+
+        Playback and mute leave volume_level untouched. The power actions go
+        through homeassistant and cancel queued volume.
+        """
+        return (
+            self._mode == MODE_VOLUME
+            and domain == "media_player"
+            and service not in ("volume_set", "volume_up", "volume_down")
+        )
+
+    @callback
+    def _signal_targets_commanded(
+        self, entity_ids: Iterable[str], domain: str | None, service: str | None
+    ) -> None:
+        """Tell the other bindings which entities a press is about to change.
+
+        A scene or a group changes its members too, so they are named as well.
+        """
+        affected = set(entity_ids)
+        for entity_id in entity_ids:
+            state = self.hass.states.get(entity_id)
+            members = state.attributes.get(ATTR_ENTITY_ID) if state else None
+            if isinstance(members, (list, tuple)):
+                affected.update(members)
+        async_dispatcher_send(
+            self.hass, SIGNAL_TARGETS_COMMANDED, self, affected, domain, service
+        )
+
+    @callback
+    def _handle_targets_commanded(
+        self,
+        sender: LightBinding,
+        entity_ids: set[str],
+        domain: str | None,
+        service: str | None,
+    ) -> None:
+        """Drop a rotation still queued here for a light another binding changed.
+
+        Two bindings may control one light; without this, the older queued
+        value of one would undo the other's press. A rotation of the other
+        binding sends no signal, so two wheels dimming one light behave as
+        before.
+        """
+        if sender is self or self._keeps_volume(domain, service):
+            return
+        if any(target in entity_ids for target in self._targets):
+            self._invalidate_tracking("other_binding_changed_target")
+
     def _members_aligned(self, attribute: str, target: float, span: float) -> bool:
         """Whether every reachable light is on and at ``target``.
 
@@ -2049,6 +2104,9 @@ class LightBinding:
         if self._closed:
             # Unloaded while the script was being built: nothing may start now.
             return
+        # shortcut: names only the entities the actions list, not the members
+        # of an area or device target; resolve those if a user needs it.
+        self._signal_targets_commanded(script.referenced_entities, None, None)
         self.hass.async_create_task(
             script.async_run(run_variables=variables, context=Context())
         )
@@ -2219,14 +2277,11 @@ class LightBinding:
         # Only discard queued rotation once the press can actually be sent.
         # A skipped/unavailable target must not erase a pending command.
         dispatched_targets = entity_id if isinstance(entity_id, list) else [entity_id]
-        if any(target in self._targets for target in dispatched_targets) and not (
-            self._mode == MODE_VOLUME
-            and domain == "media_player"
-            and service not in ("volume_set", "volume_up", "volume_down")
-        ):
-            # Playback and mute leave volume_level untouched. The power
-            # actions go through homeassistant and cancel queued volume.
+        if any(
+            target in self._targets for target in dispatched_targets
+        ) and not self._keeps_volume(domain, service):
             self._invalidate_tracking("press_changed_target")
+        self._signal_targets_commanded(dispatched_targets, domain, service)
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
         self._command_seq += 1
