@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   saturation it started with while the lights acknowledge, the setup form
   redraws its target picker when the mode changes to or from a light mode, and
   the overview names the short press of such a binding instead of "No action".
+  A press or a run of actions cancels a rotation still queued and, after a
+  press that switches the lights off, a quick scroll no longer relights them; a
+  failed older call no longer discards a newer level, a light at another level
+  still gets the value at a limit, one light off its path takes over even in the
+  middle of a scroll, and a hue half way round counts on the path either way.
 - **A gesture can run Home Assistant actions, set in the panel.** *Run actions*
   is a choice for a short press, double press, triple press and hold. The panel
   shows Home Assistant's own action editor (the one automations use) when it can

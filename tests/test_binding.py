@@ -2785,13 +2785,12 @@ def test_a_light_changed_elsewhere_still_takes_over(monkeypatch) -> None:
 
     now[0] = 5.0
     report("light.left", 30)
-    report("light.middle", 30)
-    report("light.right", 30)
     assert binding._tracked is None
 
     now[0] = 6.0
     binding._rotate_by(1, False)
-    assert _last_payload(binding)["brightness"] == round(30 - 7.65)
+    # The next read is the group mean (143) of the three, one of them now at 30.
+    assert _last_payload(binding)["brightness"] == round(143 - 7.65)
 
 
 def test_switching_the_lights_off_elsewhere_is_honoured(monkeypatch) -> None:
@@ -2870,6 +2869,7 @@ def test_an_explicit_click_target_is_still_used_alone(monkeypatch) -> None:
     )
 
     binding._single_press()
+    assert binding.hass.services.async_call.call_count == 1
 
     _domain, service, payload = binding.hass.services.async_call.call_args.args[:3]
     assert service == "toggle"
@@ -3184,3 +3184,130 @@ def test_a_light_without_kelvin_bounds_keeps_the_fallback_range(monkeypatch) -> 
     from custom_components.ikea_bilresa.binding import FALLBACK_MAX_KELVIN
 
     assert _last_payload(binding)["color_temp_kelvin"] <= FALLBACK_MAX_KELVIN
+
+
+def test_a_press_cancels_a_rotation_still_queued(monkeypatch) -> None:
+    """A coalesced value must not fire afterwards and relight the lights."""
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._min_command_interval = 5.0
+    binding._rotate_by(1, False)  # sent at once
+    binding._rotate_by(1, False)  # queued behind it
+    assert binding._pending_command is not None
+
+    _press_once(binding)
+    calls = binding.hass.services.async_call.call_count
+    binding._flush_pending_command()
+
+    assert binding._pending_command is None
+    assert binding.hass.services.async_call.call_count == calls
+
+
+def test_a_scroll_right_after_a_press_off_does_not_relight_the_lights(
+    monkeypatch,
+) -> None:
+    """The lights have not reported off yet; the press is what counts."""
+    binding, now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._rotate_by(1, False)
+    now[0] = 1.0
+    _press_once(binding)  # off: the mocked lights still say 'on'
+    calls = binding.hass.services.async_call.call_count
+
+    now[0] = 1.5
+    binding._rotate_by(1, False)
+
+    assert binding.hass.services.async_call.call_count == calls
+
+
+def test_a_failed_older_call_does_not_discard_a_newer_level(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._min_command_interval = 0.0
+    binding._rotate_by(1, False)
+    older = binding._command_seq
+    binding._rotate_by(1, False)
+    assert binding._command_seq == older + 1
+
+    async def _rejected() -> None:
+        raise RuntimeError("rejected")
+
+    asyncio.run(
+        binding._async_dispatch_service(
+            "light", "turn_on", _rejected(), result={}, action=None, seq=older
+        )
+    )
+
+    assert binding._tracked is not None
+
+
+def test_scrolling_up_switches_on_lights_that_are_all_off(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, None))
+
+    binding._rotate_by(1, True)
+
+    payload = _last_payload(binding)
+    assert payload["entity_id"] == _LIGHTS
+    assert payload["brightness"] > 0
+
+
+def test_scrolling_down_does_not_switch_on_lights_that_are_all_off(
+    monkeypatch,
+) -> None:
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, None))
+
+    binding._rotate_by(1, False)
+
+    assert binding.hass.services.async_call.call_count == 0
+
+
+def test_a_light_at_another_level_still_gets_the_value_at_the_maximum(
+    monkeypatch,
+) -> None:
+    binding, _now, report = _lights_binding(
+        monkeypatch, {"light.a": 255, "light.b": 255}
+    )
+    binding._rotate_by(1, True)
+    assert binding.hass.services.async_call.call_count == 0
+    binding._rejoining.add("light.b")
+    report("light.b", 100)  # it came back at its own level
+    assert binding._tracked == pytest.approx(255)
+
+    binding._rotate_by(1, True)
+
+    payload = _last_payload(binding)
+    assert payload["entity_id"] == ["light.a", "light.b"]
+    assert payload["brightness"] == 255
+
+
+def test_one_light_off_the_path_takes_over_even_mid_scroll(monkeypatch) -> None:
+    binding, now, report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_by(1, False)
+
+    now[0] = 0.2
+    report("light.left", 30)
+
+    assert binding._tracked is None
+
+
+def test_running_actions_invalidates_the_tracked_level(monkeypatch) -> None:
+    binding, _now, _report = _lights_binding(monkeypatch, dict.fromkeys(_LIGHTS, 200))
+    binding._rotate_by(1, False)
+    assert binding._tracked is not None
+
+    binding._run_sequence("short_press")
+
+    assert binding._tracked is None
+
+
+def test_a_hue_half_way_round_is_on_the_path_either_way(monkeypatch) -> None:
+    binding, now, report = _colour_lights(
+        monkeypatch,
+        {"light.a": (0.0, 80.0), "light.b": (0.0, 80.0)},
+        **{CONF_STEP: 50},
+    )
+    binding._rotate_by(1, True)  # 0 -> 180
+    assert binding._tracked == pytest.approx(180.0)
+
+    now[0] = 6.0
+    report("light.a", {"hs_color": [90.0, 80.0]})
+
+    assert binding._tracked == pytest.approx(180.0)

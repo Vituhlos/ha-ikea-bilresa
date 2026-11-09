@@ -82,7 +82,12 @@ Zigbee2MQTT lze dál použít jako jediný cíl.
 - Nedostupné světlo se z příkazů vynechá a další příkaz ho srovná, i když bylo
   nedostupné už při startu propojení.
 - Bez samostatného cíle krátkého stisku stisk přepne všechna světla společně:
-  vypne je, je-li některé zapnuté, jinak je zapne.
+  vypne je, je-li některé zapnuté, jinak je zapne. Dokud světla nenahlásí
+  výsledek, bere otočení hned po takovém stisku světla jako vypnutá a stisk i
+  spuštění akcí zruší ještě nepoložené otočení.
+- Když jsou všechna světla vypnutá, otočení nahoru u jasu je zapne a otočení
+  dolů nedělá nic; barva a teplota bílé potřebují rozsvícená světla, stejně jako
+  u jediného světla.
 
 ## Akce podle druhu cíle
 

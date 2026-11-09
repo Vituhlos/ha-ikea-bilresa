@@ -158,6 +158,10 @@ _RESYNC_AFTER = 3.0
 # A multi-light binding waits for the bulbs' late acknowledgements, so it keeps
 # its tracked level longer; past this it reads the lights again.
 _MULTI_RESYNC_AFTER = 30.0
+# After a press switched a multi-light set off, the lights are taken as off for
+# this long (or until one reports on), so a quick scroll does not read the
+# state from before the press and relight them.
+_OFF_INTENT_SECONDS = 5.0
 _STATE_ECHO_MARGIN = 0.25
 
 # A missing gesture boundary must not suppress rotation indefinitely.
@@ -245,6 +249,9 @@ def _on_hue_arc(
     if start is None:
         return False
     length = _hue_offset(end, start)
+    if abs(abs(length) - 180) < 1e-6:
+        # Half way round: both arcs are equally short, and a report is on one.
+        return True
     travelled = _hue_offset(observed, start)
     if abs(travelled) <= tolerance:
         return True
@@ -403,6 +410,10 @@ class LightBinding:
         # reported since. Their first report back is a power cycle or a
         # reconnect, not a choice anyone made about the brightness.
         self._rejoining: set[str] = set()
+        self._off_intent_until = 0.0
+        # Counts the service calls this binding made, so a failure only
+        # discards the tracked level when no newer call has been made since.
+        self._command_seq = 0
         # Outgoing-command rate limiting. An instance attribute so a test can
         # disable it without patching the module.
         self._min_command_interval = _MIN_COMMAND_INTERVAL
@@ -743,6 +754,8 @@ class LightBinding:
                 reported=observed,
             )
             return
+        if self._multi and new_state.state == "on":
+            self._off_intent_until = 0.0
         if (
             self._multi
             and self._tracked is not None
@@ -763,7 +776,11 @@ class LightBinding:
         if observed is not None:
             self._last_reported[entity_id] = observed
         if self._scroll_authoritative(now):
-            if not own_echo and self._mode not in _LIGHT_MODES:
+            if (
+                not own_echo
+                and (self._mode not in _LIGHT_MODES or self._multi)
+                and not settling
+            ):
                 self._forget_target("unrecognized_value_during_scroll", observed)
             else:
                 self._trace.record(
@@ -1501,8 +1518,9 @@ class LightBinding:
             after=round(target),
             result=result,
             # At a limit the value no longer changes, but a light that is off
-            # still has to join the others.
-            force=self._multi and not self._all_members_on(),
+            # or at another level still has to join the others.
+            force=self._multi
+            and not self._members_aligned(ATTR_BRIGHTNESS, target, 255),
         )
 
     @callback
@@ -1542,8 +1560,12 @@ class LightBinding:
             before=round(tracked),
             after=round(target),
             result=result,
-            # At a limit a light that is off still has to join the others.
-            force=self._multi and not self._all_members_on(),
+            # At a limit a light that is off or at another level still has to
+            # join the others.
+            force=self._multi
+            and not self._members_aligned(
+                ATTR_COLOR_TEMP_KELVIN, target, max(max_k - min_k, 1)
+            ),
         )
 
     @callback
@@ -1722,7 +1744,7 @@ class LightBinding:
         if not states:
             return None
         lit = [state for state in states if state.state == "on"]
-        if not lit:
+        if not lit or time.monotonic() < self._off_intent_until:
             return State(self._target, "off")
         attributes: dict[str, Any] = {}
         brightness = [
@@ -1774,19 +1796,40 @@ class LightBinding:
         high = min(maxs, default=FALLBACK_MAX_KELVIN)
         return (low, high) if low <= high else None
 
+    @callback
+    def _invalidate_tracking(self, reason: str) -> None:
+        """Drop the tracked level and any queued rotation of a multi-light set.
+
+        For anything that may change the lights behind the rotation: a press,
+        a run of actions. A queued value must not fire afterwards and put the
+        lights back.
+        """
+        self._cancel_pending_command()
+        self._forget_target(reason)
+
+    def _members_aligned(self, attribute: str, target: float, span: float) -> bool:
+        """Whether every reachable light is on and at ``target``.
+
+        A light that is off, or whose reported level differs by more than 2 %
+        of ``span``, still has to receive the value even when the value itself
+        no longer changes (at a limit, or after a light rejoined).
+        """
+        for member in self._targets:
+            state = self._member_state(member)
+            if state is None:
+                continue
+            if state.state != "on":
+                return False
+            level = _as_float(state.attributes.get(attribute))
+            if level is not None and abs(level - target) > span * 0.02:
+                return False
+        return True
+
     def _any_member_on(self) -> bool:
         """Whether any reachable light of this binding is on."""
         return any(
             (state := self._member_state(member)) is not None and state.state == "on"
             for member in self._targets
-        )
-
-    def _all_members_on(self) -> bool:
-        """Whether every reachable light is on (``True`` when none is)."""
-        return all(
-            state.state == "on"
-            for member in self._targets
-            if (state := self._member_state(member)) is not None
         )
 
     def _member_state(self, entity_id: str) -> State | None:
@@ -1873,8 +1916,9 @@ class LightBinding:
             return
         if self._multi and target in self._targets:
             # The press changes a light this binding rotates, so the level it
-            # tracked is no longer where the lights are.
-            self._forget_target("press_changed_target")
+            # tracked is no longer where the lights are, and a queued rotation
+            # must not fire afterwards.
+            self._invalidate_tracking("press_changed_target")
         if (
             self._multi
             and gesture == GESTURE_SHORT_PRESS
@@ -1927,6 +1971,8 @@ class LightBinding:
             service = (
                 "turn_off" if state is not None and state.state == "on" else "turn_on"
             )
+        if service == "turn_off":
+            self._off_intent_until = time.monotonic() + _OFF_INTENT_SECONDS
         self._call_entity(
             domain,
             service,
@@ -1937,6 +1983,9 @@ class LightBinding:
 
     def _run_sequence(self, gesture: str) -> None:
         """Run the Home Assistant actions the user set for this gesture."""
+        if self._multi:
+            # The actions may well change these lights.
+            self._invalidate_tracking("actions_started")
         result = {"kind": "actions", "action": "run"}
         sequence = self._sequences.get(gesture)
         if not sequence:
@@ -2124,6 +2173,9 @@ class LightBinding:
         entity_ids: str | list[str] = (
             self._available_targets() if self._multi else self._target
         )
+        if service != "turn_off":
+            self._off_intent_until = 0.0
+        self._command_seq += 1
         payload = {ATTR_ENTITY_ID: entity_ids, **data}
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
@@ -2137,6 +2189,7 @@ class LightBinding:
                 service_call,
                 result=result,
                 action=action,
+                seq=self._command_seq,
             )
         )
 
@@ -2166,6 +2219,7 @@ class LightBinding:
             self._log_latency_stage("service_dispatch")
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
+        self._command_seq += 1
         service_call = self.hass.services.async_call(
             domain,
             service,
@@ -2179,6 +2233,7 @@ class LightBinding:
                 service_call,
                 result=result,
                 action=action,
+                seq=self._command_seq,
             )
         )
         return True
@@ -2191,6 +2246,7 @@ class LightBinding:
         *,
         result: dict[str, Any],
         action: WheelAction | None,
+        seq: int | None = None,
     ) -> None:
         """Report whether Home Assistant accepted this exact service action.
 
@@ -2207,9 +2263,10 @@ class LightBinding:
                 service,
                 type(err).__name__,
             )
-            if self._multi:
+            if self._multi and (seq is None or seq == self._command_seq):
                 # The lights never got the tracked level; reading them again
-                # beats carrying a value none of them has.
+                # beats carrying a value none of them has. A newer call has
+                # replaced that level, so only the newest one decides.
                 self._forget_target("service_dispatch_failed")
             self._report_activity(
                 "failed",
