@@ -96,7 +96,7 @@ def test_older_findings_count_and_html_is_dropped() -> None:
 
 def test_the_exit_status_says_whether_the_pull_request_is_ready() -> None:
     passed = [{"name": "Unit tests", "bucket": "pass"}]
-    everyone = {"devin", "codex", "coderabbit"}
+    everyone = {"codex", "coderabbit"}
 
     assert pr_watch._verdict(passed, 0, everyone) == 0
     assert pr_watch._verdict(passed, 1, everyone) == 1
@@ -106,7 +106,7 @@ def test_the_exit_status_says_whether_the_pull_request_is_ready() -> None:
     failed = [{"name": "Lint", "bucket": "fail"}]
     assert pr_watch._verdict(failed, 0, everyone) == 1
     # A review bot that never showed up is not a passed review.
-    assert pr_watch._verdict(passed, 0, {"devin", "codex"}) == 2
+    assert pr_watch._verdict(passed, 0, {"codex"}) == 2
 
 
 def test_waiting_ends_only_when_every_check_has_stopped() -> None:
@@ -127,7 +127,7 @@ def test_a_look_alike_error_is_not_excused_by_a_known_one() -> None:
 
 
 def test_a_cancelled_job_never_passes() -> None:
-    everyone = {"devin", "codex", "coderabbit"}
+    everyone = {"codex", "coderabbit"}
     cancelled = [{"name": "Unit tests", "bucket": "cancel"}]
     skipped = [
         {"name": "Unit tests", "bucket": "pass"},
@@ -142,7 +142,10 @@ def test_waiting_goes_on_for_a_bot_that_has_not_reviewed_yet() -> None:
     done = [{"name": "Unit tests", "bucket": "pass"}]
     skipped = [*done, {"name": "CodeRabbit", "bucket": "skipping"}]
 
-    assert pr_watch._awaited(done, {"devin"}) == {"codex", "coderabbit"}
+    assert pr_watch._awaited(done, {"devin"}) == {
+        "codex",
+        "coderabbit",
+    }  # devin is not required
     # CI itself says CodeRabbit will not review: no point in waiting for it.
     assert pr_watch._awaited(skipped, {"devin", "codex"}) == set()
 
