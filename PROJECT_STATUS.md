@@ -20,6 +20,10 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## Which branch a contribution goes to (2026-11-09)
+
+`CONTRIBUTING.md` and the pull request template on `main` now say that new features go to the development line `agent/panel-0.6.1` and that `main` takes bug fixes of the stable release and Dependabot updates. Cause: a contributor sent a feature pull request (`input_boolean`) to `main` after our own invitation. Validated: only the CI checks of the pull request (`tests/test_docs.py` exists on the development line, not on `main`, so there is no documentation test to run here). Not applicable: hardware. Next: none; the same text is in `AGENTS.md` on the development line.
+
 ## Dependabot PR #53 cannot work; Dependabot ignores Home Assistant (2026-11-09)
 
 Dependabot PR #53 bumped `homeassistant` in `requirements-test.txt` from 2026.10.4 to 2026.11.0, but `pytest-homeassistant-custom-component` 0.13.375 pins Home Assistant 2026.10.4 and is the last release of that package: pip fails with `ResolutionImpossible` and the Unit tests check failed. `.github/dependabot.yml` now ignores `homeassistant` and that package; the pre-release job of `ci.yml` covers the newest Home Assistant with the official `pytest-homeassistant`. Validated: the YAML parses; the failure was read from the CI log of PR #53. Not verified: that Dependabot honours the ignore (it shows on its next run). Next: the owner decides about closing PR #53 and merging PR #54 (`codeql-action` 4, all checks green).

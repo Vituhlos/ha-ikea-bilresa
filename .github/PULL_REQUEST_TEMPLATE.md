@@ -1,3 +1,7 @@
+<!-- Base branch: new features go to `agent/panel-0.6.1` (the 0.7 development
+     line); `main` takes only bug fixes of the stable release (and Dependabot updates).
+     See CONTRIBUTING.md. -->
+
 ## Summary
 
 <!-- What does this change and why? Link the issue if there is one. -->
