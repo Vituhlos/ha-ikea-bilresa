@@ -22,6 +22,13 @@ updates:
     commit-message:
       prefix: "chore"
     open-pull-requests-limit: 3
+    # The pinned test job runs Home Assistant together with the community test
+    # package, which stopped at 2026.10.4 and pins that Home Assistant itself:
+    # a bump of one of them alone cannot be installed. The pre-release job in
+    # ci.yml tests the newest Home Assistant with the official package.
+    ignore:
+      - dependency-name: "homeassistant"
+      - dependency-name: "pytest-homeassistant-custom-component"
     groups:
       test-tools:
         patterns: ["*"]
