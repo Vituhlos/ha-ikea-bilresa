@@ -86,8 +86,11 @@ Assistant or Zigbee2MQTT group entity can still be used as a single target.
   press switches all of them together: off while any of them is on, on
   otherwise. A separate short-press target still wins, and a binding with one
   target presses that one target exactly as before. Until the lights report
-  it, a scroll right after such a press treats them as off, and a press or a run
-  of actions also cancels a rotation still queued.
+  it, a scroll right after such a press treats them as off.
+
+- For both single-target and multi-light bindings, a press acting on a rotation
+  target, a scene activation, or a configured action sequence cancels any
+  queued rotation so it cannot override the new action later.
 - When every light is off, scrolling a brightness binding up switches them on
   and scrolling down does nothing; colour and colour temperature need lit
   lights, as for a single light.

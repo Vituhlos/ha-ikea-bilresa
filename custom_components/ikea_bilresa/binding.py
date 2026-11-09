@@ -1798,11 +1798,10 @@ class LightBinding:
 
     @callback
     def _invalidate_tracking(self, reason: str) -> None:
-        """Drop the tracked level and any queued rotation of a multi-light set.
+        """Drop tracked rotation state and queued commands for any binding.
 
-        For anything that may change the lights behind the rotation: a press,
-        a run of actions. A queued value must not fire afterwards and put the
-        lights back.
+        A press acting on the rotation target, or an action sequence that may
+        change it, must not be followed by an older queued value.
         """
         self._cancel_pending_command()
         self._forget_target(reason)
@@ -1882,6 +1881,10 @@ class LightBinding:
     def _single_press(self) -> None:
         if self._scenes:
             scene = self._scenes[self._scene_index]
+            # A scene may change the rotated lights, even if it is not itself
+            # the rotation target. Do not let an older dim command override it.
+            if self._targets and self._available_state(scene) is not None:
+                self._invalidate_tracking("scene_activated")
             if self._call_entity(
                 "scene",
                 "turn_on",
@@ -1914,11 +1917,6 @@ class LightBinding:
         if not target:
             self._report_activity("skipped", reason="target_not_configured")
             return
-        if self._multi and target in self._targets:
-            # The press changes a light this binding rotates, so the level it
-            # tracked is no longer where the lights are, and a queued rotation
-            # must not fire afterwards.
-            self._invalidate_tracking("press_changed_target")
         if (
             self._multi
             and gesture == GESTURE_SHORT_PRESS
@@ -1983,14 +1981,15 @@ class LightBinding:
 
     def _run_sequence(self, gesture: str) -> None:
         """Run the Home Assistant actions the user set for this gesture."""
-        if self._multi:
-            # The actions may well change these lights.
-            self._invalidate_tracking("actions_started")
         result = {"kind": "actions", "action": "run"}
         sequence = self._sequences.get(gesture)
         if not sequence:
             self._report_activity("skipped", result=result, reason="actions_missing")
             return
+        if self._targets:
+            # A configured sequence may change any rotation target, even
+            # when the binding controls only one entity.
+            self._invalidate_tracking("actions_started")
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
         self.hass.async_create_task(
@@ -2217,6 +2216,17 @@ class LightBinding:
             return False
         elif entity_id == self._click_target:
             self._log_latency_stage("service_dispatch")
+        # Only discard queued rotation once the press can actually be sent.
+        # A skipped/unavailable target must not erase a pending command.
+        dispatched_targets = entity_id if isinstance(entity_id, list) else [entity_id]
+        if any(target in self._targets for target in dispatched_targets) and not (
+            self._mode == MODE_VOLUME
+            and domain == "media_player"
+            and service not in ("volume_set", "volume_up", "volume_down")
+        ):
+            # Playback and mute leave volume_level untouched. The power
+            # actions go through homeassistant and cancel queued volume.
+            self._invalidate_tracking("press_changed_target")
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
         self._command_seq += 1
