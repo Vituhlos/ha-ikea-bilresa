@@ -22,7 +22,7 @@ The dated entries below are preserved as a historical implementation and testing
 
 ## Which branch a contribution goes to (2026-11-09)
 
-`CONTRIBUTING.md` and the pull request template on `main` now say that new features go to the development line `agent/panel-0.6.1` and that `main` takes bug fixes of the stable release and Dependabot updates. Cause: a contributor sent a feature pull request (`input_boolean`) to `main` after our own invitation. Validated: `python -m pytest tests/test_docs.py -q -p no:cacheprovider` (see the pull request checks). Not applicable: hardware. Next: none; the same text is in `AGENTS.md` on the development line.
+`CONTRIBUTING.md` and the pull request template on `main` now say that new features go to the development line `agent/panel-0.6.1` and that `main` takes bug fixes of the stable release and Dependabot updates. Cause: a contributor sent a feature pull request (`input_boolean`) to `main` after our own invitation. Validated: only the CI checks of the pull request (`tests/test_docs.py` exists on the development line, not on `main`, so there is no documentation test to run here). Not applicable: hardware. Next: none; the same text is in `AGENTS.md` on the development line.
 
 ## Dependabot PR #53 cannot work; Dependabot ignores Home Assistant (2026-11-09)
 
