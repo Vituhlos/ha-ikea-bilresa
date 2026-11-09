@@ -263,6 +263,27 @@ def test_wheel_schema_keeps_rotary_and_triple_press_options() -> None:
     assert CONF_RAMP_DIRECTION not in keys
 
 
+def test_native_press_target_selectors_offer_input_boolean_helpers() -> None:
+    """Wheel and dual-button forms must expose helper toggle targets (#38)."""
+    flow = _device_flow()
+    for node_id, target_fields in (
+        (
+            "303",
+            (
+                CONF_CLICK_TARGET,
+                CONF_DOUBLE_TARGET,
+                CONF_HOLD_TARGET,
+                CONF_TRIPLE_TARGET,
+            ),
+        ),
+        ("101", (CONF_CLICK_TARGET, CONF_DOUBLE_TARGET, CONF_HOLD_TARGET)),
+    ):
+        schema = flow._schema({CONF_NODE_ID: node_id})
+        fields = {str(marker.schema): value for marker, value in schema.schema.items()}
+        for field in target_fields:
+            assert "input_boolean" in fields[field].config["domain"], field
+
+
 def test_reconfigure_device_choices_stay_within_the_current_variant() -> None:
     flow = _device_flow()
     flow._device_options = lambda: [
