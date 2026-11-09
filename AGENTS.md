@@ -112,8 +112,9 @@ contributor is written like the ones to @amodig on PR #5 and #23:
   a release, a pre-release or only on the development line. Promise no dates.
 - **Numbered questions** at the end, specific to the person (which device, what
   behaviour they expect), so the reply is useful to answer.
-- **Last line:** `🤖 Agent-authored: Claude Code, model ` followed by the model
-  id in backticks.
+- **Last line:** `🤖 Agent-authored: <agent>, model ` followed by the model id in
+  backticks. Name the agent that really wrote the reply (Claude Code, Codex) in
+  this line and in the first one, not always Claude.
 - Keep the issue open until the change is in a release (or the reporter
   confirms). Do not paste anything from the owner's own Home Assistant (names,
   ids, paths): documents and replies stay generic.
