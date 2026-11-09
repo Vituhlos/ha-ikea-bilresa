@@ -20,6 +20,10 @@ The dated entries below are preserved as a historical implementation and testing
 ---
 
 
+## Dependabot PR #53 cannot work; Dependabot ignores Home Assistant (2026-11-09)
+
+Dependabot PR #53 bumped `homeassistant` in `requirements-test.txt` from 2026.10.4 to 2026.11.0, but `pytest-homeassistant-custom-component` 0.13.375 pins Home Assistant 2026.10.4 and is the last release of that package: pip fails with `ResolutionImpossible` and the Unit tests check failed. `.github/dependabot.yml` now ignores `homeassistant` and that package; the pre-release job of `ci.yml` covers the newest Home Assistant with the official `pytest-homeassistant`. Validated: the YAML parses; the failure was read from the CI log of PR #53. Not verified: that Dependabot honours the ignore (it shows on its next run). Next: the owner decides about closing PR #53 and merging PR #54 (`codeql-action` 4, all checks green).
+
 ## Backport of the compatibility watch and the 2026.11 CI to `main` (2026-11-06)
 
 Copied from the development line (PR #40 and PR #41), because scheduled workflows run only from `main`: `compat-watch.yml` with `tools/compat_watch.py` and `.github/compat-baseline.json` (Home Assistant 2026.11.0, Matter Server app 9.3.0, matterjs-server v1.5.5), the pre-release job of `ci.yml` on the new `pytest-homeassistant`, `tests/ha_common.py` and `tests/ha_typing.py`, and the import changes in six test files. Validated: `pytest` 532 passed on Home Assistant 2026.9.4 (old package) and on 2026.11.0 (`pytest-homeassistant`, `-p no:respx`), ruff clean, mypy only the two known errors. Not run: the workflows on GitHub, and nothing on a real instance. The baseline says what was *tested*, so update it only in a pull request that records a check of a newer version. The garbled-Czech test and the tools of the development line are not backported. The audit section of `docs/MATTERJS_COMPATIBILITY.md` is copied too: it is what the baseline versions rest on (from sources and tests, not a real instance).
