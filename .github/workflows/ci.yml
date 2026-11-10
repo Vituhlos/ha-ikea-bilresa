@@ -33,6 +33,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/ruff-action@v3
+      - name: Validate Codespaces configuration
+        run: |
+          python3 -m json.tool .devcontainer/devcontainer.json > /dev/null
+          bash -n .devcontainer/setup.sh
+
 
   mypy:
     name: Type check (mypy)

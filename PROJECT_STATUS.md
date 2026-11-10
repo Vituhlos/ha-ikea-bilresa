@@ -1,5 +1,35 @@
 # Project status and agent handoff
 
+## GitHub automation initiative — Phase 1 ready for maintainer review (2026-11-10)
+
+**Status:** [PR #68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) is open and **not merged**. The two repository rulesets were imported by the maintainer, but remain **disabled**. The imported copies were based on an earlier, weaker JSON version and MUST be updated before activation. See `docs/architecture/phase1-activation.md`.
+
+### Static / configuration verification
+
+- New development configuration: `.devcontainer/devcontainer.json` (Python 3.14, Node 22), `.devcontainer/setup.sh`, `.github/workflows/ci-devcontainer.yml`; roadmap, activation runbook, and separately staged `main`/development rulesets.
+- Ruleset templates now pin **all six** required contexts to GitHub Actions via `integration_id: 15368`, use **strict freshness**, zero approvals, required PRs and conversation resolution, and reject force pushes/deletion. They are committed with `enforcement: disabled`; these repo files do not control the already-imported live settings.
+- Sourcery/CodeRabbit review feedback applied: explicit warning about untrusted PR Codespaces bootstrap, `persist-credentials: false` in the supplemental workflow, `requirements-test.txt` path trigger, and correct `mypy --no-site-packages` in instructions.
+- New file JSON parsing and Bash syntax are part of the normal CI lint job. The stricter run with all installed Home Assistant typing packages is deliberately not the existing project's mypy acceptance gate.
+
+### CI verification
+
+- Before review fixes: [CI 42792297786](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42792297786), [CodeQL 42792297615](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42792297615) and [Devcontainer smoke 42792297416](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42792297416) all succeeded.
+- Real interactive Codespace **opened by the maintainer** on the PR branch. Their reported output: Python 3.14.10, Node 22.23.4, `ruff check` clean, `mypy --no-site-packages` clean for 27 source files, **543/543 Python tests and 47/47 Node tests passed**. Codespace was subsequently stopped.
+- A first stricter mypy run in the installed environment exposed **39 existing typing errors across four files** (Home Assistant / voluptuous / probatio type interactions). They have not been fixed; baseline CI and Codespaces smoke align on `--no-site-packages`. Audit separately without hiding the discrepancy.
+- **After the latest review fixes:** new CI runs need to finish and review feedback must be inspected again. Do not assume green results from earlier commits apply to the current commit.
+
+### Hardware / device validation
+
+- Not applicable: these are development infrastructure, documentation and ruleset-template changes only. No physical BILRESA or HA configuration was modified or validated.
+
+### Risk / remaining actions
+
+- Already-imported disabled rulesets are stale. Their earlier status checks are not bound to GitHub Actions and use loose freshness. **Never activate them as-is.** Inspect and edit each live ruleset, or replace with the corrected templates, then verify all six expected sources and branch freshness before enabling.
+- Classic branch protection cannot be read using the present GitHub connector permissions; inspect Settings → Branches.
+- **Single best next action:** after new CI and CodeRabbit/Sourcery reviews are acceptable, the maintainer decides whether to merge PR #68. Then correct and enable the `main` ruleset first, verify behavior, and only then enable the development ruleset. Do not activate the Phase 2 AI GitHub App yet.
+
+---
+
 **Current snapshot — reviewed 2026-10-25**
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.
