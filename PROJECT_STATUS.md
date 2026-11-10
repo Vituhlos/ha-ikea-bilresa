@@ -1,5 +1,18 @@
 # Project status and agent handoff
 
+## GitHub automation initiative — Phase 1 draft (2026-11-10)
+
+**Status:** preparation only, in proposed branch `chore/phase1-codespaces-branch-guardrails-20261110`; not merged or enabled. Owner-approved design: `docs/architecture/ai-development-automation.md`.
+
+- Changes: add `.devcontainer/devcontainer.json` (Python 3.14/Node 22), `.devcontainer/setup.sh` (venv/test dependency bootstrap), a lightweight JSON/shell syntax validation in `.github/workflows/ci.yml`, and an `AGENTS.md` roadmap pointer.
+- Static validation: the devcontainer JSON was parsed while generating the file; the workflow contains JSON and Bash syntax validation commands. **Not yet run:** the new workflow on GitHub or bootstrap/test suite inside a real Codespace. Neither CI nor hardware tests have been claimed to pass.
+- Repository governance: no rulesets were reported by the connector's rulesets endpoint; classic protection could not be read with the integration. No branch rules, repository visibility, Home Assistant configuration, releases, or device-facing code have been changed.
+- Hardware validation: not applicable to these infrastructure-only changes.
+- Risks: first Codespaces bootstrap downloads Home Assistant Python dependencies, which can be sizable/slow; verify availability and versions in a live Codespace. Before requiring checks, observe a passing PR to each target branch and confirm check names.
+- **Single next action:** review the Phase 1 PR and run its CI; then test bootstrapping a Codespace. Configure branch rulesets only after these checks are green, using maintainer admin access.
+
+---
+
 **Current snapshot — reviewed 2026-10-25**
 
 - **Latest stable release:** [`v0.6.1`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.1), 2026-10-24: 0.6.0 plus the fix that makes the panel follow each user's language (PR #10). Before that, [`v0.6.0`](https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.6.0), 2026-10-18.
