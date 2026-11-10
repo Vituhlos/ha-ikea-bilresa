@@ -4,7 +4,7 @@
 
 **Phase 1: complete.** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) was merged into main. Maintainer created and stopped an interactive Codespace after **543 Python tests and 47 Node tests passed**; Ruff and mypy (existing no-site-packages baseline) were clean. Both GitHub branch rulesets are **active**: main #26934594 and agent/panel-0.6.1 #26934615, with six source-pinned CI checks, required PRs and resolved conversations. Actual enforcement on a new post-activation PR remains to be observed. Physical device validation is separate.
 
-**Phase 2A: staged in branch chore/phase2a-agent-handoff-20261110; unmerged.** Owner-approved plan: docs/architecture/ai-development-automation.md. Detailed instructions and threat model: docs/architecture/phase2-agent-handoff.md.
+**Phase 2A: proposed in [PR #69](https://github.com/Vituhlos/ha-ikea-bilresa/pull/69), branch chore/phase2a-agent-handoff-20261110; unmerged.** Owner-approved plan: docs/architecture/ai-development-automation.md. Detailed instructions and threat model: docs/architecture/phase2-agent-handoff.md.
 
 ### Changed files
 
@@ -16,7 +16,7 @@
 ### Verification status
 
 - Static: reviewed intended read-only/limited permissions; workflow runs only for owner comments/manual dispatch, checks out trusted default-branch code with credentials not persisted, and does not execute issue text. JS unit tests are **written, not yet CI-verified**.
-- CI: the first Phase 2A PR run must validate the new workflow and all six required checks; do **not** claim green before observing a run. After merge, the maintainer must test one real issue command, because issue_comment workflows only run from the default branch.
+- CI: [CI run 42806045021](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42806045021) **passed**, including the new Node handoff security tests and all six standard jobs. [CodeQL run 42806045255](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42806045255) **passed**. AI reviewers were still processing the PR at this checkpoint. After merge, the maintainer must test one real issue command because issue_comment workflows only run from the default branch.
 - Hardware: **not applicable** (no runtime or Matter changes). No physical BILRESA testing or Home Assistant changes were performed.
 
 ### Known limitations and next action
@@ -24,7 +24,7 @@
 - /agent prepare prepares a **manual handoff only**: the owner must paste the prompt into Codex Cloud and initiate a new task. It does **not** start a model or create PRs.
 - A separate bilresa-assistant[bot] GitHub App identity and fully automatic issue→code→draft PR cannot be assumed free: openai/codex-action requires separately billed API credentials, and GitHub Copilot coding-agent access is separate from GitHub Pro. Explicit owner approval of any billing, GitHub App registration, secret storage and safe trigger design is required first.
 - Existing Phase 1 stricter full-environment mypy differences (39 typing errors across four files) remain outside this infrastructure-only change.
-- **Single best next action:** review and verify the Phase 2A PR CI and AI reviewers; then the owner may merge and test one /agent prepare dev comment on a suitable open issue. Only after the handoff is proven should an autonomous backend and distinct bot identity be considered.
+- **Single best next action:** review Phase 2A [PR #69](https://github.com/Vituhlos/ha-ikea-bilresa/pull/69) and any outstanding AI review findings. The owner may then merge, test one /agent prepare dev comment on a suitable open issue, and manually hand the resulting prompt to Codex Cloud. Only after this path works should an autonomous backend and distinct bot identity be considered.
 
 ---
 
