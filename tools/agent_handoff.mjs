@@ -107,7 +107,7 @@ export function commentForHandoff({ prompt, number, targetKey, baseBranch }) {
     "4. Po zpracování zkontroluj návrh draft PR a všech šest CI kontrol.",
     "EN: Open Codex Cloud, select this repository and the expected base branch,",
     "review and edit the prompt below, start a cloud task, then inspect its",
-    "draft PR, required checks, risk notes and hardware validation status."
+    "draft PR, required checks, risk notes and hardware validation status.",
     "",
     "Issue: #" + number + " · cíl: " + baseBranch,
     "",
