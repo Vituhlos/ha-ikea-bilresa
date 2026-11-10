@@ -1,29 +1,15 @@
-name: AI issue handoff (manual, no model calls)
+name: AI issue handoff (owner-only, no model calls)
 
-# This workflow NEVER runs an AI model and never opens or merges a PR.
-# Only @Vituhlos can prepare a prompt for a selected issue.
+# A maintainer's exact issue comment prepares a prompt; AI never runs here.
+# GitHub runs issue_comment workflows from the trusted default branch.
 on:
   issue_comment:
     types: [created]
-  workflow_dispatch:
-    inputs:
-      issue_number:
-        description: "Existing open GitHub issue number"
-        type: number
-        required: true
-      target:
-        description: "Desired PR base branch: dev for features, main for stable fixes"
-        type: choice
-        required: true
-        default: dev
-        options:
-          - dev
-          - main
 
 permissions: {}
 
 concurrency:
-  group: ai-issue-handoff-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  group: ai-issue-handoff-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
@@ -31,16 +17,10 @@ jobs:
     name: Prepare Codex Cloud task prompt
     if: >-
       github.actor == 'Vituhlos' &&
+      !github.event.issue.pull_request &&
       (
-        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-        (
-          github.event_name == 'issue_comment' &&
-          !github.event.issue.pull_request &&
-          (
-            github.event.comment.body == '/agent prepare dev' ||
-            github.event.comment.body == '/agent prepare main'
-          )
-        )
+        github.event.comment.body == '/agent prepare dev' ||
+        github.event.comment.body == '/agent prepare main'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -48,7 +28,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      # Trusted default-branch checkout only. Never checkout an issue reporter's fork.
+      # Explicitly pin helper code to trusted main. Never checkout a fork.
       - name: Checkout trusted workflow code
         uses: actions/checkout@v7
         with:
@@ -57,9 +37,6 @@ jobs:
 
       - name: Prepare owner-authorized task handoff
         uses: actions/github-script@v8
-        env:
-          HANDOFF_ISSUE_NUMBER: ${{ inputs.issue_number || '' }}
-          HANDOFF_TARGET: ${{ inputs.target || '' }}
         with:
           script: |
             const { runHandoff } = await import(
@@ -70,8 +47,6 @@ jobs:
               context,
               actor: context.actor,
               eventName: context.eventName,
-              dispatchIssueNumber: process.env.HANDOFF_ISSUE_NUMBER,
-              dispatchTarget: process.env.HANDOFF_TARGET,
             });
             core.notice(
               'Prepared an issue handoff; NO Codex task or other AI execution started.'
