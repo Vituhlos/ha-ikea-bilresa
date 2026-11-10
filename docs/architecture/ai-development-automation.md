@@ -25,7 +25,7 @@ This file records the owner's agreed direction so that future Codex, Claude and 
    - Require passing CI checks, after a representative successful pull request establishes the exact check names and sources.
    - Block force pushes and branch deletion; require resolved PR conversations.
    - Do **not** require another person's approval or CODEOWNERS approval for the sole maintainer: GitHub does not allow self-approval.
-   - Avoid bypass permissions for bots. Do not enable strict merge queue, mandatory review approval, or other rules without testing for a solo-maintainer lockout.
+   - Avoid bypass permissions for bots. Do not enable merge queue, mandatory review approval, or other rules without testing for a solo-maintainer lockout. Require branch-up-to-date (strict) status freshness as the safer initial policy, accepting additional CI runs.
    - Initial CI candidates (job display names in `.github/workflows/ci.yml`): `Validate manifest (hassfest)`, `Validate HACS`, `Lint (ruff)`, `Type check (mypy)`, `Frontend checks`, `Unit tests`. Verify actual check contexts and results on **both target branches** before marking them required.
    - Do **not** make `Unit tests (newest Home Assistant pre-release)` required: it only runs on schedule/manual invocation. CodeQL and CodeRabbit stay advisory initially.
    - The workflow currently uses unrestricted `pull_request` events; never introduce branch/path filtering without checking required-check behavior, including documentation-only PRs and external contributors.
@@ -52,13 +52,13 @@ Desired experience, inspired by NSPanel-Easy's separate GitHub bot identity:
 
 - Existing public repository has `ci.yml`, `codeql.yml`, `compat-watch.yml`, `release.yml`, `stale.yml`, Dependabot, CodeRabbit configuration and `CODEOWNERS`.
 - Both `main` and `agent/panel-0.6.1` exist, and `ci.yml` responds to pull requests without target-branch filtering.
-- No repository rulesets were returned by the connected GitHub read API at the time of planning. Classic branch-protection details were inaccessible to the integration; **do not infer that no classic protection exists**.
-- A devcontainer is being proposed in the same Phase 1 PR; it is not verified by a live Codespace yet.
+- Two repo rulesets have since been imported by the maintainer and remain disabled; any imported copies must be updated with a verified GitHub Actions expected source (`integration_id: 15368`) and strict checks before activation. Classic branch-protection details were inaccessible to the integration; **do not infer that no classic protection exists**.
+- Codespaces was actually opened on the Phase 1 PR branch by the maintainer and its local checks passed (Python 543/543, JavaScript 47/47, Ruff and mypy with `--no-site-packages`). The Codespace has since been stopped.
 - Ruleset activation, AI agent installation, automatic issue dispatch, and hardware changes are deliberately deferred.
 
 ## Next owner-controlled actions
 
 1. Review the Phase 1 PR and observe its CI checks.
-2. Try Codespaces on the PR's branch; run `source .venv/bin/activate`, `ruff check custom_components tests`, `mypy custom_components/ikea_bilresa`, `python -m pytest -q`, and `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`; record results.
+2. Try Codespaces on the PR's branch; run `source .venv/bin/activate`, `ruff check custom_components tests`, `mypy --no-site-packages custom_components/ikea_bilresa`, `python -m pytest -q`, and `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`; record results.
 3. After those checks pass, configure and verify rulesets via `https://github.com/Vituhlos/ha-ikea-bilresa/settings/rules` (administrator access needed); start with `main`, then the development branch.
 4. Only then design the GitHub App / Codex handoff in a separately reviewed PR.
