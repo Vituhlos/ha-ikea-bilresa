@@ -3,7 +3,7 @@
 **Decision recorded:** 2026-11-10  
 **Owner:** @Vituhlos  
 **Scope:** `Vituhlos/ha-ikea-bilresa` (public repository)  
-**Status:** Phase 1 in progress; Phase 2 is a design, not an enabled automation.
+**Status:** Phase 1 infrastructure operational; both branch rulesets active. Real branch-rule enforcement on a new PR is pending. Phase 2A manual Codex Cloud issue handoff proposed in a separate PR; no autonomous coding bot enabled.
 
 This file records the owner's agreed direction so that future Codex, Claude and other coding-agent sessions do not have to reconstruct the plan from chat history. It does not override `PROJECT_STATUS.md`, `AGENTS.md`, `CONTRIBUTING.md`, or the hardware-test requirements.
 
@@ -34,9 +34,11 @@ This file records the owner's agreed direction so that future Codex, Claude and 
 4. **Safety of activation.** Stage the configuration in a pull request first. Rulesets are **not enabled by committing documentation**; configure and test them explicitly in repository settings after the checks have been verified. If the connected GitHub integration cannot edit repository administration settings, the maintainer performs that UI step.
 5. **Costs.** Start with a 2-core Codespace, consider a 10-minute idle timeout and a short stopped-Codespace retention period in personal Codespaces settings. No prebuilds initially. Monitor GitHub billing, storage, and applicable quotas.
 
-**Phase 1 acceptance:** a bootstrapped Codespace and passing required PR checks; changes to protected branches require PRs and green checks without blocking legitimate solo-maintainer work; no changes to device-facing code, Home Assistant or production releases.
+**Phase 1 acceptance:** interactive Codespace and checks are complete, and both rulesets are active. **The final enforcement acceptance check remains pending:** observe a fresh PR into main and one into agent/panel-0.6.1, verifying that GitHub blocks merging until all six required checks pass and that the sole maintainer can merge without requiring a second reviewer. No device-facing, Home Assistant or release changes were made.
 
 ## Phase 2 — human-supervised AI development
+
+**Phase 2A proposal:** See [phase2-agent-handoff.md](phase2-agent-handoff.md) for the owner-only GitHub Issue comment /agent prepare dev or /agent prepare main, the generated copy/paste Codex Cloud task, safeguards and precise acceptance criteria. This handoff does not call an AI model and requires a manual Cloud task start. It works with the existing ChatGPT subscription without an OpenAI API key, subject to the plan's available Cloud usage. A real bilresa-assistant GitHub App and automated issue-to-PR execution remain future steps that require explicit setup and cost approval.
 
 Desired experience, inspired by NSPanel-Easy's separate GitHub bot identity:
 
@@ -52,13 +54,13 @@ Desired experience, inspired by NSPanel-Easy's separate GitHub bot identity:
 
 - Existing public repository has `ci.yml`, `codeql.yml`, `compat-watch.yml`, `release.yml`, `stale.yml`, Dependabot, CodeRabbit configuration and `CODEOWNERS`.
 - Both `main` and `agent/panel-0.6.1` exist, and `ci.yml` responds to pull requests without target-branch filtering.
-- Two repo rulesets have since been imported by the maintainer and remain disabled; any imported copies must be updated with a verified GitHub Actions expected source (`integration_id: 15368`) and strict checks before activation. Classic branch-protection details were inaccessible to the integration; **do not infer that no classic protection exists**.
+- Both branch rulesets are confirmed **active**: main #26934594 and development #26934615, with six required checks bound to GitHub Actions (integration ID 15368), strict freshness, required PR and resolved conversations, and no mandatory second-person approval. They have not yet been exercised on a new post-activation PR. Classic branch-protection details remain inaccessible to this integration.
 - Codespaces was actually opened on the Phase 1 PR branch by the maintainer and its local checks passed (Python 543/543, JavaScript 47/47, Ruff and mypy with `--no-site-packages`). The Codespace has since been stopped.
-- Ruleset activation, AI agent installation, automatic issue dispatch, and hardware changes are deliberately deferred.
+- GitHub branch protection activation and Codespaces validation are complete. Phase 2A manual issue-to-Codex prompt handoff is staged in a separate PR; no GitHub App, unattended AI execution, paid API billing or hardware change is enabled.
 
 ## Next owner-controlled actions
 
-1. Review the Phase 1 PR and observe its CI checks.
-2. Try Codespaces on the PR's branch; run `source .venv/bin/activate`, `ruff check custom_components tests`, `mypy --no-site-packages custom_components/ikea_bilresa`, `python -m pytest -q`, and `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`; record results.
-3. After those checks pass, configure and verify rulesets via `https://github.com/Vituhlos/ha-ikea-bilresa/settings/rules` (administrator access needed); start with `main`, then the development branch.
-4. Only then design the GitHub App / Codex handoff in a separately reviewed PR.
+1. Review the Phase 2A handoff PR and its normal CI, including dedicated Node security tests.
+2. If accepted, merge it; issue_comment workflows are only activated from the default branch after merge. This Phase 2A PR itself provides the first live check of the protected main branch ruleset.
+3. As @Vituhlos, post `/agent prepare dev` on a suitable open issue and confirm the generated copyable prompt. Review and **curate** any contributor text before manually starting Codex Cloud; never paste an untrusted issue as executable instructions. No model runs automatically.
+4. Separately decide whether fully unattended GitHub issue → agent → draft PR execution is worth a paid Copilot plan or pay-as-you-go API. Only then design and register the own GitHub App identity bilresa-assistant.
