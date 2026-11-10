@@ -20,29 +20,20 @@ export function parseHandoffRequest({
   eventName,
   commentBody,
   commentIssueNumber,
-  dispatchIssueNumber,
-  dispatchTarget,
 }) {
-  let target;
-  let number;
-  if (eventName === "issue_comment") {
-    const match = /^\/agent prepare (main|dev)$/.exec(String(commentBody ?? "").trim());
-    if (!match) {
-      throw new Error("Use exactly: /agent prepare main OR /agent prepare dev");
-    }
-    target = match[1];
-    number = issueNumber(commentIssueNumber);
-  } else if (eventName === "workflow_dispatch") {
-    target = String(dispatchTarget ?? "");
-    number = issueNumber(dispatchIssueNumber);
-  } else {
-    throw new Error("Unsupported event type.");
+  if (eventName !== "issue_comment") {
+    throw new Error("Only owner GitHub Issue comments are supported.");
   }
-
-  if (!Object.hasOwn(BRANCHES, target)) {
-    throw new Error("Only main and dev target branches are allowed.");
+  const match = /^\/agent prepare (main|dev)$/.exec(String(commentBody ?? "").trim());
+  if (!match) {
+    throw new Error("Use exactly: /agent prepare main OR /agent prepare dev");
   }
-  return { issueNumber: number, targetKey: target, baseBranch: BRANCHES[target] };
+  const targetKey = match[1];
+  return {
+    issueNumber: issueNumber(commentIssueNumber),
+    targetKey,
+    baseBranch: BRANCHES[targetKey],
+  };
 }
 
 export function promptForIssue({ issue, issueNumber: number, baseBranch }) {
@@ -118,8 +109,6 @@ export async function runHandoff({
   context,
   actor,
   eventName,
-  dispatchIssueNumber,
-  dispatchTarget,
 }) {
   if (actor !== OWNER ||
       context.repo.owner !== OWNER ||
@@ -134,8 +123,6 @@ export async function runHandoff({
     eventName,
     commentBody: context.payload.comment?.body,
     commentIssueNumber: context.payload.issue?.number,
-    dispatchIssueNumber,
-    dispatchTarget,
   });
 
   const options = {
