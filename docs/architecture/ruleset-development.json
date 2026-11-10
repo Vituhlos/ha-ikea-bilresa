@@ -39,25 +39,31 @@
         "do_not_enforce_on_create": true,
         "required_status_checks": [
           {
-            "context": "Validate manifest (hassfest)"
+            "context": "Validate manifest (hassfest)",
+            "integration_id": 15368
           },
           {
-            "context": "Validate HACS"
+            "context": "Validate HACS",
+            "integration_id": 15368
           },
           {
-            "context": "Lint (ruff)"
+            "context": "Lint (ruff)",
+            "integration_id": 15368
           },
           {
-            "context": "Type check (mypy)"
+            "context": "Type check (mypy)",
+            "integration_id": 15368
           },
           {
-            "context": "Frontend checks"
+            "context": "Frontend checks",
+            "integration_id": 15368
           },
           {
-            "context": "Unit tests"
+            "context": "Unit tests",
+            "integration_id": 15368
           }
         ],
-        "strict_required_status_checks_policy": false
+        "strict_required_status_checks_policy": true
       }
     }
   ]
