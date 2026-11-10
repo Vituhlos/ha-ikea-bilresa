@@ -1,0 +1,83 @@
+name: AI issue handoff (manual, no model calls)
+
+# This workflow NEVER runs an AI model and never opens or merges a PR.
+# Only @Vituhlos can prepare a prompt for a selected issue.
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Existing open GitHub issue number"
+        type: number
+        required: true
+      target:
+        description: "Desired PR base branch: dev for features, main for stable fixes"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - main
+
+permissions: {}
+
+concurrency:
+  group: ai-issue-handoff-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare Codex Cloud task prompt
+    if: >-
+      github.actor == 'Vituhlos' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'issue_comment' &&
+          !github.event.issue.pull_request &&
+          (
+            github.event.comment.body == '/agent prepare dev' ||
+            github.event.comment.body == '/agent prepare main'
+          )
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # Trusted default-branch checkout only. Never checkout an issue reporter's fork.
+      - name: Checkout trusted workflow code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Prepare owner-authorized task handoff
+        uses: actions/github-script@v8
+        env:
+          HANDOFF_ISSUE_NUMBER: ${{ inputs.issue_number || '' }}
+          HANDOFF_TARGET: ${{ inputs.target || '' }}
+        with:
+          script: |
+            const { runHandoff } = await import(
+              process.env.GITHUB_WORKSPACE + '/tools/agent_handoff.mjs'
+            );
+            const result = await runHandoff({
+              github,
+              context,
+              actor: context.actor,
+              eventName: context.eventName,
+              dispatchIssueNumber: process.env.HANDOFF_ISSUE_NUMBER,
+              dispatchTarget: process.env.HANDOFF_TARGET,
+            });
+            core.notice(
+              'Prepared an issue handoff; NO Codex task or other AI execution started.'
+            );
+            await core.summary.addHeading('Codex Cloud handoff prepared')
+              .addRaw('Issue #' + result.issueNumber + ', PR base: ' +
+                result.baseBranch + '. No AI model was invoked.')
+              .addBreak()
+              .addLink('Open issue and copy the prompt', result.url)
+              .write();
