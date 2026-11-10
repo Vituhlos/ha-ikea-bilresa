@@ -38,10 +38,9 @@ without a server, a custom GitHub App, an OpenAI API key, or autonomous merging.
    CodeRabbit, Codex Review a fyzický BILRESA test, je-li relevantní.
    **Merguje a vydává pouze správce.**
 
-Alternativa: na GitHubu v **Actions → AI issue handoff (manual, no model calls)
-→ Run workflow** zadej číslo issue a cíl dev/main. Spuštění je povoleno
-pouze účtu @Vituhlos a **výhradně z větve main**. V nabídce Run workflow
-musí být vybraná main; jinak se job úmyslně nespustí. Po merge bude workflow dostupné na defaultní větvi.
+Workflow se aktivuje až po schválení a merge tohoto PR do main.
+Ruční spuštění z Actions není zapnuté; jediný vstup je komentář
+od správce přesně ve formátu uvedeném výše.
 
 ## Technical contract (English)
 
@@ -50,15 +49,15 @@ musí být vybraná main; jinak se job úmyslně nespustí. Po merge bude workfl
 - Workflow: .github/workflows/ai-issue-handoff.yml
 - Trusted logic: tools/agent_handoff.mjs
 - CI/unit tests: tests/agent_handoff.test.mjs
-- Trigger: issue_comment(created) only when the **actor is Vituhlos** and
-  the command is one of the two exact allowed forms, or a maintainer-only
-  workflow_dispatch with validated inputs.
-- Workflow explicitly checks out **ref: main**, never a PR's or reporter's
-  arbitrary branch. A manual workflow_dispatch run only passes the job gate
-  if the selected workflow ref is **refs/heads/main**; this prevents a
-  modified feature-branch workflow or helper from executing with issues:write.
-  Issue text is never evaluated as JavaScript, shell commands or a
-  GitHub Actions expression.
+- Trigger: issue_comment(created) **only** when the **actor is Vituhlos** and
+  the comment matches one of the two exact allowed commands. There is no
+  workflow_dispatch or broad pull-request-target trigger.
+- The issue_comment event uses GitHub's trusted default-branch workflow,
+  and checkout explicitly pins helper code to **ref: main**, never a PR's or
+  reporter's arbitrary branch. No manual dispatch is exposed, so the owner
+  cannot accidentally select a modified feature-branch workflow to run with
+  issues:write. Issue text is never evaluated as JavaScript, shell commands
+  or GitHub Actions expressions.
 - Workflow token scope is contents:read + issues:write, and checkout has
   persist-credentials:false. No external API key, service token, or
   GitHub App private key is configured.
