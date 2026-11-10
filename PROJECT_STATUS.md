@@ -1,17 +1,32 @@
 # Project status and agent handoff
 
-## GitHub automation initiative — Phase 1 verified proposal (2026-11-10)
+## GitHub automation initiative — Phase 1 ready for maintainer review (2026-11-10)
 
-**Status:** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) prepared for review, still **unmerged**. Owner-approved design: `docs/architecture/ai-development-automation.md`. Rulesets not activated.
+**Status:** [PR #68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) is open and **not merged**. The two repository rulesets were imported by the maintainer, but remain **disabled**. The imported copies were based on an earlier, weaker JSON version and MUST be updated before activation. See `docs/architecture/phase1-activation.md`.
 
-- New files: `.devcontainer/devcontainer.json`, `.devcontainer/setup.sh`, `.github/workflows/ci-devcontainer.yml`, `docs/architecture/ruleset-main.json`, `docs/architecture/ruleset-development.json`, `docs/architecture/phase1-activation.md`, plus the roadmap. Updated `.github/workflows/ci.yml` and `AGENTS.md`; no device-facing, HA or release modifications.
-- Verified in GitHub Actions: [Devcontainer smoke run 42791845154](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791845154) **success**: the devcontainer was built and its bootstrap and checks executed (Ruff, `mypy --no-site-packages`, Python pytest, Node tests). [CI run 42791845230](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791845230) **success**; [CodeQL run 42791845067](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791845067) **success**.
-- Reproducible typing discrepancy: the first Devcontainer smoke run [42791386920](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791386920) failed with **39 mypy errors in four files** when mypy used the installed Home Assistant/voluptuous/probatio type information. Existing CI runs mypy without these installed dependency types. The smoke gate is now explicitly aligned to that existing CI baseline using `--no-site-packages`; the stricter typing findings have **not been fixed** and should be audited in a separate, scoped issue.
-- Check contexts verified on both target branches through PR #68 (`main`) and PR #66 (`agent/panel-0.6.1`): hassfest, HACS, Ruff, mypy, frontend and unit tests. Do not require optional/scheduled or path-filtered workflows.
-- No rulesets were returned by the integration; classic protection remains unreadable. The importable ruleset files are staged with `enforcement: disabled` and are **not active**. Activating rulesets requires owner/admin access after checking imported config.
-- An **interactive GitHub Codespace has not been created** by this agent; the successful container smoke does not prove that interactive Codespaces can launch with the user's billing preferences.
-- Hardware validation: not applicable (infrastructure-only change). No changes made to live Home Assistant.
-- **Single best next action:** owner reviews PR #68, uses a 2-core Codespace on the PR branch for an interactive smoke test, then merges after review; import and activate the `main` ruleset first, and the development ruleset only after validation. Phase 2 AI bot not yet activated.
+### Static / configuration verification
+
+- New development configuration: `.devcontainer/devcontainer.json` (Python 3.14, Node 22), `.devcontainer/setup.sh`, `.github/workflows/ci-devcontainer.yml`; roadmap, activation runbook, and separately staged `main`/development rulesets.
+- Ruleset templates now pin **all six** required contexts to GitHub Actions via `integration_id: 15368`, use **strict freshness**, zero approvals, required PRs and conversation resolution, and reject force pushes/deletion. They are committed with `enforcement: disabled`; these repo files do not control the already-imported live settings.
+- Sourcery/CodeRabbit review feedback applied: explicit warning about untrusted PR Codespaces bootstrap, `persist-credentials: false` in the supplemental workflow, `requirements-test.txt` path trigger, and correct `mypy --no-site-packages` in instructions.
+- New file JSON parsing and Bash syntax are part of the normal CI lint job. The stricter run with all installed Home Assistant typing packages is deliberately not the existing project's mypy acceptance gate.
+
+### CI verification
+
+- Before review fixes: [CI 42792297786](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42792297786), [CodeQL 42792297615](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42792297615) and [Devcontainer smoke 42792297416](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42792297416) all succeeded.
+- Real interactive Codespace **opened by the maintainer** on the PR branch. Their reported output: Python 3.14.10, Node 22.23.4, `ruff check` clean, `mypy --no-site-packages` clean for 27 source files, **543/543 Python tests and 47/47 Node tests passed**. Codespace was subsequently stopped.
+- A first stricter mypy run in the installed environment exposed **39 existing typing errors across four files** (Home Assistant / voluptuous / probatio type interactions). They have not been fixed; baseline CI and Codespaces smoke align on `--no-site-packages`. Audit separately without hiding the discrepancy.
+- **After the latest review fixes:** new CI runs need to finish and review feedback must be inspected again. Do not assume green results from earlier commits apply to the current commit.
+
+### Hardware / device validation
+
+- Not applicable: these are development infrastructure, documentation and ruleset-template changes only. No physical BILRESA or HA configuration was modified or validated.
+
+### Risk / remaining actions
+
+- Already-imported disabled rulesets are stale. Their earlier status checks are not bound to GitHub Actions and use loose freshness. **Never activate them as-is.** Inspect and edit each live ruleset, or replace with the corrected templates, then verify all six expected sources and branch freshness before enabling.
+- Classic branch protection cannot be read using the present GitHub connector permissions; inspect Settings → Branches.
+- **Single best next action:** after new CI and CodeRabbit/Sourcery reviews are acceptable, the maintainer decides whether to merge PR #68. Then correct and enable the `main` ruleset first, verify behavior, and only then enable the development ruleset. Do not activate the Phase 2 AI GitHub App yet.
 
 ---
 
