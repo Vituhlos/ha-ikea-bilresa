@@ -22,11 +22,11 @@ test("exact owner comment selects development branch", () => {
   }), { issueNumber: 67, targetKey: "dev", baseBranch: BRANCHES.dev });
 });
 
-test("manual dispatch selects main for a stable bug fix", () => {
+test("exact owner comment selects stable main", () => {
   assert.deepEqual(parseHandoffRequest({
-    eventName: "workflow_dispatch",
-    dispatchIssueNumber: "42",
-    dispatchTarget: "main",
+    eventName: "issue_comment",
+    commentBody: "/agent prepare main",
+    commentIssueNumber: 42,
   }), { issueNumber: 42, targetKey: "main", baseBranch: "main" });
 });
 
@@ -43,14 +43,14 @@ test("rejects unexpected commands, branch names, and issue numbers", () => {
     }));
   }
   assert.throws(() => parseHandoffRequest({
-    eventName: "workflow_dispatch",
-    dispatchIssueNumber: "-1",
-    dispatchTarget: "dev",
+    eventName: "issue_comment",
+    commentBody: "/agent prepare dev",
+    commentIssueNumber: "-1",
   }));
   assert.throws(() => parseHandoffRequest({
     eventName: "workflow_dispatch",
-    dispatchIssueNumber: "1",
-    dispatchTarget: "other",
+    commentBody: "/agent prepare dev",
+    commentIssueNumber: "1",
   }));
 });
 
@@ -153,12 +153,13 @@ test("no other account, fork or closed issue may prepare a task", async () => {
   }));
 });
 
-test("GitHub Actions cannot run owner-only handoff code from a non-main dispatch ref", () => {
+test("GitHub Actions only listens for issue comments and checks out trusted main", () => {
   const workflow = readFileSync(
     new URL("../.github/workflows/ai-issue-handoff.yml", import.meta.url),
     "utf8",
   );
   assert.match(workflow, /ref: main/);
-  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /^  issue_comment:$/m);
+  assert.doesNotMatch(workflow, /workflow_dispatch/);
   assert.match(workflow, /persist-credentials: false/);
 });
