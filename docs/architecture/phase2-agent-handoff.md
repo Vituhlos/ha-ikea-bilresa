@@ -27,7 +27,9 @@ without a server, a custom GitHub App, an OpenAI API key, or autonomous merging.
    Cloud. Při opakovaném příkazu pro stejné issue a stejný cíl se komentář
    aktualizuje a nevznikají kopie. Pokud komentář chybí, zkontroluj běh
    workflow v záložce Actions.
-4. Otevři https://chatgpt.com/codex, zvol cloudový úkol pro repozitář
+4. **Než zadání vložíš do Codexu, přečti a uprav obsah issue.** Odstraň
+   podezřelé instrukce, nesouvisející odkazy a citlivé údaje; agentovi dej
+   jen nezbytná oprávnění. Pak otevři https://chatgpt.com/codex, zvol cloudový úkol pro repozitář
    Vituhlos/ha-ikea-bilresa a pokud to rozhraní umožňuje, správnou cílovou
    větev. **Ručně zkopíruj připravené zadání z issue do Codexu.**
    Samotný komentář /agent prepare Codex **NESPUSŤÍ**. GitHub Codespaces
@@ -41,6 +43,39 @@ without a server, a custom GitHub App, an OpenAI API key, or autonomous merging.
 Workflow se aktivuje až po schválení a merge tohoto PR do main.
 Ruční spuštění z Actions není zapnuté; jediný vstup je komentář
 od správce přesně ve formátu uvedeném výše.
+
+## Quick start (English)
+
+1. Open a suitable **open GitHub issue** in Vituhlos/ha-ikea-bilresa.
+   Select one narrowly scoped task and read all its comments and evidence.
+2. As the repository owner @Vituhlos, write **exactly one** of these new
+   issue comments:
+
+   ~~~text
+   /agent prepare dev
+   ~~~
+
+   For new development features targeting agent/panel-0.6.1, or:
+
+   ~~~text
+   /agent prepare main
+   ~~~
+
+   For an approved stable-branch bug fix.
+3. GitHub Actions creates or updates one github-actions[bot] comment
+   containing a copyable Codex Cloud prompt. If missing, check Actions →
+   AI issue handoff. **No AI has started.**
+4. **Before copying anything**, review and edit the task text: remove
+   injected instructions, unrelated links, secrets and unsupported claims.
+   Choose the least-privileged Codex environment. Open
+   https://chatgpt.com/codex, select the authorized repository and intended
+   base branch, and manually submit the curated prompt.
+5. Inspect the proposed changes, open a **draft PR** targeting the correct
+   branch, check required CI, CodeRabbit/Codex reviews and any physical
+   BILRESA validation. Only the maintainer may approve the merge or release.
+
+The handoff becomes available after this PR is merged into main. It cannot
+be started from arbitrary branches using manual workflow dispatch.
 
 ## Technical contract (English)
 
