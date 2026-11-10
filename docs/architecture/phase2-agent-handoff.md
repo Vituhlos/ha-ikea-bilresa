@@ -40,7 +40,8 @@ without a server, a custom GitHub App, an OpenAI API key, or autonomous merging.
 
 Alternativa: na GitHubu v **Actions → AI issue handoff (manual, no model calls)
 → Run workflow** zadej číslo issue a cíl dev/main. Spuštění je povoleno
-pouze účtu @Vituhlos. Po merge bude workflow dostupné na defaultní větvi.
+pouze účtu @Vituhlos a **výhradně z větve main**. V nabídce Run workflow
+musí být vybraná main; jinak se job úmyslně nespustí. Po merge bude workflow dostupné na defaultní větvi.
 
 ## Technical contract (English)
 
@@ -52,9 +53,12 @@ pouze účtu @Vituhlos. Po merge bude workflow dostupné na defaultní větvi.
 - Trigger: issue_comment(created) only when the **actor is Vituhlos** and
   the command is one of the two exact allowed forms, or a maintainer-only
   workflow_dispatch with validated inputs.
-- Workflow uses the **default-branch checkout only**, never a PR's or
-  reporter's arbitrary branch, and does not evaluate issue content as
-  JavaScript, shell commands or a GitHub Actions expression.
+- Workflow explicitly checks out **ref: main**, never a PR's or reporter's
+  arbitrary branch. A manual workflow_dispatch run only passes the job gate
+  if the selected workflow ref is **refs/heads/main**; this prevents a
+  modified feature-branch workflow or helper from executing with issues:write.
+  Issue text is never evaluated as JavaScript, shell commands or a
+  GitHub Actions expression.
 - Workflow token scope is contents:read + issues:write, and checkout has
   persist-credentials:false. No external API key, service token, or
   GitHub App private key is configured.
