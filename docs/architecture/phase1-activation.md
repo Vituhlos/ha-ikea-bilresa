@@ -24,7 +24,7 @@ both a stable and a development release line.
    python --version
    node --version
    ruff check custom_components tests
-   mypy custom_components/ikea_bilresa
+   mypy --no-site-packages custom_components/ikea_bilresa
    python -m pytest -q
    node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs
    ```
