@@ -3,7 +3,7 @@
 **Decision recorded:** 2026-11-10  
 **Owner:** @Vituhlos  
 **Scope:** `Vituhlos/ha-ikea-bilresa` (public repository)  
-**Status:** Phase 1 completed and branch rulesets active; Phase 2A manual Codex Cloud issue handoff proposed in a separate PR. Full autonomous coding bot is not enabled.
+**Status:** Phase 1 infrastructure operational; both branch rulesets active. Real branch-rule enforcement on a new PR is pending. Phase 2A manual Codex Cloud issue handoff proposed in a separate PR; no autonomous coding bot enabled.
 
 This file records the owner's agreed direction so that future Codex, Claude and other coding-agent sessions do not have to reconstruct the plan from chat history. It does not override `PROJECT_STATUS.md`, `AGENTS.md`, `CONTRIBUTING.md`, or the hardware-test requirements.
 
@@ -34,7 +34,7 @@ This file records the owner's agreed direction so that future Codex, Claude and 
 4. **Safety of activation.** Stage the configuration in a pull request first. Rulesets are **not enabled by committing documentation**; configure and test them explicitly in repository settings after the checks have been verified. If the connected GitHub integration cannot edit repository administration settings, the maintainer performs that UI step.
 5. **Costs.** Start with a 2-core Codespace, consider a 10-minute idle timeout and a short stopped-Codespace retention period in personal Codespaces settings. No prebuilds initially. Monitor GitHub billing, storage, and applicable quotas.
 
-**Phase 1 acceptance:** a bootstrapped Codespace and passing required PR checks; changes to protected branches require PRs and green checks without blocking legitimate solo-maintainer work; no changes to device-facing code, Home Assistant or production releases.
+**Phase 1 acceptance:** interactive Codespace and checks are complete, and both rulesets are active. **The final enforcement acceptance check remains pending:** observe a fresh PR into main and one into agent/panel-0.6.1, verifying that GitHub blocks merging until all six required checks pass and that the sole maintainer can merge without requiring a second reviewer. No device-facing, Home Assistant or release changes were made.
 
 ## Phase 2 — human-supervised AI development
 
@@ -61,6 +61,6 @@ Desired experience, inspired by NSPanel-Easy's separate GitHub bot identity:
 ## Next owner-controlled actions
 
 1. Review the Phase 2A handoff PR and its normal CI, including dedicated Node security tests.
-2. If accepted, merge it; issue_comment workflows are only activated from the default branch after merge.
-3. As @Vituhlos, post `/agent prepare dev` on a suitable open issue and confirm the generated copyable prompt. Start a Codex Cloud task manually using the resulting instructions. No model runs automatically.
+2. If accepted, merge it; issue_comment workflows are only activated from the default branch after merge. This Phase 2A PR itself provides the first live check of the protected main branch ruleset.
+3. As @Vituhlos, post `/agent prepare dev` on a suitable open issue and confirm the generated copyable prompt. Review and **curate** any contributor text before manually starting Codex Cloud; never paste an untrusted issue as executable instructions. No model runs automatically.
 4. Separately decide whether fully unattended GitHub issue → agent → draft PR execution is worth a paid Copilot plan or pay-as-you-go API. Only then design and register the own GitHub App identity bilresa-assistant.
