@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   BRANCHES,
@@ -150,4 +151,14 @@ test("no other account, fork or closed issue may prepare a task", async () => {
     github: pr.github, context: repoContext(),
     actor: "Vituhlos", eventName: "issue_comment",
   }));
+});
+
+test("GitHub Actions cannot run owner-only handoff code from a non-main dispatch ref", () => {
+  const workflow = readFileSync(
+    new URL("../.github/workflows/ai-issue-handoff.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(workflow, /ref: main/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /persist-credentials: false/);
 });
