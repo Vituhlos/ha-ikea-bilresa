@@ -8,6 +8,7 @@ on:
     paths:
       - ".devcontainer/**"
       - ".github/workflows/ci-devcontainer.yml"
+      - "requirements-test.txt"
   workflow_dispatch:
 
 permissions:
@@ -24,6 +25,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Build the real devcontainer and run checks
         uses: devcontainers/ci@v0.3
         with:
