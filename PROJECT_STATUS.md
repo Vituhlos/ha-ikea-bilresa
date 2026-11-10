@@ -1,15 +1,17 @@
 # Project status and agent handoff
 
-## GitHub automation initiative — Phase 1 draft (2026-11-10)
+## GitHub automation initiative — Phase 1 verified proposal (2026-11-10)
 
-**Status:** preparation only, in proposed branch `chore/phase1-codespaces-branch-guardrails-20261110`; not merged or enabled. Owner-approved design: `docs/architecture/ai-development-automation.md`.
+**Status:** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) prepared for review, still **unmerged**. Owner-approved design: `docs/architecture/ai-development-automation.md`. Rulesets not activated.
 
-- Changes: add `.devcontainer/devcontainer.json` (Python 3.14/Node 22), `.devcontainer/setup.sh` (venv/test dependency bootstrap), a lightweight JSON/shell syntax validation in `.github/workflows/ci.yml`, and an `AGENTS.md` roadmap pointer.
-- Static validation: the devcontainer JSON was parsed while generating the file; the workflow contains JSON and Bash syntax validation commands. **Not yet run:** the new workflow on GitHub or bootstrap/test suite inside a real Codespace. Neither CI nor hardware tests have been claimed to pass.
-- Repository governance: no rulesets were reported by the connector's rulesets endpoint; classic protection could not be read with the integration. No branch rules, repository visibility, Home Assistant configuration, releases, or device-facing code have been changed.
-- Hardware validation: not applicable to these infrastructure-only changes.
-- Risks: first Codespaces bootstrap downloads Home Assistant Python dependencies, which can be sizable/slow; verify availability and versions in a live Codespace. Before requiring checks, observe a passing PR to each target branch and confirm check names.
-- **Single next action:** review the Phase 1 PR and run its CI; then test bootstrapping a Codespace. Configure branch rulesets only after these checks are green, using maintainer admin access.
+- New files: `.devcontainer/devcontainer.json`, `.devcontainer/setup.sh`, `.github/workflows/ci-devcontainer.yml`, `docs/architecture/ruleset-main.json`, `docs/architecture/ruleset-development.json`, `docs/architecture/phase1-activation.md`, plus the roadmap. Updated `.github/workflows/ci.yml` and `AGENTS.md`; no device-facing, HA or release modifications.
+- Verified in GitHub Actions: [Devcontainer smoke run 42791845154](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791845154) **success**: the devcontainer was built and its bootstrap and checks executed (Ruff, `mypy --no-site-packages`, Python pytest, Node tests). [CI run 42791845230](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791845230) **success**; [CodeQL run 42791845067](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791845067) **success**.
+- Reproducible typing discrepancy: the first Devcontainer smoke run [42791386920](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42791386920) failed with **39 mypy errors in four files** when mypy used the installed Home Assistant/voluptuous/probatio type information. Existing CI runs mypy without these installed dependency types. The smoke gate is now explicitly aligned to that existing CI baseline using `--no-site-packages`; the stricter typing findings have **not been fixed** and should be audited in a separate, scoped issue.
+- Check contexts verified on both target branches through PR #68 (`main`) and PR #66 (`agent/panel-0.6.1`): hassfest, HACS, Ruff, mypy, frontend and unit tests. Do not require optional/scheduled or path-filtered workflows.
+- No rulesets were returned by the integration; classic protection remains unreadable. The importable ruleset files are staged with `enforcement: disabled` and are **not active**. Activating rulesets requires owner/admin access after checking imported config.
+- An **interactive GitHub Codespace has not been created** by this agent; the successful container smoke does not prove that interactive Codespaces can launch with the user's billing preferences.
+- Hardware validation: not applicable (infrastructure-only change). No changes made to live Home Assistant.
+- **Single best next action:** owner reviews PR #68, uses a 2-core Codespace on the PR branch for an interactive smoke test, then merges after review; import and activate the `main` ruleset first, and the development ruleset only after validation. Phase 2 AI bot not yet activated.
 
 ---
 
