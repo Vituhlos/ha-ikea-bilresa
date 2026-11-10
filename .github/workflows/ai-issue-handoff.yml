@@ -32,7 +32,7 @@ jobs:
     if: >-
       github.actor == 'Vituhlos' &&
       (
-        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
         (
           github.event_name == 'issue_comment' &&
           !github.event.issue.pull_request &&
@@ -52,6 +52,7 @@ jobs:
       - name: Checkout trusted workflow code
         uses: actions/checkout@v7
         with:
+          ref: main
           persist-credentials: false
 
       - name: Prepare owner-authorized task handoff
