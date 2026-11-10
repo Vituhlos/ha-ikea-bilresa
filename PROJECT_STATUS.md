@@ -8,15 +8,15 @@
 
 ### Changed files
 
-- New owner-only GitHub Actions workflow .github/workflows/ai-issue-handoff.yml triggered by an **exact owner GitHub issue comment** (/agent prepare dev or /agent prepare main), or explicit owner workflow_dispatch. It reads an existing open issue and posts/updates a copyable task prompt to the same public issue.
+- New owner-only GitHub Actions workflow .github/workflows/ai-issue-handoff.yml triggered by an **exact owner GitHub issue comment** (/agent prepare dev or /agent prepare main), and no manual dispatch. It reads an existing open issue and posts/updates a copyable, **owner-reviewed** task prompt to the same public issue.
 - New pure JS handoff helper tools/agent_handoff.mjs and new tests/agent_handoff.test.mjs validate owner/branch controls, data-only issue handling, safe Markdown wrapping, bounded issue content, idempotent comments, and no AI execution.
 - Extended the existing Frontend checks CI job with the handoff Node unit test; status context name unchanged. Updated roadmap and this project status.
 - No OpenAI API calls, external services, GitHub App private keys, self-hosted runner, paid compute, automatic Codex task creation, auto-PR, auto-merge, releases or Home Assistant/device code are part of Phase 2A.
 
 ### Verification status
 
-- Static: reviewed intended read-only/limited permissions; workflow runs only for owner comments/manual dispatch, checks out trusted default-branch code with credentials not persisted, and does not execute issue text. JS unit tests are **written, not yet CI-verified**.
-- CI: [CI run 42806045021](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42806045021) **passed**, including the new Node handoff security tests and all six standard jobs. [CodeQL run 42806045255](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42806045255) **passed**. AI reviewers were still processing the PR at this checkpoint. After merge, the maintainer must test one real issue command because issue_comment workflows only run from the default branch.
+- Static: reviewed intended read-only/limited permissions; workflow runs only from exact owner issue comments, is pinned to trusted main and immutable action SHAs, checks both original and rerun actor, never persists checkout credentials, and never executes issue text. New Node unit tests have passed CI in earlier iterations; current final revision needs fresh verification.
+- CI: [CI run 42806045021](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42806045021) **passed**, including the new Node handoff security tests and all six standard jobs. [CodeQL run 42806045255](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42806045255) **passed**. Early Codex/Sourcery/CodeRabbit reviews found security concerns. The workflow was changed to issue-comment-only, rerun authorization was tightened, pinned action SHAs and explicit main checkout were added, issue content is visibly quoted as untrusted data, and source changes are covered by tests. The newest revision still requires CI/review verification. After merge, the maintainer must test one real issue command because issue_comment workflows only run from the default branch.
 - Hardware: **not applicable** (no runtime or Matter changes). No physical BILRESA testing or Home Assistant changes were performed.
 
 ### Known limitations and next action
