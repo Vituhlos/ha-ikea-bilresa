@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "stage": "I",
+  "aiEnabled": false,
+  "publicResponsesEnabled": false,
+  "codingEnabled": false,
+  "monthlyBudgetAic": 500,
+  "futureLimits": {
+    "dailyAic": 150,
+    "issueAic": 5,
+    "pullRequestAic": 50,
+    "codingSessionAic": 150,
+    "analysesPerDay": 5,
+    "analysesPerItemPerDay": 2,
+    "concurrentPaidSessions": 1,
+    "codingSessionsPerMonth": 4
+  },
+  "limits": { "pages": 30, "sourcePaths": 20, "sourceBytes": 800000, "responseBytes": 5000000, "relatedPulls": 12 },
+  "evidencePaths": [
+    "custom_components/ikea_bilresa/binding.py",
+    "tests/test_binding.py",
+    "docs/HARDWARE_TEST.md",
+    "docs/ROADMAP.md",
+    "CHANGELOG.md"
+  ],
+  "requiredChecks": ["Validate manifest (hassfest)", "Validate HACS", "Lint (ruff)", "Type check (mypy)", "Frontend checks", "Unit tests"],
+  "checkAppId": 15368,
+  "reportRetentionDays": 14,
+  "stateRetentionDays": 90
+}

@@ -1,0 +1,434 @@
+{
+  "repository": {
+    "id": 1300699657,
+    "full_name": "Vituhlos/ha-ikea-bilresa",
+    "private": false
+  },
+  "refs": {
+    "prBase": {
+      "ref": "main",
+      "sha": "b2118a32c12afad465d68f1fc699694c0e8f1dfd"
+    },
+    "prHead": {
+      "ref": "pull/71/head",
+      "sha": "f44ddfd229189667849c9583b99b4e639e63e40b"
+    },
+    "main": {
+      "ref": "main",
+      "sha": "b2118a32c12afad465d68f1fc699694c0e8f1dfd"
+    },
+    "development": {
+      "ref": "agent/panel-0.6.1",
+      "sha": "28c1035f30411fc105575fdd64a9ede19c623c44"
+    },
+    "stable": {
+      "ref": "v0.6.1",
+      "sha": "514811a9b1cc1536591c513a1d1d4ef369cc951f"
+    }
+  },
+  "comments": [],
+  "files": [
+    {
+      "sha": "5bb1fcad3d5f292cbe701283fadb585a9d975a2e",
+      "filename": "CHANGELOG.md",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "sha": "1510482c885003b63cf57870fb484fca603741e1",
+      "filename": "PROJECT_STATUS.md",
+      "status": "modified",
+      "additions": 46,
+      "deletions": 0
+    },
+    {
+      "sha": "5d6c542349890e0b5f3410c735a73669a081a55e",
+      "filename": "README.cs.md",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "sha": "b88be7c48328e1d069b3cc703dda2b8440a3fcf6",
+      "filename": "README.md",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "sha": "dc61963d29cc4b13637513c3447055e3e3174afb",
+      "filename": "custom_components/ikea_bilresa/binding.py",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 4
+    },
+    {
+      "sha": "141387143ed016d2ca038a62d143645b893a5ff0",
+      "filename": "docs/HARDWARE_TEST.md",
+      "status": "modified",
+      "additions": 30,
+      "deletions": 0
+    },
+    {
+      "sha": "439a6307602b250197c2ec00fe7003bd7cf7296d",
+      "filename": "tests/test_binding.py",
+      "status": "modified",
+      "additions": 144,
+      "deletions": 0
+    }
+  ],
+  "related": [
+    {
+      "number": 59,
+      "state": "closed",
+      "title": "fix(binding): cancel queued dimming after a single-light press",
+      "body": "",
+      "merge_commit_sha": "4c42e233a2c804f83c0839d53da27a6e83d09d69",
+      "head": {
+        "ref": "fix/0.7-single-light-stale-rotation",
+        "sha": "2fcfc76b6dda7d623e7515c93a596ebeb82b006b"
+      },
+      "base": {
+        "ref": "agent/panel-0.6.1",
+        "sha": "08da028cca408784cc3d95849677ed68c5902fe6"
+      },
+      "merged": true,
+      "selection": "explicit-reference"
+    }
+  ],
+  "sources": [
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:custom_components/ikea_bilresa/binding.py"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:custom_components/ikea_bilresa/binding.py"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:custom_components/ikea_bilresa/binding.py"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:custom_components/ikea_bilresa/binding.py"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:custom_components/ikea_bilresa/binding.py"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:tests/test_binding.py"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:tests/test_binding.py"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:tests/test_binding.py"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:tests/test_binding.py"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:tests/test_binding.py"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:docs/HARDWARE_TEST.md"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:docs/HARDWARE_TEST.md"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:docs/HARDWARE_TEST.md"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:docs/HARDWARE_TEST.md"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:docs/HARDWARE_TEST.md"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:docs/ROADMAP.md"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:docs/ROADMAP.md"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:docs/ROADMAP.md"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:docs/ROADMAP.md"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:docs/ROADMAP.md"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:CHANGELOG.md"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:CHANGELOG.md"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:CHANGELOG.md"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:CHANGELOG.md"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:CHANGELOG.md"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:PROJECT_STATUS.md"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:PROJECT_STATUS.md"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:PROJECT_STATUS.md"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:PROJECT_STATUS.md"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:PROJECT_STATUS.md"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:README.cs.md"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:README.cs.md"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:README.cs.md"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:README.cs.md"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:README.cs.md"
+    },
+    {
+      "role": "prBase",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:README.md"
+    },
+    {
+      "role": "prHead",
+      "key": "f44ddfd229189667849c9583b99b4e639e63e40b:README.md"
+    },
+    {
+      "role": "main",
+      "key": "b2118a32c12afad465d68f1fc699694c0e8f1dfd:README.md"
+    },
+    {
+      "role": "development",
+      "key": "28c1035f30411fc105575fdd64a9ede19c623c44:README.md"
+    },
+    {
+      "role": "stable",
+      "key": "514811a9b1cc1536591c513a1d1d4ef369cc951f:README.md"
+    }
+  ],
+  "checks": [
+    {
+      "id": 131650705761,
+      "name": "CodeRabbit",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 347564
+      }
+    },
+    {
+      "id": 131650664873,
+      "name": "Sourcery review",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 48477
+      }
+    },
+    {
+      "id": 131648420442,
+      "name": "CodeQL",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 57789
+      }
+    },
+    {
+      "id": 131648173383,
+      "name": "Unit tests (newest Home Assistant pre-release)",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "skipped",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648172291,
+      "name": "Analyze (python)",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648172262,
+      "name": "Unit tests",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648172088,
+      "name": "Lint (ruff)",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648172071,
+      "name": "Type check (mypy)",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648172052,
+      "name": "Validate HACS",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648172004,
+      "name": "Validate manifest (hassfest)",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648171998,
+      "name": "Analyze (javascript-typescript)",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    },
+    {
+      "id": 131648171806,
+      "name": "Frontend checks",
+      "head_sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 15368
+      }
+    }
+  ],
+  "ancestry": [
+    {
+      "number": 59,
+      "role": "main",
+      "commit": "4c42e233a2c804f83c0839d53da27a6e83d09d69",
+      "revision": "b2118a32c12afad465d68f1fc699694c0e8f1dfd",
+      "ancestor": false
+    },
+    {
+      "number": 59,
+      "role": "development",
+      "commit": "4c42e233a2c804f83c0839d53da27a6e83d09d69",
+      "revision": "28c1035f30411fc105575fdd64a9ede19c623c44",
+      "ancestor": true
+    },
+    {
+      "number": 59,
+      "role": "stable",
+      "commit": "4c42e233a2c804f83c0839d53da27a6e83d09d69",
+      "revision": "514811a9b1cc1536591c513a1d1d4ef369cc951f",
+      "ancestor": false
+    }
+  ],
+  "missing": [],
+  "item": {
+    "id": 5288921546,
+    "number": 71,
+    "state": "open",
+    "title": "fix(binding): honor explicit zero-valued numeric and climate bounds",
+    "body": "## Summary\n\nFix incorrect rotation limits for `number`, `input_number`, and `climate` targets. The previous `_as_float(...) or default` logic treated a valid bound of `0` as missing. The fix falls back only for `None`; missing limits and invalid zero step sizes retain their existing defaults.\n\n**Target:** `main` (stable-line bug fix).\n\n## Reproduction\n\nOn 13 November, @Hinrixx3026 reproduced this with a physical BILRESA wheel:\n\n- Channel 3, Value mode, 10% per notch, 1 s smoothing\n- `input_number` helper: min **-10**, max **0**, step **1**, starting at **-1**\n- One upward notch produced **`Value -1 → 10`** in Live Test, although the maximum is **0**. The helper remained at **-1**.\n\nExpected: `-1 → 0`. The Live Test confirms the incorrect calculation, not that Home Assistant applied the invalid value.\n\n## Changes\n\n- Preserve explicit zero min/max values for numeric and climate rotations.\n- Add a regression test for the observed single-notch failure and tests for boundary handling and missing-limit defaults.\n- Update the English/Czech READMEs, changelog, project status, and hardware test notes.\n\nHistory: **3 commits** — reproducing test, fix/tests, documentation.\n\n## Verification\n\n- [x] Fork CI: **7/7 jobs passed**, including 552 Python tests and 552 against the newer HA test environment: [run 43352202078](https://github.com/Hinrixx3026/ha-ikea-bilresa/actions/runs/43352202078)\n- [x] PR checks on final head `f44ddfd`: required CI and CodeQL passed\n- [x] Original bug reproduced on physical BILRESA\n- [ ] Corrected build tested on physical hardware — **pending**\n\nNo unrelated code changes or private installation identifiers are included. More detailed observations and limitations are in `docs/HARDWARE_TEST.md`.\n\nThanks for the helpful feedback on #59!\n\n*PR text prepared with ChatGPT; hardware test performed by @Hinrixx3026.*",
+    "labels": [],
+    "updated_at": "2026-11-13T02:49:10Z",
+    "head": {
+      "sha": "f44ddfd229189667849c9583b99b4e639e63e40b",
+      "ref": "fix/zero-numeric-bounds",
+      "repo": {
+        "id": 1447476885
+      }
+    },
+    "base": {
+      "sha": "b2118a32c12afad465d68f1fc699694c0e8f1dfd",
+      "ref": "main",
+      "repo": {
+        "id": 1300699657
+      }
+    },
+    "comments": 2,
+    "changed_files": 7
+  },
+  "kind": "pull_request"
+}
