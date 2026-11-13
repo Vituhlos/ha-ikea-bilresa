@@ -1,5 +1,59 @@
 # Project status and agent handoff
 
+## Stage I PR #72 — code verified, ready for owner review (2026-11-13)
+
+[PR #72](https://github.com/Vituhlos/ha-ikea-bilresa/pull/72) is open from
+`codex/ai-assessment-snapshots` into main. All six required checks are **PASS**
+on final code revision `20609f8c2fadce23fa3fd6ebfcb56c4031507591` in
+[CI 43429652615](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/43429652615),
+including **543 HA Python tests in Linux CI** and **59 existing + 30 new Node
+tests**. Both CodeQL language jobs and the resulting check passed in
+[CodeQL 43429652629](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/43429652629).
+The newest-HA optional job was conditionally skipped. Verification used
+`gh pr checks 72 --required --json name,state,bucket,link`, `gh run view` and
+actual unit/frontend job logs, not only the overall PR color.
+
+Review disposition: both Codex P2 findings were reproduced and fixed in
+`e0afaa9`; CodeRabbit's overlapping major symbol finding is also fixed, with
+getter/setter coverage. Its body-stream issue was reproduced and fixed in
+`20609f8`; observation counts and accounting-authority wording were clarified.
+All three inline threads are resolved after implementation and regression tests;
+this records our resolution, not a new independent reviewer approval of the
+final head. The two original reviews assessed `20139ad`. A further CodeRabbit
+review is now **NEUTRAL / quota-limited**, not passed; Sourcery's substantive
+review is **SKIPPED / quota-limited**. Neither quota was bypassed or upgraded.
+CodeRabbit's initial review did not fully cover the large source fixture. Local
+provenance verification checked all 32 captured files and 2,521 retained lines.
+The full English translation of the owner-approved Czech proposal remains a
+non-blocking documentation follow-up; the Stage I runbook is bilingual.
+
+This handoff changes only `PROJECT_STATUS.md`. Its documentation-only commit
+will receive its own ordinary CI after push; the exact code validation above
+is not falsely attributed to that subsequent commit. The PR description and
+final session response carry the latest observed head/check state.
+
+Local HA pytest was **not** run; physical hardware was **not** tested and is
+not applicable to this tooling change. The manual diagnostic has not been run
+in GitHub Actions: its trusted-main guard intentionally waits for an owner merge.
+Local live GET-only smoke tests and strict schema checks passed. No integration
+runtime/product changes, new credentials, Settings changes, merge, release or
+automatic AI activation occurred. Stage I inference and spend remain **0 AIC**;
+the future BILRESA Assistant limit remains **500 AIC/month**. Immutable receipts
+are not a transactional monthly ledger and cannot authorize later paid work.
+
+**Single best next action:** after the documentation head's checks are confirmed,
+the owner reviews PR #72 and decides whether to merge. No merge is authorized
+by this handoff. A manual diagnostic Actions smoke belongs after that decision.
+
+Česky: poslední kódová revize má všech šest povinných kontrol a CodeQL zelené;
+543 HA testů prošlo v Linux CI a 89 Node testů celkem. Potvrzené funkční nálezy
+review jsou opravené a tři inline vlákna uzavřená. Nové nezávislé review poslední
+revize není doložené: CodeRabbit i Sourcery nyní omezila kvóta. Velký fixture byl
+navíc lokálně porovnán se zaznamenanými zdroji. Lokální HA pytest ani hardware
+ověřené nejsou. Merge provádí až správce; 0 AIC nyní a 500 AIC měsíční limit platí.
+
+---
+
 ## Stage I PR #72 — CodeRabbit findings evaluated (2026-11-13)
 
 CodeRabbit completed its initial review of `20139ad`. Its major repeated-name
