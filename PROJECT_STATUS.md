@@ -1,5 +1,54 @@
 # Project status and agent handoff
 
+## Stage I PR #72 — first review fixes (2026-11-13)
+
+The approved branch was committed as `20139ad` and published as
+[PR #72](https://github.com/Vituhlos/ha-ikea-bilresa/pull/72) into main, using
+the repository template and explicit local HA pytest/hardware limitations.
+All six required checks passed on that exact revision in
+[CI 43427872121](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/43427872121):
+**543 HA Python tests (Linux CI), 59 existing + 24 new Node tests**. CodeQL
+[43427872138](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/43427872138)
+also passed. The optional newest-HA job was skipped, not passed. These results
+precede the review fixes below and must not be attributed to the next head.
+
+Codex review raised two confirmed P2 findings: repeated nested `_unsubscribe`
+names in real `panel_api.py` overflowed the five-role comparison schema; and
+legitimate file additions/deletions/renames were always incomplete because
+absence at other revisions was treated as a failed read. Four new regression
+tests failed before the fixes and now pass. The symbol index records enclosing
+scopes and disambiguates repeated definitions; full immutable Git trees record
+verified absence separately from unavailable evidence. Tree modes also reject
+symlinks that GitHub Contents API would otherwise dereference, and content blob
+SHAs must match the tree. Truncated/unavailable trees remain incomplete.
+
+Changed: `branch_evidence.mjs`, `collect.mjs`, `assessment.mjs`, `validate.mjs`,
+report schema, fixture reader, new symbol tests, collector regressions and the
+bilingual runbook. `node --test tests/ai_maintainer/*.test.mjs`: **28 passed**.
+The full existing/new Node command passed **87 tests**; `git diff --check`
+passed. Live CLI #71 with system CAs and a fresh output directory returned
+exit 0; independent Draft 2020-12 validation passed for the complete report.
+The unchanged runtime suite is not rerun locally; hardware is not applicable
+and was not tested. No product behavior or external write permission is added.
+
+Sourcery review was skipped because its existing weekly review budget is
+exhausted (bot comment 6853327229); its generated guide is not a completed code
+review. CodeRabbit's initial review was still running at this checkpoint.
+The API repository-prefix boundary was already corrected before the first
+commit. New diagnostic execution is still manual-only and unmerged; no remote
+diagnostic dispatch, AI backend, credential, settings, merge or release action
+was performed. Stage I remains 0 AIC; future budget remains 500 AIC/month.
+
+**Single best next action:** push the reviewed fixes, verify the new head's CI,
+then finish evaluating available reviewer feedback before owner merge review.
+
+Česky: PR #72 má zelené CI původní revize včetně 543 HA testů v Linux CI.
+Dva potvrzené nálezy Codex review jsou opravené a nové regrese prošly. Pro novou
+revizi musí znovu projít CI. Sourcery nemohlo provést review kvůli kvótě;
+CodeRabbit zatím běželo. Lokální HA pytest ani fyzický hardware ověřené nejsou.
+
+---
+
 ## Autonomous maintainer Stage I — publication approved, CI/review pending (2026-11-13)
 
 **Implemented + Static + local Node Unit/CLI verification. Not GitHub-CI-verified,

@@ -24,10 +24,10 @@ export function assess(input, policy, branches, provenance) {
       url: `https://github.com/${branches.repository}/${input.kind === 'issue' ? 'issues' : 'pull'}/${input.item.number}` },
     provenance, policyDigest, refs: input.refs,
     analysisFingerprint: analysisFingerprint(input, policyDigest),
-    evidenceFingerprint: digest({ evidence, checks, related, ancestry: input.ancestry, missing: input.missing }),
+    evidenceFingerprint: digest({ evidence, absences: input.absences ?? [], checks, related, ancestry: input.ancestry, missing: input.missing }),
     complete: input.missing.length === 0,
     assessment: 'human-assessment-required',
-    evidence, comparisons: symbolComparisons(evidence), related, ancestry: input.ancestry,
+    evidence, absences: input.absences ?? [], comparisons: symbolComparisons(evidence), related, ancestry: input.ancestry,
     files: input.files.filter(f => safePath(f.filename) && sha(f.sha)).map(f => ({
       path: f.filename, previousPath: f.previous_filename && safePath(f.previous_filename) ? f.previous_filename : null,
       status: f.status, sha: f.sha, additions: f.additions, deletions: f.deletions,

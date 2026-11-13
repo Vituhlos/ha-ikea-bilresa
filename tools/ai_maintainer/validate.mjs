@@ -38,7 +38,7 @@ export function validateReport(schema, report) {
   validate(schema, report);
   if (report.complete !== (report.missing.length === 0)) throw new Error('Inconsistent completeness');
   if (report.item.kind === 'pull_request' && (!report.refs.prBase || !report.refs.prHead)) throw new Error('Missing PR refs');
-  for (const file of report.evidence) {
+  for (const file of [...report.evidence, ...report.absences]) {
     if (report.refs[file.role]?.sha !== file.revision) throw new Error('Evidence revision mismatch');
   }
   for (const check of report.validation.checks) {

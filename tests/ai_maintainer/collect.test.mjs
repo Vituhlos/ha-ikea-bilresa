@@ -48,6 +48,34 @@ test('read denial never degrades into a successful partial report', async () => 
   await assert.rejects(collect(fixtureReader(input, r => { if (r.includes('/contents/')) throw new ReadError('http-403'); }), 70, branches, policy), /http-403/);
 });
 
+test('tree-confirmed absence for additions, deletions and renames is evidence, not an error', async () => {
+  const input = await fixture(71);
+  input.files.push({ filename: 'new.py', sha: 'a'.repeat(40), status: 'added', additions: 1, deletions: 0 },
+    { filename: 'removed.py', sha: 'b'.repeat(40), status: 'removed', additions: 0, deletions: 1 },
+    { filename: 'renamed.py', previous_filename: 'old.py', sha: 'c'.repeat(40), status: 'renamed', additions: 0, deletions: 0 });
+  input.item.changed_files = input.files.length;
+  for (const [role, ref] of Object.entries(input.refs)) {
+    for (const path of role === 'prHead' ? ['new.py','renamed.py'] : ['removed.py','old.py']) {
+      input.sources.push({ role, path, revision: ref.sha, content: 'value = 1\n' });
+    }
+  }
+  const result = await collect(fixtureReader(input), 71, branches, policy);
+  assert.deepEqual(result.missing, []);
+  assert.ok(result.absences.some(a => a.path === 'new.py' && a.role === 'prBase'));
+  assert.ok(result.absences.some(a => a.path === 'removed.py' && a.role === 'prHead'));
+  assert.ok(result.absences.some(a => a.path === 'old.py' && a.role === 'prHead'));
+});
+
+test('incomplete trees and tree symlinks cannot masquerade as known absence or normal files', async () => {
+  const input = await fixture(70);
+  for (const tree of [{ sha: 'a'.repeat(40), truncated: true, tree: [] },
+    { sha: 'a'.repeat(40), truncated: false, tree: [{ path: policy.evidencePaths[0], mode: '120000', type: 'blob', sha: 'a'.repeat(40) }] }]) {
+    const result = await collect(fixtureReader(input, r => r.includes('/git/trees/') ? tree : undefined), 70, branches, policy);
+    assert.ok(result.missing.length > 0);
+    assert.ok(!result.sources.some(s => s.path === policy.evidencePaths[0]));
+  }
+});
+
 test('force-push and comment edits during collection are detected', async () => {
   const input = await fixture(71); let prReads = 0; let commentReads = 0;
   const actual = await collect(fixtureReader(input, route => {

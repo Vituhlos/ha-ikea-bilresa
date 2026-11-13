@@ -19,6 +19,12 @@ export function fixtureReader(input, override = () => undefined) {
     if (path === `/issues/${item.number}`) return structuredClone({ ...item, ...(input.kind === 'pull_request' ? { pull_request: {} } : {}) });
     if (path === `/pulls/${item.number}`) return structuredClone(item);
     if (path === '/releases/latest') return { tag_name: input.refs.stable.ref, draft: false, prerelease: false };
+    if (path.startsWith('/git/trees/')) {
+      const revision = path.slice('/git/trees/'.length);
+      const entries = new Map(input.sources.filter(s => s.revision === revision)
+        .map(s => [s.path, { path: s.path, mode: '100644', type: 'blob', sha: 'a'.repeat(40) }]));
+      return { sha: revision, truncated: false, tree: [...entries.values()] };
+    }
     if (path.startsWith('/commits/')) {
       const ref = Object.values(input.refs).find(r => r.ref === path.slice('/commits/'.length));
       if (ref) return { sha: ref.sha };

@@ -12,17 +12,32 @@ export function safePath(value) {
 export function pythonSymbols(content) {
   const lines = content.replace(/\r\n/g, '\n').split('\n');
   const symbols = [];
-  let className = '';
+  const scopes = [];
+  const occurrences = new Map();
   for (let i = 0; i < lines.length; i++) {
-    const cls = /^class ([A-Za-z_]\w*)/.exec(lines[i]);
-    if (cls) className = cls[1];
+    if (!lines[i].trim() || lines[i].trimStart().startsWith('#')) continue;
+    const indentation = lines[i].search(/\S/);
+    // Closing a multiline declaration does not leave its newly opened scope.
+    if (!lines[i].trimStart().startsWith(')')) {
+      while (scopes.length && indentation <= scopes.at(-1).indent) scopes.pop();
+    }
+    const cls = /^( *)class ([A-Za-z_]\w*)/.exec(lines[i]);
     const match = /^( *)(?:async )?def ([A-Za-z_]\w*)\(/.exec(lines[i]);
+    if (cls || match) {
+      const declaration = cls ?? match;
+      const base = [...scopes.map(s => s.name), declaration[2]].join('.');
+      const occurrence = (occurrences.get(base) ?? 0) + 1;
+      occurrences.set(base, occurrence);
+      const localName = declaration[2] + (occurrence > 1 ? `.definition${occurrence}` : '');
+      scopes.push({ indent: declaration[1].length, name: localName });
+    }
     if (!match) continue;
     const indent = match[1].length;
     let end = i + 1;
-    while (end < lines.length && (!lines[end].trim() || lines[end].search(/\S/) > indent)) end++;
+    while (end < lines.length && (!lines[end].trim() || lines[end].search(/\S/) > indent
+      || lines[end].trimStart().startsWith(')'))) end++;
     const body = lines.slice(i, end).join('\n').trimEnd();
-    symbols.push({ name: `${indent && className ? className + '.' : ''}${match[2]}`,
+    symbols.push({ name: scopes.map(s => s.name).join('.'),
       line: i + 1, endLine: end, digest: digest(body) });
   }
   return symbols;

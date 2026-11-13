@@ -708,6 +708,44 @@
         "inferenceCalls"
       ],
       "additionalProperties": false
+    },
+    "absences": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "path",
+          "revision",
+          "basis"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "stable",
+              "main",
+              "development",
+              "prBase",
+              "prHead"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 240,
+            "pattern": "^[A-Za-z0-9_./-]+$"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "basis": {
+            "const": "complete-git-tree"
+          }
+        }
+      }
     }
   },
   "required": [
@@ -732,7 +770,8 @@
     "risks",
     "nextAction",
     "ownerApprovalRequired",
-    "budget"
+    "budget",
+    "absences"
   ],
   "additionalProperties": false
 }

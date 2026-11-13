@@ -11,7 +11,7 @@ function itemState(item) {
 export async function collect(reader, number, branches, policy) {
   if (!Number.isSafeInteger(number) || number < 1) throw new ReadError('invalid-item-number');
   const input = { repository: await reader.get(repoPath('')), refs: {},
-    comments: [], files: [], related: [], sources: [], checks: [], ancestry: [], missing: [] };
+    comments: [], files: [], related: [], sources: [], absences: [], checks: [], ancestry: [], missing: [] };
   if (input.repository.id !== branches.repositoryId || input.repository.full_name !== branches.repository
     || input.repository.private) throw new ReadError('repository-identity-mismatch');
   // Authentication/rate-limit failures stop; missing bounded evidence is explicit.
@@ -82,13 +82,33 @@ export async function collect(reader, number, branches, policy) {
 
   const paths = [...new Set([...policy.evidencePaths, ...input.files.flatMap(f =>
     [f.filename, f.previous_filename].filter(Boolean))])];
+  const trees = new Map();
+  for (const revision of Object.values(input.refs)) {
+    if (trees.has(revision.sha)) continue;
+    const tree = await optional(`tree-${revision.sha}`, () => reader.get(repoPath(`/git/trees/${revision.sha}?recursive=1`)), null);
+    if (!tree || tree.truncated !== false || !Array.isArray(tree.tree) || !sha(tree.sha)
+      || tree.tree.length > 100000) {
+      input.missing.push(`tree-${revision.sha}:unavailable-or-truncated`);
+      trees.set(revision.sha, null);
+    } else trees.set(revision.sha, new Map(tree.tree.map(entry => [entry.path, entry])));
+  }
   if (paths.length > policy.limits.sourcePaths) input.missing.push('source-paths:limit');
   for (const path of paths.slice(0, policy.limits.sourcePaths)) {
     if (!safePath(path)) { input.missing.push('source-path:unsupported'); continue; }
     for (const [role, revision] of Object.entries(input.refs)) {
+      const tree = trees.get(revision.sha);
+      if (!tree) continue;
+      const entry = tree.get(path);
+      if (!entry) {
+        input.absences.push({ role, path, revision: revision.sha, basis: 'complete-git-tree' });
+        continue;
+      }
+      if (entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode) || !sha(entry.sha)) {
+        input.missing.push(`source-${role}-${path}:unsupported-tree-entry`); continue;
+      }
       const source = await optional(`source-${role}-${path}`, () => reader.get(repoPath(`/contents/${path}?ref=${revision.sha}`)), null);
       if (!source) continue;
-      if (source.type !== 'file' || source.encoding !== 'base64' || !sha(source.sha)
+      if (source.type !== 'file' || source.encoding !== 'base64' || source.sha !== entry.sha
         || source.size > policy.limits.sourceBytes) {
         input.missing.push(`source-${role}-${path}:unsupported-or-large`); continue;
       }

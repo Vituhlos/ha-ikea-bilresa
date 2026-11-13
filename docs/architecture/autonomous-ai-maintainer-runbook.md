@@ -82,12 +82,17 @@ expose work in progress. Unrelated open-inventory head changes update evidence
 only; they do not change the analysis fingerprint. Candidate discovery is
 bounded and cannot prove absence of every semantic duplicate. Source selection
 is the trusted evidence-path list plus **every PR changed/previous path**,
-within a 20-path limit; excess/missing/binary/symlink files mark it incomplete.
+within a 20-path limit. A complete immutable Git tree records verified path
+absence explicitly (including added/deleted/renamed files across revisions).
+Unavailable/truncated trees, failed reads of existing files, excess paths, binary
+files and symlinks mark it incomplete. Tree modes reject symlinks before the
+Contents API can dereference them; blob SHAs must match the tree.
 The PR files endpoint is paginated and checked against `changed_files`; the
 API's 3,000-file ceiling cannot silently pass. Compare API is used only for
 ancestry, never as a complete file list.
 
-The Python symbol index and named observations are lexical, not an AST or
+The Python symbol index includes enclosing class/function scopes and disambiguates
+repeated definitions within a scope. It and the named observations are lexical, not an AST or
 automatic classification. The report always asks for human assessment:
 
 - #70: first-notch zero-transition observations on stable/main/dev; the later
@@ -197,7 +202,11 @@ Sběr rozlišuje stabilní tag, `main`, vývojovou větev a přesný base/head P
 Zachycuje ancestry, související a otevřené PR, hashe metod, lexikální pozorování
 a testovací symboly. Shoda není důkaz sémantické duplicity. Kandidáti podle
 odkazů či slov názvu nejsou úplným sémantickým vyhledáváním. Limit počtu podkladů,
-chybějící stránka, soubor nebo pohyb revize vytvářejí neúplný výsledek. CI se
+chybějící stránka, nedostupný podklad nebo pohyb revize vytvářejí neúplný výsledek.
+Nepřítomnost cesty ověřená úplným Git stromem se eviduje zvlášť, takže přidání,
+smazání či přejmenování souboru není samo o sobě chybou. Režim položky stromu
+zachytí symlink ještě před načtením přes Contents API a SHA blobu musí souhlasit.
+Identita funkce zahrnuje nadřazené funkce/třídy i rozlišení opakovaných definic. CI se
 váže k head SHA, názvu kontroly a App 15368; skipped ani podvržená kontrola
 není úspěch. Implementace, Static, Unit, CI, Hardware a Released zůstávají
 oddělené. Sběrač nespouští testy posuzovaného PR ani fyzické testy.
