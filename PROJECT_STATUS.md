@@ -1,5 +1,52 @@
 # Project status and agent handoff
 
+## Contributor fix: zero-valued numeric bounds (2026-11-13)
+
+**Status:** [PR #71](https://github.com/Vituhlos/ha-ikea-bilresa/pull/71) is open from
+contributor fork `Hinrixx3026/ha-ikea-bilresa`, branch
+`fix/zero-numeric-bounds`, originally based on upstream `main` commit
+`b2118a32`. **Not merged or released.**
+
+- **Change:** `binding.py` now distinguishes a missing `min`/`max` or
+  `min_temp`/`max_temp` from an explicitly configured zero; the existing
+  positive fallback for invalid zero step sizes is unchanged.
+- **Tests:** `tests/test_binding.py` covers a zero minimum climate target,
+  zero maximum climate and negative `number`/`input_number` targets,
+  the exact observed hardware input (one upward notch at 10% from -1),
+  no extra command at a zero maximum, and backward-compatible missing bounds.
+  An **isolated executable pytest harness** copied the two calculation methods
+  from original upstream and patched code: original 4 boundary failures plus
+  2 unaffected passes; patched 6/6 passes. This is not the repository tests.
+  **GitHub Actions passed all seven jobs on the reorganized three-commit
+  head** `e124ac1`, manual workflow run
+  [43352202078](https://github.com/Hinrixx3026/ha-ikea-bilresa/actions/runs/43352202078):
+  552 Python tests on pinned dependencies, another 552 on newest Home
+  Assistant pre-release dependencies (5 warnings), Ruff, mypy, frontend,
+  hassfest, and HACS validation. The documentation-only amendment to this
+  status entry requires fresh PR CI on the new commit SHA. No local
+  full-suite run or patched-hardware run.
+- **Hardware baseline reproduction (2026-11-13):** The contributor used a
+  physical BILRESA scroll wheel on channel 3, bound in Value mode to
+  a dedicated `input_number` test helper (range -10..0, step 1, initial -1;
+  binding step 10%, smoothing 1 s). One upward notch appeared in the panel
+  Live test as `Channel 3 · rotate up · 1 steps`, with action result
+  `Value -1 → 10` and `Home Assistant accepted the action`. This
+  **confirms the pre-fix target calculation exceeds the entity's maximum**.
+  A subsequent helper screenshot showed its current value was still
+  -1, with no later successful history/activity entry after the original
+  02:54:20 value change. This supports that +10 was not applied, though
+  it does not identify which Home Assistant layer rejected it. Installed
+  integration/HA/Matter version details were not captured in the screenshot.
+  **The patched branch has NOT been installed or hardware-tested.** Record
+  the corrected behavior separately before marking a passing hardware check.
+- **Risks:** Bound values are read from target state attributes; no changes
+  to Matter event decoding, queueing, UI, service dispatch, or target-step
+  fallbacks were intended.
+- **Next action:** Review PR #71 exact-head CI and automated feedback after
+  synchronizing with upstream `main`, then confirm corrected behavior
+  on a physical BILRESA without downgrading an unrelated 0.7 installation.
+  Do not mark post-fix hardware validation passed before observation.
+
 ## GitHub development automation — Phase 2A proposed (2026-11-10)
 
 **Phase 1: complete.** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) was merged into main. Maintainer created and stopped an interactive Codespace after **543 Python tests and 47 Node tests passed**; Ruff and mypy (existing no-site-packages baseline) were clean. Both GitHub branch rulesets are **active**: main #26934594 and agent/panel-0.6.1 #26934615, with six source-pinned CI checks, required PRs and resolved conversations. Actual enforcement on a new post-activation PR remains to be observed. Physical device validation is separate.

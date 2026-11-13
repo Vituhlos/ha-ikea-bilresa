@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a pre-release tag, and a stale-issue workflow for issues waiting for information.
 
 ### Fixed
+- **Numeric and climate rotations honour explicit zero-valued bounds.** The
+  BILRESA number and temperature modes no longer mistake a valid minimum or
+  maximum of zero for a missing attribute and send values beyond the target's
+  configured range. Missing bounds retain their previous fallback values, and
+  invalid zero step sizes retain their positive fallback.
+
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
   device converted every node to a mapping and walked every attribute of every

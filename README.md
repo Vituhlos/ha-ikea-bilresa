@@ -196,6 +196,10 @@ configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
 
+For `number`, `input_number`, and climate targets, scrolling respects the
+entity's reported minimum and maximum, including a limit explicitly set to
+`0`. Missing limits still use the previous default values.
+
 For a dual button, the same flow first selects Button 1 or Button 2 and then
 shows only supported actions: independent single/double-press targets and
 hold/release. There are no rotary, scene or triple-press fields. A hold ramp can

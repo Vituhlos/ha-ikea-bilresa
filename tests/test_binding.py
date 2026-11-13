@@ -46,6 +46,8 @@ from custom_components.ikea_bilresa.const import (
     HOLD_RAMP,
     MODE_COLOR_TEMP,
     MODE_COVER,
+    MODE_NUMBER,
+    MODE_TEMPERATURE,
     MODE_VOLUME,
     RAMP_DIRECTION_DOWN,
     RAMP_DIRECTION_UP,
@@ -668,6 +670,252 @@ def test_bounded_rotation_does_not_repeat_service_at_limit(
     assert updates[-1]["dispatch_status"] == "completed"
     assert updates[-1]["reason"] == "target_unchanged"
     assert updates[-1]["result"]["before"] == updates[-1]["result"]["after"]
+
+
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+def test_number_rotation_obeys_explicit_zero_maximum(
+    monkeypatch, target_domain: str
+) -> None:
+    """Zero is a real upper bound, not a missing attribute."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.negative_range",
+            CONF_MODE: MODE_NUMBER,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1",
+        attributes={"min": -10.0, "max": 0.0, "step": 1.0},
+    )
+
+    assert binding._rotate_number(3, True) is True
+
+    domain, service, payload = binding.hass.services.async_call.call_args.args
+    assert (domain, service) == (target_domain, "set_value")
+    assert payload["entity_id"] == f"{target_domain}.negative_range"
+    assert payload["value"] == 0
+
+
+def test_input_number_single_notch_matches_reported_hardware_bug(
+    monkeypatch,
+) -> None:
+    """The pre-fix live test sent -1 -> +10 instead of clamping at zero."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "input_number.zero_bound_test",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 10,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1",
+        attributes={"min": -10.0, "max": 0.0, "step": 1.0},
+    )
+
+    assert binding._rotate_number(1, True) is True
+
+    domain, service, payload = binding.hass.services.async_call.call_args.args
+    assert (domain, service) == ("input_number", "set_value")
+    assert payload["entity_id"] == "input_number.zero_bound_test"
+    assert payload["value"] == 0
+
+
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+def test_numeric_small_notches_accumulate_without_redundant_commands(
+    monkeypatch, target_domain: str
+) -> None:
+    """Repeated sub-step notches advance and survive quantized state echoes."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.small_range",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 3,
+        },
+    )
+    binding._min_command_interval = 0.0
+    attributes = {"min": -10.0, "max": 0.0, "step": 1.0}
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes=attributes
+    )
+    assert binding._rotate_number(1, True) is False
+    assert binding._tracked == pytest.approx(-0.7)
+    binding.hass.services.async_call.assert_not_called()
+    assert binding._rotate_number(1, True) is True
+    assert binding.hass.services.async_call.call_count == 1
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == 0
+    assert binding._tracked == pytest.approx(-0.4)
+
+    # A valid HA echo must not erase the remaining fractional progress.
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={"new_state": SimpleNamespace(state="0", attributes=attributes)}
+        )
+    )
+    assert binding._tracked == pytest.approx(-0.4)
+    assert binding._rotate_number(1, False) is True
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == -1
+
+
+def test_numeric_external_report_rebases_fractional_progress(monkeypatch) -> None:
+    """An off-path update still replaces the internal numeric target."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "number.small_range",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 3,
+        },
+    )
+    attributes = {"min": -10.0, "max": 0.0, "step": 1.0}
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes=attributes
+    )
+    assert binding._rotate_number(1, True) is False
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={"new_state": SimpleNamespace(state="-5", attributes=attributes)}
+        )
+    )
+    assert binding._tracked is None
+
+
+def test_climate_small_notches_accumulate_without_redundant_commands(
+    monkeypatch,
+) -> None:
+    """Small climate ranges retain notches below the half-degree step."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "climate.small_range",
+            CONF_MODE: MODE_TEMPERATURE,
+            CONF_STEP: 3,
+        },
+    )
+    attributes = {
+        "temperature": 1.0,
+        "min_temp": 0.0,
+        "max_temp": 4.0,
+        "target_temp_step": 0.5,
+    }
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat", attributes=attributes
+    )
+    assert binding._rotate_temperature(1, True) is False
+    assert binding._rotate_temperature(1, True) is False
+    binding.hass.services.async_call.assert_not_called()
+    assert binding._rotate_temperature(1, True) is True
+    assert binding.hass.services.async_call.call_count == 1
+    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == 1.5
+    assert binding._tracked == pytest.approx(1.36)
+
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(
+                    state="heat", attributes={**attributes, "temperature": 1.5}
+                )
+            }
+        )
+    )
+    assert binding._tracked == pytest.approx(1.36)
+
+
+def test_number_rotation_does_not_dispatch_past_zero_maximum(monkeypatch) -> None:
+    """At an explicit zero limit, rotating up must not send a higher value."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.zero_max", CONF_MODE: MODE_NUMBER},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="0",
+        attributes={"min": -10.0, "max": 0.0, "step": 1.0},
+    )
+
+    assert binding._rotate_number(1, True) is False
+
+    binding.hass.services.async_call.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("attributes", "current", "notches", "up", "expected"),
+    [
+        (
+            {"min_temp": 0.0, "max_temp": 35.0, "target_temp_step": 0.5},
+            1.0,
+            1,
+            False,
+            0.0,
+        ),
+        (
+            {"min_temp": -10.0, "max_temp": 0.0, "target_temp_step": 0.5},
+            -1.0,
+            3,
+            True,
+            0.0,
+        ),
+    ],
+)
+def test_climate_rotation_obeys_explicit_zero_boundaries(
+    monkeypatch,
+    attributes: dict,
+    current: float,
+    notches: int,
+    up: bool,
+    expected: float,
+) -> None:
+    """Climate 0 °C bounds must not be replaced by 7 or 35 °C defaults."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TARGET: "climate.test", CONF_MODE: MODE_TEMPERATURE}
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat", attributes={**attributes, "temperature": current}
+    )
+
+    assert binding._rotate_temperature(notches, up) is True
+
+    domain, service, payload = binding.hass.services.async_call.call_args.args
+    assert (domain, service) == ("climate", "set_temperature")
+    assert payload["temperature"] == expected
+
+
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+def test_missing_number_maximum_preserves_default_range(
+    monkeypatch, target_domain: str
+) -> None:
+    """Absent upper bounds still default to 100, unlike an explicit zero."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.default_range",
+            CONF_MODE: MODE_NUMBER,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="95", attributes={"min": 0.0, "step": 1.0}
+    )
+
+    assert binding._rotate_number(1, True) is True
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == 98
+
+
+def test_missing_climate_limits_preserve_default_range(monkeypatch) -> None:
+    """Absent climate bounds keep the historic 7–35 °C defaults."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch, **{CONF_TARGET: "climate.test", CONF_MODE: MODE_TEMPERATURE}
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={"temperature": 8.0, "target_temp_step": 0.5},
+    )
+
+    assert binding._rotate_temperature(1, True) is True
+    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == 9.0
 
 
 def test_color_rotation_still_wraps_instead_of_stopping_at_hue_boundary(
