@@ -2319,3 +2319,30 @@ test("an answer from Home Assistant's editor after the form was closed does noth
     panel._setSequence("double_press_sequence", "double_press_action", []),
   );
 });
+
+test("maximum volume survives an editor round trip and reveals validation errors", async () => {
+  const panel = newPanel();
+  panel._loadEditor(false, {
+    mode: "volume",
+    target: "media_player.test",
+    max_volume: 40,
+  });
+  assert.equal(panel._editorData.max_volume, 40);
+  let sent;
+  panel._hass = {
+    callWS: async (message) => {
+      sent = message.data;
+      return {
+        ok: false,
+        error: "validation",
+        fields: { max_volume: "invalid_value" },
+      };
+    },
+  };
+
+  await panel._saveBinding({ key: "wheel-a", variant: "wheel" }, { channel: 1 });
+
+  assert.equal(sent.max_volume, 40);
+  assert.equal(panel._advancedOpen, true);
+  assert.deepEqual(panel._editorErrors, { max_volume: "invalid_value" });
+});

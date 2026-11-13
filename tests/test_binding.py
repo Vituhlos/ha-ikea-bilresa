@@ -34,6 +34,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -3861,3 +3862,52 @@ def test_a_failed_call_keeps_the_level_while_a_newer_one_is_queued(
     )
 
     assert binding._tracked is not None
+
+
+@pytest.mark.parametrize(
+    ("maximum", "current", "notches", "up", "expected"),
+    [
+        (40, 0.39, 1, True, 0.4),
+        (40, 0.1, 100, True, 0.4),
+        (40, 0.8, 1, True, 0.4),
+        (40, 0.8, 1, False, 0.4),
+        (40, 0.3, 1, False, 0.27),
+        (40, 0.01, 1, False, 0.0),
+        (0, 0.3, 1, True, 0.0),
+        (None, 0.99, 1, True, 1.0),
+    ],
+)
+def test_volume_rotation_respects_maximum(
+    monkeypatch, maximum, current, notches, up, expected
+) -> None:
+    overrides = {CONF_TARGET: "media_player.test", CONF_MODE: MODE_VOLUME, CONF_STEP: 3}
+    if maximum is not None:
+        overrides[CONF_MAX_VOLUME] = maximum
+    binding, _, _ = _binding(monkeypatch, **overrides)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": current}
+    )
+
+    binding._rotate_volume(notches, up)
+
+    call = binding.hass.services.async_call.call_args.args
+    assert call[:2] == ("media_player", "volume_set")
+    assert call[2]["volume_level"] == expected
+
+
+def test_volume_rotation_at_maximum_sends_no_command(monkeypatch) -> None:
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "media_player.test",
+            CONF_MODE: MODE_VOLUME,
+            CONF_MAX_VOLUME: 40,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.4}
+    )
+
+    binding._rotate_volume(10, up=True)
+
+    binding.hass.services.async_call.assert_not_called()

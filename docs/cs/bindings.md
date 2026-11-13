@@ -53,6 +53,10 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
 
+Pro hlasitost přehrávače omezuje **Maximální hlasitost** (%) otáčení kolečka na
+zvolenou úroveň (0–100 %, výchozí 100 %). Limit platí pro toto propojení; změny
+hlasitosti z jiných ovládacích prvků nebo akcí tlačítek neomezuje.
+
 ## Více světel na jednom kanálu
 
 Propojení jasu, teploty bílé nebo barvy může ovládat několik světel najednou:

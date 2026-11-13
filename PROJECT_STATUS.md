@@ -5,6 +5,32 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 (PR #16, Issue #9 / PRs #14 and #15, PR #13, the 0.6.1 language release), are in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
 
+## Maximum volume for wheel bindings — 2026-11-13
+
+Local feature branch `feat/maximum-volume`, based on `origin/agent/panel-0.6.1`.
+Adds `max_volume` (0–100%, default 100%) to the shared binding schema, native
+create/reconfigure form and panel's More rotation settings in volume mode.
+Wheel volume commands clamp to this ceiling; existing bindings retain 100%.
+Other controls and button actions are not capped. No migration or Matter
+protocol changes.
+
+Files: `binding.py`, `binding_config.py`, `config_flow.py`, `const.py`,
+`panel_schema.py`, `panel_strings.py`, panel JavaScript, EN/CS JSON strings,
+`tests/test_binding.py`, `tests/test_config_flow.py`, `tests/test_panel_schema.py`,
+`tests/panel_frontend.test.mjs`, EN/CS binding guides and `CHANGELOG.md`.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` passed:
+1,073 Python tests, 103 Node tests, JSON, compile, JavaScript syntax, diff,
+Ruff formatting/lint. Mypy reports only the two known baseline errors, no new
+errors. Dependencies installed from `requirements-test.txt` in ignored `.venv`
+with Python 3.14.8 / Home Assistant 2026.9.4. No CI run, live Home Assistant,
+browser or physical BILRESA validation was performed; these need an external
+instance or PR. Hardware status: unverified.
+
+Assumption: this is a per-binding wheel limit, not a player-wide volume limit.
+Next action: submit a fork PR against `agent/panel-0.6.1`, then verify a configured
+cap and the unchanged default with a physical wheel and media-player target.
+
 ## Goal
 
 - **Stable line:** `v0.6.1` is the latest stable release on `main`. Stable releases stay deferred until the hardware checks pass (`AGENTS.md`).

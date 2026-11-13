@@ -54,6 +54,10 @@ configured minimum (or one usable step when the minimum is zero). External HA
 changes rebase the next wheel action, while direction reversal during a
 transition continues from the last requested value.
 
+For media-player volume, **Maximum volume** (%) limits wheel scrolling to the
+chosen level (0–100%, default 100%). This is a per-binding limit; volume changes
+from other controls or button actions are not capped.
+
 ## Several lights on one channel
 
 A brightness, colour-temperature or colour binding can drive several lights

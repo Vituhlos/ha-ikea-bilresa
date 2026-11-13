@@ -8,6 +8,7 @@ import voluptuous as vol
 from custom_components.ikea_bilresa.const import (
     CONF_ACCELERATION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_STEP,
     CONF_TRANSITION,
@@ -26,6 +27,7 @@ def test_every_numeric_binding_field_is_described() -> None:
         CONF_ACCELERATION,
         CONF_MIN_BRIGHTNESS,
         CONF_MAX_BRIGHTNESS,
+        CONF_MAX_VOLUME,
         CONF_TRANSITION,
     }
 

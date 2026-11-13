@@ -79,6 +79,7 @@ from .const import (
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -96,6 +97,7 @@ from .const import (
     DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
     DEFAULT_MAX_BRIGHTNESS,
+    DEFAULT_MAX_VOLUME,
     DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_MODE,
     DEFAULT_RAMP_DIRECTION,
@@ -355,6 +357,7 @@ class LightBinding:
         self._max_units = _pct_to_units(
             float(data.get(CONF_MAX_BRIGHTNESS, DEFAULT_MAX_BRIGHTNESS))
         )
+        self._max_volume = float(data.get(CONF_MAX_VOLUME, DEFAULT_MAX_VOLUME)) / 100
         self._transition = float(data.get(CONF_TRANSITION, DEFAULT_TRANSITION))
         self._click = data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION)
         explicit_click = data.get(CONF_CLICK_TARGET)
@@ -1614,7 +1617,10 @@ class LightBinding:
         if state is None:
             return False
         tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
-        target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
+        target = min(
+            self._max_volume,
+            max(0.0, tracked + self._delta(self._step, 1, notches, up)),
+        )
         self._set_target(target, 1)
         result = self._value_result(
             "volume", round(tracked * 100), round(target * 100), "%"

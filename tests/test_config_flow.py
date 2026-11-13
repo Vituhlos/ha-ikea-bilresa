@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from custom_components.ikea_bilresa.binding_config import validate_binding_data
 from custom_components.ikea_bilresa.config_flow import (
     BindingSubentryFlowHandler,
     _run_scripts_and_scenes,
@@ -38,6 +39,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -218,6 +220,7 @@ def test_dual_button_schema_uses_real_endpoint_shape_and_hides_rotary_fields() -
         CONF_ACCELERATION,
         CONF_MIN_BRIGHTNESS,
         CONF_MAX_BRIGHTNESS,
+        CONF_MAX_VOLUME,
         CONF_TRANSITION,
         CONF_TRIPLE_TARGET,
         CONF_SCENES,
@@ -265,6 +268,7 @@ def test_wheel_schema_keeps_rotary_and_triple_press_options() -> None:
         CONF_ACCELERATION,
         CONF_MIN_BRIGHTNESS,
         CONF_MAX_BRIGHTNESS,
+        CONF_MAX_VOLUME,
         CONF_TRANSITION,
         CONF_TRIPLE_TARGET,
         CONF_SCENES,
@@ -899,3 +903,34 @@ async def test_changing_the_mode_redraws_the_target_picker() -> None:
     [marker] = [m for m in shown[-1]["data_schema"].schema if m == CONF_TARGET]
     assert shown[-1]["data_schema"].schema[marker].config["multiple"] is True
     assert flow._shown_multiple is True
+
+
+@pytest.mark.parametrize("maximum", [0, 40, 100, -1, 101])
+def test_maximum_volume_validation(maximum) -> None:
+    data, errors = validate_binding_data(
+        {
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: maximum,
+        },
+        node_id="303",
+        channel="1",
+    )
+
+    if 0 <= maximum <= 100:
+        assert errors == {}
+        assert data[CONF_MAX_VOLUME] == maximum
+    else:
+        assert data is None
+        assert errors == {CONF_MAX_VOLUME: "invalid_value"}
+
+
+def test_existing_volume_binding_defaults_to_full_volume() -> None:
+    data, errors = validate_binding_data(
+        {CONF_MODE: MODE_VOLUME, CONF_TARGET: "media_player.test"},
+        node_id="303",
+        channel="1",
+    )
+
+    assert errors == {}
+    assert data[CONF_MAX_VOLUME] == 100
