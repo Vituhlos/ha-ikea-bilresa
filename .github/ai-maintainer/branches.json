@@ -1,0 +1,7 @@
+{
+  "repository": "Vituhlos/ha-ikea-bilresa",
+  "repositoryId": 1300699657,
+  "stable": "latest-non-prerelease",
+  "main": "main",
+  "development": "agent/panel-0.6.1"
+}

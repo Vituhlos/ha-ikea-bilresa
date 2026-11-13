@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stage I state",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "stage": {
+      "const": "I"
+    },
+    "repositoryId": {
+      "const": 1300699657
+    },
+    "itemId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reportDigest": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "analysisFingerprint": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidenceFingerprint": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "collectedAt": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+        },
+        "toolRevision": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "runId": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^(local|[0-9]+)$"
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "toolDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "collectedAt",
+        "toolRevision",
+        "runId",
+        "runAttempt",
+        "toolDigest"
+      ],
+      "additionalProperties": false
+    },
+    "authorizesSpending": {
+      "const": false
+    },
+    "authorizesPublication": {
+      "const": false
+    },
+    "monthlyBalance": {
+      "type": "null"
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "const": "AIC"
+        },
+        "monthlyLimit": {
+          "const": 500
+        },
+        "spent": {
+          "const": 0
+        },
+        "reserved": {
+          "const": 0
+        },
+        "inferenceCalls": {
+          "const": 0
+        }
+      },
+      "required": [
+        "currency",
+        "monthlyLimit",
+        "spent",
+        "reserved",
+        "inferenceCalls"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "stage",
+    "repositoryId",
+    "itemId",
+    "reportDigest",
+    "analysisFingerprint",
+    "evidenceFingerprint",
+    "provenance",
+    "authorizesSpending",
+    "authorizesPublication",
+    "monthlyBalance",
+    "budget"
+  ],
+  "additionalProperties": false
+}
