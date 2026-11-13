@@ -445,7 +445,7 @@ Posun main vyvolá přehodnocení, nikoli druhý coding PR. Před novou session 
 - rezervovaná a naměřená spotřeba;
 - chybějící důkazy a následující krok.
 
-Pro počáteční rozsah stačí historie Actions, malé validované artefakty a dohledatelné bot komentáře/PR. Cache pouze zrychluje, není autorizační autoritou. Reporty například 14 dní, malé účetní/stavové záznamy 90 dní; hlídat storage kvótu.
+Pro diagnostické potvrzení v Etapě I stačí historie Actions a malé validované artefakty. Nejde o autoritu měsíčního účetnictví. Před placenou inferencí v Etapě II je nutná trvalá transakční evidence s atomickou rezervací, důvěryhodnou rekonstrukcí a vyúčtováním podle [provozního kontraktu](autonomous-ai-maintainer-runbook.md#persistent-state-and-future-accounting-contract). Pozdější komentáře a PR jsou dohledatelné výstupy, nikoli účetní autorita. Cache pouze zrychluje, není autorizační autoritou. Reporty například 14 dní, malé účetní/stavové záznamy 90 dní; hlídat storage kvótu.
 
 Při ztrátě záznamu načíst znovu GitHub a hledat existující výstup. Nejasná historie zakazuje nový coding pokus a další nevyúčtovanou spotřebu. Stav dodaný modelem nikdy nepřepisuje rozpočet nebo schválení.
 

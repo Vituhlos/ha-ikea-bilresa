@@ -1,5 +1,49 @@
 # Project status and agent handoff
 
+## Stage I PR #72 — CodeRabbit findings evaluated (2026-11-13)
+
+CodeRabbit completed its initial review of `20139ad`. Its major repeated-name
+finding is covered by `e0afaa9` and an additional real property getter/setter
+regression. A confirmed minor transport issue is now fixed: errors while reading
+an HTTP body become sanitized `ReadError('network-error')`, preserving explicit
+size-limit errors. Its regression failed before the fix. The #71 wording now
+states four old zero-bound fallback observations versus zero on the PR head,
+and the approved plan explicitly distinguishes Stage I diagnostic receipts from
+the transactional authority required before Stage II paid inference.
+
+The recommendation to translate the entire owner-requested, approved Czech
+architecture is a documentation follow-up, not a runtime/security defect. This
+PR retains that source and its four diagrams; the Stage I operational/security
+contract and user-facing summary remain aligned in English and Czech. It does
+not introduce or activate the later architectural stages. CodeRabbit reported
+that `fixtures/sources.json` exceeded its per-file review size limit; its review
+is therefore not claimed to cover that entire fixture. The recorded fixture
+was locally inspected, scanned, parsed and exercised by deterministic tests.
+An additional full-fixture audit compared every retained line and the original
+full-content SHA-256 against the captured read-only API source inputs: PASS.
+Sourcery remains quota-skipped; no paid upgrade or explicit rerun was requested.
+
+Validation: the full Node command (existing frontend/handoff plus
+`tests/ai_maintainer/*.test.mjs`) now passes **89 tests, including 30 new tests**.
+`git diff --check` passes. Linux CI and CodeQL also passed on intermediate
+`e0afaa9` ([CI 43429056708](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/43429056708),
+[CodeQL 43429056596](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/43429056596));
+the transport-fix commit still needs its own CI. Local HA pytest and hardware
+remain untested; no HA/runtime change, merge, release, Settings change,
+credential or automatic AI activation occurred. Stage I spends 0 AIC; the
+future monthly limit remains 500 AIC.
+
+**Single best next action:** verify final-head CI and any available incremental
+review, then present PR #72 to the owner for the final merge decision.
+
+Česky: závažný nález CodeRabbit je pokryt opravou identit funkcí. Potvrzená chyba
+při čtení těla HTTP odpovědi je opravená, počty ve scénáři #71 a účetní hranice
+jsou upřesněné. Úplný anglický překlad českého návrhu zůstává dokumentační
+follow-up. CodeRabbit neprošlo celý velký fixture soubor; Sourcery review
+přeskočilo kvůli kvótě. Po ověření posledního CI rozhoduje o merge pouze správce.
+
+---
+
 ## Stage I PR #72 — first review fixes (2026-11-13)
 
 The approved branch was committed as `20139ad` and published as

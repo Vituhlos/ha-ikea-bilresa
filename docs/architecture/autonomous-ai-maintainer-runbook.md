@@ -100,8 +100,9 @@ automatic classification. The report always asks for human assessment:
 - #9: #14 ancestry and source observations show existing work; original
   reporter validation and the remaining hardware checklist must be reviewed.
   There is no new comment, closure or stale-policy change here.
-- #71: zero `or default` observations in both target branches versus explicit
-  `None` checks in the existing contributor PR; retain that PR and authorship.
+- #71: four zero-bound `or default` observations on each target branch and
+  stable, versus none on the contributor PR head, which has four explicit
+  `None` checks; retain that PR and authorship.
   Head-pinned CI is recorded separately from unit tests run by this tool (none)
   and from hardware. A skipped optional job remains skipped.
 
@@ -213,8 +214,9 @@ oddělené. Sběrač nespouští testy posuzovaného PR ani fyzické testy.
 
 Příklady: #70 odlišuje první zářez od již existujícího vyhlazování dalších dávek;
 #9 ukazuje hotovou související práci, ale nepotvrzuje původní hardwarový scénář;
-#71 ukazuje existující příspěvek autora a nulové meze, ale zelené CI nepovyšuje
-na fyzické ověření. Nevzniká nový komentář, konkurenční oprava ani uzavření issue.
+#71 ukazuje existující příspěvek autora: na stable/main/dev jsou vždy čtyři
+vzory `or default` pro meze, na headu PR žádný a místo nich čtyři kontroly
+`None`. Zelené CI se nepovyšuje na fyzické ověření. Nevzniká nový komentář, konkurenční oprava ani uzavření issue.
 
 Fingerprint analýzy ignoruje pouhé časové značky, botí provozní text a přechody CI.
 Změna lidského obsahu, relevantního PR, revize či politiky jej mění; změna CI

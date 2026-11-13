@@ -19,3 +19,13 @@ test('multiline signatures and repeated scoped definitions keep unique stable id
   assert.ok(symbols.some(s => s.name === 'outer.inner'));
   assert.equal(new Set(symbols.map(s => s.name)).size, symbols.length);
 });
+
+test('property getter/setter occurrences remain bounded per source role', () => {
+  const content = 'class C:\n    @property\n    def value(self):\n        return 1\n    @value.setter\n    def value(self, new):\n        pass\n';
+  const evidence = ['stable','main','development','prBase','prHead'].map(role => sourceEvidence({
+    role, path: 'example.py', revision: 'a'.repeat(40), content,
+  }));
+  const comparisons = symbolComparisons(evidence);
+  assert.equal(comparisons.length, 2);
+  assert.ok(comparisons.every(c => c.versions.length === 5));
+});

@@ -64,3 +64,12 @@ test('oversized responses are rejected before parsing', async () => {
   const reader = new GitHubReader({ maxBytes: 10, fetchImpl: async () => response('a'.repeat(100)) });
   await assert.rejects(reader.get(repoPath('')), /response-too-large/);
 });
+
+test('a body-stream transport failure is a bounded ReadError with no upstream message', async () => {
+  const reader = new GitHubReader({ fetchImpl: async () => new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode('{')); },
+    pull(controller) { controller.error(new Error('private-transport-detail')); },
+  })) });
+  await assert.rejects(reader.get(repoPath('/issues/70')), error =>
+    error.constructor.name === 'ReadError' && error.code === 'network-error' && !error.message.includes('private'));
+});

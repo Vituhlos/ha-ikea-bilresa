@@ -42,10 +42,15 @@ export class GitHubReader {
       if (!response.ok) throw new ReadError(`http-${response.status}`);
       const chunks = [];
       let size = 0;
-      for await (const chunk of response.body) {
-        size += chunk.length;
-        if (size > this.maxBytes) throw new ReadError('response-too-large');
-        chunks.push(chunk);
+      try {
+        for await (const chunk of response.body) {
+          size += chunk.length;
+          if (size > this.maxBytes) throw new ReadError('response-too-large');
+          chunks.push(chunk);
+        }
+      } catch (error) {
+        if (error instanceof ReadError) throw error;
+        throw new ReadError('network-error');
       }
       try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
       catch { throw new ReadError('invalid-json'); }
