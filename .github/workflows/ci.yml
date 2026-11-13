@@ -61,7 +61,6 @@ jobs:
       - run: node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js
       - run: node --check tools/agent_handoff.mjs
       - run: node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs tests/agent_handoff.test.mjs
-      - run: node --test tests/ai_maintainer/*.test.mjs
 
   tests:
     name: Unit tests

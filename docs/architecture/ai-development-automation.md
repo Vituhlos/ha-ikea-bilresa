@@ -3,7 +3,7 @@
 **Decision recorded:** 2026-11-10  
 **Owner:** @Vituhlos  
 **Scope:** `Vituhlos/ha-ikea-bilresa` (public repository)  
-**Status:** Phase 1 infrastructure operational; both branch rulesets active. Real branch-rule enforcement on a new PR is pending. Phase 2A manual Codex Cloud issue handoff merged in PR #69 and exercised successfully; no autonomous coding bot enabled.
+**Status:** Phase 1 infrastructure operational; both branch rulesets active. Real branch-rule enforcement on a new PR is pending. Phase 2A manual Codex Cloud issue handoff proposed in a separate PR; no autonomous coding bot enabled.
 
 This file records the owner's agreed direction so that future Codex, Claude and other coding-agent sessions do not have to reconstruct the plan from chat history. It does not override `PROJECT_STATUS.md`, `AGENTS.md`, `CONTRIBUTING.md`, or the hardware-test requirements.
 
@@ -38,7 +38,7 @@ This file records the owner's agreed direction so that future Codex, Claude and 
 
 ## Phase 2 — human-supervised AI development
 
-**Phase 2A operational (verified 2026-11-13):** See [phase2-agent-handoff.md](phase2-agent-handoff.md) for the owner-only GitHub Issue comment /agent prepare dev or /agent prepare main, the generated copy/paste Codex Cloud task, safeguards and precise acceptance criteria. This handoff does not call an AI model and requires a manual Cloud task start. It works with the existing ChatGPT subscription without an OpenAI API key, subject to the plan's available Cloud usage. A real bilresa-assistant GitHub App and automated issue-to-PR execution remain future steps that require explicit setup and cost approval.
+**Phase 2A proposal:** See [phase2-agent-handoff.md](phase2-agent-handoff.md) for the owner-only GitHub Issue comment /agent prepare dev or /agent prepare main, the generated copy/paste Codex Cloud task, safeguards and precise acceptance criteria. This handoff does not call an AI model and requires a manual Cloud task start. It works with the existing ChatGPT subscription without an OpenAI API key, subject to the plan's available Cloud usage. A real bilresa-assistant GitHub App and automated issue-to-PR execution remain future steps that require explicit setup and cost approval.
 
 Desired experience, inspired by NSPanel-Easy's separate GitHub bot identity:
 
@@ -56,29 +56,11 @@ Desired experience, inspired by NSPanel-Easy's separate GitHub bot identity:
 - Both `main` and `agent/panel-0.6.1` exist, and `ci.yml` responds to pull requests without target-branch filtering.
 - Both branch rulesets are confirmed **active**: main #26934594 and development #26934615, with six required checks bound to GitHub Actions (integration ID 15368), strict freshness, required PR and resolved conversations, and no mandatory second-person approval. They have not yet been exercised on a new post-activation PR. Classic branch-protection details remain inaccessible to this integration.
 - Codespaces was actually opened on the Phase 1 PR branch by the maintainer and its local checks passed (Python 543/543, JavaScript 47/47, Ruff and mypy with `--no-site-packages`). The Codespace has since been stopped.
-- GitHub branch protection activation and Codespaces validation are complete. Phase 2A manual issue-to-Codex prompt handoff was merged in PR #69 on 2026-11-10; no GitHub App, unattended AI execution, paid API billing or hardware change is enabled.
-
-## Verified Phase 2A follow-up (2026-11-13)
-
-PR [#69](https://github.com/Vituhlos/ha-ikea-bilresa/pull/69) merged on
-2026-11-10 at 12:31:12 UTC, commit `b2118a32c12afad465d68f1fc699694c0e8f1dfd`.
-The owner-triggered [handoff run 42816664327](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42816664327)
-completed successfully on that revision and produced the
-[issue #67 prompt](https://github.com/Vituhlos/ha-ikea-bilresa/issues/67#issuecomment-6767416430).
-This verifies the manual handoff, not model execution, repeated-command
-idempotence on GitHub, full branch-rule enforcement, or hardware behavior.
-
-Česky: PR #69 je sloučený a ruční předání na #67 má úspěšný běh. Nejde o spuštění
-AI ani o fyzickou validaci. Opakované spuštění a úplné vynucení rulesetů tím
-nejsou nově doloženy.
+- GitHub branch protection activation and Codespaces validation are complete. Phase 2A manual issue-to-Codex prompt handoff is staged in a separate PR; no GitHub App, unattended AI execution, paid API billing or hardware change is enabled.
 
 ## Next owner-controlled actions
 
-1. Continue using the existing owner-only `/agent prepare` when a manually
-   curated Codex Cloud handoff is wanted; no automatic model start occurs.
-2. Review the separate [Stage I snapshot implementation](autonomous-ai-maintainer-runbook.md),
-   following [chapter 16 of the approved direction](autonomous-ai-maintainer.cs.md).
-   Publication requires explicit approval; subsequent stages remain disabled.
-3. Before a future Copilot backend, verify billing and credential isolation,
-   implement durable atomic budget admission and retain the approved 500 AIC
-   monthly limit. No App, credential or autonomous writer is authorized here.
+1. Review the Phase 2A handoff PR and its normal CI, including dedicated Node security tests.
+2. If accepted, merge it; issue_comment workflows are only activated from the default branch after merge. This Phase 2A PR itself provides the first live check of the protected main branch ruleset.
+3. As @Vituhlos, post `/agent prepare dev` on a suitable open issue and confirm the generated copyable prompt. Review and **curate** any contributor text before manually starting Codex Cloud; never paste an untrusted issue as executable instructions. No model runs automatically.
+4. Separately decide whether fully unattended GitHub issue → agent → draft PR execution is worth a paid Copilot plan or pay-as-you-go API. Only then design and register the own GitHub App identity bilresa-assistant.
