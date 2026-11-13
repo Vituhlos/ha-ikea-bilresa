@@ -1,0 +1,738 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stage I report",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "stage": {
+      "const": "I"
+    },
+    "repositoryId": {
+      "const": 1300699657
+    },
+    "item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "issue",
+            "pull_request"
+          ]
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 150,
+          "pattern": "^https://github.com/Vituhlos/ha-ikea-bilresa/(issues|pull)/[1-9][0-9]*$"
+        }
+      },
+      "required": [
+        "id",
+        "number",
+        "kind",
+        "state",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "collectedAt": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+        },
+        "toolRevision": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "runId": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^(local|[0-9]+)$"
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "toolDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "collectedAt",
+        "toolRevision",
+        "runId",
+        "runAttempt",
+        "toolDigest"
+      ],
+      "additionalProperties": false
+    },
+    "policyDigest": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "refs": {
+      "type": "object",
+      "properties": {
+        "stable": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_./-]+$"
+            },
+            "sha": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "required": [
+            "ref",
+            "sha"
+          ],
+          "additionalProperties": false
+        },
+        "main": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_./-]+$"
+            },
+            "sha": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "required": [
+            "ref",
+            "sha"
+          ],
+          "additionalProperties": false
+        },
+        "development": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_./-]+$"
+            },
+            "sha": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "required": [
+            "ref",
+            "sha"
+          ],
+          "additionalProperties": false
+        },
+        "prBase": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_./-]+$"
+            },
+            "sha": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "required": [
+            "ref",
+            "sha"
+          ],
+          "additionalProperties": false
+        },
+        "prHead": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_./-]+$"
+            },
+            "sha": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "required": [
+            "ref",
+            "sha"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "main",
+        "development"
+      ],
+      "additionalProperties": false
+    },
+    "analysisFingerprint": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidenceFingerprint": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "assessment": {
+      "const": "human-assessment-required"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "enum": [
+              "stable",
+              "main",
+              "development",
+              "prBase",
+              "prHead"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 240,
+            "pattern": "^[A-Za-z0-9_./-]+$"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "digest": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "endLine": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "digest": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "name",
+                "line",
+                "endLine",
+                "digest"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 10000
+          },
+          "observations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rule": {
+                  "enum": [
+                    "first_notch_zero",
+                    "later_batch_transition",
+                    "scroll_report_ignored",
+                    "zero_bound_or_fallback",
+                    "explicit_none_bound"
+                  ]
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "rule",
+                "line"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 10000
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^https://github.com/Vituhlos/ha-ikea-bilresa/blob/[a-f0-9]{40}/[A-Za-z0-9_./-]+$"
+          }
+        },
+        "required": [
+          "role",
+          "path",
+          "revision",
+          "digest",
+          "symbols",
+          "observations",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    },
+    "comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 240,
+            "pattern": "^[A-Za-z0-9_./-]+$"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 300,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "enum": [
+                    "stable",
+                    "main",
+                    "development",
+                    "prBase",
+                    "prHead"
+                  ]
+                },
+                "revision": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-f0-9]{40}$"
+                },
+                "digest": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "role",
+                "revision",
+                "digest",
+                "line"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "path",
+          "symbol",
+          "versions"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 10000
+    },
+    "related": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "merged": {
+            "type": "boolean"
+          },
+          "head": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "base": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 150,
+            "pattern": "^https://github.com/Vituhlos/ha-ikea-bilresa/pull/[1-9][0-9]*$"
+          },
+          "relationship": {
+            "const": "candidate-not-semantic-proof"
+          },
+          "selection": {
+            "enum": [
+              "explicit-reference",
+              "shared-title-terms",
+              "open-inventory"
+            ]
+          }
+        },
+        "required": [
+          "number",
+          "state",
+          "merged",
+          "head",
+          "base",
+          "url",
+          "relationship",
+          "selection"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 12
+    },
+    "ancestry": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "role": {
+            "enum": [
+              "stable",
+              "main",
+              "development",
+              "prBase",
+              "prHead"
+            ]
+          },
+          "commit": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "ancestor": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "number",
+          "role",
+          "commit",
+          "revision",
+          "ancestor"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 36
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 240,
+            "pattern": "^[A-Za-z0-9_./-]+$"
+          },
+          "previousPath": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240,
+                "pattern": "^[A-Za-z0-9_./-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "added",
+              "removed",
+              "modified",
+              "renamed",
+              "copied",
+              "changed",
+              "unchanged"
+            ]
+          },
+          "sha": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "additions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deletions": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "path",
+          "previousPath",
+          "status",
+          "sha",
+          "additions",
+          "deletions"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 3000
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "implementation": {
+          "const": "not-adjudicated"
+        },
+        "static": {
+          "const": "source-observations-only"
+        },
+        "unit": {
+          "const": "not-run"
+        },
+        "ci": {
+          "enum": [
+            "required-checks-pass-at-head",
+            "not-established"
+          ]
+        },
+        "hardware": {
+          "const": "not-established"
+        },
+        "released": {
+          "const": "not-adjudicated"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "appId": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "revision": {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "status": {
+                "enum": [
+                  "queued",
+                  "in_progress",
+                  "completed",
+                  "waiting",
+                  "requested",
+                  "pending"
+                ]
+              },
+              "conclusion": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "success",
+                      "failure",
+                      "neutral",
+                      "cancelled",
+                      "skipped",
+                      "timed_out",
+                      "action_required",
+                      "stale",
+                      "startup_failure"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "appId",
+              "revision",
+              "status",
+              "conclusion"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "implementation",
+        "static",
+        "unit",
+        "ci",
+        "hardware",
+        "released",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 400
+      },
+      "maxItems": 1000
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 250
+      },
+      "maxItems": 10
+    },
+    "nextAction": {
+      "const": "owner-review-evidence"
+    },
+    "ownerApprovalRequired": {
+      "const": true
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "const": "AIC"
+        },
+        "monthlyLimit": {
+          "const": 500
+        },
+        "spent": {
+          "const": 0
+        },
+        "reserved": {
+          "const": 0
+        },
+        "inferenceCalls": {
+          "const": 0
+        }
+      },
+      "required": [
+        "currency",
+        "monthlyLimit",
+        "spent",
+        "reserved",
+        "inferenceCalls"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "stage",
+    "repositoryId",
+    "item",
+    "provenance",
+    "policyDigest",
+    "refs",
+    "analysisFingerprint",
+    "evidenceFingerprint",
+    "complete",
+    "assessment",
+    "evidence",
+    "comparisons",
+    "related",
+    "ancestry",
+    "files",
+    "validation",
+    "missing",
+    "risks",
+    "nextAction",
+    "ownerApprovalRequired",
+    "budget"
+  ],
+  "additionalProperties": false
+}

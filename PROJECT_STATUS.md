@@ -1,10 +1,134 @@
 # Project status and agent handoff
 
-## GitHub development automation — Phase 2A proposed (2026-11-10)
+## Autonomous maintainer Stage I — publication approved, CI/review pending (2026-11-13)
+
+**Implemented + Static + local Node Unit/CLI verification. Not GitHub-CI-verified,
+publication authorized; not merged or activated. Hardware not applicable: integration runtime unchanged.**
+
+Prepared title: `chore(ai): add read-only contribution assessment snapshots`.
+Branch: `codex/ai-assessment-snapshots`, based on freshly fetched remote main
+`b2118a32c12afad465d68f1fc699694c0e8f1dfd`, in an isolated managed worktree.
+The original dirty main checkout and its owner files were preserved; the
+approved Czech architecture was copied here. The owner explicitly approved commit,
+push and a PR into main on 2026-11-13, including in-scope fixes from review.
+Merge, release, Settings changes, credentials and later-stage activation remain
+unauthorized. Pre-publication review corrected an API route-boundary check:
+normalized sibling repository names sharing the prefix are now rejected, with
+a regression case. The entire candidate diff and fixtures were inspected for
+unrelated files and obvious credentials before staging.
+
+### Remote audit and scope
+
+- Read branches, workflow inventory, both rulesets and #69 merge/run metadata
+  using read-only GitHub API calls; fetched origin main/development and tags.
+  Main remains `b2118a32`; development remains `28c1035f30411fc105575fdd64a9ede19c623c44`.
+  Stable v0.6.1 resolves to `514811a9b1cc1536591c513a1d1d4ef369cc951f`.
+- Both active rulesets (#26934594, #26934615) retain strict freshness, six
+  GitHub Actions App 15368 contexts, required PR/resolved conversations and no
+  bypass. No settings were changed. Main and development tooling were searched;
+  no existing Stage I collector/fingerprint/budget implementation was found.
+- Corrected stale Phase 2A documentation: #69 is merged, and observed owner
+  handoff run 42816664327 succeeded. The original `/agent prepare` workflow,
+  helper and tests are unchanged. Old pre-merge verification notes are history.
+- `.github/ai-maintainer/{branches,policy,report.schema,state.schema}.json`:
+  branch identity, disabled AI/public/coding flags, approved **500 AIC/month**,
+  future guardrail values, strict diagnostic/receipt contracts.
+- `tools/ai_maintainer/`: bounded GET-only collection; complete PR-file pagination;
+  stable/main/dev/PR-base/head evidence; related/open work and ancestry;
+  lexical source observations/symbol hashes; exact-head/App check observations;
+  separate analysis/evidence fingerprints; strict validation and immutable local
+  diagnostic receipts. No runtime code execution from assessed contributions.
+- `.github/workflows/ai-maintainer-snapshot.yml`: owner-only manual main dispatch,
+  read-only token, pinned actions, 14-day report and 90-day non-authoritative
+  receipt. No automatic analysis trigger or model call. Existing `ci.yml` adds
+  only the new Node test command inside the existing `Frontend checks` job;
+  required check names and triggers are unchanged. Local outputs are ignored.
+- `tests/ai_maintainer/`: 24 new tests, fixtures captured from real #70/#9/#71,
+  reviewed source excerpts with original line positions and full-source hashes.
+  API errors, page ceilings, truncation, symlinks, binary content, changing refs,
+  spoofed CI, bot activity, duplicate receipts and untrusted text are covered.
+- The approved proposal is retained in `docs/architecture/autonomous-ai-maintainer.cs.md`
+  with the owner's 500 AIC confirmation. The bilingual
+  `autonomous-ai-maintainer-runbook.md` documents operation, limits, persistent
+  state/accounting requirements and separate activation gates.
+
+### Exact verification commands and observed results
+
+- Baseline `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs tests/agent_handoff.test.mjs`:
+  **59 passed** before implementation.
+- `node --test tests/ai_maintainer/*.test.mjs`: **24 passed** on local Node 24.12.0.
+- With `NODE_USE_SYSTEM_CA=1`, `npx --yes --package=node@22 node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs tests/agent_handoff.test.mjs tests/ai_maintainer/*.test.mjs`:
+  **83 passed, 0 failed/skipped**, Node **22.23.5**. The first npm attempt without
+  the system trust store failed certificate verification; retry used trusted
+  system CAs, never disabled TLS verification. No package/dependency file changed.
+- `Get-ChildItem tools/ai_maintainer/*.mjs | ForEach-Object { node --check $_.FullName }`
+  and `node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`:
+  **PASS**.
+- `ruff format --check custom_components tests`: **61 files already formatted**.
+  `ruff check custom_components tests`: **PASS**.
+  `mypy custom_components/ikea_bilresa`: **PASS, 27 source files**.
+  `python -m compileall -q custom_components tests`: **PASS**.
+- `python -X utf8 -` validation scripts: all workflow YAML parsed, policy/map
+  and translation JSON parsed; Draft 2020-12 schemas checked with `jsonschema`;
+  actual CLI report and receipt independently validated against those schemas:
+  **PASS**. Report size 411,897 bytes; receipt 846 bytes.
+- Live read-only collection of **#70, #9 and #71** returned complete evidence at
+  the recorded revisions. After final tool changes, the actual CLI
+  `node --use-system-ca --use-env-proxy tools/ai_maintainer/snapshot.mjs`, with
+  `SNAPSHOT_ITEM=71`, `SNAPSHOT_TOOL_SHA=b2118a32c12afad465d68f1fc699694c0e8f1dfd`
+  and `SNAPSHOT_OUTPUT=snapshot-output/verified-71`, returned **exit 0**.
+  It used the existing local GitHub credential only for reads; process token
+  environment was removed afterward. Report records the exact uncommitted tool
+  content digest as well as its base commit. Six required #71 checks passed at
+  `f44ddfd229189667849c9583b99b4e639e63e40b`; hardware remains `not-established`.
+- `git diff --check`: **PASS**. Scope checks confirm no changes under
+  `custom_components/`, to existing runtime tests, handoff logic, stale or release
+  workflows. Fixture/tool scans found no obvious credential material or AI API
+  endpoint. This is a bounded scan, not a general proof of absence of secrets.
+
+### Not run, limitations and design refinements
+
+- At the pre-publication checkpoint, no GitHub Actions run of this new
+  workflow or PR CI had occurred. Local parsing/tests do not establish server-side workflow operation.
+  HACS/hassfest and CodeQL remain the normal subsequent GitHub gates.
+- Full Home Assistant pytest was not run: system Python 3.13 lacks Home Assistant,
+  and no integration behavior or Python test changed. No physical device or HA
+  access was performed; existing hardware checklists are unchanged.
+- No inference, AI/API credential setup, comments or paid execution occurred.
+  Stage I spend is **0 AIC**; future monthly budget remains **500 AIC**.
+- The report deliberately uses auditable lexical observations and human review,
+  not automatic semantic duplicate/implementation verdicts. Candidate/source
+  discovery is bounded; incomplete data fails closed. Fork content is data only.
+- Receipts are not authoritative monthly accounting: `monthlyBalance=null`,
+  spending/publication permissions false. Atomic durable reservations,
+  provider settlement and trusted provenance verification remain Stage II
+  activation gates. Actions cache/concurrency alone is insufficient. This is a
+  documented refinement of the persistence design, not activation of later stages.
+- Diagnostic artifact metadata/source links remain public. Full source/issue/
+  comment text is omitted. Bot review prose is omitted from analysis inputs and
+  requires manual review. Unrelated open-PR movement and check status update
+  evidence only; relevant human/ref/policy changes invalidate analysis.
+- `CHANGELOG.md` is unchanged because this changes maintainer tooling only, with
+  no integration/product behavior. No deviations expand chapter 16's scope.
+
+**Single best next action:** publish the approved branch/PR, inspect exact-head
+CI and available reviewer findings, and correct confirmed Stage I defects.
+Leave merge and all subsequent-stage activation to the owner.
+
+Česky: Etapa I je připravená lokálně, 83 Node testů prošlo včetně 24 nových;
+statické kontroly a živé čtení #70/#9/#71 jsou doložené. GitHub CI nové změny
+ani hardware nebyly spuštěny. Spotřeba je 0 AIC, měsíční limit 500 AIC.
+Správce nyní výslovně schválil commit, push a PR včetně oprav v rozsahu Etapy I.
+Následuje kontrola CI a review; merge nadále povolen není. Zdrojový kód integrace,
+rulesets a ruční předání zůstávají zachovány.
+
+---
+
+## GitHub development automation — Phase 2A (2026-11-10; status corrected 2026-11-13)
 
 **Phase 1: complete.** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) was merged into main. Maintainer created and stopped an interactive Codespace after **543 Python tests and 47 Node tests passed**; Ruff and mypy (existing no-site-packages baseline) were clean. Both GitHub branch rulesets are **active**: main #26934594 and agent/panel-0.6.1 #26934615, with six source-pinned CI checks, required PRs and resolved conversations. Actual enforcement on a new post-activation PR remains to be observed. Physical device validation is separate.
 
-**Phase 2A: proposed in [PR #69](https://github.com/Vituhlos/ha-ikea-bilresa/pull/69), branch chore/phase2a-agent-handoff-20261110; unmerged.** Owner-approved plan: docs/architecture/ai-development-automation.md. Detailed instructions and threat model: docs/architecture/phase2-agent-handoff.md.
+**Phase 2A: merged in [PR #69](https://github.com/Vituhlos/ha-ikea-bilresa/pull/69) on 2026-11-10 at 12:31:12 UTC, commit `b2118a32c12afad465d68f1fc699694c0e8f1dfd`. Manual handoff [run 42816664327](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/42816664327) succeeded on that commit and posted the issue #67 prompt. No AI model ran.** Owner-approved plan: docs/architecture/ai-development-automation.md. Detailed instructions and threat model: docs/architecture/phase2-agent-handoff.md.
 
 ### Changed files
 
@@ -24,7 +148,7 @@
 - /agent prepare prepares a **manual handoff only**: the owner must paste the prompt into Codex Cloud and initiate a new task. It does **not** start a model or create PRs.
 - A separate bilresa-assistant[bot] GitHub App identity and fully automatic issue→code→draft PR cannot be assumed free: openai/codex-action requires separately billed API credentials, and GitHub Copilot coding-agent access is separate from GitHub Pro. Explicit owner approval of any billing, GitHub App registration, secret storage and safe trigger design is required first.
 - Existing Phase 1 stricter full-environment mypy differences (39 typing errors across four files) remain outside this infrastructure-only change.
-- **Single best next action:** review Phase 2A [PR #69](https://github.com/Vituhlos/ha-ikea-bilresa/pull/69) and any outstanding AI review findings. The owner may then merge, test one /agent prepare dev comment on a suitable open issue, and manually hand the resulting prompt to Codex Cloud. Only after this path works should an autonomous backend and distinct bot identity be considered.
+- **Current next action:** review the separately authorized Stage I snapshot implementation. The earlier pre-merge verification notes above are historical; they do not mean #69 is still unmerged. The observed manual handoff does not prove AI execution or full ruleset enforcement.
 
 ---
 
