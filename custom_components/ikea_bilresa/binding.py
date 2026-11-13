@@ -513,6 +513,7 @@ class LightBinding:
             "acceleration": self._accelerator.percent,
             "min_units": self._min_units,
             "max_units": self._max_units,
+            "max_volume": self._max_volume * 100,
             "transition": self._transition,
         }
         if self._multi:
