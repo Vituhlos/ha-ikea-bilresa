@@ -269,6 +269,36 @@ candidate and must not be claimed as RC.5 hardware coverage.
 
 ## Recorded runs
 
+### 2026-11-13 — contributor reproduction of zero-bound regression (pre-fix)
+
+**Result: FAIL (pre-fix calculation).** The contributor operated a physical
+BILRESA scroll wheel on channel 3 and supplied a screenshot of the integration
+panel's Live test. A dedicated Home Assistant `input_number` helper named
+"BILRESA Grenzwerttest" was configured with min -10, max 0 and step 1;
+the initial value was -1. The BILRESA Value binding targeted that helper
+with 10% change per notch and 1 s smoothing; short, double, triple and hold
+actions were set to "No action".
+
+One deliberate upward detent was recognized in the panel as
+`Channel 3 · rotate up · 1 steps`. The action result read
+`Value -1 → 10` and `Home Assistant accepted the action`. **The calculated
+target +10 is outside the configured helper maximum 0**, independently
+confirming the zero-bound fallback bug in the installed pre-fix integration.
+"Accepted" means the service call was accepted by Home Assistant, **not**
+that the invalid numeric value was applied. A follow-up screenshot of the
+helper showed the current value was still -1, with no later recorded
+successful change after the 02:54:20 initialization. The helper thus
+did not apply +10; the exact Home Assistant validation/rejection layer
+was not established because lower-level service logs were not captured.
+
+**Version and verification limits:** Exact installed integration, Home
+Assistant Core and Matter Server versions were not present in the screenshot
+and remain to be collected. This is **only a pre-fix hardware reproduction**;
+the contributor fix branch `fix/zero-numeric-bounds` was **not deployed or
+validated on hardware**. Re-run this same setup on the patched code, confirm
+that the computed target is 0 and that the helper reaches 0 without errors.
+Do not check off section C until the fixed run has been observed.
+
 A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
 below. Unchecked items belong to the broader all-features matrix and are not
 claims made by B4.
