@@ -46,6 +46,7 @@ from custom_components.ikea_bilresa.const import (
     HOLD_RAMP,
     MODE_COLOR_TEMP,
     MODE_COVER,
+    MODE_NUMBER,
     MODE_VOLUME,
     RAMP_DIRECTION_DOWN,
     RAMP_DIRECTION_UP,
@@ -668,6 +669,31 @@ def test_bounded_rotation_does_not_repeat_service_at_limit(
     assert updates[-1]["dispatch_status"] == "completed"
     assert updates[-1]["reason"] == "target_unchanged"
     assert updates[-1]["result"]["before"] == updates[-1]["result"]["after"]
+
+
+def test_input_number_single_notch_matches_reported_hardware_bug(
+    monkeypatch,
+) -> None:
+    """The pre-fix live test sent -1 -> +10 instead of clamping at zero."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "input_number.zero_bound_test",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 10,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1",
+        attributes={"min": -10.0, "max": 0.0, "step": 1.0},
+    )
+
+    assert binding._rotate_number(1, True) is True
+
+    domain, service, payload = binding.hass.services.async_call.call_args.args
+    assert (domain, service) == ("input_number", "set_value")
+    assert payload["entity_id"] == "input_number.zero_bound_test"
+    assert payload["value"] == 0
 
 
 def test_color_rotation_still_wraps_instead_of_stopping_at_hue_boundary(
