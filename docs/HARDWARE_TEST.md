@@ -141,6 +141,20 @@ Repeat on all three channels:
 - [ ] Colour temperature clamps to the light's supported Kelvin range.
 - [ ] Hue wraps correctly and preserves saturation.
 - [ ] Media-player volume clamps to 0–100%.
+- [ ] **Configured maximum volume:** set a volume binding's maximum to 20%
+      and start below it. Slow and fast upward scrolling stop at 20%; further
+      upward scrolling sends no higher volume, and downward scrolling still
+      lowers it. Save/reopen the binding and restart Home Assistant to confirm
+      the ceiling persists. Status: pending.
+- [ ] **Default maximum volume:** an existing volume binding without
+      `max_volume`, and a new binding left at the 100% default, retain the
+      original 0–100% range. Verify commanded values with a muted player.
+      Status: pending.
+- [ ] **Other volume controls:** with the wheel binding capped at 20%, Home
+      Assistant's volume slider and the player's own controls can still exceed
+      20%. Configured volume-up/down button actions also retain their normal
+      behavior above the wheel ceiling. Restore the original volume and binding
+      settings after testing. Status: pending.
 - [ ] Cover position clamps to 0–100%.
 - [ ] Climate target respects min/max and target step.
 - [ ] Fan percentage clamps to 0–100%.

@@ -5,6 +5,57 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 (PR #16, Issue #9 / PRs #14 and #15, PR #13, the 0.6.1 language release), are in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
 
+## Maximum volume for wheel bindings — 2026-11-13
+
+Local feature branch `feat/maximum-volume`, based on `origin/agent/panel-0.6.1`.
+Adds `max_volume` (0–100%, default 100%) to the shared binding schema, native
+create/reconfigure form and panel's More rotation settings in volume mode.
+Wheel volume commands clamp to this ceiling; existing bindings retain 100%.
+Other controls and button actions are not capped. No migration or Matter
+protocol changes.
+
+Files: `binding.py`, `binding_config.py`, `config_flow.py`, `const.py`,
+`panel_schema.py`, `panel_strings.py`, panel JavaScript, EN/CS JSON strings,
+`tests/test_binding.py`, `tests/test_config_flow.py`, `tests/test_panel_schema.py`,
+`tests/panel_frontend.test.mjs`, EN/CS binding guides and `CHANGELOG.md`.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` passed:
+1,073 Python tests, 103 Node tests, JSON, compile, JavaScript syntax, diff,
+Ruff formatting/lint. Mypy reports only the two known baseline errors, no new
+errors. Dependencies installed from `requirements-test.txt` in ignored `.venv`
+with Python 3.14.8 / Home Assistant 2026.9.4. No CI run, live Home Assistant,
+browser or physical BILRESA validation was performed; these need an external
+instance or PR. Hardware status: unverified.
+
+Review follow-up: `docs/HARDWARE_TEST.md` section C now has pending checks
+for a configured ceiling (slow/fast scrolling, downward control and persistence),
+the 100% default on existing/new bindings, and unaffected external volume
+controls and volume-up/down button actions. Documentation-only change;
+`git diff --check` passed. Runtime tests were not rerun because no code changed.
+Physical checks remain unperformed; this prescribes validation, not a hardware
+pass. No new runtime risks or assumptions.
+
+Trace/replay review follow-up: verified that `binding.py`'s `trace_config()`
+omitted the ceiling and `tests/replay.py` restored the default. The trace now
+captures `max_volume` as a percentage and replay restores it, defaulting to 100%
+for older captures. `tests/test_replay.py` records and replays a 40% ceiling and
+asserts that the volume command remains 0.4.
+
+Validation: `.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_replay.py
+ tests/test_trace.py` passed (23 tests). Full
+`PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` passed: 1,074 Python
+and 103 Node tests, formatting, lint, JSON, compilation, syntax and diff checks;
+mypy only the two known baseline errors. CodeRabbit CLI was not run because
+`command -v coderabbit` found no installed executable. No live Home Assistant
+or hardware validation was performed (no instance available); hardware remains
+pending. Older captures retain the default because they contain no ceiling.
+Next action for this follow-up: commit and push the review fixes to the existing
+fork PR, then perform the pending maximum-volume hardware checklist.
+
+Assumption: this is a per-binding wheel limit, not a player-wide volume limit.
+Next action: submit a fork PR against `agent/panel-0.6.1`, then verify a configured
+cap and the unchanged default with a physical wheel and media-player target.
+
 ## Goal
 
 - **Stable line:** `v0.6.1` is the latest stable release on `main`. Stable releases stay deferred until the hardware checks pass (`AGENTS.md`).

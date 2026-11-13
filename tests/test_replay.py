@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from custom_components.ikea_bilresa.const import CONF_MAX_VOLUME, CONF_MODE, CONF_TARGET
 from custom_components.ikea_bilresa.trace import CAPTURE_VERSION
 
 from .replay import ReplayResult, perceptual, replay, simulate_target
@@ -473,3 +474,26 @@ def test_a_capture_with_member_rows_but_no_targets_is_refused(monkeypatch) -> No
 
     with pytest.raises(NotImplementedError, match="multi-light"):
         replay(capture, monkeypatch, initial_value=255)
+
+
+def test_replay_restores_captured_maximum_volume(monkeypatch) -> None:
+    """A replay must use the recorded ceiling rather than the 100% default."""
+    from .test_trace import _traced
+
+    binding, trace = _traced(
+        monkeypatch,
+        **{
+            CONF_MODE: "volume",
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+        },
+    )
+    binding._rotate_by(25, True)
+    capture = trace.capture()
+
+    assert capture["bindings"][binding.trace_key]["max_volume"] == 40
+
+    result = replay(capture, monkeypatch, initial_value=0.5)
+
+    assert result.sent == [0.4]
+    assert result.final_value == 0.4

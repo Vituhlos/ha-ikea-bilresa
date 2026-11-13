@@ -29,6 +29,7 @@ from custom_components.ikea_bilresa.binding import LightBinding
 from custom_components.ikea_bilresa.const import (
     CONF_ACCELERATION,
     CONF_CHANNEL,
+    CONF_MAX_VOLUME,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_STEP,
@@ -169,6 +170,7 @@ def _binding_data(
         CONF_CHANNEL: channel,
         CONF_TARGET: config.get("target") or "light.replay",
         CONF_MODE: config.get("mode", "brightness"),
+        CONF_MAX_VOLUME: config.get("max_volume", 100),
         CONF_STEP: config.get("step", 3),
         CONF_ACCELERATION: config.get("acceleration", 0),
         CONF_TRANSITION: config.get("transition", 0.0),

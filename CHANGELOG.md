@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- Configurable maximum volume (0–100%, default 100%) for wheel volume bindings,
+  available in the panel and native binding form. Other volume controls and
+  button actions are unaffected.
+
 ## [0.7.0-rc.7] - 2026-11-09
 
 Pre-release candidate for testing, not a stable release. It fixes two cases in
