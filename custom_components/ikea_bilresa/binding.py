@@ -665,9 +665,12 @@ class LightBinding:
         return _as_float(attributes.get(ATTR_BRIGHTNESS))
 
     @callback
-    def _set_target(self, value: float, span: float) -> None:
-        """Record the newest calculated target and the range it came from."""
-        self._tracked = value
+    def _set_target(
+        self, value: float, span: float, *, tracked: float | None = None
+    ) -> None:
+        """Record the quantized service target, retaining sub-step progress."""
+        # Compare state echoes against sent values, not fractional progress.
+        self._tracked = value if tracked is None else tracked
         self._commanded.append((value, max(span, 1e-9)))
 
     @callback
@@ -1343,12 +1346,17 @@ class LightBinding:
         tracked = self._resync(
             _as_float(state.attributes.get("temperature")), (min_t + max_t) / 2
         )
-        target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
-        target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
-        self._set_target(target, max(max_t - min_t, 1))
+        span = max(max_t - min_t, 1)
+        continuous_target = tracked + self._delta(self._step, span, notches, up)
+        continuous_target = min(max_t, max(min_t, continuous_target))
+        target = min(
+            max_t, max(min_t, round(continuous_target / temp_step) * temp_step)
+        )
+        previous = min(max_t, max(min_t, round(tracked / temp_step) * temp_step))
+        self._set_target(target, span, tracked=continuous_target)
         result = self._value_result(
             "temperature",
-            round(tracked, 2),
+            round(previous, 2),
             round(target, 2),
             str(state.attributes.get("unit_of_measurement") or "°"),
         )
@@ -1356,7 +1364,7 @@ class LightBinding:
             "climate",
             "set_temperature",
             {"temperature": round(target, 2)},
-            before=round(tracked, 2),
+            before=round(previous, 2),
             after=round(target, 2),
             result=result,
         )
@@ -1396,15 +1404,16 @@ class LightBinding:
         num_step = _as_float(state.attributes.get("step")) or 1.0
         current = _as_float(state.state)
         tracked = self._resync(current, (min_n + max_n) / 2)
-        target = tracked + self._delta(
-            self._step, max(max_n - min_n, num_step), notches, up
-        )
-        target = min(max_n, max(min_n, round(target / num_step) * num_step))
-        self._set_target(target, max(max_n - min_n, num_step))
+        span = max(max_n - min_n, num_step)
+        continuous_target = tracked + self._delta(self._step, span, notches, up)
+        continuous_target = min(max_n, max(min_n, continuous_target))
+        target = min(max_n, max(min_n, round(continuous_target / num_step) * num_step))
+        previous = min(max_n, max(min_n, round(tracked / num_step) * num_step))
+        self._set_target(target, span, tracked=continuous_target)
         domain = self._target.split(".", 1)[0]
         result = self._value_result(
             "number",
-            round(tracked, 4),
+            round(previous, 4),
             round(target, 4),
             str(state.attributes.get("unit_of_measurement") or ""),
         )
@@ -1412,7 +1421,7 @@ class LightBinding:
             domain,
             "set_value",
             {"value": round(target, 4)},
-            before=round(tracked, 4),
+            before=round(previous, 4),
             after=round(target, 4),
             result=result,
         )
