@@ -722,6 +722,110 @@ def test_input_number_single_notch_matches_reported_hardware_bug(
     assert payload["value"] == 0
 
 
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+def test_numeric_small_notches_accumulate_without_redundant_commands(
+    monkeypatch, target_domain: str
+) -> None:
+    """Repeated sub-step notches advance and survive quantized state echoes."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.small_range",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 3,
+        },
+    )
+    binding._min_command_interval = 0.0
+    attributes = {"min": -10.0, "max": 0.0, "step": 1.0}
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes=attributes
+    )
+    assert binding._rotate_number(1, True) is False
+    assert binding._tracked == pytest.approx(-0.7)
+    binding.hass.services.async_call.assert_not_called()
+    assert binding._rotate_number(1, True) is True
+    assert binding.hass.services.async_call.call_count == 1
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == 0
+    assert binding._tracked == pytest.approx(-0.4)
+
+    # A valid HA echo must not erase the remaining fractional progress.
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={"new_state": SimpleNamespace(state="0", attributes=attributes)}
+        )
+    )
+    assert binding._tracked == pytest.approx(-0.4)
+    assert binding._rotate_number(1, False) is True
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == -1
+
+
+def test_numeric_external_report_rebases_fractional_progress(monkeypatch) -> None:
+    """An off-path update still replaces the internal numeric target."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "number.small_range",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 3,
+        },
+    )
+    attributes = {"min": -10.0, "max": 0.0, "step": 1.0}
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes=attributes
+    )
+    assert binding._rotate_number(1, True) is False
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={"new_state": SimpleNamespace(state="-5", attributes=attributes)}
+        )
+    )
+    assert binding._tracked is None
+
+
+def test_climate_small_notches_accumulate_without_redundant_commands(
+    monkeypatch,
+) -> None:
+    """Small climate ranges retain notches below the half-degree step."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "climate.small_range",
+            CONF_MODE: MODE_TEMPERATURE,
+            CONF_STEP: 3,
+        },
+    )
+    attributes = {
+        "temperature": 1.0,
+        "min_temp": 0.0,
+        "max_temp": 4.0,
+        "target_temp_step": 0.5,
+    }
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat", attributes=attributes
+    )
+    assert binding._rotate_temperature(1, True) is False
+    assert binding._rotate_temperature(1, True) is False
+    binding.hass.services.async_call.assert_not_called()
+    assert binding._rotate_temperature(1, True) is True
+    assert binding.hass.services.async_call.call_count == 1
+    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == 1.5
+    assert binding._tracked == pytest.approx(1.36)
+
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={
+                "new_state": SimpleNamespace(
+                    state="heat", attributes={**attributes, "temperature": 1.5}
+                )
+            }
+        )
+    )
+    assert binding._tracked == pytest.approx(1.36)
+
+
 def test_number_rotation_does_not_dispatch_past_zero_maximum(monkeypatch) -> None:
     """At an explicit zero limit, rotating up must not send a higher value."""
     binding, _interval_unsub, _watchdog_unsub = _binding(
