@@ -151,6 +151,7 @@ SUBENTRY_BINDING = "binding"
 SUBENTRY_WHEEL = "wheel_settings"
 
 CONF_CHANNEL_ENABLED = "channel_enabled"
+CONF_CHANNEL_EXTERNAL = "channel_external"
 
 # Per-channel 1-100 dials moved by scrolling. `CONF_STEP` and
 # `CONF_ACCELERATION` are reused, so a dial reads the same as a binding.

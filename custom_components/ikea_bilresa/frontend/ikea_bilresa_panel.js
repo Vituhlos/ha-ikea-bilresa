@@ -2096,6 +2096,8 @@ class IkeaBilresaPanel extends HTMLElement {
 
   _overviewControl(device, control) {
     const configured = this._isConfigured(control);
+    const external = !configured && device.variant !== "dual_button" &&
+      device.settings?.channel_external?.[String(control.channel)] === true;
     const number = this._controlNumber(device, control);
     const row = el("span", "channel");
     row.dataset.state = configured ? "ok" : "empty";
@@ -2107,14 +2109,14 @@ class IkeaBilresaPanel extends HTMLElement {
         "span",
         "channel-behaviour",
         control.behaviour ||
-          (configured ? control.profile : this._t("not_configured")),
+          (configured ? control.profile : this._t(external ? "channel_external" : "not_configured")),
       ),
     );
     text.appendChild(
       el(
         "span",
         "channel-target",
-        this._controlTargetText(control) || this._t("add_binding"),
+        this._controlTargetText(control) || (external ? "" : this._t("add_binding")),
       ),
     );
     row.appendChild(text);
@@ -3157,6 +3159,8 @@ class IkeaBilresaPanel extends HTMLElement {
     const isButton = wheel.variant === "dual_button";
     const number = this._controlNumber(wheel, channel);
     const configured = this._isConfigured(channel);
+    const external = !isButton &&
+      wheel.settings?.channel_external?.[String(number)] === true;
     const missingTarget =
       targetState(channel) === "missing" ||
       (channel.actions || []).some(
@@ -3172,7 +3176,7 @@ class IkeaBilresaPanel extends HTMLElement {
           "div",
           "channel-empty-title",
           this._t(
-            isButton ? "button_empty_title" : "channel_empty_title",
+            isButton ? "button_empty_title" : external ? "channel_external" : "channel_empty_title",
             isButton ? { button: number } : { channel: number },
           ),
         ),
@@ -3181,14 +3185,37 @@ class IkeaBilresaPanel extends HTMLElement {
         el(
           "div",
           "channel-empty-body",
-          this._t(isButton ? "button_empty_body" : "channel_empty_body"),
+          this._t(isButton ? "button_empty_body" : external ? "channel_external_body" : "channel_empty_body"),
         ),
       );
-      const add = el("button", "action-button", this._t("add_binding"));
-      add.type = "button";
-      add.dataset.primary = "true";
-      add.addEventListener("click", () => this._startEditor(wheel, channel));
-      empty.appendChild(add);
+      if (!external) {
+        const add = el("button", "action-button", this._t("add_binding"));
+        add.type = "button";
+        add.dataset.primary = "true";
+        add.addEventListener("click", () => this._startEditor(wheel, channel));
+        empty.appendChild(add);
+      }
+      if (!isButton) {
+        const row = el("label", "settings-toggle");
+        const box = el("input");
+        box.type = "checkbox";
+        box.checked = external;
+        box.disabled = this._settingsBusy;
+        box.addEventListener("change", () => {
+          this._updateSettingsDraft(wheel, {
+            channel_external: {
+              ...this._storedSettings(wheel).channel_external,
+              [String(number)]: box.checked,
+            },
+          });
+          this._saveSettings(wheel, "external");
+        });
+        row.appendChild(box);
+        row.appendChild(el("span", null, this._t("channel_external_switch")));
+        empty.appendChild(row);
+        const status = this._settingsStatus("external");
+        if (status) empty.appendChild(status);
+      }
       card.appendChild(empty);
       return card;
     }
@@ -3339,6 +3366,7 @@ class IkeaBilresaPanel extends HTMLElement {
     });
     return {
       channel_enabled: enabled,
+      channel_external: { ...(stored.channel_external || {}) },
       step: stored.step ?? 2,
       acceleration: stored.acceleration ?? 0,
     };
@@ -3364,12 +3392,14 @@ class IkeaBilresaPanel extends HTMLElement {
     try {
       const draft = this._settingsStateFor(wheel);
       const stored = this._storedSettings(wheel);
-      const channels = scope === "dial" ? stored : draft;
-      const dial = scope === "channels" ? stored : draft;
+      const channels = scope === "dial" || scope === "external" ? stored : draft;
+      const dial = scope === "channels" || scope === "external" ? stored : draft;
+      const external = scope && scope !== "external" ? stored : draft;
       const payload = {
         type: SETTINGS_SAVE,
         wheel: wheel.key,
         channel_enabled: channels.channel_enabled,
+        channel_external: external.channel_external,
         step: Number(dial.step),
         acceleration: Number(dial.acceleration),
       };
@@ -3398,10 +3428,12 @@ class IkeaBilresaPanel extends HTMLElement {
       // The part that was not saved stays a draft.
       const kept =
         scope === "channels"
-          ? { step: draft.step, acceleration: draft.acceleration }
+          ? { step: draft.step, acceleration: draft.acceleration, channel_external: draft.channel_external }
           : scope === "dial"
-            ? { channel_enabled: draft.channel_enabled }
-            : null;
+            ? { channel_enabled: draft.channel_enabled, channel_external: draft.channel_external }
+            : scope === "external"
+              ? { channel_enabled: draft.channel_enabled, step: draft.step, acceleration: draft.acceleration }
+              : null;
       this._settingsDraft = null;
       this._settingsDraftKey = null;
       await this._refreshSnapshot();
@@ -3413,7 +3445,7 @@ class IkeaBilresaPanel extends HTMLElement {
         this._settingsDraftKey = refreshed.key;
       }
       this._settingsMessage = this._t(
-        scope === "channels" ? "settings_channels_saved" : "settings_saved",
+        scope === "dial" ? "settings_saved" : "settings_channels_saved",
       );
     } catch (err) {
       this._settingsMessage = this._t("settings_error_generic");
@@ -3576,7 +3608,11 @@ class IkeaBilresaPanel extends HTMLElement {
             ? this._t("settings_disabled_badge")
             : configured
               ? channel.behaviour || channel.profile
-              : this._t("not_configured")
+              : this._t(
+                  wheel.settings?.channel_external?.[String(channel.channel)] === true
+                    ? "channel_external"
+                    : "not_configured",
+                )
         }`,
       );
       dot.addEventListener("click", () => this._openChannelAt(channel.channel));
@@ -4016,7 +4052,11 @@ class IkeaBilresaPanel extends HTMLElement {
             ? [control.behaviour || control.profile, target]
                 .filter(Boolean)
                 .join(" · ")
-            : this._t("not_configured"),
+            : this._t(
+                !isButton && wheel.settings?.channel_external?.[String(number)] === true
+                  ? "channel_external"
+                  : "not_configured",
+              ),
         ),
       );
       row.appendChild(copy);
@@ -4107,12 +4147,16 @@ class IkeaBilresaPanel extends HTMLElement {
           el("div", "live-explanation", explanation),
         );
       }
-      const [dispatchState, dispatchKey] = this._dispatchLabel(latest);
+      const external = !isButton && latest.dispatch_status === "not_configured" &&
+        wheel.settings?.channel_external?.[String(latest.channel)] === true;
+      const [dispatchState, dispatchKey] = external
+        ? ["unknown", "channel_external"]
+        : this._dispatchLabel(latest);
       const dispatch = el("div", "dispatch");
       dispatch.appendChild(this._statusDot(dispatchState));
       dispatch.appendChild(el("span", null, this._t(dispatchKey)));
       body.appendChild(dispatch);
-      if (latest.dispatch_status === "not_configured") {
+      if (latest.dispatch_status === "not_configured" && !external) {
         const number = isButton ? latest.button : latest.channel;
         const control = this._controlsFor(wheel).find(
           (item) => this._controlNumber(wheel, item) === number,

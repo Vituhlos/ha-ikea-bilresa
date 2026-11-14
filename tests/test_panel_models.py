@@ -12,6 +12,7 @@ from custom_components.ikea_bilresa.channel_controls import (
 )
 from custom_components.ikea_bilresa.const import (
     CONF_CHANNEL,
+    CONF_CHANNEL_EXTERNAL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
@@ -28,6 +29,7 @@ from custom_components.ikea_bilresa.const import (
     MODE_BRIGHTNESS,
     MODE_VOLUME,
     SUBENTRY_BINDING,
+    SUBENTRY_WHEEL,
 )
 from custom_components.ikea_bilresa.device_link import MatterDeviceLink
 from custom_components.ikea_bilresa.model import (
@@ -225,6 +227,25 @@ def test_snapshot_includes_dual_button_as_two_buttons(monkeypatch) -> None:
     assert button["channels"] == []
     assert [item["button"] for item in button["buttons"]] == [1, 2]
     assert all(item["binding"] is None for item in button["buttons"])
+
+
+def test_snapshot_exposes_only_known_external_channel_flags(monkeypatch) -> None:
+    _patch(monkeypatch)
+    settings = SimpleNamespace(
+        subentry_id="settings-1",
+        subentry_type=SUBENTRY_WHEEL,
+        title="Wheel settings",
+        data={
+            CONF_NODE_ID: str(NODE_A),
+            CONF_CHANNEL_EXTERNAL: {"1": True, "2": False, "private": True},
+        },
+    )
+    snapshot = async_overview_snapshot(_hass(), _entry([_wheel(NODE_A)], [settings]))
+    assert snapshot["wheels"][0]["settings"]["channel_external"] == {
+        "1": True,
+        "2": False,
+        "3": False,
+    }
 
 
 def test_live_e2489_shape_reaches_panel_as_two_buttons(monkeypatch) -> None:

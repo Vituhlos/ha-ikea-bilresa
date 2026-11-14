@@ -864,6 +864,105 @@ test("saving the dial does not carry an unsaved channel switch", async () => {
   assert.equal(calls[0].expected_revision, "r1");
 });
 
+test("external handling saves independently of unsaved channel and dial settings", async () => {
+  const panel = newPanel();
+  const wheel = settingsWheel();
+  const calls = [];
+  panel._snapshot = { wheels: [wheel] };
+  panel._hass = {
+    callWS: async (message) => {
+      calls.push(message);
+      return message.type.endsWith("overview") ? panel._snapshot : { ok: true };
+    },
+  };
+  panel._updateSettingsDraft(wheel, {
+    step: 9,
+    channel_enabled: { 1: false, 2: true },
+    channel_external: { 1: true },
+  });
+
+  await panel._saveSettings(wheel, "external");
+
+  assert.deepEqual(calls[0].channel_external, { 1: true });
+  assert.deepEqual(calls[0].channel_enabled, { 1: true, 2: true });
+  assert.equal(calls[0].step, 2);
+  assert.equal(panel._settingsStateFor(wheel).step, 9);
+  assert.deepEqual(panel._settingsStateFor(wheel).channel_enabled, { 1: false, 2: true });
+});
+
+test("an unbound channel can toggle its external note without offering a binding", () => {
+  const previous = globalThis.document;
+  class Node {
+    constructor(tag) {
+      this.tag = tag;
+      this.children = [];
+      this.dataset = {};
+      this.listeners = {};
+    }
+    appendChild(child) { this.children.push(child); }
+    addEventListener(name, handler) { this.listeners[name] = handler; }
+    setAttribute() {}
+  }
+  globalThis.document = { createElement: (tag) => new Node(tag) };
+  try {
+    const panel = newPanel();
+    panel._t = (key) => key;
+    const wheel = settingsWheel();
+    const channel = { channel: 1, configured: false };
+    let scope;
+    panel._saveSettings = (_wheel, value) => { scope = value; };
+    const empty = panel._channelDetail(wheel, channel).children[0];
+    assert.equal(empty.children[0].textContent, "channel_empty_title");
+    const box = empty.children.find((child) => child.tag === "label").children[0];
+    box.checked = true;
+    box.listeners.change();
+    assert.equal(scope, "external");
+    assert.deepEqual(panel._settingsDraft.channel_external, { 1: true });
+
+    wheel.settings.channel_external = { 1: true };
+    const handled = panel._channelDetail(wheel, channel).children[0];
+    assert.equal(handled.children[0].textContent, "channel_external");
+    assert.equal(handled.children[1].textContent, "channel_external_body");
+    assert.equal(handled.children.some((child) => child.tag === "button"), false);
+    const checked = handled.children.find((child) => child.tag === "label").children[0];
+    assert.equal(checked.checked, true);
+    checked.checked = false;
+    checked.listeners.change();
+    assert.deepEqual(panel._settingsDraft.channel_external, { 1: false });
+
+    const overview = panel._overviewControl(wheel, channel);
+    assert.equal(overview.children[1].children[0].textContent, "channel_external");
+    assert.equal(overview.children[1].children[1].textContent, "");
+
+    wheel.settings.channel_external = {};
+    const other = panel._channelDetail(wheel, { channel: 2, configured: false })
+      .children[0].children.find((child) => child.tag === "label").children[0];
+    panel._updateSettingsDraft(wheel, { channel_external: { 1: true } });
+    other.checked = true;
+    other.listeners.change();
+    assert.deepEqual(panel._settingsDraft.channel_external, { 2: true });
+
+    panel._sectionHead = () => new Node("header");
+    panel._statusDot = () => new Node("dot");
+    panel._liveControls = () => new Node("section");
+    panel._testPanel = () => new Node("section");
+    panel._gestureLabel = () => "gesture";
+    panel._formatTime = () => "";
+    panel._activities = [{ channel: 2, gesture: "press", dispatch_status: "not_configured" }];
+    wheel.settings.channel_external = { 2: true };
+    const body = panel._liveView(wheel).children[1].children[0].children[1];
+    assert.equal(body.children[3].children[1].textContent, "channel_external");
+    assert.equal(body.children.some((child) => child.tag === "button"), false);
+    wheel.settings.channel_external = {};
+    const normalBody = panel._liveView(wheel).children[1].children[0].children[1];
+    assert.equal(normalBody.children[3].children[1].textContent, "dispatch_not_configured");
+    assert.equal(normalBody.children.some((child) => child.tag === "button"), true);
+
+  } finally {
+    globalThis.document = previous;
+  }
+});
+
 test("the editor replaces the ledger instead of sitting under it", async () => {
   const { readFileSync } = await import("node:fs");
   const source = readFileSync(

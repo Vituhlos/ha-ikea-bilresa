@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+- Unbound wheel channels can be marked as handled outside the panel, replacing
+  the waiting-for-binding prompt with a neutral note. This does not detect or
+  change automations, events, or bindings.
+
 ### Changed
 - **Compatibility watch and test setup (repository tooling, no change to the
   integration).** A weekly compatibility watch (`tools/compat_watch.py`) keeps one issue open while Home Assistant Core,

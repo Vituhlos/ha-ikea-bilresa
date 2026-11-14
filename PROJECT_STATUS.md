@@ -1,5 +1,47 @@
 # Project status and agent handoff
 
+## Panel external channel note — issue #67 (2026-11-14)
+
+- **Implemented, locally verified; CI and hardware not verified for this change.**
+  Unbound wheel channels can be marked **Handled outside this panel**. The
+  setting is a note, not automation detection: it neither disables events nor
+  changes bindings. Existing bindings take precedence over the note.
+- `const.py`, `panel_api.py`, and `panel_models.py` persist and expose the
+  per-channel flag in wheel settings, validate channel addresses, preserve it
+  for older settings clients, and use the existing revision conflict check.
+  `frontend/ikea_bilresa_panel.js` and `panel_strings.py` provide the switch,
+  overview and live-test messages in English and Czech. `README.md`,
+  `README.cs.md`, and `CHANGELOG.md` document the feature; `tests/test_panel_api.py`,
+  `tests/test_panel_models.py`, and `tests/panel_frontend.test.mjs` cover it.
+- Validation in a temporary Python 3.14 environment installed with
+  `/opt/hostedtoolcache/Python/3.14.10/x64/bin/python3 -m venv /tmp/bilresa-issue67-venv`
+  and `/tmp/bilresa-issue67-venv/bin/python -m pip install -r requirements-test.txt ruff mypy`:
+  - `/tmp/bilresa-issue67-venv/bin/python -m pytest -q tests/test_panel_api.py tests/test_panel_models.py tests/test_panel_strings.py` — 81 passed.
+  - `/tmp/bilresa-issue67-venv/bin/python -m pytest -q` — 547 passed.
+  - `node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`
+    and `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`
+    — syntax passed, 49 tests passed.
+  - `/tmp/bilresa-issue67-venv/bin/ruff format --check custom_components tests`,
+    `/tmp/bilresa-issue67-venv/bin/ruff check custom_components tests`, and
+    `/tmp/bilresa-issue67-venv/bin/mypy --no-site-packages custom_components/ikea_bilresa`
+    — passed. Full-environment mypy reports existing Home Assistant dependency
+    type incompatibilities, including the existing voluptuous schemas.
+  - `python -m compileall -q custom_components tests`, `python -m json.tool`
+    on `strings.json` and both translation JSON files, and `git diff --check`
+    — passed.
+  - CodeQL review — no Python or JavaScript alerts; changed files passed secret
+    scanning.
+  - `/tmp/bilresa-issue67-venv/bin/python tools/panel_preview/build.py` and
+    `python -m http.server 8765 --bind 0.0.0.0 --directory tools/panel_preview/out`
+    — browser preview confirmed both empty and externally handled channel
+    states and the live view using synthetic state. The preview does not persist
+    settings; this is not a real Home Assistant or hardware test.
+- Not run: Home Assistant UI, GitHub CI/hassfest/HACS, or physical BILRESA tests.
+  The flag is user-declared and cannot establish whether an automation exists;
+  a separately created binding can still act alongside external automation.
+  **Next action:** verify the switch and persistence in Home Assistant, then
+  review CI results; do not claim hardware validation without recorded evidence.
+
 ## GitHub development automation — Phase 2A proposed (2026-11-10)
 
 **Phase 1: complete.** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) was merged into main. Maintainer created and stopped an interactive Codespace after **543 Python tests and 47 Node tests passed**; Ruff and mypy (existing no-site-packages baseline) were clean. Both GitHub branch rulesets are **active**: main #26934594 and agent/panel-0.6.1 #26934615, with six source-pinned CI checks, required PRs and resolved conversations. Actual enforcement on a new post-activation PR remains to be observed. Physical device validation is separate.

@@ -5,11 +5,13 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from custom_components.ikea_bilresa.binding_config import binding_revision
 from custom_components.ikea_bilresa.channel_controls import DEFAULT_SETTINGS
 from custom_components.ikea_bilresa.const import (
     CONF_ACCELERATION,
     CONF_CHANNEL,
     CONF_CHANNEL_ENABLED,
+    CONF_CHANNEL_EXTERNAL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_ENDPOINT,
@@ -716,6 +718,41 @@ def test_first_save_creates_the_settings_subentry(monkeypatch) -> None:
     assert created.data[CONF_NODE_ID] == NODE_A
     # Applied in place, so disabling a channel needs no reload.
     entry.runtime_data.async_setup_settings.assert_called_once_with(entry)
+
+
+def test_external_handling_is_persisted_without_disabling_channel(monkeypatch) -> None:
+    hass, _entry = _mutation_hass()
+    result = _save_settings(
+        hass,
+        _connection(),
+        monkeypatch,
+        channel_enabled={"1": True},
+        channel_external={"1": True},
+    )
+    assert result["ok"] is True
+    data = hass.config_entries.async_add_subentry.call_args.args[1].data
+    assert data[CONF_CHANNEL_ENABLED] == {"1": True}
+    assert data[CONF_CHANNEL_EXTERNAL] == {"1": True}
+
+
+def test_older_panel_save_preserves_external_handling(monkeypatch) -> None:
+    subentry = _stored_settings(channel_external={"1": True})
+    hass, _entry = _mutation_hass({subentry.subentry_id: subentry})
+    result = _save_settings(
+        hass, _connection(), monkeypatch, expected_revision=binding_revision(subentry)
+    )
+    assert result["ok"] is True
+    data = hass.config_entries.async_update_subentry.call_args.kwargs["data"]
+    assert data[CONF_CHANNEL_EXTERNAL] == {"1": True}
+
+
+def test_unknown_external_channel_is_rejected(monkeypatch) -> None:
+    hass, _entry = _mutation_hass()
+    result = _save_settings(
+        hass, _connection(), monkeypatch, channel_external={"7": True}
+    )
+    assert result == {"ok": False, "error": "control_missing"}
+    hass.config_entries.async_add_subentry.assert_not_called()
 
 
 def test_saving_settings_never_creates_a_binding(monkeypatch) -> None:
