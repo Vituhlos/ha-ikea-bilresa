@@ -29,6 +29,8 @@
   - `python -m compileall -q custom_components tests`, `python -m json.tool`
     on `strings.json` and both translation JSON files, and `git diff --check`
     — passed.
+  - CodeQL review — no Python or JavaScript alerts; changed files passed secret
+    scanning.
   - `/tmp/bilresa-issue67-venv/bin/python tools/panel_preview/build.py` and
     `python -m http.server 8765 --bind 0.0.0.0 --directory tools/panel_preview/out`
     — browser preview confirmed both empty and externally handled channel
