@@ -20,7 +20,7 @@ two in step, or the panel will render fields nobody produces.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from typing import Any
@@ -38,6 +38,7 @@ from .const import (
     CLICK_ON,
     CLICK_TOGGLE,
     CONF_CHANNEL,
+    CONF_CHANNEL_EXTERNAL,
     CONF_CLICK_ACTION,
     CONF_CLICK_TARGET,
     CONF_DOUBLE_TARGET,
@@ -178,6 +179,7 @@ class WheelSettingsEditor:
     revision: str | None
     step: float
     acceleration: float
+    channel_external: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -308,6 +310,12 @@ def settings_subentry(entry: Any, node_id: int) -> Any | None:
 def _settings_editor(entry: Any, node_id: int, settings: Any) -> WheelSettingsEditor:
     """Serialize a wheel's settings with a token for conflict detection."""
     subentry = settings_subentry(entry, node_id)
+    raw_external = dict(subentry.data).get(CONF_CHANNEL_EXTERNAL, {}) if subentry else {}
+    channels = {
+        str(endpoint.channel)
+        for endpoint in entry.runtime_data.wheels[node_id].endpoints.values()
+        if endpoint.channel is not None
+    }
     return WheelSettingsEditor(
         subentry_id=subentry.subentry_id if subentry else None,
         # `binding_revision` is generic over subentries despite its name; the
@@ -315,6 +323,11 @@ def _settings_editor(entry: Any, node_id: int, settings: Any) -> WheelSettingsEd
         revision=binding_revision(subentry) if subentry else None,
         step=settings.step,
         acceleration=settings.acceleration,
+        channel_external={
+            channel: raw_external.get(channel) is True for channel in channels
+        }
+        if isinstance(raw_external, Mapping)
+        else {},
     )
 
 

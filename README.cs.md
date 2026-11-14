@@ -153,6 +153,11 @@ entitu na každý kanál, dvoutlačítko na každé fyzické tlačítko.
 
 ### GUI ovládací propojení (ovládání bez YAML)
 
+Pokud kanál kolečka místo propojení ovládá automatizace, skript nebo jiný
+nástroj, otevřete jej v panelu BILRESA a zapněte **Ovládáno mimo tento panel**.
+Jde pouze o poznámku; automatizace se nezjišťují ani nemění a události kanálu
+zůstávají zapnuté. Chcete-li v panelu přidat propojení, volbu vypněte.
+
 Nechcete psát automatizace? U položky **IKEA BILRESA**
 (Nastavení → Zařízení a služby) klikněte na **＋ Přidat → Ovládací propojení** a vyberte:
 

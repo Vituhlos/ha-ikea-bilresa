@@ -157,6 +157,11 @@ per physical button.
 
 ### GUI control bindings (turnkey control)
 
+For a wheel channel controlled by an automation, script or another tool instead
+of a binding, open that channel in the BILRESA panel and select **Handled
+outside this panel**. This is a note only; it does not detect or change the
+automation or disable channel events. Turn it off to add a binding in the panel.
+
 Prefer not to write automations? On the **IKEA BILRESA** entry
 (Settings → Devices & Services) click **＋ Add → Control binding** and pick:
 

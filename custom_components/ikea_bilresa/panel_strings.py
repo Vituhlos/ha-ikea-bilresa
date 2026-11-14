@@ -163,6 +163,11 @@ STRINGS: dict[str, dict[str, str]] = {
             "Pick a behaviour and a target. The other two physical positions "
             "stay unchanged."
         ),
+        "channel_external": "Handled outside this panel",
+        "channel_external_body": (
+            "This is a note only. Automations, scripts and events work as before."
+        ),
+        "channel_external_switch": "Handled outside this panel",
         "channel_title": "Channel {channel}",
         "channel_binding": "Binding",
         "detail_buttons_intro": (
@@ -585,6 +590,11 @@ STRINGS: dict[str, dict[str, str]] = {
             "Zvolte chování a cíl. Ostatní dvě fyzické polohy kolečka zůstanou "
             "beze změny."
         ),
+        "channel_external": "Ovládáno mimo tento panel",
+        "channel_external_body": (
+            "Jde pouze o poznámku. Automatizace, skripty a události fungují jako dříve."
+        ),
+        "channel_external_switch": "Ovládáno mimo tento panel",
         "channel_title": "Kanál {channel}",
         "channel_binding": "Propojení",
         "detail_buttons_intro": (

@@ -51,6 +51,7 @@ from .const import (
     CONF_ACCELERATION,
     CONF_CHANNEL,
     CONF_CHANNEL_ENABLED,
+    CONF_CHANNEL_EXTERNAL,
     CONF_ENDPOINT,
     CONF_NODE_ID,
     CONF_STEP,
@@ -648,6 +649,7 @@ def ws_binding_test(
         vol.Required("type"): TYPE_SETTINGS_SAVE,
         vol.Required("wheel"): str,
         vol.Required("channel_enabled"): {vol.Coerce(str): bool},
+        vol.Optional("channel_external"): {vol.Coerce(str): bool},
         vol.Required("step"): SETTINGS_NUMBERS["step"].validator(),
         vol.Required("acceleration"): SETTINGS_NUMBERS["acceleration"].validator(),
         vol.Optional("expected_revision"): str,
@@ -663,8 +665,7 @@ def ws_settings_save(
     """Save one wheel's channel settings, creating the subentry on first save.
 
     The mutation surface stays as narrow as the binding one: it writes only a
-    `wheel_settings` subentry for a wheel that currently exists, and only the
-    four fields above.
+    `wheel_settings` subentry for a wheel that currently exists.
     """
     entry = _loaded_entry(hass)
     if entry is None:
@@ -706,11 +707,30 @@ def ws_settings_save(
             )
             return
 
+    external: dict[str, bool] = {}
+    raw_external = msg.get(
+        "channel_external",
+        dict(existing.data).get(CONF_CHANNEL_EXTERNAL, {}) if existing else {},
+    )
+    for raw_channel, value in raw_external.items():
+        try:
+            channel = int(raw_channel)
+        except (TypeError, ValueError):
+            connection.send_result(msg["id"], {"ok": False, "error": "control_missing"})
+            return
+        if channel not in known:
+            if "channel_external" not in msg:
+                continue
+            connection.send_result(msg["id"], {"ok": False, "error": "control_missing"})
+            return
+        external[str(channel)] = bool(value)
+
     data = {
         CONF_NODE_ID: node_id,
         CONF_CHANNEL_ENABLED: enabled,
         CONF_STEP: msg["step"],
         CONF_ACCELERATION: msg["acceleration"],
+        CONF_CHANNEL_EXTERNAL: external,
     }
     title = _settings_title(hass, entry, msg["wheel"])
     if existing is None:
