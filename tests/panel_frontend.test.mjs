@@ -933,6 +933,31 @@ test("an unbound channel can toggle its external note without offering a binding
     const overview = panel._overviewControl(wheel, channel);
     assert.equal(overview.children[1].children[0].textContent, "channel_external");
     assert.equal(overview.children[1].children[1].textContent, "");
+
+    wheel.settings.channel_external = {};
+    const other = panel._channelDetail(wheel, { channel: 2, configured: false })
+      .children[0].children.find((child) => child.tag === "label").children[0];
+    panel._updateSettingsDraft(wheel, { channel_external: { 1: true } });
+    other.checked = true;
+    other.listeners.change();
+    assert.deepEqual(panel._settingsDraft.channel_external, { 2: true });
+
+    panel._sectionHead = () => new Node("header");
+    panel._statusDot = () => new Node("dot");
+    panel._liveControls = () => new Node("section");
+    panel._testPanel = () => new Node("section");
+    panel._gestureLabel = () => "gesture";
+    panel._formatTime = () => "";
+    panel._activities = [{ channel: 2, gesture: "press", dispatch_status: "not_configured" }];
+    wheel.settings.channel_external = { 2: true };
+    const body = panel._liveView(wheel).children[1].children[0].children[1];
+    assert.equal(body.children[3].children[1].textContent, "channel_external");
+    assert.equal(body.children.some((child) => child.tag === "button"), false);
+    wheel.settings.channel_external = {};
+    const normalBody = panel._liveView(wheel).children[1].children[0].children[1];
+    assert.equal(normalBody.children[3].children[1].textContent, "dispatch_not_configured");
+    assert.equal(normalBody.children.some((child) => child.tag === "button"), true);
+
   } finally {
     globalThis.document = previous;
   }

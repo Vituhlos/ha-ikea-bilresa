@@ -310,7 +310,9 @@ def settings_subentry(entry: Any, node_id: int) -> Any | None:
 def _settings_editor(entry: Any, node_id: int, settings: Any) -> WheelSettingsEditor:
     """Serialize a wheel's settings with a token for conflict detection."""
     subentry = settings_subentry(entry, node_id)
-    raw_external = dict(subentry.data).get(CONF_CHANNEL_EXTERNAL, {}) if subentry else {}
+    raw_external = (
+        dict(subentry.data).get(CONF_CHANNEL_EXTERNAL, {}) if subentry else {}
+    )
     channels = {
         str(endpoint.channel)
         for endpoint in entry.runtime_data.wheels[node_id].endpoints.values()

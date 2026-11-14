@@ -25,6 +25,7 @@ config entries.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any
 
@@ -712,6 +713,8 @@ def ws_settings_save(
         "channel_external",
         dict(existing.data).get(CONF_CHANNEL_EXTERNAL, {}) if existing else {},
     )
+    if not isinstance(raw_external, Mapping):
+        raw_external = {}
     for raw_channel, value in raw_external.items():
         try:
             channel = int(raw_channel)

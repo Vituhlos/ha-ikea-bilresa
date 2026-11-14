@@ -3204,7 +3204,7 @@ class IkeaBilresaPanel extends HTMLElement {
         box.addEventListener("change", () => {
           this._updateSettingsDraft(wheel, {
             channel_external: {
-              ...this._settingsStateFor(wheel).channel_external,
+              ...this._storedSettings(wheel).channel_external,
               [String(number)]: box.checked,
             },
           });
@@ -4147,12 +4147,16 @@ class IkeaBilresaPanel extends HTMLElement {
           el("div", "live-explanation", explanation),
         );
       }
-      const [dispatchState, dispatchKey] = this._dispatchLabel(latest);
+      const external = !isButton && latest.dispatch_status === "not_configured" &&
+        wheel.settings?.channel_external?.[String(latest.channel)] === true;
+      const [dispatchState, dispatchKey] = external
+        ? ["unknown", "channel_external"]
+        : this._dispatchLabel(latest);
       const dispatch = el("div", "dispatch");
       dispatch.appendChild(this._statusDot(dispatchState));
       dispatch.appendChild(el("span", null, this._t(dispatchKey)));
       body.appendChild(dispatch);
-      if (latest.dispatch_status === "not_configured") {
+      if (latest.dispatch_status === "not_configured" && !external) {
         const number = isButton ? latest.button : latest.channel;
         const control = this._controlsFor(wheel).find(
           (item) => this._controlNumber(wheel, item) === number,
