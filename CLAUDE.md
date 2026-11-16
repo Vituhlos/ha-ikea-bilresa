@@ -8,9 +8,10 @@ prompt names plus the files it finds with `Grep` and `Glob` inside the scope the
 prompt sets.
 
 `PROJECT_STATUS.md` is the canonical handoff between Claude Code, Codex, and the
-owner. Read every section except `## Done`; `grep` `## Done` and `docs/archive/`
-for the item at hand. Update it before ending any coding session. Do not infer
-hardware success from CI success, and do not resume work solely from
+owner. The main session reads every section except `## Done` at the start; a
+subagent does not read it in full, only what its task needs. `grep` `## Done` and
+`docs/archive/` for the item at hand. Update it before ending any coding session.
+Do not infer hardware success from CI success, and do not resume work solely from
 conversation history.
 
 ## Delegation
