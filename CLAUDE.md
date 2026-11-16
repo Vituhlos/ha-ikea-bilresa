@@ -16,14 +16,18 @@ conversation history.
 The main Sonnet session solves a task alone and is the only writer. Two
 read-only subagents exist; use them only when they save work:
 
-- `repo-scout` (Haiku): a wider survey of the code (a call chain, where
-  something is defined and tested across many files). Not for a single lookup:
-  use `grep`.
-- `critical-reviewer` (Opus): architecture questions, security review and
-  critical changes (Matter events, gestures, races, stored data, migrations).
-  Consider it after two failed fix attempts. Give it the diff and the files, not
-  the whole repository.
+- `repo-scout` (Haiku), optional: a wider survey of the code (a call chain,
+  where something is defined and tested across many files). Not for a single
+  lookup (use `grep`) and not for an ordinary mid-size survey, unless it clearly
+  pays off.
+- `critical-reviewer` (Opus): truly critical changes and questions (Matter
+  events, gesture semantics, races, stored data and migrations, security,
+  architecture). Consider it after two failed fix attempts. Give it the diff and
+  the files, not the whole repository.
 
 At most two subagents run at a time. No other subagents, skills or hooks for
-this. Check a report against the code; simulation and review never replace CI or
-a test on a physical BILRESA.
+this. Give a subagent a narrow task and ask for `path:line` citations. When it
+returns, do not repeat its survey or re-read whole files it read: verify its
+important conclusions by reading the exact cited ranges, then answer. For a
+critical change verify everything that is needed, with no cap on the checks.
+Simulation and review never replace CI or a test on a physical BILRESA.
