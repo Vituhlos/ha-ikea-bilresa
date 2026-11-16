@@ -1,6 +1,6 @@
 ---
 name: critical-reviewer
-description: Independent read-only review of one concrete change or diff in this repository: Matter event handling, race conditions, gesture semantics, storage compatibility, security and risky migrations. Use it for critical changes and after two failed fix attempts. Pass the diff text (or a patch file path), the files it touches and the invariants that must hold.
+description: "Independent read-only review of one concrete change or diff in this repository: Matter event handling, race conditions, gesture semantics, storage compatibility, security and risky migrations. Use it for critical changes and after two failed fix attempts. Pass the diff text (or a patch file path), the files it touches and the invariants that must hold."
 model: opus
 tools: Read, Grep, Glob
 omitClaudeMd: true
