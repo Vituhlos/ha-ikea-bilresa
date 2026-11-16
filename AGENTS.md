@@ -4,8 +4,15 @@ These instructions apply to the entire repository and to every coding agent.
 
 ## Start every session
 
-1. Read `PROJECT_STATUS.md` completely. It is the canonical source of truth for
-   current work, validation state, decisions, and backlog.
+The guardrails in this file apply to every agent, delegated ones included. Only
+the start-up reading below is for the main session: a delegated agent reads just
+the files its prompt names, and the prompt carries the guardrails the task touches.
+
+1. Read `PROJECT_STATUS.md`: the header and every section except `## Done`
+   (Goal, Verified, Failed, Remaining, Git / build / test). It is the canonical
+   source of truth for current work, validation state, decisions, and backlog.
+   `## Done` is the dated log and `docs/archive/` the older one: `grep` them for
+   the item at hand and read only that range. Nothing is removed from either.
 2. Read `docs/DEVELOPMENT.md` before changing code. For device-facing changes,
    also read `docs/DEVICE_REFERENCE.md`, `docs/MATTERJS_COMPATIBILITY.md`, and
    `docs/HARDWARE_TEST.md`.
@@ -159,5 +166,8 @@ tree with:
 - hardware validation status;
 - known risks or assumptions;
 - the single best next action.
+
+The next session reads every section except `## Done`: put the next action and
+the open risks in `Remaining`, `Verified` or `Failed`, not only in a `Done` entry.
 
 Do not use chat history as the only record of unfinished work.
