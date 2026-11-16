@@ -5,8 +5,10 @@ These instructions apply to the entire repository and to every coding agent.
 ## Start every session
 
 The guardrails in this file apply to every agent, delegated ones included. Only
-the start-up reading below is for the main session: a delegated agent reads just
-the files its prompt names, and the prompt carries the guardrails the task touches.
+the start-up reading below is for the main session: a delegated agent reads only
+what its task needs (the files its prompt names, and the files it finds with
+`Grep` and `Glob` inside the scope the prompt sets), and the prompt carries the
+guardrails the task touches.
 
 1. Read `PROJECT_STATUS.md`: the header and every section except `## Done`
    (Goal, Verified, Failed, Remaining, Git / build / test). It is the canonical

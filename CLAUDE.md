@@ -3,7 +3,9 @@
 The shared repository instructions are in `AGENTS.md`; follow them in full.
 
 In the main session, follow "Start every session" in `AGENTS.md`. A subagent
-follows the same guardrails but reads only the files its prompt names.
+follows the same guardrails; it does not run that list, and reads the files its
+prompt names plus the files it finds with `Grep` and `Glob` inside the scope the
+prompt sets.
 
 `PROJECT_STATUS.md` is the canonical handoff between Claude Code, Codex, and the
 owner. Read every section except `## Done`; `grep` `## Done` and `docs/archive/`

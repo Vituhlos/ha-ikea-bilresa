@@ -15,12 +15,15 @@
       "mcp__*__ha_write_*",
       "mcp__*__ha_get_integration",
       "mcp__*__ha_get_dashboard_screenshot",
-      "Read(**/.env)",
-      "Read(**/.env.*)",
+      "Read(**/.env*)",
       "Read(**/secrets.yaml)",
+      "Read(**/.claude/settings.local.json)",
       "Read(~/.ssh/**)",
-      "Read(~/.claude/.credentials.json)",
-      "Read(~/.claude.json)"
+      "Read(~/.claude.json)",
+      "Read(~/.claude/.credentials*)",
+      "Read(~/.claude/settings*.json)",
+      "Read(~/.claude/projects/**)",
+      "Read(~/.claude/history.jsonl)"
     ]
   }
 }
