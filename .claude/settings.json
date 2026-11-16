@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__*__ha_bulk_*",
+      "mcp__*__ha_call_*",
+      "mcp__*__ha_config_delete_*",
+      "mcp__*__ha_config_remove_*",
+      "mcp__*__ha_config_set_*",
+      "mcp__*__ha_delete_*",
+      "mcp__*__ha_manage_*",
+      "mcp__*__ha_reload_*",
+      "mcp__*__ha_remove_*",
+      "mcp__*__ha_restart",
+      "mcp__*__ha_set_*",
+      "mcp__*__ha_write_*",
+      "mcp__*__ha_get_integration",
+      "mcp__*__ha_get_dashboard_screenshot"
+    ]
+  }
+}
