@@ -796,6 +796,140 @@ def test_numeric_external_report_rebases_fractional_progress(monkeypatch) -> Non
     assert binding._tracked == pytest.approx(-4.1)
 
 
+@pytest.mark.parametrize(
+    ("target", "mode", "initial", "rebase", "external", "step", "notches", "expected"),
+    [
+        ("number.old_path", MODE_NUMBER, 1.0, 9.0, 2.0, 1.0, 6, 3.0),
+        ("input_number.old_path", MODE_NUMBER, 1.0, 9.0, 2.0, 1.0, 6, 3.0),
+        ("climate.old_path", MODE_TEMPERATURE, 17.0, 23.0, 18.0, 0.5, 7, 18.5),
+    ],
+)
+def test_old_command_path_cannot_hide_external_change_without_current_command(
+    monkeypatch,
+    target: str,
+    mode: str,
+    initial: float,
+    rebase: float,
+    external: float,
+    step: float,
+    notches: int,
+    expected: float,
+) -> None:
+    """After a rebase and suppressed sub-step, old commands are not own echoes."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding, _interval, _watchdog = _binding(
+        monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 1}
+    )
+    minimum, maximum = (16.0, 24.0) if mode == MODE_TEMPERATURE else (0.0, 10.0)
+    attributes = (
+        {
+            "temperature": rebase,
+            "min_temp": minimum,
+            "max_temp": maximum,
+            "target_temp_step": step,
+        }
+        if mode == MODE_TEMPERATURE
+        else {"min": minimum, "max": maximum, "step": step}
+    )
+
+    def state(value: float):
+        if mode == MODE_TEMPERATURE:
+            return SimpleNamespace(
+                state="heat", attributes={**attributes, "temperature": value}
+            )
+        return SimpleNamespace(state=str(value), attributes=attributes)
+
+    # A real command of 1/17 belongs to an old baseline. The trajectory from
+    # that historical command to 9/23 would misleadingly contain 2/18.
+    binding._set_target(initial, maximum - minimum)
+    binding._forget_target("external_rebase")
+    binding.hass.states.get.return_value = state(rebase)
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is False
+    assert binding._value_last_effective == rebase
+    assert binding._commanded  # Historical commands must still be retained.
+    binding.hass.services.async_call.assert_not_called()
+
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(data={"new_state": state(external)})
+    )
+    assert binding._tracked is None
+
+    binding.hass.states.get.return_value = state(external)
+    assert rotate(notches, True) is True
+    key = "temperature" if mode == MODE_TEMPERATURE else "value"
+    assert binding.hass.services.async_call.call_args.args[2][key] == expected
+
+
+@pytest.mark.parametrize("mode", (MODE_NUMBER, MODE_TEMPERATURE))
+def test_own_echo_uses_only_commands_from_current_value_baseline(
+    monkeypatch, mode: str
+) -> None:
+    """Keep current trajectory echoes, but not a historical command's path."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    target = "climate.current_path" if mode == MODE_TEMPERATURE else "number.current_path"
+    binding, _interval, _watchdog = _binding(
+        monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10}
+    )
+    if mode == MODE_TEMPERATURE:
+        attributes = {
+            "temperature": 22.0,
+            "min_temp": 16.0,
+            "max_temp": 24.0,
+            "target_temp_step": 0.5,
+        }
+
+        def state(value: float):
+            return SimpleNamespace(
+                state="heat", attributes={**attributes, "temperature": value}
+            )
+
+        old, baseline, own_echo, foreign = 17.0, 22.0, 22.4, 18.0
+        expected = 23.0
+    else:
+        attributes = {"min": 0.0, "max": 10.0, "step": 1.0}
+
+        def state(value: float):
+            return SimpleNamespace(state=str(value), attributes=attributes)
+
+        old, baseline, own_echo, foreign = 1.0, 6.0, 6.5, 2.0
+        expected = 7.0
+    binding._set_target(old, 10.0)
+    binding._forget_target("external_rebase")
+    binding.hass.states.get.return_value = state(baseline)
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True
+    assert binding._commanded[-1][0] == expected
+    assert binding._tracked == pytest.approx(expected if mode == MODE_NUMBER else 22.8)
+    binding._last_scroll_seen = binding._last
+
+    # An acknowledgement between the new baseline and the new command
+    # is legitimate, even with older historical commands present.
+    binding._handle_target_state_change(
+        SimpleNamespace(data={"new_state": state(own_echo)})
+    )
+    assert binding._tracked is not None
+
+    # The old command's path would include this, but the current one does not.
+    binding._handle_target_state_change(
+        SimpleNamespace(data={"new_state": state(foreign)})
+    )
+    assert binding._tracked is None
+
+
 def test_climate_small_notches_accumulate_without_redundant_commands(
     monkeypatch,
 ) -> None:
