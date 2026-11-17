@@ -1312,6 +1312,36 @@ def test_reversed_substep_discards_opposing_queued_command(
 
 
 @pytest.mark.asyncio
+async def test_real_ha_number_handler_rejection_rebases_tracking(
+    monkeypatch, hass
+) -> None:
+    """A real HA registry handler exception reaches background value recovery."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.real_handler", CONF_MODE: MODE_NUMBER, CONF_STEP: 10},
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding.hass = hass
+    hass.states.async_set(
+        "number.real_handler", "2", {"min": 0, "max": 10, "step": 1}
+    )
+
+    async def reject_handler(_call):
+        raise RuntimeError("simulated real Home Assistant handler rejection")
+
+    hass.services.async_register("number", "set_value", reject_handler)
+    assert binding._rotate_number(1, True) is True
+    assert binding._tracked == pytest.approx(3.0)
+    await hass.async_block_till_done()
+    # blocking=True is awaited by the dispatch task, so the real handler's
+    # exception is observable and cannot leave 3 as a false baseline.
+    assert binding._tracked is None
+    assert binding._last_command_at is None
+
+
+@pytest.mark.asyncio
 async def test_old_service_rejection_does_not_erase_rebased_substep(
     monkeypatch,
 ) -> None:
