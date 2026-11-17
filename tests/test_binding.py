@@ -1328,15 +1328,18 @@ async def test_real_ha_number_handler_rejection_rebases_tracking(
         "number.real_handler", "2", {"min": 0, "max": 10, "step": 1}
     )
 
+    handler_calls = []
+
     async def reject_handler(_call):
+        handler_calls.append(True)
         raise RuntimeError("simulated real Home Assistant handler rejection")
 
     hass.services.async_register("number", "set_value", reject_handler)
     assert binding._rotate_number(1, True) is True
-    assert binding._tracked == pytest.approx(3.0)
     await hass.async_block_till_done()
-    # blocking=True is awaited by the dispatch task, so the real handler's
-    # exception is observable and cannot leave 3 as a false baseline.
+    # HA can run a background task eagerly, so recovery may finish before
+    # _rotate_number returns; the final state is the reliable assertion.
+    assert handler_calls == [True]
     assert binding._tracked is None
     assert binding._last_command_at is None
 
