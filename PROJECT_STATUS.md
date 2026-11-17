@@ -1,5 +1,13 @@
 # Project status and agent handoff
 
+## PR #71: rejected numeric/climate service recovery (2026-11-17)
+
+- **Scope:** After a failed `number.set_value`, `input_number.set_value` or `climate.set_temperature` call, `binding.py` discards fractional tracking, stale calculated target history, any pending/coalesced command, and the command-rate/echo authority windows. The next notch starts from Home Assistant's currently reported state. Light/group state-echo behavior and other modes are deliberately unchanged.
+- **Tests:** Added async regression cases for `number`, `input_number` and `climate`: a failed first command, another queued notch, rejection, and a retry from the unchanged actual value. Also verify a failed light call retains the existing light accounting policy. New cases are modelled service failures, not hardware proof.
+- **Verification:** Previous head `59d6e99` passed CI [44133262095](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44133262095) (six successful jobs; optional newest-HA pre-release job skipped) and CodeQL [44133262347](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44133262347). New fix commits require fresh **exact-head** CI, CodeQL, and review before considering this verified. Local full pytest/Ruff/mypy not executed here because a dependency-equipped checkout was unavailable.
+- **Hardware:** **NOT tested** with the patched PR on a physical BILRESA; 2026-11-13 was the pre-fix failure reproduction only.
+- **Risks/next action:** Confirm exact-head CI and Sourcery findings, then verify on physical hardware before release/merge approval. No main-branch change or hardware/release validation is claimed.
+
 ## PR #71: Sourcery review follow-up (2026-11-17)
 
 - **Scope:** Address Sourcery's five findings in [PR #71](https://github.com/Vituhlos/ha-ikea-bilresa/pull/71). In `binding.py`, number/input_number and climate rotation now compare the newly quantized command with the actual off-grid starting value, or with the last calculated service value during a continuing gesture. Keep fractional internal progress and send exact min/max values even when their precision exceeds four/two decimal places; round and clamp only intermediate service values. Other modes and Matter event handling are unchanged.
