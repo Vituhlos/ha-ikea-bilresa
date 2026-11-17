@@ -876,7 +876,9 @@ def test_own_echo_uses_only_commands_from_current_value_baseline(
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
     )
-    target = "climate.current_path" if mode == MODE_TEMPERATURE else "number.current_path"
+    target = (
+        "climate.current_path" if mode == MODE_TEMPERATURE else "number.current_path"
+    )
     binding, _interval, _watchdog = _binding(
         monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10}
     )
