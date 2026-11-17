@@ -283,6 +283,16 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _bound(value: Any, default: float) -> float:
+    """A reported range limit, or ``default`` when it is missing or unreadable.
+
+    ``0`` is a real limit (a thermostat down to 0, a number that stops at 0), so
+    this must not be ``_as_float(value) or default``, which reads it as missing.
+    """
+    number = _as_float(value)
+    return default if number is None else number
+
+
 class LightBinding:
     """Runtime for one GUI-configured wheel channel or button endpoint."""
 
@@ -1653,8 +1663,8 @@ class LightBinding:
         state = self._target_state()
         if state is None:
             return False
-        min_t = _as_float(state.attributes.get("min_temp")) or 7.0
-        max_t = _as_float(state.attributes.get("max_temp")) or 35.0
+        min_t = _bound(state.attributes.get("min_temp"), 7.0)
+        max_t = _bound(state.attributes.get("max_temp"), 35.0)
         temp_step = _as_float(state.attributes.get("target_temp_step")) or 0.5
         tracked = self._resync(
             _as_float(state.attributes.get("temperature")), (min_t + max_t) / 2
@@ -1702,8 +1712,8 @@ class LightBinding:
         state = self._target_state()
         if state is None:
             return False
-        min_n = _as_float(state.attributes.get("min")) or 0.0
-        max_n = _as_float(state.attributes.get("max")) or 100.0
+        min_n = _bound(state.attributes.get("min"), 0.0)
+        max_n = _bound(state.attributes.get("max"), 100.0)
         num_step = _as_float(state.attributes.get("step")) or 1.0
         current = _as_float(state.state)
         tracked = self._resync(current, (min_n + max_n) / 2)

@@ -30,7 +30,7 @@ import socket
 import time
 import pytest
 from custom_components.ikea_bilresa import binding as binding_module
-from tests.lab.known_issues import KNOWN_DEFECT_71
+from tests.lab.known_issues import SELFTEST_EXPECTED_FAILURE
 from tests.lab.service_spy import LabSafetyViolation
 """
 
@@ -86,24 +86,24 @@ def run_probe(tmp_path: Path, source: str) -> tuple[int, dict[str, list[str]]]:
 
 # One child process for every probe that leaves the process state clean.
 INDEPENDENT_PROBES = """
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_wrong_value():
     assert 10 == 0
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_violation_in_the_body():
     raise LabSafetyViolation("something left the sandbox")
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_harness_error_is_not_an_expected_failure_either():
     raise KeyError("a harness error")
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_unacknowledged_refusal(lab):
     lab.safety.record("something_refused")
     assert False
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_refused_service_call_that_was_caught_and_ignored(lab):
     call = lab.hass.services.async_call("script", "turn_on", {"entity_id": "x.y"})
     try:
@@ -112,28 +112,28 @@ def test_a_refused_service_call_that_was_caught_and_ignored(lab):
         pass
     assert False
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_leaked_timer(lab):
     lab.scheduler.call_later(60, lambda now: None, "production_timer")
     assert False
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_leaked_dispatcher_subscription(lab):
     lab.dispatcher.connect(None, "some_signal", lambda: None)
     assert False
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_leaked_state_listener(lab):
     lab.registry.track(["light.x"], lambda event: None)
     assert False
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_task_that_would_wait_for_something_real(lab):
     import asyncio
     lab.tasks.create(asyncio.sleep(0))
     assert False
 
-@KNOWN_DEFECT_71
+@SELFTEST_EXPECTED_FAILURE
 def test_a_blocked_network_attempt_that_was_caught_and_ignored():
     try:
         socket.getaddrinfo("matter-server.invalid", 5580)
@@ -210,7 +210,7 @@ def test_an_unrestored_patch_fails_the_next_test_even_if_it_is_expected_to_fail(
         def test_a_leaks_a_patch():
             binding_module.time = None  # not restored
 
-        @KNOWN_DEFECT_71
+        @SELFTEST_EXPECTED_FAILURE
         def test_b_expected_to_fail_but_starts_on_a_dirty_module():
             assert False
         """,

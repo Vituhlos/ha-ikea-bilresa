@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+- **A range limit of `0` is a real limit.** A `number` or `input_number` that stops
+  at 0 (for example -10 to 0), or a thermostat whose `min_temp` or `max_temp` is 0,
+  was rotated as if that limit were missing: the maximum 0 became 100 and the
+  minimum 0 became 7. One notch up on a -10 to 0 number asked for 10, which the
+  entity refuses, and one notch down on a thermostat at 1 degree with a minimum of
+  0 raised the setpoint to 7. Only a limit that the entity does not report
+  falls back to the default now. (Reported in pull request #71.)
+
 ### Changed
 - **Compatibility watch and test setup (repository tooling, no change to the
   integration).** A weekly compatibility watch (`tools/compat_watch.py`) keeps one issue open while Home Assistant Core,
