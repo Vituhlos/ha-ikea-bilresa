@@ -31,7 +31,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a numeric or climate value service call, the binding discards stale fractional
   progress and any queued follow-up value so the next notch reads the actual
   reported state. A delayed failure from an older call no longer cancels a
-  newer queued or dispatched command.
+  newer queued or dispatched command. Numeric and climate quantization now
+  suppresses targets that move opposite to the wheel's direction while
+  preserving fractional progress until a valid target is reached. Queued
+  value commands retain their original generation, and a canceled late
+  timer can no longer flush a newer pending command.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
