@@ -1378,6 +1378,117 @@ async def test_service_dispatch_reports_acceptance_for_exact_action(
     assert updates[-1]["dispatched"] is True
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("target", "mode", "state_name", "attributes", "key"),
+    [
+        (
+            "number.failed_command",
+            MODE_NUMBER,
+            "2",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            "value",
+        ),
+        (
+            "input_number.failed_command",
+            MODE_NUMBER,
+            "2",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            "value",
+        ),
+        (
+            "climate.failed_command",
+            MODE_TEMPERATURE,
+            "heat",
+            {
+                "temperature": 2.0,
+                "min_temp": 0.0,
+                "max_temp": 10.0,
+                "target_temp_step": 0.5,
+            },
+            "temperature",
+        ),
+    ],
+)
+async def test_failed_numeric_and_climate_service_rebases_next_rotation(
+    monkeypatch,
+    target: str,
+    mode: str,
+    state_name: str,
+    attributes: dict,
+    key: str,
+) -> None:
+    """Reject a command; do not retain its progress or its queued successor."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10}
+    )
+    now = [100.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=state_name, attributes=attributes
+    )
+    scheduled = []
+    binding.hass.async_create_task.side_effect = lambda coro: scheduled.append(coro)
+    cancel = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later",
+        lambda *_args: cancel,
+    )
+
+    async def rejected():
+        raise RuntimeError("simulated Home Assistant failure")
+
+    binding.hass.services.async_call.side_effect = [rejected(), object()]
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True
+    assert binding.hass.services.async_call.call_args.args[2][key] == 3.0
+    now[0] += 0.05
+    assert rotate(1, True) is True
+    assert binding._pending_command is not None
+    assert binding._tracked == pytest.approx(4.0)
+
+    # The asynchronous failure arrives while the second (stale) target is queued.
+    await scheduled.pop(0)
+    assert binding._tracked is None
+    assert not binding._commanded
+    assert binding._pending_command is None
+    cancel.assert_called_once()
+    assert binding._last_command_at is None
+    assert binding._command_authoritative_until == 0
+
+    # Read the unchanged real HA value 2, not the failed internal value 4.
+    now[0] += 0.05
+    assert rotate(1, True) is True
+    assert binding.hass.services.async_call.call_count == 2
+    assert binding.hass.services.async_call.call_args.args[2][key] == 3.0
+    scheduled.pop().close()
+
+
+@pytest.mark.asyncio
+async def test_failed_light_service_keeps_existing_tracking_policy(monkeypatch) -> None:
+    """Do not change light/group echo accounting for a numeric-only fix."""
+    binding, _interval, _watchdog = _binding(monkeypatch)
+    binding._tracked = 128
+
+    async def rejected():
+        raise RuntimeError("simulated failure")
+
+    await binding._async_dispatch_service(
+        "light",
+        "turn_on",
+        rejected(),
+        result={"kind": "brightness"},
+        action=None,
+    )
+    assert binding._tracked == 128
+
+
 def test_external_state_change_invalidates_tracked_target(monkeypatch) -> None:
     binding, _interval_unsub, _watchdog_unsub = _binding(monkeypatch)
     binding._tracked = 220
