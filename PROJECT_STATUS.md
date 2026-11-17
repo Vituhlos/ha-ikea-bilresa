@@ -1,5 +1,28 @@
 # Project status and agent handoff
 
+## PR #71: preserve exact range endpoints (2026-11-17)
+
+- **Scope:** In `binding.py`, numeric and climate rotations now send the
+  reported min/max exactly when the clamped continuous target reaches it.
+  Intermediate quantization and fractional tracking are unchanged.
+- **Tests:** `tests/test_binding.py` adds minimum and maximum regressions for
+  `number` and `input_number` (step 3, bounds -100..0 and 0..100) plus
+  `climate` (step 0.5, non-grid endpoints 16.3 and 25.2). The old
+  calculation returns -99, 99, 16.5 and 25.0 respectively; the corrected
+  calculation returns -100, 100, 16.3 and 25.2. Tests were committed first.
+- **Verification:** The four arithmetic boundary cases were checked before
+  the commits. Full local pytest, Ruff and mypy were **not run** because a
+  local checkout and project dependencies were unavailable; check exact-head
+  GitHub Actions CI next. This is not a hardware validation.
+- **Hardware:** The contributor has not installed or tested this patched
+  branch on a physical BILRESA. The 2026-11-13 pre-fix observation below
+  remains the only applicable hardware evidence.
+- **Risks:** The separate CodeRabbit concern about quantizing the initial
+  reported value is *not* addressed by this exact-endpoint patch. All other
+  behavior, target step fallbacks, and service dispatch remain unchanged.
+- **Single next action:** Review the new PR #71 CI and maintainer feedback;
+  subsequently test on physical hardware before marking it release-ready.
+
 ## Contributor fix: zero-valued numeric bounds (2026-11-13)
 
 **Status:** [PR #71](https://github.com/Vituhlos/ha-ikea-bilresa/pull/71) is open from
