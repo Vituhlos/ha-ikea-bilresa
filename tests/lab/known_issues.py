@@ -13,7 +13,7 @@ Three kinds are kept apart, and the reason text always names the reference, what
 is wrong or missing, and when the marker goes:
 
 * KNOWN DEFECT: reproduced here, with the observed wrong value pinned by a
-  separate characterization test;
+  separate characterization test (none is open at the moment: #71 is fixed);
 * MISSING FEATURE: not on this branch, and the test is the executable contract;
 * SUSPECTED DEFECT: a mismatch with an authoritative source whose effect on real
   hardware is not proven.
@@ -37,12 +37,11 @@ def _expected_failure(reason: str, *, condition: bool = True) -> pytest.MarkDeco
     )
 
 
-KNOWN_DEFECT_71 = _expected_failure(
-    "KNOWN DEFECT (reproduced) | PR #71, https://github.com/Vituhlos/ha-ikea-bilresa/pull/71"
-    " | binding.py _rotate_number / _rotate_temperature read a bound with"
-    " `_as_float(x) or default`, so a valid min/max of 0 counts as missing"
-    " | remove when PR #71 (or an equivalent fix) is on this branch; the pinned"
-    " observed values in test_observed_defect_71_* fail then and go with it"
+# A stand-in expected failure for the meta tests (``test_meta_safety.py``), which
+# need *some* marker of this kind to prove what pytest does with it. It marks no
+# real defect.
+SELFTEST_EXPECTED_FAILURE = _expected_failure(
+    "SELFTEST | the lab's own meta tests | a stand-in expected failure | never removed"
 )
 
 MISSING_FEATURE_MAX_VOLUME = _expected_failure(

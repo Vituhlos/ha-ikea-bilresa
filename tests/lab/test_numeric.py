@@ -4,13 +4,9 @@ A ``number`` target is rotated by a percentage of its own range, so the range
 is the whole question. The expected values are worked out from the range by
 hand: a 10 % step of a span of 10 is 1, of a span of 30 is 3, and so on.
 
-The tests marked ``DEFECT_71`` (``known_issues.KNOWN_DEFECT_71``) fail on this
-branch for a reason that is known
-and reproduced: ``binding.py`` reads a bound with ``_as_float(x) or default``,
-so a valid bound of ``0`` counts as "missing". They are ``xfail(strict=True)``:
-they must keep failing until PR #71 (or an equivalent) lands, and then turn
-into ordinary passes by deleting the one marker. Inputs and expected values do
-not change.
+PR #71 (a valid bound of ``0`` read as missing) is fixed on this branch: the
+three scenarios below that reproduced it are ordinary tests now, with the inputs
+and expected values they always had.
 """
 
 from __future__ import annotations
@@ -20,14 +16,11 @@ from typing import Any
 import pytest
 
 from .fake_matter import E2490_ENDPOINTS, Wire, e2490_node
-from .known_issues import KNOWN_DEFECT_71
 from .targets import ClimateTarget, NumberTarget
 
 NODE = 14
 UP1 = E2490_ENDPOINTS[1]["up"]
 DOWN1 = E2490_ENDPOINTS[1]["down"]
-
-DEFECT_71 = KNOWN_DEFECT_71
 
 
 def _binding(target: str, mode: str, step: int) -> dict[str, Any]:
@@ -142,15 +135,15 @@ def test_climate_targets_follow_their_own_range(
 # -- PR #71: a bound of zero is a real bound ---------------------------------
 
 
-@DEFECT_71
 def test_number_with_a_maximum_of_zero_stops_at_zero(lab) -> None:
     """The reproduction from PR #71.
 
     input_number, minimum -10, maximum 0, step 1, now -1; Value binding, 10 %
     per step; one notch up. The span is 10, so one notch is 1: -1 + 1 = 0.
 
-    Today the maximum 0 is read as missing and replaced by 100, the span becomes
-    110, one notch is 11 and the binding asks for 10, which the entity refuses.
+    The maximum 0 is a real limit. Before the fix (PR #71) it was read as missing
+    and replaced by 100: the span became 110, one notch 11, and the binding asked
+    for 10, which the entity refuses.
     """
     entity = _number(lab, minimum=-10, maximum=0, step=1, value=-1)
     lab.load(e2490_node(NODE))
@@ -160,13 +153,12 @@ def test_number_with_a_maximum_of_zero_stops_at_zero(lab) -> None:
     assert _sent(lab) == [("input_number", "set_value", {"value": 0.0}, "accepted")]
 
 
-@DEFECT_71
 def test_climate_with_a_minimum_of_zero_does_not_go_up_when_turned_down(lab) -> None:
     """min_temp 0, max_temp 30, now 1.0, 10 % per step (span 30, a step is 3).
 
     One notch down: 1.0 - 3 = -2, the floor is 0, so the setpoint goes to 0.0.
-    Today the minimum 0 is read as missing and replaced by 7; the same notch
-    down raises the setpoint from 1.0 to 7.0.
+    The minimum 0 is a real limit. Before the fix it was read as missing and
+    replaced by 7, so the same notch down raised the setpoint from 1.0 to 7.0.
     """
     lab.add_target(
         ClimateTarget(
@@ -186,13 +178,12 @@ def test_climate_with_a_minimum_of_zero_does_not_go_up_when_turned_down(lab) -> 
     ]
 
 
-@DEFECT_71
 def test_climate_with_a_maximum_of_zero_stops_at_zero(lab) -> None:
     """min_temp -20, max_temp 0, now -5, 10 % per step (span 20, a step is 2).
 
-    One notch up: -5 + 2 = -3, inside the range. Today the maximum 0 is read as
-    missing and replaced by 35, the span becomes 55 and the setpoint is asked
-    to move to 0.5, above the thermostat's maximum.
+    One notch up: -5 + 2 = -3, inside the range. Before the fix the maximum 0 was
+    read as missing and replaced by 35: the span became 55 and the setpoint was
+    asked to move to 0.5, above the thermostat's maximum.
     """
     lab.add_target(
         ClimateTarget(
@@ -209,71 +200,4 @@ def test_climate_with_a_maximum_of_zero_stops_at_zero(lab) -> None:
 
     assert _sent(lab) == [
         ("climate", "set_temperature", {"temperature": -3.0}, "accepted")
-    ]
-
-
-# -- the observed wrong values, pinned -----------------------------------------
-#
-# These three PASS on this branch and FAIL once PR #71 is merged. They are the
-# proof that the xfail tests above fail for the declared reason (the wrong value
-# below), not because of the harness or a bad input. Delete them together with
-# the ``DEFECT_71`` markers when the fix lands.
-
-
-def test_observed_defect_71_number_max_zero_asks_for_ten(lab) -> None:
-    entity = _number(lab, minimum=-10, maximum=0, step=1, value=-1)
-    lab.load(e2490_node(NODE))
-    lab.setup_bindings(_binding(entity, "number", 10))
-    _rotate_once(lab, UP1)
-
-    assert _sent(lab) == [
-        (
-            "input_number",
-            "set_value",
-            {"value": 10.0},
-            "rejected_by_target:value_out_of_range",
-        )
-    ]
-
-
-def test_observed_defect_71_climate_min_zero_raises_the_setpoint(lab) -> None:
-    lab.add_target(
-        ClimateTarget(
-            "climate.lab",
-            min_temp=0,
-            max_temp=30,
-            temperature=1.0,
-            target_temp_step=0.5,
-        )
-    )
-    lab.load(e2490_node(NODE))
-    lab.setup_bindings(_binding("climate.lab", "temperature", 10))
-    _rotate_once(lab, DOWN1)
-
-    assert _sent(lab) == [
-        ("climate", "set_temperature", {"temperature": 7.0}, "accepted")
-    ]
-
-
-def test_observed_defect_71_climate_max_zero_asks_for_half_a_degree(lab) -> None:
-    lab.add_target(
-        ClimateTarget(
-            "climate.lab",
-            min_temp=-20,
-            max_temp=0,
-            temperature=-5.0,
-            target_temp_step=0.5,
-        )
-    )
-    lab.load(e2490_node(NODE))
-    lab.setup_bindings(_binding("climate.lab", "temperature", 10))
-    _rotate_once(lab, UP1)
-
-    assert _sent(lab) == [
-        (
-            "climate",
-            "set_temperature",
-            {"temperature": 0.5},
-            "rejected_by_target:temperature_out_of_range",
-        )
     ]
