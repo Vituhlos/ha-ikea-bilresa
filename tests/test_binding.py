@@ -826,6 +826,88 @@ def test_climate_small_notches_accumulate_without_redundant_commands(
     assert binding._tracked == pytest.approx(1.36)
 
 
+
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+@pytest.mark.parametrize(
+    ("minimum", "maximum", "current", "up", "expected"),
+    [
+        (-100.0, 0.0, -96.0, False, -100.0),
+        (0.0, 100.0, 96.0, True, 100.0),
+    ],
+)
+def test_numeric_rotation_reaches_exact_non_grid_boundaries(
+    monkeypatch,
+    target_domain: str,
+    minimum: float,
+    maximum: float,
+    current: float,
+    up: bool,
+    expected: float,
+) -> None:
+    """Preserve exact numeric endpoints outside the entity step grid."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.non_grid_bound",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 6,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=str(current),
+        attributes={"min": minimum, "max": maximum, "step": 3.0},
+    )
+
+    assert binding._rotate_number(1, up) is True
+
+    domain, service, payload = binding.hass.services.async_call.call_args.args
+    assert (domain, service) == (target_domain, "set_value")
+    assert payload["value"] == expected
+    assert binding._tracked == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum", "current", "up", "expected"),
+    [
+        (16.3, 24.5, 17.5, False, 16.3),
+        (17.0, 25.2, 24.0, True, 25.2),
+    ],
+)
+def test_climate_rotation_reaches_exact_non_grid_boundaries(
+    monkeypatch,
+    minimum: float,
+    maximum: float,
+    current: float,
+    up: bool,
+    expected: float,
+) -> None:
+    """Preserve exact climate endpoints outside the entity step grid."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "climate.non_grid_bound",
+            CONF_MODE: MODE_TEMPERATURE,
+            CONF_STEP: 20,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={
+            "min_temp": minimum,
+            "max_temp": maximum,
+            "temperature": current,
+            "target_temp_step": 0.5,
+        },
+    )
+
+    assert binding._rotate_temperature(1, up) is True
+
+    domain, service, payload = binding.hass.services.async_call.call_args.args
+    assert (domain, service) == ("climate", "set_temperature")
+    assert payload["temperature"] == pytest.approx(expected)
+    assert binding._tracked == pytest.approx(expected)
+
+
 def test_number_rotation_does_not_dispatch_past_zero_maximum(monkeypatch) -> None:
     """At an explicit zero limit, rotating up must not send a higher value."""
     binding, _interval_unsub, _watchdog_unsub = _binding(
