@@ -1349,9 +1349,13 @@ class LightBinding:
         span = max(max_t - min_t, 1)
         continuous_target = tracked + self._delta(self._step, span, notches, up)
         continuous_target = min(max_t, max(min_t, continuous_target))
-        target = min(
-            max_t, max(min_t, round(continuous_target / temp_step) * temp_step)
-        )
+        # A range endpoint can fall outside the entity's step grid.
+        if continuous_target in (min_t, max_t):
+            target = continuous_target
+        else:
+            target = min(
+                max_t, max(min_t, round(continuous_target / temp_step) * temp_step)
+            )
         previous = min(max_t, max(min_t, round(tracked / temp_step) * temp_step))
         self._set_target(target, span, tracked=continuous_target)
         result = self._value_result(
@@ -1407,7 +1411,13 @@ class LightBinding:
         span = max(max_n - min_n, num_step)
         continuous_target = tracked + self._delta(self._step, span, notches, up)
         continuous_target = min(max_n, max(min_n, continuous_target))
-        target = min(max_n, max(min_n, round(continuous_target / num_step) * num_step))
+        # A range endpoint can fall outside the entity's step grid.
+        if continuous_target in (min_n, max_n):
+            target = continuous_target
+        else:
+            target = min(
+                max_n, max(min_n, round(continuous_target / num_step) * num_step)
+            )
         previous = min(max_n, max(min_n, round(tracked / num_step) * num_step))
         self._set_target(target, span, tracked=continuous_target)
         domain = self._target.split(".", 1)[0]
