@@ -1410,7 +1410,7 @@ async def test_service_dispatch_reports_acceptance_for_exact_action(
         ),
     ],
 )
-async def test_failed_numeric_and_climate_service_rebases_next_rotation(
+async def test_latest_failed_numeric_and_climate_service_rebases_next_rotation(
     monkeypatch,
     target: str,
     mode: str,
@@ -1418,17 +1418,67 @@ async def test_failed_numeric_and_climate_service_rebases_next_rotation(
     attributes: dict,
     key: str,
 ) -> None:
-    """Reject a command; do not retain its progress or its queued successor."""
+    """A rejected latest command must not seed the next rotation."""
     binding, _interval, _watchdog = _binding(
         monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10}
+    )
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=state_name, attributes=attributes
+    )
+    scheduled = []
+    binding.hass.async_create_task.side_effect = lambda coro: scheduled.append(coro)
+
+    async def rejected():
+        raise RuntimeError("simulated Home Assistant failure")
+
+    async def accepted():
+        return None
+
+    binding.hass.services.async_call.side_effect = [rejected(), accepted()]
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True
+    assert binding.hass.services.async_call.call_args.args[2][key] == 3.0
+    assert binding._tracked == pytest.approx(3.0)
+
+    await scheduled.pop(0)
+    assert binding._tracked is None
+    assert not binding._commanded
+    assert binding._pending_command is None
+    assert binding._last_command_at is None
+    assert binding._command_authoritative_until == 0
+
+    assert rotate(1, True) is True
+    assert binding.hass.services.async_call.call_count == 2
+    assert binding.hass.services.async_call.call_args.args[2][key] == 3.0
+    await scheduled.pop(0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("new_command_queued", [True, False])
+async def test_older_numeric_failure_preserves_newer_command(
+    monkeypatch, new_command_queued: bool
+) -> None:
+    """An older async rejection cannot cancel a newer desired target."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.out_of_order", CONF_MODE: MODE_NUMBER, CONF_STEP: 10},
     )
     now = [100.0]
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
     )
     binding.hass.states.get.return_value = SimpleNamespace(
-        state=state_name, attributes=attributes
+        state="2", attributes={"min": 0.0, "max": 10.0, "step": 1.0}
     )
+    if not new_command_queued:
+        binding._min_command_interval = 0.0
     scheduled = []
     binding.hass.async_create_task.side_effect = lambda coro: scheduled.append(coro)
     cancel = Mock()
@@ -1438,36 +1488,36 @@ async def test_failed_numeric_and_climate_service_rebases_next_rotation(
     )
 
     async def rejected():
-        raise RuntimeError("simulated Home Assistant failure")
+        raise RuntimeError("late rejection of first command")
 
-    binding.hass.services.async_call.side_effect = [rejected(), object()]
-    rotate = (
-        binding._rotate_temperature
-        if mode == MODE_TEMPERATURE
-        else binding._rotate_number
-    )
-    assert rotate(1, True) is True
-    assert binding.hass.services.async_call.call_args.args[2][key] == 3.0
+    async def accepted():
+        return None
+
+    binding.hass.services.async_call.side_effect = [rejected(), accepted()]
+    assert binding._rotate_number(1, True) is True
     now[0] += 0.05
-    assert rotate(1, True) is True
-    assert binding._pending_command is not None
+    assert binding._rotate_number(1, True) is True
     assert binding._tracked == pytest.approx(4.0)
+    if new_command_queued:
+        assert binding._pending_command is not None
+        assert binding.hass.services.async_call.call_count == 1
+    else:
+        assert binding.hass.services.async_call.call_count == 2
 
-    # The asynchronous failure arrives while the second (stale) target is queued.
     await scheduled.pop(0)
-    assert binding._tracked is None
-    assert not binding._commanded
-    assert binding._pending_command is None
-    cancel.assert_called_once()
-    assert binding._last_command_at is None
-    assert binding._command_authoritative_until == 0
+    assert binding._tracked == pytest.approx(4.0)
+    assert binding._commanded[-1][0] == 4.0
+    assert binding._last_command_at is not None
+    cancel.assert_not_called()
+    if new_command_queued:
+        assert binding._pending_command is not None
+        now[0] += 0.15
+        binding._flush_pending_command()
+        assert binding.hass.services.async_call.call_count == 2
 
-    # Read the unchanged real HA value 2, not the failed internal value 4.
-    now[0] += 0.05
-    assert rotate(1, True) is True
-    assert binding.hass.services.async_call.call_count == 2
-    assert binding.hass.services.async_call.call_args.args[2][key] == 3.0
-    scheduled.pop().close()
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == 4.0
+    await scheduled.pop(0)
+    assert binding._tracked == pytest.approx(4.0)
 
 
 @pytest.mark.asyncio
