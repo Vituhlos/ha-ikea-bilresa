@@ -902,6 +902,89 @@ def test_climate_inward_notch_from_off_grid_state_dispatches_once(
     assert binding.hass.services.async_call.call_count == 1
 
 
+@pytest.mark.parametrize(
+    ("target", "mode", "state_name", "attributes", "up", "expected"),
+    [
+        (
+            "number.opposite_step",
+            MODE_NUMBER,
+            "0.7",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            False,
+            0.0,
+        ),
+        (
+            "input_number.opposite_step",
+            MODE_NUMBER,
+            "0.7",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            False,
+            0.0,
+        ),
+        (
+            "climate.opposite_step",
+            MODE_TEMPERATURE,
+            "heat",
+            {
+                "temperature": 16.6,
+                "min_temp": 16.0,
+                "max_temp": 24.0,
+                "target_temp_step": 0.5,
+            },
+            True,
+            17.0,
+        ),
+    ],
+)
+def test_off_grid_quantization_never_reverses_rotation(
+    monkeypatch,
+    target: str,
+    mode: str,
+    state_name: str,
+    attributes: dict,
+    up: bool,
+    expected: float,
+) -> None:
+    """Suppress wrong-way payloads, but keep fractional notches accumulating."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 1},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=state_name, attributes=attributes
+    )
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    original = (
+        attributes["temperature"] if mode == MODE_TEMPERATURE else float(state_name)
+    )
+    assert rotate(1, up) is False
+    binding.hass.services.async_call.assert_not_called()
+    assert not binding._commanded
+    assert binding._value_last_effective == original
+    assert binding._tracked != original
+
+    # Later notches must eventually dispatch a value in the requested direction.
+    for _ in range(12):
+        if rotate(1, up):
+            break
+    else:
+        pytest.fail("Fractional progress never produced a valid service target")
+    payload = binding.hass.services.async_call.call_args.args[2]
+    key = "temperature" if mode == MODE_TEMPERATURE else "value"
+    assert payload[key] == expected
+    assert (payload[key] > original) is up
+    assert binding._commanded[-1][0] == expected
+    assert binding._value_last_effective == expected
+    assert binding.hass.services.async_call.call_count == 1
+
+
 @pytest.mark.parametrize("target_domain", ("number", "input_number"))
 @pytest.mark.parametrize(
     ("minimum", "maximum", "current", "up", "expected"),
@@ -2428,6 +2511,105 @@ def test_a_burst_of_targets_reaches_the_device_as_one_command(monkeypatch) -> No
     assert binding.hass.services.async_call.call_args.args[2]["brightness"] == round(
         255 - 3 * 7.65
     )
+
+
+@pytest.mark.parametrize(
+    ("target", "mode", "state_name", "attributes", "key"),
+    [
+        (
+            "number.late_flush",
+            MODE_NUMBER,
+            "2",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            "value",
+        ),
+        (
+            "input_number.late_flush",
+            MODE_NUMBER,
+            "2",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            "value",
+        ),
+        (
+            "climate.late_flush",
+            MODE_TEMPERATURE,
+            "heat",
+            {
+                "temperature": 2.0,
+                "min_temp": 0.0,
+                "max_temp": 10.0,
+                "target_temp_step": 0.5,
+            },
+            "temperature",
+        ),
+    ],
+)
+def test_late_coalescing_timer_cannot_send_superseded_value(
+    monkeypatch,
+    target: str,
+    mode: str,
+    state_name: str,
+    attributes: dict,
+    key: str,
+) -> None:
+    """Requests 3, 4, 5 and 6 must dispatch 3, 5, 6, never stale 4."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10},
+    )
+    now = [100.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=state_name, attributes=attributes
+    )
+    timers = []
+    canceled = []
+    def schedule(_hass, _delay, callback):
+        timers.append(callback)
+        cancel = Mock()
+        canceled.append(cancel)
+        return cancel
+
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later", schedule
+    )
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True  # send 3
+    now[0] = 100.05
+    assert rotate(1, True) is True  # queue 4
+    assert binding._pending_command is not None
+    assert binding._pending_command[-1] == 2
+
+    now[0] = 100.20
+    assert rotate(1, True) is True  # send 5, cancel stale 4 timer
+    canceled[0].assert_called_once()
+    assert binding._pending_command is None
+    assert binding.hass.services.async_call.call_count == 2
+
+    now[0] = 100.25
+    assert rotate(1, True) is True  # queue 6 on a new timer
+    assert len(timers) == 2
+    assert binding._pending_command is not None
+    assert binding._pending_command[-1] == 4
+
+    # Even if the canceled first timer arrives late, it cannot flush 6 early.
+    timers[0](None)
+    assert binding.hass.services.async_call.call_count == 2
+    assert binding._pending_command is not None
+
+    now[0] = 100.38
+    timers[1](None)
+    values = [
+        call.args[2][key] for call in binding.hass.services.async_call.call_args_list
+    ]
+    assert values == [3.0, 5.0, 6.0]
+    assert binding._pending_command is None
 
 
 def test_the_first_command_of_a_gesture_is_never_delayed(monkeypatch) -> None:
