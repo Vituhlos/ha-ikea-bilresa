@@ -727,6 +727,9 @@ def test_numeric_small_notches_accumulate_without_redundant_commands(
     monkeypatch, target_domain: str
 ) -> None:
     """Repeated sub-step notches advance and survive quantized state echoes."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
     binding, _interval, _watchdog = _binding(
         monkeypatch,
         **{
@@ -783,11 +786,23 @@ def test_numeric_external_report_rebases_fractional_progress(monkeypatch) -> Non
     )
     assert binding._tracked is None
 
+    # The following gesture must start at the externally reported -5, not
+    # continue the abandoned fractional progress near the previous -1.
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-5", attributes=attributes
+    )
+    assert binding._rotate_number(3, True) is True
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == -4
+    assert binding._tracked == pytest.approx(-4.1)
+
 
 def test_climate_small_notches_accumulate_without_redundant_commands(
     monkeypatch,
 ) -> None:
     """Small climate ranges retain notches below the half-degree step."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
     binding, _interval, _watchdog = _binding(
         monkeypatch,
         **{
@@ -824,6 +839,140 @@ def test_climate_small_notches_accumulate_without_redundant_commands(
         )
     )
     assert binding._tracked == pytest.approx(1.36)
+
+
+
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+def test_numeric_inward_notch_from_off_grid_state_dispatches_once(
+    monkeypatch, target_domain: str
+) -> None:
+    """Compare the first quantized target with the actual off-grid state."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.off_grid",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 1,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="0.7", attributes={"min": 0.7, "max": 10.7, "step": 1.0}
+    )
+
+    assert binding._rotate_number(1, True) is True
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == 1.0
+    assert binding._tracked == pytest.approx(0.8)
+    # Continued sub-step progress must not send an identical second command.
+    assert binding._rotate_number(1, True) is False
+    assert binding.hass.services.async_call.call_count == 1
+
+
+def test_climate_inward_notch_from_off_grid_state_dispatches_once(
+    monkeypatch,
+) -> None:
+    """Do not round the starting temperature before deciding to dispatch."""
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: 100.0
+    )
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "climate.off_grid",
+            CONF_MODE: MODE_TEMPERATURE,
+            CONF_STEP: 1,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={
+            "temperature": 16.3,
+            "min_temp": 16.3,
+            "max_temp": 24.3,
+            "target_temp_step": 0.5,
+        },
+    )
+
+    assert binding._rotate_temperature(1, True) is True
+    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == 16.5
+    assert binding._tracked == pytest.approx(16.38)
+    assert binding._rotate_temperature(1, True) is False
+    assert binding.hass.services.async_call.call_count == 1
+
+
+@pytest.mark.parametrize("target_domain", ("number", "input_number"))
+@pytest.mark.parametrize(
+    ("minimum", "maximum", "current", "up", "expected"),
+    [
+        (0.00001, 10.0, 1.0, False, 0.00001),
+        (0.0, 2.34567, 2.0, True, 2.34567),
+    ],
+)
+def test_numeric_precision_at_endpoint_survives_service_payload(
+    monkeypatch,
+    target_domain: str,
+    minimum: float,
+    maximum: float,
+    current: float,
+    up: bool,
+    expected: float,
+) -> None:
+    """A high-precision limit is never rounded outside its allowed range."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: f"{target_domain}.precise_endpoint",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 20,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=str(current),
+        attributes={"min": minimum, "max": maximum, "step": 0.1},
+    )
+
+    assert binding._rotate_number(1, up) is True
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == expected
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum", "current", "up", "expected"),
+    [
+        (16.234, 25.0, 17.0, False, 16.234),
+        (16.0, 25.236, 24.0, True, 25.236),
+    ],
+)
+def test_climate_precision_at_endpoint_survives_service_payload(
+    monkeypatch,
+    minimum: float,
+    maximum: float,
+    current: float,
+    up: bool,
+    expected: float,
+) -> None:
+    """Reported climate limits retain precision beyond two decimal places."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "climate.precise_endpoint",
+            CONF_MODE: MODE_TEMPERATURE,
+            CONF_STEP: 20,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={
+            "temperature": current,
+            "min_temp": minimum,
+            "max_temp": maximum,
+            "target_temp_step": 0.5,
+        },
+    )
+
+    assert binding._rotate_temperature(1, up) is True
+    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == expected
 
 
 @pytest.mark.parametrize("target_domain", ("number", "input_number"))
