@@ -24,6 +24,7 @@ import pytest
 
 from custom_components.ikea_bilresa import binding as binding_module
 from custom_components.ikea_bilresa import coordinator as coordinator_module
+from custom_components.ikea_bilresa import matter_core as matter_core_module
 
 from .harness import LabHarness
 from .net_guard import NetworkGuard
@@ -57,6 +58,10 @@ _PRISTINE = {
     ),
     (coordinator_module, "async_call_later"): coordinator_module.async_call_later,
     (coordinator_module, "GestureEngine"): coordinator_module.GestureEngine,
+    (matter_core_module, "time"): matter_core_module.time,
+    (matter_core_module, "async_track_time_interval"): (
+        matter_core_module.async_track_time_interval
+    ),
 }
 
 

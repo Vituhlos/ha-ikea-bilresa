@@ -72,6 +72,9 @@ ALLOWED_SERVICES = frozenset(
         ("number", "set_value"),
         ("climate", "set_temperature"),
         ("media_player", "volume_set"),
+        ("media_player", "volume_mute"),
+        ("media_player", "media_play_pause"),
+        ("scene", "turn_on"),
     }
 )
 

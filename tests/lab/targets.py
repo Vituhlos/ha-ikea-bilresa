@@ -51,6 +51,14 @@ class Target:
     def accepts(self, domain: str, service: str) -> bool:
         return (domain, service) in self.services()
 
+    def device_snapshot(self) -> Any:
+        """The device state before a command (for reports that depend on it)."""
+        return None
+
+    def extra_reports(self, before: Any, after: Any) -> list[tuple[float, Any]]:
+        """Further reports a command causes besides its echo: (delay, snapshot)."""
+        return []
+
     def apply(self, service: str, data: dict[str, Any]) -> tuple[Any, float]:
         raise NotImplementedError
 
@@ -100,6 +108,9 @@ class LightTarget(Target):
         super().__init__(entity_id, echo_delay=echo_delay)
         self._applied = (on, brightness)
         self._reported = (on, brightness)
+
+    def device_snapshot(self) -> Any:
+        return self._applied
 
     def services(self) -> frozenset[tuple[str, str]]:
         own = {("light", name) for name in ("turn_on", "turn_off", "toggle")}
@@ -256,7 +267,11 @@ class ClimateTarget(Target):
 
 
 class MediaPlayerTarget(Target):
-    """A media player with ``volume_level`` 0.0-1.0."""
+    """A media player: ``volume_level`` 0.0-1.0, mute, play/pause and power.
+
+    Mute, play/pause and power change the device and are reported at once; only a
+    volume command is reported after ``echo_delay``.
+    """
 
     def __init__(
         self,
@@ -268,11 +283,31 @@ class MediaPlayerTarget(Target):
         super().__init__(entity_id, echo_delay=echo_delay)
         self._applied = float(volume)
         self._reported = float(volume)
+        self.muted = False
+        self.playing = True
+        self.power = True
 
     def services(self) -> frozenset[tuple[str, str]]:
-        return frozenset({("media_player", "volume_set")})
+        shared = {("homeassistant", name) for name in ("turn_on", "turn_off", "toggle")}
+        own = {
+            ("media_player", name)
+            for name in ("volume_set", "volume_mute", "media_play_pause")
+        }
+        return frozenset(own | shared)
 
     def apply(self, service: str, data: dict[str, Any]) -> tuple[Any, float]:
+        if service == "volume_mute":
+            _only(data, {"is_volume_muted"})
+            self.muted = bool(data["is_volume_muted"])
+            return self._applied, 0.0
+        if service == "media_play_pause":
+            _only(data, set())
+            self.playing = not self.playing
+            return self._applied, 0.0
+        if service in ("turn_on", "turn_off", "toggle"):
+            _only(data, set())
+            self.power = not self.power if service == "toggle" else service == "turn_on"
+            return self._applied, 0.0
         _only(data, {"volume_level"})
         value = _number(data, "volume_level")
         if not 0.0 <= value <= 1.0:
@@ -288,13 +323,51 @@ class MediaPlayerTarget(Target):
         self._reported = float(snapshot)
 
     def reported_state(self) -> tuple[str, dict[str, Any]]:
-        return "playing", {"volume_level": self._reported, "is_volume_muted": False}
+        state = "off" if not self.power else ("playing" if self.playing else "paused")
+        return state, {
+            "volume_level": self._reported,
+            "is_volume_muted": self.muted,
+        }
 
     def requested(self) -> dict[str, Any]:
         return {"volume_level": self._applied}
 
     def value(self) -> Any:
         return self._reported
+
+
+class GroupLightTarget(LightTarget):
+    """A Zigbee2MQTT-style light group (issue #9).
+
+    The group does not report an average. It passes up whichever member reported
+    last, so while the bulbs fade its reported brightness wanders: for each
+    command the group first reports the *old* level (a member that had not moved
+    yet), then a much *brighter* unrelated level (another member), and only then
+    the new level. All three are reports; the device itself is only ever at the
+    new level.
+    """
+
+    def __init__(
+        self,
+        entity_id: str,
+        *,
+        brightness: int = 128,
+        stale_after: float = 0.15,
+        bright_after: float = 0.35,
+        bright_jump: int = 60,
+        echo_delay: float | None = 0.6,
+    ) -> None:
+        super().__init__(entity_id, brightness=brightness, echo_delay=echo_delay)
+        self._stale_after = stale_after
+        self._bright_after = bright_after
+        self._bright_jump = bright_jump
+
+    def extra_reports(self, before: Any, after: Any) -> list[tuple[float, Any]]:
+        on, brightness = after
+        return [
+            (self._stale_after, before),
+            (self._bright_after, (on, min(255, brightness + self._bright_jump))),
+        ]
 
 
 class TargetRegistry:
@@ -360,6 +433,7 @@ class TargetRegistry:
 
     def apply(self, entity_id: str, service: str, data: dict[str, Any]) -> None:
         target = self._targets[entity_id]
+        before = target.device_snapshot()
         snapshot, extra = target.apply(service, data)
         self.history.append(
             {
@@ -372,6 +446,12 @@ class TargetRegistry:
         if target.echo_delay is None:
             return
 
+        self._schedule_report(target, snapshot, target.echo_delay + extra)
+        for delay, extra_snapshot in target.extra_reports(before, snapshot):
+            self._schedule_report(target, extra_snapshot, delay)
+
+    def _schedule_report(self, target: Target, snapshot: Any, delay: float) -> None:
+        entity_id = target.entity_id
         made_in = self._generation[entity_id]
 
         def report(_now: float) -> None:
@@ -386,9 +466,7 @@ class TargetRegistry:
                 return
             self._publish(target, snapshot, stale=made_in < self._generation[entity_id])
 
-        self._scheduler.call_later(
-            target.echo_delay + extra, report, label=f"echo:{entity_id}"
-        )
+        self._scheduler.call_later(delay, report, label=f"echo:{entity_id}")
 
     def external_change(
         self, entity_id: str, snapshot: Any, *, stale_echoes: str = "drop"
