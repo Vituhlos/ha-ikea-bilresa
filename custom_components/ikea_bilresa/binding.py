@@ -1356,20 +1356,31 @@ class LightBinding:
             target = min(
                 max_t, max(min_t, round(continuous_target / temp_step) * temp_step)
             )
-        previous = min(max_t, max(min_t, round(tracked / temp_step) * temp_step))
+        # Compare the new command against the last computed service value.
+        # On a fresh gesture, compare with the *actual* (possibly off-grid)
+        # state instead of rounding that starting value to the step grid.
+        previous = (
+            self._commanded[-1][0]
+            if self._trace_source == "tracked" and self._commanded
+            else tracked
+        )
+        # Preserve exact endpoints, including bounds more precise than 0.01.
+        # Intermediate values are rounded for service payload stability.
+        if target not in (min_t, max_t):
+            target = min(max_t, max(min_t, round(target, 2)))
         self._set_target(target, span, tracked=continuous_target)
         result = self._value_result(
             "temperature",
-            round(previous, 2),
-            round(target, 2),
+            previous,
+            target,
             str(state.attributes.get("unit_of_measurement") or "°"),
         )
         return self._call_value_if_changed(
             "climate",
             "set_temperature",
-            {"temperature": round(target, 2)},
-            before=round(previous, 2),
-            after=round(target, 2),
+            {"temperature": target},
+            before=previous,
+            after=target,
             result=result,
         )
 
@@ -1418,21 +1429,28 @@ class LightBinding:
             target = min(
                 max_n, max(min_n, round(continuous_target / num_step) * num_step)
             )
-        previous = min(max_n, max(min_n, round(tracked / num_step) * num_step))
+        previous = (
+            self._commanded[-1][0]
+            if self._trace_source == "tracked" and self._commanded
+            else tracked
+        )
+        # Never round a reported min/max outward (or inward) in the payload.
+        if target not in (min_n, max_n):
+            target = min(max_n, max(min_n, round(target, 4)))
         self._set_target(target, span, tracked=continuous_target)
         domain = self._target.split(".", 1)[0]
         result = self._value_result(
             "number",
-            round(previous, 4),
-            round(target, 4),
+            previous,
+            target,
             str(state.attributes.get("unit_of_measurement") or ""),
         )
         return self._call_value_if_changed(
             domain,
             "set_value",
-            {"value": round(target, 4)},
-            before=round(previous, 4),
-            after=round(target, 4),
+            {"value": target},
+            before=previous,
+            after=target,
             result=result,
         )
 
