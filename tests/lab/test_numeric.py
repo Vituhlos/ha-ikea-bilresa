@@ -141,8 +141,9 @@ def test_number_with_a_maximum_of_zero_stops_at_zero(lab) -> None:
     input_number, minimum -10, maximum 0, step 1, now -1; Value binding, 10 %
     per step; one notch up. The span is 10, so one notch is 1: -1 + 1 = 0.
 
-    Today the maximum 0 is read as missing and replaced by 100, the span becomes
-    110, one notch is 11 and the binding asks for 10, which the entity refuses.
+    The maximum 0 is a real limit. Before the fix (PR #71) it was read as missing
+    and replaced by 100: the span became 110, one notch 11, and the binding asked
+    for 10, which the entity refuses.
     """
     entity = _number(lab, minimum=-10, maximum=0, step=1, value=-1)
     lab.load(e2490_node(NODE))
@@ -156,8 +157,8 @@ def test_climate_with_a_minimum_of_zero_does_not_go_up_when_turned_down(lab) -> 
     """min_temp 0, max_temp 30, now 1.0, 10 % per step (span 30, a step is 3).
 
     One notch down: 1.0 - 3 = -2, the floor is 0, so the setpoint goes to 0.0.
-    Today the minimum 0 is read as missing and replaced by 7; the same notch
-    down raises the setpoint from 1.0 to 7.0.
+    The minimum 0 is a real limit. Before the fix it was read as missing and
+    replaced by 7, so the same notch down raised the setpoint from 1.0 to 7.0.
     """
     lab.add_target(
         ClimateTarget(
@@ -180,9 +181,9 @@ def test_climate_with_a_minimum_of_zero_does_not_go_up_when_turned_down(lab) -> 
 def test_climate_with_a_maximum_of_zero_stops_at_zero(lab) -> None:
     """min_temp -20, max_temp 0, now -5, 10 % per step (span 20, a step is 2).
 
-    One notch up: -5 + 2 = -3, inside the range. Today the maximum 0 is read as
-    missing and replaced by 35, the span becomes 55 and the setpoint is asked
-    to move to 0.5, above the thermostat's maximum.
+    One notch up: -5 + 2 = -3, inside the range. Before the fix the maximum 0 was
+    read as missing and replaced by 35: the span became 55 and the setpoint was
+    asked to move to 0.5, above the thermostat's maximum.
     """
     lab.add_target(
         ClimateTarget(
