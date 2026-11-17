@@ -272,6 +272,12 @@ class LightBinding:
         # start of a gesture). A suppressed off-grid quantization must not
         # replace it while fractional progress continues accumulating.
         self._value_last_effective: float | None = None
+        # Unlike the global echo history, this deque contains commands only
+        # from the current numeric/climate baseline. Older commands must not
+        # make an unrelated external report look like our own value change.
+        self._value_baseline_commands: deque[tuple[float, float]] = deque(
+            maxlen=_COMMAND_HISTORY
+        )
         self._command_authoritative_until = 0.0
         self._last_direction: str | None = None
         self._saturation = 100.0
@@ -634,20 +640,29 @@ class LightBinding:
         observed = self._observed_value(state)
         if observed is None:
             return True
-        if not self._commanded:
+        # The global history intentionally survives an external rebase to
+        # recognize delayed echoes for other targets. Numeric and climate
+        # targets must instead compare only commands issued from their current
+        # baseline, not the older path that existed before a rebase.
+        commands = (
+            self._value_baseline_commands
+            if self._mode in (MODE_NUMBER, MODE_TEMPERATURE)
+            else self._commanded
+        )
+        if not commands:
             # A suppressed quantization is not an outgoing command. Without
-            # a command to echo, a changed numeric/climate value must still
-            # be recognized as an external update, even mid-scroll.
+            # a current-baseline command to echo, an external value change
+            # must still rebase, even during a continuous scroll.
             if (
                 self._mode in (MODE_NUMBER, MODE_TEMPERATURE)
                 and self._value_last_effective is not None
             ):
                 return observed == self._value_last_effective
             return True
-        values = [value for value, _span in self._commanded]
+        values = [value for value, _span in commands]
         if self._last_reported is not None:
             values.append(self._last_reported)
-        span = max(span for _value, span in self._commanded)
+        span = max(span for _value, span in commands)
         tolerance = span * _ECHO_MATCH_FRACTION
         if self._mode == MODE_COLOR:
             # Hue wraps, so "between two values" has no meaning; proximity to
@@ -689,7 +704,10 @@ class LightBinding:
         """Record the quantized service target, retaining sub-step progress."""
         # Compare state echoes against sent values, not fractional progress.
         self._tracked = value if tracked is None else tracked
-        self._commanded.append((value, max(span, 1e-9)))
+        command = (value, max(span, 1e-9))
+        self._commanded.append(command)
+        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
+            self._value_baseline_commands.append(command)
 
     @callback
     def _forget_target(self, reason: str = "unspecified", reported: Any = None) -> None:
@@ -712,6 +730,7 @@ class LightBinding:
             )
         self._tracked = None
         self._value_last_effective = None
+        self._value_baseline_commands.clear()
         # The command history is deliberately kept. It describes where the
         # target is still travelling to, and that stays true after we give up
         # our calculated value — clearing it made the very next report look
@@ -1156,6 +1175,9 @@ class LightBinding:
             self._last_reported = current
         self._tracked = value
         if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
+            # A fresh idle/state resync starts a new numeric/climate baseline;
+            # previous target commands no longer describe its trajectory.
+            self._value_baseline_commands.clear()
             self._value_last_effective = value
         return value
 
