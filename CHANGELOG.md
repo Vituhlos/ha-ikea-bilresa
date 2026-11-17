@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   BILRESA number and temperature modes no longer mistake a valid minimum or
   maximum of zero for a missing attribute and send values beyond the target's
   configured range. Missing bounds retain their previous fallback values, and
-  invalid zero step sizes retain their positive fallback.
+  invalid zero step sizes retain their positive fallback. Exact range endpoints
+  stay reachable even when the target step does not divide the range.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
