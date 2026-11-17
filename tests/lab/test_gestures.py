@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from .catalog import covers
 from .fake_matter import E2490_ENDPOINTS, Wire, e2489_node, e2490_node
 
 NODE = 14
@@ -31,6 +32,7 @@ def _types(lab) -> list[str]:
 # -- A01 .. A04: scrolling ------------------------------------------------
 
 
+@covers("gesture:rotate_up", "gesture:rotate_down")
 def test_a01_one_notch_up_and_down(lab) -> None:
     """A01: one notch is exactly one action, in the right direction."""
     wire = Wire(NODE)
@@ -173,6 +175,7 @@ def test_a_direction_change_is_not_mixed(lab) -> None:
 
 
 @pytest.mark.parametrize("presses", [1, 2, 3])
+@covers("gesture:press", "gesture:double_press", "gesture:triple_press")
 def test_a10_e2490_button_counts_presses(lab, presses: int) -> None:
     """A10: a wheel button reports single, double and triple presses."""
     wire = Wire(NODE)
@@ -185,6 +188,7 @@ def test_a10_e2490_button_counts_presses(lab, presses: int) -> None:
     assert _types(lab).count("short_release") == presses
 
 
+@covers("gesture:hold", "gesture:release")
 def test_a10_e2490_hold_and_release_report_host_observed_time(lab) -> None:
     """InitialPress at 0 s, LongPress at 0.72 s, LongRelease at 1.4 s."""
     wire = Wire(NODE)

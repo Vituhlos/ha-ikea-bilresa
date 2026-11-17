@@ -29,6 +29,7 @@ from custom_components.ikea_bilresa import const
 from custom_components.ikea_bilresa import matter_core as matter_core_module
 from custom_components.ikea_bilresa.matter_core import CoreMatterEventSource
 
+from .catalog import covers
 from .fake_clock import fake_time_module
 from .fake_matter import E2490_ENDPOINTS, Wire, e2490_node
 from .harness import LabHarness
@@ -183,6 +184,7 @@ def world(lab: LabHarness, monkeypatch: pytest.MonkeyPatch):
     built.stop()
 
 
+@covers("conf:url")
 def test_the_wheel_is_found_among_sixty_four_nodes(world) -> None:
     assert list(world.lab.coordinator.wheels) == [WHEEL]
     assert world.converted == NODES, "every node is converted once, when attaching"

@@ -16,6 +16,7 @@ import pytest
 
 from custom_components.ikea_bilresa import binding as binding_module
 
+from .catalog import covers
 from .fake_matter import E2490_ENDPOINTS, Wire, e2490_node
 from .harness import LabHarness
 from .service_spy import LabSafetyViolation
@@ -250,6 +251,7 @@ def _ramp_setup(lab) -> Wire:
     return Wire(NODE)
 
 
+@covers("hold:ramp", "conf:hold_action", "conf:hold_target")
 def test_a_hold_ramp_starts_and_a_release_leaves_no_timer(lab) -> None:
     wire = _ramp_setup(lab)
     lab.play(
@@ -268,6 +270,7 @@ def test_a_hold_ramp_starts_and_a_release_leaves_no_timer(lab) -> None:
     assert [t for t in lab.scheduler.pending() if not t.startswith("echo:")] == []
 
 
+@covers("hold:ramp")
 def test_a_lost_release_is_stopped_by_the_watchdog(lab) -> None:
     """No LongRelease ever arrives: the 30 s watchdog ends the ramp by itself."""
     wire = _ramp_setup(lab)

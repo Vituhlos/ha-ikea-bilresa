@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from .catalog import covers
 from .fake_matter import E2490_ENDPOINTS, Wire, e2490_node
 from .targets import ClimateTarget, NumberTarget
 
@@ -71,6 +72,7 @@ def _number(lab, **kwargs: Any) -> str:
         (0, 100, 5, 50, 3, True, 55.0),
     ],
 )
+@covers("mode:number")
 def test_number_targets_follow_their_own_range(
     lab, minimum, maximum, step, value, binding_step, up, expected
 ) -> None:
@@ -111,6 +113,7 @@ def test_a_number_target_never_receives_a_value_outside_its_range(lab) -> None:
         (-20, -5, -10.0, 0.5, True, -8.5),
     ],
 )
+@covers("mode:temperature")
 def test_climate_targets_follow_their_own_range(
     lab, minimum, maximum, temperature, step, up, expected
 ) -> None:

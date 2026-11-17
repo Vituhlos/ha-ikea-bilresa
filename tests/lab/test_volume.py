@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from .catalog import covers
 from .fake_matter import E2490_ENDPOINTS, Wire, e2490_node
 from .known_issues import HAS_MAX_VOLUME, MISSING_FEATURE_MAX_VOLUME
 from .targets import MediaPlayerTarget
@@ -58,6 +59,7 @@ def _notch(lab, wire: Wire, endpoint: int, when: float = 0.0) -> None:
 # -- runs today ---------------------------------------------------------------
 
 
+@covers("mode:volume", "conf:step")
 def test_one_notch_is_ten_percent_of_the_scale(lab) -> None:
     wire = _setup(lab, 0.5)
     _notch(lab, wire, UP1)
