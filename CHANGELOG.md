@@ -35,7 +35,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   suppresses targets that move opposite to the wheel's direction while
   preserving fractional progress until a valid target is reached. Queued
   value commands retain their original generation, and a canceled late
-  timer can no longer flush a newer pending command.
+  timer can no longer flush a newer pending command. Numeric/climate
+  state-echo detection now uses only the current baseline's commands, so
+  historical value commands cannot hide genuine external changes after a
+  new gesture starts.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
