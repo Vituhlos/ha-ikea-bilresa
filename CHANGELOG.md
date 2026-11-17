@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   maximum of zero for a missing attribute and send values beyond the target's
   configured range. Missing bounds retain their previous fallback values, and
   invalid zero step sizes retain their positive fallback. Exact range endpoints
-  stay reachable even when the target step does not divide the range.
+  stay reachable even when the target step does not divide the range or has
+  more decimal places than the normal service payload. The first inward notch
+  from an off-grid state is no longer lost, and fractional progress still
+  accumulates without repeating unchanged commands.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
