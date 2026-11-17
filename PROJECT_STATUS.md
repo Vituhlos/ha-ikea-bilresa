@@ -1,5 +1,13 @@
 # Project status and agent handoff
 
+## PR #71: CodeRabbit stability and direction review follow-up (2026-11-17)
+
+- **Scope:** Address both CodeRabbit findings from [review #5944160825](https://github.com/Vituhlos/ha-ikea-bilresa/pull/71#pullrequestreview-5944160825). In `binding.py`, coalesced numeric/climate commands retain their generation at request creation, and a newer immediately dispatched target cancels an older pending request. A separately versioned timer ignores late callbacks after cancellation or replacement. For number/input_number and climate targets, quantization can no longer issue a command opposite to the wheel direction; the continuous fractional accumulator is retained and only an actual, direction-consistent command updates the effective comparison value and command history. Without an outgoing value command, an external numeric/climate state change still rebases the gesture. Light/group policies are unchanged.
+- **Tests:** `tests/test_binding.py` covers off-grid wrong-way number, input_number and climate rounding; subsequent notches eventually dispatch a direction-consistent value; queued command generations; canceled timers firing late after a new command and another queued request; and existing external state rebase after a suppressed first notch.
+- **Verification:** Initial code/test commit `f6227dd` had **586 Python passes, 1 failed** (`test_numeric_external_report_rebases_fractional_progress`), revealing the no-command echo edge case. The follow-up fix `61770b1` passed [CI #44150293529](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44150293529) and [CodeQL #44150293553](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44150293553). The subsequent changelog-only head `6ace1e0` passed [CI #44150327207](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44150327207) and [CodeQL #44150327332](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44150327332), including six successful CI jobs; the optional newest-HA pre-release unit-test job was skipped. The status-only commit that records these results still requires its own exact-head check. No local full-suite pytest, Ruff or mypy was performed; verification was via GitHub Actions.
+- **Hardware:** **Not verified** on a physical BILRESA with this branch. The 2026-11-13 observation remains a pre-fix failure reproduction, not a passing patched-hardware result.
+- **Remaining risks / next action:** Recheck final exact-head CI and review feedback, obtain maintainer approval, then repeat the physical negative-to-zero and off-grid rotation checks before release. No stable release or merge is implied.
+
 ## PR #71: out-of-order service failures, verified code (2026-11-17)
 
 - **Scope:** After Sourcery's later review, `binding.py` now identifies
@@ -20,9 +28,12 @@
   The subsequent changelog-only commit `b652812` also passed
   [CI #44144072268](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144072268)
   and [CodeQL #44144072147](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144072147).
-  Required checks for this new status-documentation commit must still be read
-  from GitHub's exact-head status. Full local pytest/Ruff/mypy were not run
-  in this session because a dependency-equipped checkout was unavailable.
+  The next status-only head `825386b` passed
+  [CI #44144411021](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144411021)
+  and [CodeQL #44144411083](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144411083).
+  Later CodeRabbit review fixes and their results are recorded in the newer
+  entry above. Full local pytest/Ruff/mypy were not run because a
+  dependency-equipped checkout was unavailable.
 - **Hardware:** The patched PR is **NOT** hardware-verified. The November 13
   BILRESA observation documented below is the pre-fix reproduction only.
 - **Known risks / next action:** Human review by Vituhlos and actual hardware
