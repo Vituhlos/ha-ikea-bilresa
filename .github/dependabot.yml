@@ -1,0 +1,34 @@
+# Keeps the actions in the workflows and the test tools up to date, one pull
+# request per group a week, so a bump is a small reviewed change and not a
+# surprise. The Home Assistant version the tests are pinned to is part of the
+# test tools group: its pull request shows whether the suite still passes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore"
+    open-pull-requests-limit: 3
+    # The pinned test job runs Home Assistant together with the community test
+    # package, which stopped at 2026.10.4 and pins that Home Assistant itself:
+    # a bump of one of them alone cannot be installed. The pre-release job in
+    # ci.yml tests the newest Home Assistant with the official package.
+    ignore:
+      - dependency-name: "homeassistant"
+      - dependency-name: "pytest-homeassistant-custom-component"
+    groups:
+      test-tools:
+        patterns: ["*"]

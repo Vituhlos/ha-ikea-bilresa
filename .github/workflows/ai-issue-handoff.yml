@@ -1,0 +1,57 @@
+name: AI issue handoff (owner-only, no model calls)
+
+# A maintainer's exact issue comment prepares a prompt; AI never runs here.
+# GitHub runs issue_comment workflows from the trusted default branch.
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  prepare:
+    name: Prepare Codex Cloud task prompt
+    if: >-
+      github.actor == 'Vituhlos' &&
+      github.triggering_actor == 'Vituhlos' &&
+      !github.event.issue.pull_request &&
+      (
+        github.event.comment.body == '/agent prepare dev' ||
+        github.event.comment.body == '/agent prepare main'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # Explicitly pin helper code to trusted main. Never checkout a fork.
+      - name: Checkout trusted workflow code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Prepare owner-authorized task handoff
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { runHandoff } = await import(
+              process.env.GITHUB_WORKSPACE + '/tools/agent_handoff.mjs'
+            );
+            const result = await runHandoff({
+              github,
+              context,
+              actor: context.actor,
+              triggeringActor: process.env.GITHUB_TRIGGERING_ACTOR,
+              eventName: context.eventName,
+            });
+            core.notice(
+              'Prepared an issue handoff; NO Codex task or other AI execution started.'
+            );
+            await core.summary.addHeading('Codex Cloud handoff prepared')
+              .addRaw('Issue #' + result.issueNumber + ', PR base: ' +
+                result.baseBranch + '. No AI model was invoked.')
+              .addBreak()
+              .addLink('Open issue and copy the prompt', result.url)
+              .write();
