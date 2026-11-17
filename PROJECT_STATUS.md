@@ -1,5 +1,34 @@
 # Project status and agent handoff
 
+## PR #71: out-of-order service failures, verified code (2026-11-17)
+
+- **Scope:** After Sourcery's later review, `binding.py` now identifies
+  numeric/input_number and climate value commands by a monotonically increasing
+  request generation. A delayed rejection from a superseded command must NOT
+  discard a newer dispatched or coalesced target. A failure of the still-current
+  command resets tracked progress, queued work and dispatch authority, allowing
+  the next rotation to read Home Assistant's reported state. Unrelated modes,
+  including light/group echo recovery, remain unchanged.
+- **Regression coverage:** `tests/test_binding.py` exercises the latest
+  rejected number, input_number and climate command followed by a real-state
+  retry, and an older rejection after a newer command has been sent or queued
+  for each mode. It also checks that a failed light service leaves the existing
+  light tracking policy unchanged. No physical hardware validation is implied.
+- **Exact code verification:** Commit `e632a02` passed GitHub Actions
+  [CI #44144020339](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144020339)
+  and [CodeQL #44144020169](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144020169).
+  The subsequent changelog-only commit `b652812` also passed
+  [CI #44144072268](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144072268)
+  and [CodeQL #44144072147](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44144072147).
+  Required checks for this new status-documentation commit must still be read
+  from GitHub's exact-head status. Full local pytest/Ruff/mypy were not run
+  in this session because a dependency-equipped checkout was unavailable.
+- **Hardware:** The patched PR is **NOT** hardware-verified. The November 13
+  BILRESA observation documented below is the pre-fix reproduction only.
+- **Known risks / next action:** Human review by Vituhlos and actual hardware
+  retesting remain pending. Check the exact final PR-head CI/review gates and
+  obtain maintainer approval; do not release or merge based on code checks alone.
+
 ## PR #71: rejected numeric/climate service recovery (2026-11-17)
 
 - **Scope:** After a failed `number.set_value`, `input_number.set_value` or `climate.set_temperature` call, `binding.py` discards fractional tracking, stale calculated target history, any pending/coalesced command, and the command-rate/echo authority windows. The next notch starts from Home Assistant's currently reported state. Light/group state-echo behavior and other modes are deliberately unchanged.
@@ -12,7 +41,7 @@
 
 - **Scope:** Address Sourcery's five findings in [PR #71](https://github.com/Vituhlos/ha-ikea-bilresa/pull/71). In `binding.py`, number/input_number and climate rotation now compare the newly quantized command with the actual off-grid starting value, or with the last calculated service value during a continuing gesture. Keep fractional internal progress and send exact min/max values even when their precision exceeds four/two decimal places; round and clamp only intermediate service values. Other modes and Matter event handling are unchanged.
 - **Tests:** `tests/test_binding.py` now verifies the first inward off-grid notch and no duplicate follow-up command for number/input_number and climate; exact high-precision minimum/maximum payloads; and a new rotation using the externally reported -5 after internal tracking is cleared. The numeric and climate multi-notch tests use deterministic monotonic time to avoid CI stalls crossing the three-second gesture resync window.
-- **Verification:** Prior exact commit `6e9917f` passed GitHub Actions CI run `44077240440` and CodeQL run `44077240537` before this follow-up. The new code/test/docs commits require fresh **exact-head** CI, CodeQL, and reviewer checks. This session did not run full local pytest, Ruff or mypy: a dependency-equipped repository checkout is unavailable in the current environment. Do not mistake previous successful jobs for verification of the new head.
+- **Verification (historical follow-up):** The earlier follow-up head `59d6e99` passed CI [44133262095](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44133262095) and CodeQL [44133262347](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44133262347). Later failure-handling changes and their exact-head verification are documented in the newer entry above. Local full pytest, Ruff and mypy were not run because a dependency-equipped checkout was unavailable.
 - **Hardware:** **NOT tested** with the patched PR on a physical BILRESA. The recorded 2026-11-13 observation remains strictly a pre-fix reproduction, not a regression pass.
 - **Risk and next action:** Verify the new head's automated tests, respond to any new code-review findings, then install the approved candidate on a physical device and repeat the zero-bound and off-grid step tests before calling the bug release-ready.
 
