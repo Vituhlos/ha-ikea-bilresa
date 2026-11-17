@@ -168,6 +168,9 @@ test("GitHub Actions only listens for issue comments and checks out trusted main
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /github\.triggering_actor == 'Vituhlos'/);
   assert.match(workflow, /actions\/github-script@[0-9a-f]{40}/);
+  // Two quick commands on one issue must queue, not run side by side, or both
+  // would create a comment instead of one updating the other.
+  assert.match(workflow, /concurrency:\s+group: ai-issue-handoff-\$\{\{ github\.repository \}\}-\$\{\{ github\.event\.issue\.number \}\}\s+cancel-in-progress: false/);
 });
 
 test("a non-owner rerun is rejected even if the original actor was the owner", async () => {

@@ -19,6 +19,11 @@ jobs:
         github.event.comment.body == '/agent prepare dev' ||
         github.event.comment.body == '/agent prepare main'
       )
+    # One run per issue at a time, so two quick commands cannot both create a
+    # comment; a waiting run then finds the first one and updates it.
+    concurrency:
+      group: ai-issue-handoff-${{ github.repository }}-${{ github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
