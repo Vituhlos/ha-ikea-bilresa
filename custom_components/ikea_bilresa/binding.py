@@ -632,7 +632,17 @@ class LightBinding:
         ends is where a group reasserts its real level.
         """
         observed = self._observed_value(state)
-        if observed is None or not self._commanded:
+        if observed is None:
+            return True
+        if not self._commanded:
+            # A suppressed quantization is not an outgoing command. Without
+            # a command to echo, a changed numeric/climate value must still
+            # be recognized as an external update, even mid-scroll.
+            if (
+                self._mode in (MODE_NUMBER, MODE_TEMPERATURE)
+                and self._value_last_effective is not None
+            ):
+                return observed == self._value_last_effective
             return True
         values = [value for value, _span in self._commanded]
         if self._last_reported is not None:
