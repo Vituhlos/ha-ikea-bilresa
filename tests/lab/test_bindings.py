@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from .fake_matter import E2490_ENDPOINTS, Wire, e2489_node, e2490_node
 from .targets import LightTarget
 
@@ -171,12 +173,18 @@ def test_b_the_first_notch_is_never_faded(lab) -> None:
     assert lab.registry.target("light.lab").value() == 108
 
 
-def test_b_a_fade_reports_the_new_level_only_when_it_ends(lab) -> None:
+def fade_reports_the_new_level_only_when_it_ends(lab, light_class) -> None:
     """The second notch of the same scroll is sent with the whole 1 s transition,
     so the light keeps reporting the old level for 1 s and then the new one:
     request at 0.5 s (107.65 + 7.65 = 115.3 -> 115), report at 1.5 s.
+
+    A plain function of the target class so the mutation test below can run it
+    against a device that wrongly reports a fade at once.
     """
-    wire = _setup(lab, LightTarget("light.lab", brightness=100), transition=1.0)
+    lab.add_target(light_class("light.lab", brightness=100))
+    lab.load(e2490_node(NODE))
+    lab.setup_bindings(light_binding(transition=1.0))
+    wire = Wire(NODE)
     _notch(lab, wire, 0.0, UP1)
     _notch(lab, wire, 0.5, UP1)
 
@@ -184,10 +192,30 @@ def test_b_a_fade_reports_the_new_level_only_when_it_ends(lab) -> None:
         {"brightness": 108, "transition": 0.0},
         {"brightness": 115, "transition": 1.0},
     ]
+    target = lab.registry.target("light.lab")
+    assert target.requested()["brightness"] == 115, "the device is already fading"
     lab.at(1.4)
-    assert lab.registry.target("light.lab").value() == 108, "still fading"
+    assert target.value() == 108, "still fading: the old level is reported"
     lab.at(1.6)
-    assert lab.registry.target("light.lab").value() == 115, "the fade has ended"
+    assert target.value() == 115, "the fade has ended: the new level is reported"
+
+
+def test_b_a_fade_reports_the_new_level_only_when_it_ends(lab) -> None:
+    fade_reports_the_new_level_only_when_it_ends(lab, LightTarget)
+
+
+class _ReportsAFadeAtOnce(LightTarget):
+    """Wrong device: it ignores ``transition`` when deciding when to report."""
+
+    def apply(self, service, data):
+        snapshot, _ = super().apply(service, data)
+        return snapshot, 0.0
+
+
+def test_mutation_a_device_that_reports_a_fade_at_once_fails_the_fade_test(lab) -> None:
+    """The fade test is not satisfied by an immediate report."""
+    with pytest.raises(AssertionError):
+        fade_reports_the_new_level_only_when_it_ends(lab, _ReportsAFadeAtOnce)
 
 
 # -- buttons ----------------------------------------------------------------

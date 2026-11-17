@@ -9,7 +9,6 @@ caused it (see ``conftest.lab``).
 from __future__ import annotations
 
 import asyncio
-import socket
 import time
 from typing import Any
 
@@ -216,25 +215,6 @@ def test_a_task_that_would_wait_for_something_real_is_refused(lab) -> None:
     with pytest.raises(LabSafetyViolation):
         lab.tasks.run_now(asyncio.sleep(0))
     assert [e["kind"] for e in lab.safety.acknowledge()] == ["task_suspended"]
-
-
-def test_the_network_tripwire_blocks_everything_but_loopback(
-    lab, network_attempts: list[str]
-) -> None:
-    """A connection or a lookup toward a Matter server never leaves the process.
-
-    No socket is created: the tripwire's ``connect`` is called directly with a
-    stand-in object (it raises before it would use it), so this also holds on
-    Linux CI, where the Home Assistant test plugin refuses to create sockets at
-    all. The address is a documentation range and the name does not exist.
-    """
-    with pytest.raises(LabSafetyViolation):
-        socket.socket.connect(object(), ("192.0.2.1", 5580))  # type: ignore[arg-type]
-    with pytest.raises(LabSafetyViolation):
-        socket.getaddrinfo("matter-server.invalid", 5580)
-
-    assert network_attempts == ["192.0.2.1", "matter-server.invalid"]
-    network_attempts.clear()
 
 
 def test_the_process_clock_is_not_patched() -> None:

@@ -1,19 +1,24 @@
 """Fixtures for the lab: a harness that cleans up and checks its own safety.
 
-Two guards run around every test in this directory:
+Guards that run around every test in this directory:
 
-* a network tripwire: any connection or name lookup that is not loopback is
-  refused and recorded, whatever the platform's socket plugin does;
+* a network guard (``net_guard``): every outbound socket operation and name
+  lookup that is not loopback is refused and recorded, whatever the platform's
+  socket plugin does;
+* a patch guard: no production module may be left patched;
 * the harness teardown: no refusal may be left unacknowledged, and the
-  coordinator's shutdown must leave no timer, subscription or task behind.
+  coordinator's shutdown must leave no timer, subscription, listener or task.
+
+Every one of these raises ``LabSafetyViolation``, which is *not* an
+``AssertionError``. The expected-failure markers of ``known_issues`` accept only
+``AssertionError``, so a safety failure can never be reported as an expected
+failure, in a test body, in fixture setup or in fixture teardown.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
-import socket
 import time
-from typing import Any
 
 import pytest
 
@@ -21,9 +26,8 @@ from custom_components.ikea_bilresa import binding as binding_module
 from custom_components.ikea_bilresa import coordinator as coordinator_module
 
 from .harness import LabHarness
+from .net_guard import NetworkGuard
 from .service_spy import LabSafetyViolation
-
-_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
 # What the production modules looked like before any lab patch. Captured when
 # this file is imported, which is before the first test runs.
@@ -69,12 +73,14 @@ def _drift() -> list[str]:
 
 @pytest.fixture(autouse=True)
 def pristine_modules() -> Iterator[None]:
-    """Every test starts and ends with the production modules unpatched.
+    """Every test starts with the production modules unpatched.
 
     A patch that leaked from one test would otherwise make the next one depend
     on order. This turns such a leak into a loud failure at the next test.
     """
-    assert _drift() == [], "a previous test left a patch behind"
+    drift = _drift()
+    if drift:
+        raise LabSafetyViolation(f"a previous test left a patch behind: {drift}")
     yield
 
 
@@ -82,36 +88,25 @@ def pristine_modules() -> Iterator[None]:
 def pristine_after_the_last_test() -> Iterator[None]:
     """The same check once more after the very last test has been torn down."""
     yield
-    assert _drift() == [], "the lab left a production module patched"
+    drift = _drift()
+    if drift:
+        raise LabSafetyViolation(f"the lab left a production module patched: {drift}")
 
 
 @pytest.fixture(autouse=True)
-def network_attempts(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
-    """Refuse every non-loopback connection or lookup; yield what was tried."""
+def network_attempts() -> Iterator[list[str]]:
+    """Refuse every non-loopback network operation; yield what was tried."""
     attempts: list[str] = []
-    real_connect = socket.socket.connect
-    real_getaddrinfo = socket.getaddrinfo
-
-    def _host(address: Any) -> str | None:
-        return address[0] if isinstance(address, tuple) and address else None
-
-    def connect(self: socket.socket, address: Any) -> Any:
-        host = _host(address)
-        if host is not None and host not in _LOOPBACK:
-            attempts.append(str(host))
-            raise LabSafetyViolation(f"lab refused a connection to {host}")
-        return real_connect(self, address)
-
-    def getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
-        if host is not None and str(host) not in _LOOPBACK:
-            attempts.append(str(host))
-            raise LabSafetyViolation(f"lab refused a lookup of {host}")
-        return real_getaddrinfo(host, *args, **kwargs)
-
-    monkeypatch.setattr(socket.socket, "connect", connect)
-    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
-    yield attempts
-    assert not attempts, f"the lab tried to reach {attempts}"
+    guard = NetworkGuard(attempts)
+    guard.install()
+    try:
+        yield attempts
+    finally:
+        not_restored = guard.uninstall()
+    if not_restored:
+        raise LabSafetyViolation(f"the network guard was not removed: {not_restored}")
+    if attempts:
+        raise LabSafetyViolation(f"the lab tried to reach {attempts}")
 
 
 @pytest.fixture
@@ -119,10 +114,10 @@ def lab(monkeypatch: pytest.MonkeyPatch) -> Iterator[LabHarness]:
     harness = LabHarness(monkeypatch)
     yield harness
     harness.close()
-    assert harness.leftovers_at_close == {
-        "timers": [],
-        "subscribers": 0,
-        "state_listeners": 0,
-        "tasks": 0,
-    }, "the shutdown left something running"
-    assert not harness.safety.unacknowledged, harness.safety.unacknowledged
+    left = harness.leftovers_at_close
+    if left != {"timers": [], "subscribers": 0, "state_listeners": 0, "tasks": 0}:
+        raise LabSafetyViolation(f"the shutdown left something running: {left}")
+    if harness.safety.unacknowledged:
+        raise LabSafetyViolation(
+            f"unacknowledged safety events: {harness.safety.unacknowledged}"
+        )

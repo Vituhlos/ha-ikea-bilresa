@@ -4,6 +4,21 @@ A target models the *device and its service validation*, not the binding. It
 accepts a service call, remembers what was requested and reports it back after
 a delay the scenario chooses (``echo_delay``; ``None`` never reports). None of
 the binding's arithmetic is repeated here.
+
+Three different things are kept apart:
+
+* *requested* / *applied*: what the device actually is (``_applied``). A service
+  call changes it at once, and so does an outside change.
+* *reported*: what Home Assistant sees (``_reported``). It follows the device
+  only when a report arrives: a delayed echo of a command, or the report that
+  goes with an outside change.
+* an *echo* only moves the reported value. It never changes the device.
+
+An outside change (``TargetRegistry.external_change``) moves both. An echo that
+was already in flight when it happened is, by default, superseded and dropped:
+the device reports in order, and its newest state supersedes older reports.
+``stale_echoes="deliver"`` models the opposite, a reordered stale report that
+arrives after the change and leaves reported and device disagreeing.
 """
 
 from __future__ import annotations
@@ -40,6 +55,11 @@ class Target:
         raise NotImplementedError
 
     def publish(self, snapshot: Any) -> None:
+        """A report arrived: only what Home Assistant sees changes."""
+        raise NotImplementedError
+
+    def set_device(self, snapshot: Any) -> None:
+        """Somebody else changed the device: it is that now, and it says so."""
         raise NotImplementedError
 
     def reported_state(self) -> tuple[str, dict[str, Any]]:
@@ -107,6 +127,10 @@ class LightTarget(Target):
     def publish(self, snapshot: Any) -> None:
         self._reported = snapshot
 
+    def set_device(self, snapshot: Any) -> None:
+        self._applied = snapshot
+        self._reported = snapshot
+
     def reported_state(self) -> tuple[str, dict[str, Any]]:
         on, brightness = self._reported
         attributes: dict[str, Any] = {
@@ -156,6 +180,10 @@ class NumberTarget(Target):
     def publish(self, snapshot: Any) -> None:
         self._reported = snapshot
 
+    def set_device(self, snapshot: Any) -> None:
+        self._applied = float(snapshot)
+        self._reported = float(snapshot)
+
     def reported_state(self) -> tuple[str, dict[str, Any]]:
         return str(self._reported), {
             "min": self.minimum,
@@ -204,6 +232,10 @@ class ClimateTarget(Target):
     def publish(self, snapshot: Any) -> None:
         self._reported = snapshot
 
+    def set_device(self, snapshot: Any) -> None:
+        self._applied = float(snapshot)
+        self._reported = float(snapshot)
+
     def reported_state(self) -> tuple[str, dict[str, Any]]:
         attributes: dict[str, Any] = {
             "temperature": self._reported,
@@ -251,6 +283,10 @@ class MediaPlayerTarget(Target):
     def publish(self, snapshot: Any) -> None:
         self._reported = snapshot
 
+    def set_device(self, snapshot: Any) -> None:
+        self._applied = float(snapshot)
+        self._reported = float(snapshot)
+
     def reported_state(self) -> tuple[str, dict[str, Any]]:
         return "playing", {"volume_level": self._reported, "is_volume_muted": False}
 
@@ -271,6 +307,9 @@ class TargetRegistry:
         self._scheduler = scheduler
         self._safety = safety
         self._targets: dict[str, Target] = {}
+        # Bumped by every outside change; an echo remembers the one it was made in.
+        self._generation: dict[str, int] = {}
+        self._drop_below: dict[str, int] = {}
         self._listeners: list[tuple[frozenset[str], Callable[[Any], None]]] = []
         self.history: list[dict[str, Any]] = []
 
@@ -309,6 +348,8 @@ class TargetRegistry:
 
     def add(self, target: Target) -> Target:
         self._targets[target.entity_id] = target
+        self._generation[target.entity_id] = 0
+        self._drop_below[target.entity_id] = 0
         return target
 
     def owns(self, entity_id: str) -> bool:
@@ -331,16 +372,53 @@ class TargetRegistry:
         if target.echo_delay is None:
             return
 
+        made_in = self._generation[entity_id]
+
         def report(_now: float) -> None:
-            self._publish(target, snapshot)
+            if made_in < self._drop_below[entity_id]:
+                self.history.append(
+                    {
+                        "t": self._clock.elapsed(),
+                        "entity_id": entity_id,
+                        "event": "stale_echo_dropped",
+                    }
+                )
+                return
+            self._publish(target, snapshot, stale=made_in < self._generation[entity_id])
 
         self._scheduler.call_later(
             target.echo_delay + extra, report, label=f"echo:{entity_id}"
         )
 
-    def external_change(self, entity_id: str, snapshot: Any) -> None:
-        """Somebody else changed the entity: reported at once, not requested."""
-        self._publish(self._targets[entity_id], snapshot)
+    def external_change(
+        self, entity_id: str, snapshot: Any, *, stale_echoes: str = "drop"
+    ) -> None:
+        """Somebody else changed the entity.
+
+        The device really is in the new state (``_applied``) and reports it at
+        once (``_reported``). Echoes of earlier commands still in flight are
+        dropped (``"drop"``, the default: the device's newest state supersedes
+        older reports) or delivered after all (``"deliver"``: a reordered stale
+        report, which then leaves the reported value and the device apart).
+        """
+        if stale_echoes not in ("drop", "deliver"):
+            raise ValueError(stale_echoes)
+        target = self._targets[entity_id]
+        self._generation[entity_id] += 1
+        if stale_echoes == "drop":
+            self._drop_below[entity_id] = self._generation[entity_id]
+        before = self.get(entity_id)
+        target.set_device(snapshot)
+        self.history.append(
+            {
+                "t": self._clock.elapsed(),
+                "entity_id": entity_id,
+                "event": "external",
+                "value": target.value(),
+                **target.requested(),
+            }
+        )
+        self._notify(entity_id, before)
 
     def set_available(self, entity_id: str, available: bool) -> None:
         target = self._targets[entity_id]
@@ -349,17 +427,18 @@ class TargetRegistry:
 
     # -- internals ------------------------------------------------------
 
-    def _publish(self, target: Target, snapshot: Any) -> None:
+    def _publish(self, target: Target, snapshot: Any, *, stale: bool = False) -> None:
         before = self.get(target.entity_id)
         target.publish(snapshot)
-        self.history.append(
-            {
-                "t": self._clock.elapsed(),
-                "entity_id": target.entity_id,
-                "event": "reported",
-                "value": target.value(),
-            }
-        )
+        row: dict[str, Any] = {
+            "t": self._clock.elapsed(),
+            "entity_id": target.entity_id,
+            "event": "reported",
+            "value": target.value(),
+        }
+        if stale:
+            row["stale"] = True
+        self.history.append(row)
         self._notify(target.entity_id, before)
 
     def _notify(self, entity_id: str, before: State | None) -> None:

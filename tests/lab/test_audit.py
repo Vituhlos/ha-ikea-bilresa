@@ -132,11 +132,15 @@ def test_the_lab_requests_no_real_home_assistant_socket_or_clock_fixture() -> No
         "threading",
         "subprocess",
     ]
+    # Only the meta tests start a child pytest, to prove how a failure is
+    # classified; that child has the same guards as the parent.
+    exempt = {("test_meta_safety.py", "subprocess")}
     hits = [
         f"{path.name}: {token}"
         for path in SOURCES
         for token in forbidden
         if token in path.read_text(encoding="utf-8")
+        and (path.name, token) not in exempt
     ]
     assert hits == []
 
