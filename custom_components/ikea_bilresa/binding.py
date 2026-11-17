@@ -1695,6 +1695,22 @@ class LightBinding:
                 service,
                 type(err).__name__,
             )
+            if (
+                (self._mode == MODE_NUMBER and domain in ("number", "input_number")
+                 and service == "set_value")
+                or (self._mode == MODE_TEMPERATURE and domain == "climate"
+                    and service == "set_temperature")
+            ):
+                # An unaccepted absolute target is not a valid baseline for the
+                # next notch. Drop fractional progress and any deferred value
+                # derived from it; the next rotation must read the HA state.
+                # Keep the existing light/group reconciliation policy unchanged.
+                self._forget_target("service_dispatch_failed")
+                self._cancel_pending_command()
+                self._commanded.clear()
+                self._last_reported = None
+                self._command_authoritative_until = 0.0
+                self._last_command_at = None
             self._report_activity(
                 "failed",
                 result=result,
