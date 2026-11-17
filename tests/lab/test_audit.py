@@ -161,7 +161,9 @@ def test_the_lab_never_waits_for_real_time() -> None:
 )
 def test_the_ha_plugin_socket_guard_is_on_in_ci() -> None:
     """Outer layer, independent of the lab's own tripwire."""
-    assert socket.socket.__name__ == "GuardedSocket"
+    # The lab's own guard sits on top (``GuardedLabSocket``); the plugin's
+    # ``GuardedSocket`` is the class underneath it.
+    assert any(cls.__name__ == "GuardedSocket" for cls in socket.socket.__mro__)
 
 
 # -- time -------------------------------------------------------------------
