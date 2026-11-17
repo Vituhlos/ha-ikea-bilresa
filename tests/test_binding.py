@@ -1462,20 +1462,56 @@ async def test_latest_failed_numeric_and_climate_service_rebases_next_rotation(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("new_command_queued", [True, False])
-async def test_older_numeric_failure_preserves_newer_command(
-    monkeypatch, new_command_queued: bool
+@pytest.mark.parametrize(
+    ("target", "mode", "state_name", "attributes", "key"),
+    [
+        (
+            "number.out_of_order",
+            MODE_NUMBER,
+            "2",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            "value",
+        ),
+        (
+            "input_number.out_of_order",
+            MODE_NUMBER,
+            "2",
+            {"min": 0.0, "max": 10.0, "step": 1.0},
+            "value",
+        ),
+        (
+            "climate.out_of_order",
+            MODE_TEMPERATURE,
+            "heat",
+            {
+                "temperature": 2.0,
+                "min_temp": 0.0,
+                "max_temp": 10.0,
+                "target_temp_step": 0.5,
+            },
+            "temperature",
+        ),
+    ],
+)
+async def test_older_value_failure_preserves_newer_command(
+    monkeypatch,
+    new_command_queued: bool,
+    target: str,
+    mode: str,
+    state_name: str,
+    attributes: dict,
+    key: str,
 ) -> None:
-    """An older async rejection cannot cancel a newer desired target."""
+    """A late rejection cannot cancel a newer queued or dispatched target."""
     binding, _interval, _watchdog = _binding(
-        monkeypatch,
-        **{CONF_TARGET: "number.out_of_order", CONF_MODE: MODE_NUMBER, CONF_STEP: 10},
+        monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10}
     )
     now = [100.0]
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
     )
     binding.hass.states.get.return_value = SimpleNamespace(
-        state="2", attributes={"min": 0.0, "max": 10.0, "step": 1.0}
+        state=state_name, attributes=attributes
     )
     if not new_command_queued:
         binding._min_command_interval = 0.0
@@ -1494,9 +1530,14 @@ async def test_older_numeric_failure_preserves_newer_command(
         return None
 
     binding.hass.services.async_call.side_effect = [rejected(), accepted()]
-    assert binding._rotate_number(1, True) is True
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True
     now[0] += 0.05
-    assert binding._rotate_number(1, True) is True
+    assert rotate(1, True) is True
     assert binding._tracked == pytest.approx(4.0)
     if new_command_queued:
         assert binding._pending_command is not None
@@ -1515,7 +1556,7 @@ async def test_older_numeric_failure_preserves_newer_command(
         binding._flush_pending_command()
         assert binding.hass.services.async_call.call_count == 2
 
-    assert binding.hass.services.async_call.call_args.args[2]["value"] == 4.0
+    assert binding.hass.services.async_call.call_args.args[2][key] == 4.0
     await scheduled.pop(0)
     assert binding._tracked == pytest.approx(4.0)
 
