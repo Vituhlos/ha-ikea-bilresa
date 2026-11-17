@@ -27,7 +27,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   stay reachable even when the target step does not divide the range or has
   more decimal places than the normal service payload. The first inward notch
   from an off-grid state is no longer lost, and fractional progress still
-  accumulates without repeating unchanged commands.
+  accumulates without repeating unchanged commands. If Home Assistant rejects
+  a numeric or climate value service call, the binding discards stale fractional
+  progress and any queued follow-up value so the next notch reads the actual
+  reported state.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
