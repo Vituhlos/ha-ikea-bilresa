@@ -1216,7 +1216,9 @@ def test_external_update_cancels_queued_absolute_value(monkeypatch, mode: str) -
 
     def state(value: float):
         if mode == MODE_TEMPERATURE:
-            return SimpleNamespace(state="heat", attributes={**attrs, "temperature": value})
+            return SimpleNamespace(
+                state="heat", attributes={**attrs, "temperature": value}
+            )
         return SimpleNamespace(state=str(value), attributes=attrs)
 
     binding.hass.states.get.return_value = state(2.0)
@@ -1316,7 +1318,11 @@ async def test_old_service_rejection_does_not_erase_rebased_substep(
     """Rebase and a suppressed notch supersede an older pending service task."""
     binding, _interval, _watchdog = _binding(
         monkeypatch,
-        **{CONF_TARGET: "number.rebased_failure", CONF_MODE: MODE_NUMBER, CONF_STEP: 10},
+        **{
+            CONF_TARGET: "number.rebased_failure",
+            CONF_MODE: MODE_NUMBER,
+            CONF_STEP: 10,
+        },
     )
     now = [100.0]
     monkeypatch.setattr(
@@ -3011,7 +3017,11 @@ def test_external_change_cancels_queued_numeric_or_climate_command(
         "custom_components.ikea_bilresa.binding.async_call_later",
         lambda *_args: cancel,
     )
-    rotate = binding._rotate_temperature if mode == MODE_TEMPERATURE else binding._rotate_number
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
     assert rotate(1, True) is True
     now[0] = 100.05
     assert rotate(1, True) is True
