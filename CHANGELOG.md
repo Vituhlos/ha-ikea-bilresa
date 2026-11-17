@@ -38,7 +38,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   timer can no longer flush a newer pending command. Numeric/climate
   state-echo detection now uses only the current baseline's commands, so
   historical value commands cannot hide genuine external changes after a
-  new gesture starts.
+  new gesture starts. Genuine external changes also cancel queued numeric/
+  climate targets, and a reversed sub-step cannot leave an opposing target
+  queued. Number and climate step grids now start at the configured minimum
+  and retain the entity step's full precision, avoiding rejected off-grid
+  service values. Old failures cannot reset a newer undispatched gesture.
+  Numeric/climate handlers are observed to completion in a background task,
+  so rejected Home Assistant service handlers can reset stale tracking.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
