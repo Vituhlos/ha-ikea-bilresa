@@ -295,6 +295,9 @@ class LightBinding:
             tuple[str, str, dict[str, Any], dict[str, Any]] | None
         ) = None
         self._pending_unsub: Callable[[], None] | None = None
+        # A delayed failed service must not invalidate a newer numeric/climate
+        # command, including one still waiting for the coalescing timer.
+        self._value_command_generation = 0
         # Recently calculated targets with the range they were derived from,
         # so a later absolute state report can be recognized as our own echo.
         self._commanded: deque[tuple[float, float]] = deque(maxlen=_COMMAND_HISTORY)
@@ -1565,6 +1568,15 @@ class LightBinding:
         if self._available_state(self._target) is None:
             self._report_activity("skipped", result=result, reason="target_unavailable")
             return
+        if (
+            (self._mode == MODE_NUMBER and domain in ("number", "input_number")
+             and service == "set_value")
+            or (self._mode == MODE_TEMPERATURE and domain == "climate"
+                and service == "set_temperature")
+        ):
+            # Count requested commands, not only dispatched ones: a newer
+            # coalesced target is still authoritative over a late rejection.
+            self._value_command_generation += 1
         now = time.monotonic()
         elapsed = (
             float("inf")
@@ -1638,6 +1650,7 @@ class LightBinding:
                 service_call,
                 result=result,
                 action=action,
+                command_generation=self._value_command_generation,
             )
         )
 
@@ -1679,6 +1692,7 @@ class LightBinding:
         *,
         result: dict[str, Any],
         action: WheelAction | None,
+        command_generation: int | None = None,
     ) -> None:
         """Report whether Home Assistant accepted this exact service action.
 
@@ -1696,15 +1710,19 @@ class LightBinding:
                 type(err).__name__,
             )
             if (
-                (self._mode == MODE_NUMBER and domain in ("number", "input_number")
-                 and service == "set_value")
-                or (self._mode == MODE_TEMPERATURE and domain == "climate"
-                    and service == "set_temperature")
+                command_generation is not None
+                and command_generation == self._value_command_generation
+                and (
+                    (self._mode == MODE_NUMBER and domain in ("number", "input_number")
+                     and service == "set_value")
+                    or (self._mode == MODE_TEMPERATURE and domain == "climate"
+                        and service == "set_temperature")
+                )
             ):
-                # An unaccepted absolute target is not a valid baseline for the
-                # next notch. Drop fractional progress and any deferred value
-                # derived from it; the next rotation must read the HA state.
-                # Keep the existing light/group reconciliation policy unchanged.
+                # Only the newest requested numeric/climate command can
+                # invalidate tracking on rejection. Older failures must not
+                # discard newer dispatched or coalesced absolute targets.
+                # Keep the existing light/group policy unchanged.
                 self._forget_target("service_dispatch_failed")
                 self._cancel_pending_command()
                 self._commanded.clear()
