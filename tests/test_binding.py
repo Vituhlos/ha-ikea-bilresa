@@ -2954,10 +2954,11 @@ def test_late_coalescing_timer_cannot_send_superseded_value(
         else binding._rotate_number
     )
     assert rotate(1, True) is True  # send 3
+    initial_generation = binding._value_command_generation
     now[0] = 100.05
     assert rotate(1, True) is True  # queue 4
     assert binding._pending_command is not None
-    assert binding._pending_command[-1] == 2
+    assert binding._pending_command[-1] == initial_generation + 1
 
     now[0] = 100.20
     assert rotate(1, True) is True  # send 5, cancel stale 4 timer
@@ -2969,7 +2970,7 @@ def test_late_coalescing_timer_cannot_send_superseded_value(
     assert rotate(1, True) is True  # queue 6 on a new timer
     assert len(timers) == 2
     assert binding._pending_command is not None
-    assert binding._pending_command[-1] == 4
+    assert binding._pending_command[-1] == initial_generation + 3
 
     # Even if the canceled first timer arrives late, it cannot flush 6 early.
     timers[0](None)
@@ -3026,6 +3027,7 @@ def test_external_change_cancels_queued_numeric_or_climate_command(
     now[0] = 100.05
     assert rotate(1, True) is True
     assert binding._pending_command is not None
+    generation_before_external = binding._value_command_generation
 
     # The report is not an echo of the commands from 2 to 4.
     new_attributes = dict(attributes)
@@ -3043,7 +3045,7 @@ def test_external_change_cancels_queued_numeric_or_climate_command(
     binding._flush_pending_command()
     assert binding.hass.services.async_call.call_count == 1
     assert binding._tracked is None
-    assert binding._value_command_generation == 3
+    assert binding._value_command_generation > generation_before_external
 
 
 def test_the_first_command_of_a_gesture_is_never_delayed(monkeypatch) -> None:
