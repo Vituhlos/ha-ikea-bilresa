@@ -1,5 +1,13 @@
 # Project status and agent handoff
 
+## PR #71: Sourcery review follow-up (2026-11-17)
+
+- **Scope:** Address Sourcery's five findings in [PR #71](https://github.com/Vituhlos/ha-ikea-bilresa/pull/71). In `binding.py`, number/input_number and climate rotation now compare the newly quantized command with the actual off-grid starting value, or with the last calculated service value during a continuing gesture. Keep fractional internal progress and send exact min/max values even when their precision exceeds four/two decimal places; round and clamp only intermediate service values. Other modes and Matter event handling are unchanged.
+- **Tests:** `tests/test_binding.py` now verifies the first inward off-grid notch and no duplicate follow-up command for number/input_number and climate; exact high-precision minimum/maximum payloads; and a new rotation using the externally reported -5 after internal tracking is cleared. The numeric and climate multi-notch tests use deterministic monotonic time to avoid CI stalls crossing the three-second gesture resync window.
+- **Verification:** Prior exact commit `6e9917f` passed GitHub Actions CI run `44077240440` and CodeQL run `44077240537` before this follow-up. The new code/test/docs commits require fresh **exact-head** CI, CodeQL, and reviewer checks. This session did not run full local pytest, Ruff or mypy: a dependency-equipped repository checkout is unavailable in the current environment. Do not mistake previous successful jobs for verification of the new head.
+- **Hardware:** **NOT tested** with the patched PR on a physical BILRESA. The recorded 2026-11-13 observation remains strictly a pre-fix reproduction, not a regression pass.
+- **Risk and next action:** Verify the new head's automated tests, respond to any new code-review findings, then install the approved candidate on a physical device and repeat the zero-bound and off-grid step tests before calling the bug release-ready.
+
 ## PR #71: preserve exact range endpoints (2026-11-17)
 
 - **Scope:** In `binding.py`, numeric and climate rotations now send the
@@ -10,10 +18,12 @@
   `climate` (step 0.5, non-grid endpoints 16.3 and 25.2). The old
   calculation returns -99, 99, 16.5 and 25.0 respectively; the corrected
   calculation returns -100, 100, 16.3 and 25.2. Tests were committed first.
-- **Verification:** The four arithmetic boundary cases were checked before
-  the commits. Full local pytest, Ruff and mypy were **not run** because a
-  local checkout and project dependencies were unavailable; check exact-head
-  GitHub Actions CI next. This is not a hardware validation.
+- **Verification (for this historical endpoint patch):** The four arithmetic
+  boundary cases were checked before the commits. CI and CodeQL succeeded on
+  exact head `6e9917f` (runs `44077240440` and `44077240537`). Full local
+  pytest, Ruff and mypy were **not run** because a dependency-equipped local
+  checkout was unavailable. Subsequent Sourcery fixes require separate CI
+  verification as recorded above. None of this is a hardware validation.
 - **Hardware:** The contributor has not installed or tested this patched
   branch on a physical BILRESA. The 2026-11-13 pre-fix observation below
   remains the only applicable hardware evidence.
