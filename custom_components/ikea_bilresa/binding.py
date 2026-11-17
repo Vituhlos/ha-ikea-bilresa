@@ -299,6 +299,7 @@ class LightBinding:
             tuple[str, str, dict[str, Any], dict[str, Any], int | None] | None
         ) = None
         self._pending_unsub: Callable[[], None] | None = None
+        self._pending_timer_generation = 0
         # A delayed failed service must not invalidate a newer numeric/climate
         # command, including one still waiting for the coalescing timer.
         self._value_command_generation = 0
@@ -1617,10 +1618,18 @@ class LightBinding:
                 waited=round(self._min_command_interval - elapsed, 3),
             )
             if self._pending_unsub is None:
+                self._pending_timer_generation += 1
+                timer_generation = self._pending_timer_generation
+
+                @callback
+                def flush_if_current(_now) -> None:
+                    if timer_generation == self._pending_timer_generation:
+                        self._flush_pending_command(_now)
+
                 self._pending_unsub = async_call_later(
                     self.hass,
                     self._min_command_interval - elapsed,
-                    self._flush_pending_command,
+                    flush_if_current,
                 )
             return
         # A newer immediate request supersedes a queued absolute value.
@@ -1635,6 +1644,7 @@ class LightBinding:
     @callback
     def _flush_pending_command(self, _now=None) -> None:
         """Send the newest queued value once the interval has passed."""
+        self._pending_timer_generation += 1
         self._pending_unsub = None
         pending = self._pending_command
         self._pending_command = None
@@ -1645,6 +1655,7 @@ class LightBinding:
 
     @callback
     def _cancel_pending_command(self) -> None:
+        self._pending_timer_generation += 1
         if self._pending_unsub is not None:
             self._pending_unsub()
             self._pending_unsub = None
