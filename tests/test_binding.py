@@ -998,10 +998,14 @@ def test_numeric_inward_notch_from_off_grid_state_dispatches_once(
         state="0.7", attributes={"min": 0.7, "max": 10.7, "step": 1.0}
     )
 
+    # The grid is anchored to min=0.7: the next valid value is 1.7,
+    # not the invalid zero-anchored value 1.0.
+    for _ in range(5):
+        assert binding._rotate_number(1, True) is False
+    binding.hass.services.async_call.assert_not_called()
     assert binding._rotate_number(1, True) is True
-    assert binding.hass.services.async_call.call_args.args[2]["value"] == 1.0
-    assert binding._tracked == pytest.approx(0.8)
-    # Continued sub-step progress must not send an identical second command.
+    assert binding.hass.services.async_call.call_args.args[2]["value"] == 1.7
+    assert binding._tracked == pytest.approx(1.3)
     assert binding._rotate_number(1, True) is False
     assert binding.hass.services.async_call.call_count == 1
 
@@ -1031,9 +1035,13 @@ def test_climate_inward_notch_from_off_grid_state_dispatches_once(
         },
     )
 
+    # A climate min=16.3 with step=0.5 has a grid of 16.3, 16.8, ...
+    for _ in range(3):
+        assert binding._rotate_temperature(1, True) is False
+    binding.hass.services.async_call.assert_not_called()
     assert binding._rotate_temperature(1, True) is True
-    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == 16.5
-    assert binding._tracked == pytest.approx(16.38)
+    assert binding.hass.services.async_call.call_args.args[2]["temperature"] == 16.8
+    assert binding._tracked == pytest.approx(16.62)
     assert binding._rotate_temperature(1, True) is False
     assert binding.hass.services.async_call.call_count == 1
 
@@ -1119,6 +1127,229 @@ def test_off_grid_quantization_never_reverses_rotation(
     assert binding._commanded[-1][0] == expected
     assert binding._value_last_effective == expected
     assert binding.hass.services.async_call.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("target", "mode", "initial", "attrs", "percent", "expected"),
+    [
+        (
+            "number.offset_step",
+            MODE_NUMBER,
+            0.05,
+            {"min": 0.05, "max": 1.05, "step": 0.2},
+            40.0,
+            0.45,
+        ),
+        (
+            "input_number.micro_step",
+            MODE_NUMBER,
+            0.000001,
+            {"min": 0.000001, "max": 0.000011, "step": 0.000002},
+            40.0,
+            0.000005,
+        ),
+        (
+            "climate.precise_step",
+            MODE_TEMPERATURE,
+            16.333,
+            {"min_temp": 16.333, "max_temp": 19.333, "target_temp_step": 0.125},
+            10.0,
+            16.583,
+        ),
+    ],
+)
+def test_value_payload_stays_on_minimum_anchored_precision_grid(
+    monkeypatch,
+    target: str,
+    mode: str,
+    initial: float,
+    attrs: dict,
+    percent: float,
+    expected: float,
+) -> None:
+    """Never turn a valid target into an off-grid value by final rounding."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: percent}
+    )
+    if mode == MODE_TEMPERATURE:
+        value_state = SimpleNamespace(
+            state="heat", attributes={**attrs, "temperature": initial}
+        )
+    else:
+        value_state = SimpleNamespace(state=str(initial), attributes=attrs)
+    binding.hass.states.get.return_value = value_state
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True
+    key = "temperature" if mode == MODE_TEMPERATURE else "value"
+    payload = binding.hass.services.async_call.call_args.args[2]
+    assert payload[key] == expected
+    assert binding.hass.services.async_call.call_args.kwargs["blocking"] is True
+
+
+@pytest.mark.parametrize("mode", (MODE_NUMBER, MODE_TEMPERATURE))
+def test_external_update_cancels_queued_absolute_value(monkeypatch, mode: str) -> None:
+    """An external change must not be overwritten by a coalescing timer."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: (
+                "climate.external_queue" if mode == MODE_TEMPERATURE
+                else "number.external_queue"
+            ),
+            CONF_MODE: mode,
+            CONF_STEP: 10,
+        },
+    )
+    now = [100.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    attrs = (
+        {"temperature": 2.0, "min_temp": 0.0, "max_temp": 10.0, "target_temp_step": 1.0}
+        if mode == MODE_TEMPERATURE
+        else {"min": 0.0, "max": 10.0, "step": 1.0}
+    )
+
+    def state(value: float):
+        if mode == MODE_TEMPERATURE:
+            return SimpleNamespace(state="heat", attributes={**attrs, "temperature": value})
+        return SimpleNamespace(state=str(value), attributes=attrs)
+
+    binding.hass.states.get.return_value = state(2.0)
+    canceled = Mock()
+    timer_callbacks = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later",
+        lambda _hass, _delay, callback: timer_callbacks.append(callback) or canceled,
+    )
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True
+    now[0] += 0.05
+    assert rotate(1, True) is True
+    assert binding._pending_command is not None
+    assert binding.hass.services.async_call.call_count == 1
+    binding._last_scroll_seen = binding._last
+    binding._handle_target_state_change(
+        SimpleNamespace(data={"new_state": state(9.0)})
+    )
+    assert binding._tracked is None
+    assert binding._pending_command is None
+    canceled.assert_called_once()
+    now[0] = 100.30
+    timer_callbacks[0](None)  # A canceled timer that somehow arrives late
+    assert binding.hass.services.async_call.call_count == 1
+    binding.hass.states.get.return_value = state(9.0)
+    assert rotate(1, False) is True
+    key = "temperature" if mode == MODE_TEMPERATURE else "value"
+    assert binding.hass.services.async_call.call_args.args[2][key] == 8.0
+
+
+@pytest.mark.parametrize("mode", (MODE_NUMBER, MODE_TEMPERATURE))
+def test_reversed_substep_discards_opposing_queued_command(
+    monkeypatch, mode: str
+) -> None:
+    """A queued up-value must not fire after an unquantized down notch."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: (
+                "climate.reverse_queue" if mode == MODE_TEMPERATURE
+                else "number.reverse_queue"
+            ),
+            CONF_MODE: mode,
+            CONF_STEP: 20,
+        },
+    )
+    now = [100.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    attrs = (
+        {"temperature": 2.0, "min_temp": 0.0, "max_temp": 10.0, "target_temp_step": 1.0}
+        if mode == MODE_TEMPERATURE
+        else {"min": 0.0, "max": 10.0, "step": 1.0}
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat" if mode == MODE_TEMPERATURE else "2", attributes=attrs
+    )
+    canceled = Mock()
+    timer_callbacks = []
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later",
+        lambda _hass, _delay, cb: timer_callbacks.append(cb) or canceled,
+    )
+    rotate = (
+        binding._rotate_temperature
+        if mode == MODE_TEMPERATURE
+        else binding._rotate_number
+    )
+    assert rotate(1, True) is True  # 2 -> 4, already dispatched
+    now[0] += 0.05
+    assert rotate(1, True) is True  # 4 -> 6, queued
+    assert binding._pending_command is not None
+    binding._step = 1.0
+    now[0] += 0.05
+    assert rotate(1, False) is False  # Fractional 5.9 rounds to 6
+    assert binding._pending_command is None
+    assert binding._value_last_effective == 4.0
+    assert binding._tracked == pytest.approx(5.9)
+    canceled.assert_called_once()
+    timer_callbacks[0](None)
+    key = "temperature" if mode == MODE_TEMPERATURE else "value"
+    assert [
+        c.args[2][key] for c in binding.hass.services.async_call.call_args_list
+    ] == [4.0]
+
+
+@pytest.mark.asyncio
+async def test_old_service_rejection_does_not_erase_rebased_substep(
+    monkeypatch,
+) -> None:
+    """Rebase and a suppressed notch supersede an older pending service task."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.rebased_failure", CONF_MODE: MODE_NUMBER, CONF_STEP: 10},
+    )
+    now = [100.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    attrs = {"min": 0.0, "max": 10.0, "step": 1.0}
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="2", attributes=attrs
+    )
+    tasks = []
+    binding.hass.async_create_task.side_effect = lambda coro: tasks.append(coro)
+
+    async def rejected():
+        raise RuntimeError("simulated delayed service failure")
+
+    binding.hass.services.async_call.return_value = rejected()
+    assert binding._rotate_number(1, True) is True  # 3 requested
+    binding._last_scroll_seen = binding._last
+    now[0] += 0.05
+    binding._handle_target_state_change(
+        SimpleNamespace(
+            data={"new_state": SimpleNamespace(state="9", attributes=attrs)}
+        )
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="9", attributes=attrs
+    )
+    binding._step = 1
+    assert binding._rotate_number(1, True) is False  # 9.1, no new service
+    assert binding._tracked == pytest.approx(9.1)
+    await tasks.pop()
+    assert binding._tracked == pytest.approx(9.1)
+    assert binding._value_last_effective == 9.0
 
 
 @pytest.mark.parametrize("target_domain", ("number", "input_number"))
