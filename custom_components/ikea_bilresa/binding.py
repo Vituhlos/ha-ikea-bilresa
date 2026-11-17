@@ -589,6 +589,7 @@ class LightBinding:
             self._last_reported = observed
         if self._scroll_authoritative(now):
             if not own_echo and self._mode not in _LIGHT_MODES:
+                self._cancel_stale_value_command()
                 self._forget_target("unrecognized_value_during_scroll", observed)
             else:
                 self._trace.record(
@@ -606,7 +607,15 @@ class LightBinding:
         # service transition. A later external update invalidates the desired
         # value so the next gesture reads reality again.
         if now >= self._command_authoritative_until:
+            self._cancel_stale_value_command()
             self._forget_target("outside_scroll_authority", observed)
+
+    @callback
+    def _cancel_stale_value_command(self) -> None:
+        """An external rebase supersedes queued and in-flight value requests."""
+        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
+            self._value_command_generation += 1
+            self._cancel_pending_command()
 
     def _scroll_authoritative(self, now: float) -> bool:
         """Report whether one continuous scroll still owns the target value."""
