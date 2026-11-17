@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from .catalog import covers
 from .fake_matter import E2490_ENDPOINTS, Wire, e2489_node, e2490_node
 from .targets import LightTarget
 
@@ -54,6 +55,16 @@ def _setup(lab, light: LightTarget, **binding: Any) -> Wire:
 # -- B01 / B02: brightness ---------------------------------------------------
 
 
+@covers(
+    "mode:brightness",
+    "conf:mode",
+    "conf:node_id",
+    "conf:channel",
+    "conf:target",
+    "conf:step",
+    "conf:step_curve",
+    "curve:linear",
+)
 def test_b01_a_light_that_is_off_starts_at_the_first_step(lab) -> None:
     """Off, one notch up: 3 % of 255 = 7.65, sent as the integer 8."""
     wire = _setup(lab, LightTarget("light.lab", on=False, brightness=0))
@@ -65,6 +76,7 @@ def test_b01_a_light_that_is_off_starts_at_the_first_step(lab) -> None:
     assert lab.registry.target("light.lab").value() == 8
 
 
+@covers("conf:min_brightness")
 def test_b01_the_first_step_is_never_below_the_minimum(lab) -> None:
     """A 20 % minimum is 51 of 255: the first step from off lands there, not at 8."""
     wire = _setup(
@@ -97,6 +109,7 @@ def test_b02_the_top_is_clamped_and_then_unchanged(lab) -> None:
     assert "target_unchanged" in [a["reason"] for a in lab.dispatcher.activity]
 
 
+@covers("conf:min_brightness")
 def test_b02_the_minimum_is_a_floor_when_it_is_above_zero(lab) -> None:
     """55 - 7.65 = 47.35 is below the 51 floor: sent as 51, then unchanged."""
     wire = _setup(lab, LightTarget("light.lab", brightness=55), min_brightness=20)
@@ -108,6 +121,7 @@ def test_b02_the_minimum_is_a_floor_when_it_is_above_zero(lab) -> None:
     ]
 
 
+@covers("conf:min_brightness")
 def test_b02_a_zero_minimum_switches_the_light_off(lab) -> None:
     """With a minimum of 0 %, going below it is "off", as the checklist says."""
     wire = _setup(lab, LightTarget("light.lab", brightness=5), min_brightness=0)
@@ -162,6 +176,7 @@ def test_b_a_delayed_echo_does_not_pull_the_next_step_back(lab) -> None:
     ]
 
 
+@covers("conf:transition")
 def test_b_the_first_notch_is_never_faded(lab) -> None:
     """With a 1 s transition configured, the first notch of a scroll is sent
     with transition 0.0 (the eager response; see ``_smoothing_transition``).
@@ -221,6 +236,7 @@ def test_mutation_a_device_that_reports_a_fade_at_once_fails_the_fade_test(lab) 
 # -- buttons ----------------------------------------------------------------
 
 
+@covers("conf:click_action", "conf:click_target", "gesture:press", "verb:light.toggle")
 def test_e2490_single_press_toggles_the_target_once(lab) -> None:
     lab.add_target(LightTarget("light.lab", on=True, brightness=120))
     lab.load(e2490_node(NODE))
@@ -244,6 +260,7 @@ def test_e2490_single_press_toggles_the_target_once(lab) -> None:
     assert lab.registry.target("light.lab").value() == 0
 
 
+@covers("conf:endpoint")
 def test_e2489_overflow_never_clicks_and_the_next_single_still_works(lab) -> None:
     """Complete(0) after three rapid taps leaves the light alone; a normal
     single press afterwards toggles it exactly once.
