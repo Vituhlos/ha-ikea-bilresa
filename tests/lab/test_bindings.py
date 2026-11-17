@@ -160,16 +160,34 @@ def test_b_a_delayed_echo_does_not_pull_the_next_step_back(lab) -> None:
     ]
 
 
-def test_b_transition_delays_the_report_of_a_fade(lab) -> None:
-    """A 1 s transition on the service call reports the new level 1 s later."""
+def test_b_the_first_notch_is_never_faded(lab) -> None:
+    """With a 1 s transition configured, the first notch of a scroll is sent
+    with transition 0.0 (the eager response; see ``_smoothing_transition``).
+    """
     wire = _setup(lab, LightTarget("light.lab", brightness=100), transition=1.0)
     _notch(lab, wire, 0.0, UP1)
-    lab.advance(2.0)
 
-    # The first notch of a scroll is never smoothed: transition 0.0 is sent.
-    first = lab.spy.intents[0]
-    assert first["data"] == {"brightness": 108, "transition": 0.0}
+    assert lab.spy.intents[0]["data"] == {"brightness": 108, "transition": 0.0}
     assert lab.registry.target("light.lab").value() == 108
+
+
+def test_b_a_fade_reports_the_new_level_only_when_it_ends(lab) -> None:
+    """The second notch of the same scroll is sent with the whole 1 s transition,
+    so the light keeps reporting the old level for 1 s and then the new one:
+    request at 0.5 s (107.65 + 7.65 = 115.3 -> 115), report at 1.5 s.
+    """
+    wire = _setup(lab, LightTarget("light.lab", brightness=100), transition=1.0)
+    _notch(lab, wire, 0.0, UP1)
+    _notch(lab, wire, 0.5, UP1)
+
+    assert [d for _, _, d, _ in _sent(lab)] == [
+        {"brightness": 108, "transition": 0.0},
+        {"brightness": 115, "transition": 1.0},
+    ]
+    lab.at(1.4)
+    assert lab.registry.target("light.lab").value() == 108, "still fading"
+    lab.at(1.6)
+    assert lab.registry.target("light.lab").value() == 115, "the fade has ended"
 
 
 # -- buttons ----------------------------------------------------------------

@@ -41,7 +41,7 @@ def random_gesture(seed: int) -> tuple[list[int], int]:
     return ongoing, ongoing[-1]
 
 
-def run_seed(seed: int) -> tuple[dict, str, int, int]:
+def run_seed(seed: int, *, step: int = 3) -> tuple[dict, str, int, int]:
     """One seeded gesture on a delayed-echo light; returns record, digest, ..."""
     rng = random.Random(f"timing-{seed}")
     ongoing, complete = random_gesture(seed)
@@ -55,7 +55,7 @@ def run_seed(seed: int) -> tuple[dict, str, int, int]:
                 "channel": 1,
                 "target": "light.lab",
                 "mode": "brightness",
-                "step": 3,
+                "step": step,
                 "step_curve": "linear",
                 "transition": 0.0,
             }
@@ -94,31 +94,6 @@ def test_different_seeds_really_differ() -> None:
 
 
 def test_a_changed_input_changes_the_digest() -> None:
-    first = run_seed(3)[1]
-    with pytest.MonkeyPatch.context() as patch:
-        lab = LabHarness(patch)
-        lab.add_target(LightTarget("light.lab", brightness=100, echo_delay=0.3))
-        lab.load(e2490_node(NODE))
-        lab.setup_bindings(
-            {
-                "node_id": NODE,
-                "channel": 1,
-                "target": "light.lab",
-                "mode": "brightness",
-                "step": 4,  # the only difference
-                "step_curve": "linear",
-                "transition": 0.0,
-            }
-        )
-        wire = Wire(NODE)
-        ongoing, complete = random_gesture(3)
-        lab.play(
-            [
-                (0.0, e)
-                for e in wire.scroll(UP1, ongoing=tuple(ongoing), complete=complete)
-            ]
-        )
-        lab.advance(5.0)
-        other = lab.digest()
-        lab.close()
-    assert other != first
+    """Same seed, same event schedule; only the binding's step differs."""
+    assert run_seed(3, step=3)[1] == run_seed(3, step=3)[1]
+    assert run_seed(3, step=3)[1] != run_seed(3, step=4)[1]
