@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   accumulates without repeating unchanged commands. If Home Assistant rejects
   a numeric or climate value service call, the binding discards stale fractional
   progress and any queued follow-up value so the next notch reads the actual
-  reported state.
+  reported state. A delayed failure from an older call no longer cancels a
+  newer queued or dispatched command.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
