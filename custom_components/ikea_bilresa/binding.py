@@ -268,6 +268,10 @@ class LightBinding:
         self._ramp_unsub: Callable[[], None] | None = None
         self._ramp_watchdog_unsub: Callable[[], None] | None = None
         self._tracked: float | None = None
+        # Last effective number/climate target (or the actual state at the
+        # start of a gesture). A suppressed off-grid quantization must not
+        # replace it while fractional progress continues accumulating.
+        self._value_last_effective: float | None = None
         self._command_authoritative_until = 0.0
         self._last_direction: str | None = None
         self._saturation = 100.0
@@ -292,7 +296,7 @@ class LightBinding:
         # one is the opposite of what this is for.
         self._last_command_at: float | None = None
         self._pending_command: (
-            tuple[str, str, dict[str, Any], dict[str, Any]] | None
+            tuple[str, str, dict[str, Any], dict[str, Any], int | None] | None
         ) = None
         self._pending_unsub: Callable[[], None] | None = None
         # A delayed failed service must not invalidate a newer numeric/climate
@@ -696,6 +700,7 @@ class LightBinding:
                 recent_commands=[round(value, 2) for value, _span in self._commanded],
             )
         self._tracked = None
+        self._value_last_effective = None
         # The command history is deliberately kept. It describes where the
         # target is still travelling to, and that stays true after we give up
         # our calculated value — clearing it made the very next report look
@@ -1139,6 +1144,8 @@ class LightBinding:
             # that has barely set off — looks like it came from nowhere.
             self._last_reported = current
         self._tracked = value
+        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
+            self._value_last_effective = value
         return value
 
     @staticmethod
@@ -1359,25 +1366,31 @@ class LightBinding:
             target = min(
                 max_t, max(min_t, round(continuous_target / temp_step) * temp_step)
             )
-        # Compare the new command against the last computed service value.
-        # On a fresh gesture, compare with the *actual* (possibly off-grid)
-        # state instead of rounding that starting value to the step grid.
+        # Compare against the actual initial value or the last *effective*
+        # command, never a suppressed quantization or fractional accumulator.
         previous = (
-            self._commanded[-1][0]
-            if self._trace_source == "tracked" and self._commanded
+            self._value_last_effective
+            if self._value_last_effective is not None
             else tracked
         )
         # Preserve exact endpoints, including bounds more precise than 0.01.
         # Intermediate values are rounded for service payload stability.
         if target not in (min_t, max_t):
             target = min(max_t, max(min_t, round(target, 2)))
+        unit = str(state.attributes.get("unit_of_measurement") or "°")
+        if (up and target <= previous) or (not up and target >= previous):
+            # Quantization can point opposite to the physical rotation.
+            # Keep fractional progress, but do not send or record that target.
+            self._tracked = continuous_target
+            self._report_activity(
+                "completed",
+                result=self._value_result("temperature", previous, previous, unit),
+                reason="target_unchanged",
+            )
+            return False
         self._set_target(target, span, tracked=continuous_target)
-        result = self._value_result(
-            "temperature",
-            previous,
-            target,
-            str(state.attributes.get("unit_of_measurement") or "°"),
-        )
+        self._value_last_effective = target
+        result = self._value_result("temperature", previous, target, unit)
         return self._call_value_if_changed(
             "climate",
             "set_temperature",
@@ -1433,21 +1446,26 @@ class LightBinding:
                 max_n, max(min_n, round(continuous_target / num_step) * num_step)
             )
         previous = (
-            self._commanded[-1][0]
-            if self._trace_source == "tracked" and self._commanded
+            self._value_last_effective
+            if self._value_last_effective is not None
             else tracked
         )
         # Never round a reported min/max outward (or inward) in the payload.
         if target not in (min_n, max_n):
             target = min(max_n, max(min_n, round(target, 4)))
+        unit = str(state.attributes.get("unit_of_measurement") or "")
+        if (up and target <= previous) or (not up and target >= previous):
+            self._tracked = continuous_target
+            self._report_activity(
+                "completed",
+                result=self._value_result("number", previous, previous, unit),
+                reason="target_unchanged",
+            )
+            return False
         self._set_target(target, span, tracked=continuous_target)
+        self._value_last_effective = target
         domain = self._target.split(".", 1)[0]
-        result = self._value_result(
-            "number",
-            previous,
-            target,
-            str(state.attributes.get("unit_of_measurement") or ""),
-        )
+        result = self._value_result("number", previous, target, unit)
         return self._call_value_if_changed(
             domain,
             "set_value",
@@ -1568,15 +1586,17 @@ class LightBinding:
         if self._available_state(self._target) is None:
             self._report_activity("skipped", result=result, reason="target_unavailable")
             return
+        command_generation: int | None = None
         if (
             (self._mode == MODE_NUMBER and domain in ("number", "input_number")
              and service == "set_value")
             or (self._mode == MODE_TEMPERATURE and domain == "climate"
                 and service == "set_temperature")
         ):
-            # Count requested commands, not only dispatched ones: a newer
-            # coalesced target is still authoritative over a late rejection.
+            # Capture the generation at request creation, including when the
+            # command is queued. A delayed timer must not relabel stale work.
             self._value_command_generation += 1
+            command_generation = self._value_command_generation
         now = time.monotonic()
         elapsed = (
             float("inf")
@@ -1586,7 +1606,9 @@ class LightBinding:
         if self._min_command_interval > 0 and elapsed < self._min_command_interval:
             # Replace whatever was queued: an older absolute value has no
             # value of its own once a newer one exists.
-            self._pending_command = (domain, service, data, result)
+            self._pending_command = (
+                domain, service, data, result, command_generation
+            )
             self._trace.record(
                 "coalesced",
                 binding=self.trace_key,
@@ -1601,8 +1623,14 @@ class LightBinding:
                     self._flush_pending_command,
                 )
             return
+        # A newer immediate request supersedes a queued absolute value.
+        # Its old timer may still fire later; the queue must be empty then.
+        if self._pending_command is not None:
+            self._cancel_pending_command()
         self._last_command_at = now
-        self._dispatch_call(domain, service, data, result)
+        self._dispatch_call(
+            domain, service, data, result, command_generation
+        )
 
     @callback
     def _flush_pending_command(self, _now=None) -> None:
@@ -1629,6 +1657,7 @@ class LightBinding:
         service: str,
         data: dict[str, Any],
         result: dict[str, Any],
+        command_generation: int | None = None,
     ) -> None:
         transition = _as_float(data.get(ATTR_TRANSITION)) or 0.0
         # The scroll epoch this command belongs to. The next batch of the
@@ -1650,7 +1679,7 @@ class LightBinding:
                 service_call,
                 result=result,
                 action=action,
-                command_generation=self._value_command_generation,
+                command_generation=command_generation,
             )
         )
 
