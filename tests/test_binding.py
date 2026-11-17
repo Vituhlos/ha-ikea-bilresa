@@ -2748,6 +2748,63 @@ def test_late_coalescing_timer_cannot_send_superseded_value(
     assert binding._pending_command is None
 
 
+
+@pytest.mark.parametrize(
+    ("target", "mode", "state_name", "attributes"),
+    [
+        ("number.external", MODE_NUMBER, "2", {"min": 0, "max": 10, "step": 1}),
+        (
+            "climate.external",
+            MODE_TEMPERATURE,
+            "heat",
+            {"temperature": 2, "min_temp": 0, "max_temp": 10, "target_temp_step": 1},
+        ),
+    ],
+)
+def test_external_change_cancels_queued_numeric_or_climate_command(
+    monkeypatch, target, mode, state_name, attributes
+) -> None:
+    """An external update must not be overwritten by a queued absolute value."""
+    binding, _interval, _watchdog = _binding(
+        monkeypatch, **{CONF_TARGET: target, CONF_MODE: mode, CONF_STEP: 10}
+    )
+    now = [100.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state=state_name, attributes=attributes
+    )
+    cancel = Mock()
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.async_call_later",
+        lambda *_args: cancel,
+    )
+    rotate = binding._rotate_temperature if mode == MODE_TEMPERATURE else binding._rotate_number
+    assert rotate(1, True) is True
+    now[0] = 100.05
+    assert rotate(1, True) is True
+    assert binding._pending_command is not None
+
+    # The report is not an echo of the commands from 2 to 4.
+    new_attributes = dict(attributes)
+    if mode == MODE_TEMPERATURE:
+        new_attributes["temperature"] = 9
+    new_state = SimpleNamespace(
+        state="heat" if mode == MODE_TEMPERATURE else "9",
+        attributes=new_attributes,
+    )
+    binding._active_scrolls[1] = now[0]
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": new_state}))
+
+    cancel.assert_called_once()
+    assert binding._pending_command is None
+    binding._flush_pending_command()
+    assert binding.hass.services.async_call.call_count == 1
+    assert binding._tracked is None
+    assert binding._value_command_generation == 3
+
+
 def test_the_first_command_of_a_gesture_is_never_delayed(monkeypatch) -> None:
     """The eager response is the point of this integration; it must not queue."""
     binding, _interval_unsub, _watchdog_unsub = _binding(
