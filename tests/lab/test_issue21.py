@@ -233,13 +233,7 @@ def test_a_changed_position_is_forwarded_exactly_once(world) -> None:
     assert world.lab.record()["ignored"].get("invalid_switch_position", 0) == 0
 
 
-def test_the_lookup_is_repeated_only_after_its_age_limit_and_once_per_node(
-    world,
-) -> None:
-    """Paths are looked up again every 30-60 s so a table changed in place is
-    found. Not on every update: after 29 s nothing; past the limit one walk per
-    node, then nothing again.
-    """
+def lookup_is_refreshed_once_per_node(world) -> None:
     world.client.update()
     walks = world.client.walks()
 
@@ -248,13 +242,25 @@ def test_the_lookup_is_repeated_only_after_its_age_limit_and_once_per_node(
         world.client.update()
     assert world.client.walks() == walks
 
+    # 70 s in, every node is past its own limit (30 s plus up to 29 s of jitter):
+    # exactly one walk each, no more, and none missed.
     world.lab.advance(41.0)
     world.client.update()
     refreshed = world.client.walks()
-    assert refreshed - walks <= NODES
+    assert refreshed - walks == NODES
     for _ in range(100):
         world.client.update()
     assert world.client.walks() == refreshed
+
+
+def test_the_lookup_is_repeated_only_after_its_age_limit_and_once_per_node(
+    world,
+) -> None:
+    """Paths are looked up again every 30-60 s so a table changed in place is
+    found: after 29 s nothing; past the limit exactly one walk per node, then
+    nothing again.
+    """
+    lookup_is_refreshed_once_per_node(world)
 
 
 def test_a_wheel_still_scrolls_correctly_during_the_flood(world) -> None:
@@ -301,3 +307,10 @@ def test_mutation_converting_every_node_on_every_update_is_caught(
     )
     with pytest.raises(AssertionError):
         flood_does_no_further_work(world)
+
+
+def test_mutation_a_cache_that_never_expires_is_caught(world, monkeypatch) -> None:
+    """With expiry removed no node is ever refreshed: zero walks, not ``NODES``."""
+    monkeypatch.setattr(matter_core_module, "_POSITION_PATH_MAX_AGE", float("inf"))
+    with pytest.raises(AssertionError):
+        lookup_is_refreshed_once_per_node(world)
