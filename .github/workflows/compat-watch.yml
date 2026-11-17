@@ -8,6 +8,10 @@ on:
     - cron: "40 6 * * 1"
   workflow_dispatch:
 
+# One run at a time: two runs must not both create the issue.
+concurrency:
+  group: compat-watch
+
 permissions:
   contents: read
   issues: write
@@ -17,8 +21,8 @@ jobs:
     name: Compare the newest releases with the tested ones
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - run: python tools/compat_watch.py

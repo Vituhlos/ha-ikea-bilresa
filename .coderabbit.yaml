@@ -4,10 +4,30 @@
 # (for example agent/panel-0.6.1), not main. CodeRabbit reviews only the default
 # branch unless told otherwise, and its "skipped" status looks like a pass.
 # Review every base branch. The house rules below come from AGENTS.md.
+#
+# Quiet on purpose: a pull request here is read by a person and by other
+# reviewers, so the walkthrough extras, labels, diagrams and advisory checks are
+# off and only findings are left. Turn something back on by deleting its line.
 
 language: en
 
 reviews:
+  profile: quiet
+  high_level_summary: false
+  sequence_diagrams: false
+  suggested_labels: false
+  suggested_reviewers: false
+  estimate_code_review_effort: false
+  in_progress_fortune: false
+  related_prs: false
+  enable_prompt_for_ai_agents: false
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
   auto_review:
     enabled: true
     drafts: false

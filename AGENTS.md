@@ -24,6 +24,8 @@ guardrails the task touches.
    relevant diff. Preserve existing user/agent work.
 5. Confirm whether the selected task is already implemented, only statically
    verified, CI-verified, or hardware-verified. Never collapse these states.
+6. For GitHub governance, Codespaces, CI automation or AI-agent integrations,
+   follow the owner-approved plan in `docs/architecture/ai-development-automation.md`.
 
 ## Project guardrails
 

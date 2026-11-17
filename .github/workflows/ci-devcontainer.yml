@@ -1,0 +1,45 @@
+name: Devcontainer smoke
+
+# Only run the heavier container build when the Codespaces setup changes.
+# This is supplementary CI; do not make it a required check because unrelated
+# PRs intentionally skip it.
+on:
+  pull_request:
+    paths:
+      - ".devcontainer/**"
+      - ".github/workflows/ci-devcontainer.yml"
+      - "requirements-test.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devcontainer-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Codespaces bootstrap (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build the real devcontainer and run checks
+        uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: |
+            set -eu
+            test -x .venv/bin/python
+            .venv/bin/python --version
+            node --version
+            .venv/bin/ruff check custom_components tests
+            # Match regular CI: it runs mypy without installed Home Assistant
+            # type packages. Full env mypy currently reports external-type
+            # compatibility findings; those must be tracked separately.
+            .venv/bin/python -m mypy --no-site-packages custom_components/ikea_bilresa
+            .venv/bin/python -m pytest -q
+            node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs
