@@ -826,7 +826,6 @@ def test_climate_small_notches_accumulate_without_redundant_commands(
     assert binding._tracked == pytest.approx(1.36)
 
 
-
 @pytest.mark.parametrize("target_domain", ("number", "input_number"))
 @pytest.mark.parametrize(
     ("minimum", "maximum", "current", "up", "expected"),
