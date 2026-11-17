@@ -55,6 +55,13 @@ RESOLVERS = (
     "getnameinfo",
 )
 SOCKET_METHODS = ("connect", "connect_ex", "sendto", "sendmsg")
+# ``transport.sendto(data, addr)`` of an unconnected datagram endpoint: on the
+# Proactor loop it goes straight to the send operation, never through the socket.
+DATAGRAM_SEND = "datagram_sendto"
+_DATAGRAM_TRANSPORTS = (
+    ("asyncio.selector_events", "_SelectorDatagramTransport"),
+    ("asyncio.proactor_events", "_ProactorDatagramTransport"),
+)
 LOOP_METHODS = (
     "create_connection",
     "create_datagram_endpoint",
@@ -138,6 +145,7 @@ class NetworkGuard:
         self._install_socket_class()
         self._install_resolvers()
         self._install_loop_methods()
+        self._install_datagram_transports()
 
     def uninstall(self) -> list[str]:
         """Restore everything; return the names that did not come back."""
@@ -212,6 +220,36 @@ class NetworkGuard:
                     continue
                 self._swap(cls, name, self._wrap_loop_method(name, vars(cls)[name]))
 
+    @staticmethod
+    def _datagram_transports() -> list[type]:
+        found: list[type] = []
+        for module, name in _DATAGRAM_TRANSPORTS:
+            try:
+                cls = getattr(importlib.import_module(module), name, None)
+            except ImportError:  # pragma: no cover
+                continue
+            if cls is not None and "sendto" in vars(cls):
+                found.append(cls)
+        return found
+
+    def _install_datagram_transports(self) -> None:
+        guard = self
+
+        for cls in self._datagram_transports():
+            original = vars(cls)["sendto"]
+
+            def guarded(
+                transport: Any, data: Any, addr: Any = None, _original: Any = original
+            ) -> Any:
+                if DATAGRAM_SEND not in guard._skip:
+                    guard.check_address(DATAGRAM_SEND, addr)
+                if guard._probing:
+                    return None
+                return _original(transport, data, addr)
+
+            guarded.__name__ = "sendto"
+            self._swap(cls, "sendto", guarded)
+
     def _wrap_loop_method(self, name: str, original: Callable[..., Any]) -> Any:
         guard = self
 
@@ -243,6 +281,7 @@ class NetworkGuard:
             "connect_ex": lambda: sock.connect_ex(stand_in, far6),
             "sendto": lambda: sock.sendto(stand_in, b"x", far),
             "sendmsg": lambda: sock.sendmsg(stand_in, [b"x"], [], 0, far),
+            DATAGRAM_SEND: lambda: self._probe_datagram_transports(far),
             "getaddrinfo": lambda: socket.getaddrinfo("matter-server.invalid", 5580),
             "gethostbyname": lambda: socket.gethostbyname("matter-server.invalid"),
             "gethostbyname_ex": lambda: socket.gethostbyname_ex(
@@ -265,6 +304,16 @@ class NetworkGuard:
         finally:
             self._probing = False
         return missed
+
+    def _probe_datagram_transports(self, address: Any) -> None:
+        """Refuses only if every datagram transport class refuses (stand-in self)."""
+        for cls in self._datagram_transports():
+            try:
+                vars(cls)["sendto"](object(), b"x", address)
+            except LabSafetyViolation:
+                continue
+            raise RuntimeError(f"{cls.__name__}.sendto is not guarded")
+        raise LabSafetyViolation("every datagram transport refused")
 
     async def uncovered_async(self) -> list[str]:
         """The same for the asyncio entry points, called on a stand-in loop."""
@@ -322,6 +371,10 @@ def _loop_destinations(name: str, args: tuple[Any, ...], kwargs: dict[str, Any])
         remote = kwargs.get("remote_addr")
         return [remote] if remote else []
     if name in ("sock_connect", "sock_sendto"):
-        address = args[-1] if args else kwargs.get("address")
-        return [address]
+        # sock_connect(sock, address) / sock_sendto(sock, data, address): the
+        # keyword form first, then the exact positional slot.
+        if "address" in kwargs:
+            return [kwargs["address"]]
+        slot = 1 if name == "sock_connect" else 2
+        return [args[slot] if len(args) > slot else None]
     return []

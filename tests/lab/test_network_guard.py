@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from .net_guard import (
+    DATAGRAM_SEND,
     LOOP_METHODS,
     RESOLVERS,
     NetworkGuard,
@@ -277,7 +278,7 @@ async def test_a_complete_guard_leaves_no_asyncio_path_uncovered() -> None:
 
 @pytest.mark.parametrize(
     "hole",
-    ["connect", "connect_ex", "sendto", "sendmsg", *RESOLVERS],
+    ["connect", "connect_ex", "sendto", "sendmsg", DATAGRAM_SEND, *RESOLVERS],
 )
 def test_a_guard_with_a_hole_is_caught_by_the_probes(hole: str) -> None:
     """Mutation: leave one path unguarded; the probes must name exactly that path."""
@@ -303,12 +304,20 @@ async def test_an_asyncio_guard_with_a_hole_is_caught(hole: str) -> None:
 def test_with_no_guard_at_all_every_path_is_reported() -> None:
     """Mutation: the whole guard switched off (every path skipped)."""
     everything = frozenset(
-        {"connect", "connect_ex", "sendto", "sendmsg", *RESOLVERS, *LOOP_METHODS}
+        {
+            "connect",
+            "connect_ex",
+            "sendto",
+            "sendmsg",
+            DATAGRAM_SEND,
+            *RESOLVERS,
+            *LOOP_METHODS,
+        }
     )
     guard = NetworkGuard([], skip=everything)
     guard.install()
     try:
-        assert len(guard.uncovered()) == 9
+        assert len(guard.uncovered()) == 10
     finally:
         assert guard.uninstall() == []
 
@@ -331,3 +340,48 @@ def test_installing_and_removing_the_guard_restores_everything() -> None:
     for name in RESOLVERS:
         assert getattr(socket, name) is before[name]
         assert getattr(_socket, name) is before[f"_{name}"]
+
+
+# -- findings of the review of 26d1210 ------------------------------------------
+
+
+@pytest.mark.parametrize("address", [FAR4, FAR6, (NAME, 5353)])
+def test_an_unconnected_datagram_transport_cannot_send_outside(
+    address: Any, network_attempts: list[str]
+) -> None:
+    """``transport.sendto(data, addr)`` of an endpoint made with ``local_addr`` only.
+
+    Called on a stand-in transport for every datagram transport class (selector
+    and Proactor), so nothing is sent; the guard refuses before the send.
+    """
+    from .net_guard import NetworkGuard as _Guard
+
+    classes = _Guard._datagram_transports()
+    assert classes, "no datagram transport class found"
+    for cls in classes:
+        with pytest.raises(LabSafetyViolation):
+            vars(cls)["sendto"](_stand_in(), b"x", address)
+
+    host = address[0]
+    assert network_attempts == [f"{DATAGRAM_SEND}:{host}"] * len(classes)
+    network_attempts.clear()
+
+
+async def test_asyncio_raw_socket_calls_are_checked_when_the_address_is_a_keyword(
+    network_attempts: list[str],
+) -> None:
+    """``address=`` given by keyword next to positional arguments is still checked."""
+    loop = asyncio.get_running_loop()
+    with pytest.raises(LabSafetyViolation):
+        await loop.sock_sendto(_stand_in(), b"x", address=FAR4)
+    with pytest.raises(LabSafetyViolation):
+        await loop.sock_connect(_stand_in(), address=FAR6)
+    with pytest.raises(LabSafetyViolation):
+        await loop.sock_connect(_stand_in(), address=(NAME, 5580))
+
+    assert network_attempts == [
+        "sock_sendto:192.0.2.1",
+        "sock_connect:2001:db8::1",
+        "sock_connect:" + NAME,
+    ]
+    network_attempts.clear()
