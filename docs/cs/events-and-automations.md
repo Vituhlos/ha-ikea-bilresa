@@ -205,9 +205,16 @@ nahraďte `event.bilresa_scroll_wheel_channel_1` entitou kanálu BILRESY,
 `light.example` světlem Hue a `select.example` entitou
 výběru scény v jeho místnosti nebo zóně. Scéna může změnit všechna světla
 v dané skupině Hue. Pokud má kolečko ovládat jedno světlo, použijte zónu
-s jediným světlem. Světlo musí podporovat 3000 K. Pro otáčení ponechte vazbu
-pro stmívání a u stisku a podržení v ní nastavte **Bez akce**. Spouštěče
-stisku čekají na výsledný počet stisků.
+s jediným světlem. Světlo musí podporovat 3000 K.
+
+Pro otáčení ponechte vazbu pro stmívání. V panelu BILRESA odeberte všechny
+položky ze seznamu **Procházet scény** a pro tento kanál nastavte u krátkého,
+dvojitého a trojitého stisku i podržení **Bez akce**. V ostatních automatizacích
+pro stejná gesta tento kanál vynechte.
+
+Spouštěče stisku čekají na výsledný počet stisků. Pokud Hue hlásí stav světla
+nebo scény se zpožděním, rychlý další stisk může vycházet z předchozího stavu
+světla nebo zopakovat stejnou scénu. Mezi gesty dejte Hue chvíli na aktualizaci.
 
 [@amodig](https://github.com/amodig) toto nastavení vyzkoušel na fyzickém kolečku
 BILRESA s Home Assistant Core `2026.11.2`, integrací BILRESA `0.7.0-rc.5`

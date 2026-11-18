@@ -74,6 +74,11 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
   Home Assistant. `python -m pytest -q -p no:cacheprovider` reported 1,334
   passed, one skipped and 32 expected failures. A live unavailable-state or
   multi-lamp test was outside the contributor's one-lamp smoke test.
+  PR #86 review clarified how to remove overlapping binding actions and
+  documented slow Hue state updates. The example uses Home Assistant's
+  default 10-run queue. `git diff --check` and
+  `python -m pytest -q -p no:cacheprovider tests/test_docs.py` passed
+  (72 documentation tests).
 
 `agent/panel-0.6.1` after merging PR #25 and PR #20, local Windows stand-ins, 2026-10-29:
 

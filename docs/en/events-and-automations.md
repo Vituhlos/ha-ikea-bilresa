@@ -274,9 +274,16 @@ Replace `event.bilresa_scroll_wheel_channel_1` with your BILRESA channel,
 `light.example` with the Hue light, and `select.example`
 with its room or zone's Scene entity. A scene can change every light in that
 Hue group. Use a zone containing just that lamp if the wheel should control
-one light. The lamp must support 3000 K. Keep the brightness binding for
-rotation and set its press and hold actions to **No action**. The press triggers
-wait for the completed click count.
+one light. The lamp must support 3000 K.
+
+Keep the brightness binding for rotation. In the BILRESA panel, remove any
+entries from **Cycle scenes** and set **Short press**, **Double press**,
+**Triple press** and **Hold** to **No action** for this channel. Set any other
+automation for these gestures to skip this channel.
+
+The press triggers wait for the completed click count. If Hue is slow to
+report the lamp or scene state, a quick follow-up press can read the old lamp
+state or repeat the same scene. Give Hue a moment to update between gestures.
 
 <details>
 <summary>Complete automation YAML</summary>
