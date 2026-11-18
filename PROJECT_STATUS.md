@@ -15,9 +15,12 @@ reload and a subsequent server disconnect.
 
 Live verification used the same guard on `0.7.0-rc.5` with Home Assistant Core
 `2026.11.2`. BILRESA showed a live Matter connection and Repairs stayed clear
-71 seconds after reload. The `main` branch build and physical wheel gestures
-were untested on hardware. Next action is to review the PR and verify the
-reload on the stable line before release.
+71 seconds after reload. The [dated checklist entry](docs/HARDWARE_TEST.md#2026-11-18--bilresa-reload-and-false-disconnect-repair)
+records the environment and observations. The documentation follow-up passed
+`git diff --check` and
+`python -m pytest -q tests/test_coordinator.py::test_reload_does_not_raise_disconnect_repair`
+(1 passed). The `main` branch build and physical wheel gestures remain untested
+on hardware. Next action is to verify reload on the stable line before release.
 
 ## GitHub development automation — Phase 2A proposed (2026-11-10)
 
