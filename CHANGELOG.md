@@ -19,32 +19,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a pre-release tag, and a stale-issue workflow for issues waiting for information.
 
 ### Fixed
-- **Numeric and climate rotations honour explicit zero-valued bounds.** The
-  BILRESA number and temperature modes no longer mistake a valid minimum or
-  maximum of zero for a missing attribute and send values beyond the target's
-  configured range. Missing bounds retain their previous fallback values, and
-  invalid zero step sizes retain their positive fallback. Exact range endpoints
-  stay reachable even when the target step does not divide the range or has
-  more decimal places than the normal service payload. The first inward notch
-  from an off-grid state is no longer lost, and fractional progress still
-  accumulates without repeating unchanged commands. If Home Assistant rejects
-  a numeric or climate value service call, the binding discards stale fractional
-  progress and any queued follow-up value so the next notch reads the actual
-  reported state. A delayed failure from an older call no longer cancels a
-  newer queued or dispatched command. Numeric and climate quantization now
-  suppresses targets that move opposite to the wheel's direction while
-  preserving fractional progress until a valid target is reached. Queued
-  value commands retain their original generation, and a canceled late
-  timer can no longer flush a newer pending command. Numeric/climate
-  state-echo detection now uses only the current baseline's commands, so
-  historical value commands cannot hide genuine external changes after a
-  new gesture starts. Genuine external changes also cancel queued numeric/
-  climate targets, and a reversed sub-step cannot leave an opposing target
-  queued. Number and climate step grids now start at the configured minimum
-  and retain the entity step's full precision, avoiding rejected off-grid
-  service values. Old failures cannot reset a newer undispatched gesture.
-  Numeric/climate handlers are observed to completion in a background task,
-  so rejected Home Assistant service handlers can reset stale tracking.
+- **Number/input_number and climate scroll limits:** Explicit `0` min/max values
+  are treated as valid bounds instead of missing attributes. Missing limits and
+  invalid zero steps retain their previous fallback behavior.
 
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter

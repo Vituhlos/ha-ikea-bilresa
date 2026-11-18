@@ -19,7 +19,6 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from decimal import Decimal
 import logging
 import time
 from typing import Any
@@ -269,19 +268,6 @@ class LightBinding:
         self._ramp_unsub: Callable[[], None] | None = None
         self._ramp_watchdog_unsub: Callable[[], None] | None = None
         self._tracked: float | None = None
-        # Last effective number/climate target (or the actual state at the
-        # start of a gesture). A suppressed off-grid quantization must not
-        # replace it while fractional progress continues accumulating.
-        self._value_last_effective: float | None = None
-        # The most recently dispatched numeric/climate setpoint, distinct from
-        # a newer coalesced value that the device has not yet received.
-        self._value_last_dispatched: float | None = None
-        # Unlike the global echo history, this deque contains commands only
-        # from the current numeric/climate baseline. Older commands must not
-        # make an unrelated external report look like our own value change.
-        self._value_baseline_commands: deque[tuple[float, float]] = deque(
-            maxlen=_COMMAND_HISTORY
-        )
         self._command_authoritative_until = 0.0
         self._last_direction: str | None = None
         self._saturation = 100.0
@@ -306,13 +292,9 @@ class LightBinding:
         # one is the opposite of what this is for.
         self._last_command_at: float | None = None
         self._pending_command: (
-            tuple[str, str, dict[str, Any], dict[str, Any], int | None] | None
+            tuple[str, str, dict[str, Any], dict[str, Any]] | None
         ) = None
         self._pending_unsub: Callable[[], None] | None = None
-        self._pending_timer_generation = 0
-        # A delayed failed service must not invalidate a newer numeric/climate
-        # command, including one still waiting for the coalescing timer.
-        self._value_command_generation = 0
         # Recently calculated targets with the range they were derived from,
         # so a later absolute state report can be recognized as our own echo.
         self._commanded: deque[tuple[float, float]] = deque(maxlen=_COMMAND_HISTORY)
@@ -589,7 +571,6 @@ class LightBinding:
             self._last_reported = observed
         if self._scroll_authoritative(now):
             if not own_echo and self._mode not in _LIGHT_MODES:
-                self._cancel_stale_value_command()
                 self._forget_target("unrecognized_value_during_scroll", observed)
             else:
                 self._trace.record(
@@ -607,15 +588,7 @@ class LightBinding:
         # service transition. A later external update invalidates the desired
         # value so the next gesture reads reality again.
         if now >= self._command_authoritative_until:
-            self._cancel_stale_value_command()
             self._forget_target("outside_scroll_authority", observed)
-
-    @callback
-    def _cancel_stale_value_command(self) -> None:
-        """An external rebase supersedes queued and in-flight value requests."""
-        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
-            self._value_command_generation += 1
-            self._cancel_pending_command()
 
     def _scroll_authoritative(self, now: float) -> bool:
         """Report whether one continuous scroll still owns the target value."""
@@ -651,31 +624,12 @@ class LightBinding:
         ends is where a group reasserts its real level.
         """
         observed = self._observed_value(state)
-        if observed is None:
+        if observed is None or not self._commanded:
             return True
-        # The global history intentionally survives an external rebase to
-        # recognize delayed echoes for other targets. Numeric and climate
-        # targets must instead compare only commands issued from their current
-        # baseline, not the older path that existed before a rebase.
-        commands = (
-            self._value_baseline_commands
-            if self._mode in (MODE_NUMBER, MODE_TEMPERATURE)
-            else self._commanded
-        )
-        if not commands:
-            # A suppressed quantization is not an outgoing command. Without
-            # a current-baseline command to echo, an external value change
-            # must still rebase, even during a continuous scroll.
-            if (
-                self._mode in (MODE_NUMBER, MODE_TEMPERATURE)
-                and self._value_last_effective is not None
-            ):
-                return observed == self._value_last_effective
-            return True
-        values = [value for value, _span in commands]
+        values = [value for value, _span in self._commanded]
         if self._last_reported is not None:
             values.append(self._last_reported)
-        span = max(span for _value, span in commands)
+        span = max(span for _value, span in self._commanded)
         tolerance = span * _ECHO_MATCH_FRACTION
         if self._mode == MODE_COLOR:
             # Hue wraps, so "between two values" has no meaning; proximity to
@@ -711,16 +665,10 @@ class LightBinding:
         return _as_float(attributes.get(ATTR_BRIGHTNESS))
 
     @callback
-    def _set_target(
-        self, value: float, span: float, *, tracked: float | None = None
-    ) -> None:
-        """Record the quantized service target, retaining sub-step progress."""
-        # Compare state echoes against sent values, not fractional progress.
-        self._tracked = value if tracked is None else tracked
-        command = (value, max(span, 1e-9))
-        self._commanded.append(command)
-        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
-            self._value_baseline_commands.append(command)
+    def _set_target(self, value: float, span: float) -> None:
+        """Record the newest calculated target and the range it came from."""
+        self._tracked = value
+        self._commanded.append((value, max(span, 1e-9)))
 
     @callback
     def _forget_target(self, reason: str = "unspecified", reported: Any = None) -> None:
@@ -742,14 +690,6 @@ class LightBinding:
                 recent_commands=[round(value, 2) for value, _span in self._commanded],
             )
         self._tracked = None
-        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
-            # An external rebase or fresh gesture supersedes any in-flight
-            # rejection and any queued value derived from the old baseline.
-            self._value_command_generation += 1
-            self._cancel_pending_command()
-        self._value_last_effective = None
-        self._value_last_dispatched = None
-        self._value_baseline_commands.clear()
         # The command history is deliberately kept. It describes where the
         # target is still travelling to, and that stays true after we give up
         # our calculated value — clearing it made the very next report look
@@ -1193,79 +1133,7 @@ class LightBinding:
             # that has barely set off — looks like it came from nowhere.
             self._last_reported = current
         self._tracked = value
-        if self._mode in (MODE_NUMBER, MODE_TEMPERATURE):
-            # An idle resync also supersedes old in-flight service failures.
-            # A deferred target from that old baseline must never be flushed.
-            self._value_command_generation += 1
-            if self._pending_command is not None:
-                self._cancel_pending_command()
-            self._value_baseline_commands.clear()
-            self._value_last_dispatched = None
-            self._value_last_effective = value
         return value
-
-    @staticmethod
-    def _quantize_value(
-        value: float, minimum: float, maximum: float, step: float
-    ) -> float:
-        """Quantize on the minimum-anchored grid without discarding precision."""
-        if value <= minimum:
-            return minimum
-        if value >= maximum:
-            return maximum
-        index = round((value - minimum) / step)
-        target = float(Decimal(str(minimum)) + index * Decimal(str(step)))
-        return min(maximum, max(minimum, target))
-
-    def _suppress_value_command(
-        self,
-        *,
-        continuous: float,
-        previous: float,
-        up: bool,
-        span: float,
-        kind: str,
-        unit: str,
-    ) -> None:
-        """Retain sub-step progress without allowing stale opposing commands."""
-        if self._pending_command is not None:
-            pending_result = self._pending_command[3]
-            pending_before = _as_float(pending_result.get("before"))
-            pending_after = _as_float(pending_result.get("after"))
-            if (
-                pending_before is not None
-                and pending_after is not None
-                and (
-                    (up and pending_after < pending_before)
-                    or (not up and pending_after > pending_before)
-                )
-            ):
-                # A reversed physical notch supersedes a queued command, even
-                # when quantization cannot yet produce a different setpoint.
-                self._cancel_pending_command()
-                if self._value_last_dispatched is not None:
-                    previous = self._value_last_dispatched
-                    self._value_baseline_commands.clear()
-                    self._value_baseline_commands.append(
-                        (previous, max(span, 1e-9))
-                    )
-                elif self._last_reported is not None:
-                    previous = self._last_reported
-                    self._value_baseline_commands.clear()
-                self._value_last_effective = previous
-        # A smaller new gesture must not be erased by an older failure.
-        self._value_command_generation += 1
-        self._tracked = continuous
-        previous = (
-            self._value_last_effective
-            if self._value_last_effective is not None
-            else previous
-        )
-        self._report_activity(
-            "completed",
-            result=self._value_result(kind, previous, previous, unit),
-            reason="target_unchanged",
-        )
 
     @staticmethod
     def _delta(step_pct: float, span: float, notches: int, up: bool) -> float:
@@ -1470,44 +1338,25 @@ class LightBinding:
             min_t = 7.0
         if max_t is None:
             max_t = 35.0
-        # A zero target step is invalid: retain the safe positive fallback.
         temp_step = _as_float(state.attributes.get("target_temp_step")) or 0.5
         tracked = self._resync(
             _as_float(state.attributes.get("temperature")), (min_t + max_t) / 2
         )
-        span = max(max_t - min_t, 1)
-        continuous_target = tracked + self._delta(self._step, span, notches, up)
-        continuous_target = min(max_t, max(min_t, continuous_target))
-        target = self._quantize_value(
-            continuous_target, min_t, max_t, temp_step
+        target = tracked + self._delta(self._step, max(max_t - min_t, 1), notches, up)
+        target = min(max_t, max(min_t, round(target / temp_step) * temp_step))
+        self._set_target(target, max(max_t - min_t, 1))
+        result = self._value_result(
+            "temperature",
+            round(tracked, 2),
+            round(target, 2),
+            str(state.attributes.get("unit_of_measurement") or "°"),
         )
-        # Compare against the actual initial value or the last *effective*
-        # command, never a suppressed quantization or fractional accumulator.
-        previous = (
-            self._value_last_effective
-            if self._value_last_effective is not None
-            else tracked
-        )
-        unit = str(state.attributes.get("unit_of_measurement") or "°")
-        if (up and target <= previous) or (not up and target >= previous):
-            self._suppress_value_command(
-                continuous=continuous_target,
-                previous=previous,
-                up=up,
-                span=span,
-                kind="temperature",
-                unit=unit,
-            )
-            return False
-        self._set_target(target, span, tracked=continuous_target)
-        self._value_last_effective = target
-        result = self._value_result("temperature", previous, target, unit)
         return self._call_value_if_changed(
             "climate",
             "set_temperature",
-            {"temperature": target},
-            before=previous,
-            after=target,
+            {"temperature": round(target, 2)},
+            before=round(tracked, 2),
+            after=round(target, 2),
             result=result,
         )
 
@@ -1542,42 +1391,27 @@ class LightBinding:
             min_n = 0.0
         if max_n is None:
             max_n = 100.0
-        # A zero target step is invalid: retain the safe positive fallback.
         num_step = _as_float(state.attributes.get("step")) or 1.0
         current = _as_float(state.state)
         tracked = self._resync(current, (min_n + max_n) / 2)
-        span = max(max_n - min_n, num_step)
-        continuous_target = tracked + self._delta(self._step, span, notches, up)
-        continuous_target = min(max_n, max(min_n, continuous_target))
-        target = self._quantize_value(
-            continuous_target, min_n, max_n, num_step
+        target = tracked + self._delta(
+            self._step, max(max_n - min_n, num_step), notches, up
         )
-        previous = (
-            self._value_last_effective
-            if self._value_last_effective is not None
-            else tracked
-        )
-        unit = str(state.attributes.get("unit_of_measurement") or "")
-        if (up and target <= previous) or (not up and target >= previous):
-            self._suppress_value_command(
-                continuous=continuous_target,
-                previous=previous,
-                up=up,
-                span=span,
-                kind="number",
-                unit=unit,
-            )
-            return False
-        self._set_target(target, span, tracked=continuous_target)
-        self._value_last_effective = target
+        target = min(max_n, max(min_n, round(target / num_step) * num_step))
+        self._set_target(target, max(max_n - min_n, num_step))
         domain = self._target.split(".", 1)[0]
-        result = self._value_result("number", previous, target, unit)
+        result = self._value_result(
+            "number",
+            round(tracked, 4),
+            round(target, 4),
+            str(state.attributes.get("unit_of_measurement") or ""),
+        )
         return self._call_value_if_changed(
             domain,
             "set_value",
-            {"value": target},
-            before=previous,
-            after=target,
+            {"value": round(target, 4)},
+            before=round(tracked, 4),
+            after=round(target, 4),
             result=result,
         )
 
@@ -1692,17 +1526,6 @@ class LightBinding:
         if self._available_state(self._target) is None:
             self._report_activity("skipped", result=result, reason="target_unavailable")
             return
-        command_generation: int | None = None
-        if (
-            (self._mode == MODE_NUMBER and domain in ("number", "input_number")
-             and service == "set_value")
-            or (self._mode == MODE_TEMPERATURE and domain == "climate"
-                and service == "set_temperature")
-        ):
-            # Capture the generation at request creation, including when the
-            # command is queued. A delayed timer must not relabel stale work.
-            self._value_command_generation += 1
-            command_generation = self._value_command_generation
         now = time.monotonic()
         elapsed = (
             float("inf")
@@ -1712,9 +1535,7 @@ class LightBinding:
         if self._min_command_interval > 0 and elapsed < self._min_command_interval:
             # Replace whatever was queued: an older absolute value has no
             # value of its own once a newer one exists.
-            self._pending_command = (
-                domain, service, data, result, command_generation
-            )
+            self._pending_command = (domain, service, data, result)
             self._trace.record(
                 "coalesced",
                 binding=self.trace_key,
@@ -1723,33 +1544,18 @@ class LightBinding:
                 waited=round(self._min_command_interval - elapsed, 3),
             )
             if self._pending_unsub is None:
-                self._pending_timer_generation += 1
-                timer_generation = self._pending_timer_generation
-
-                @callback
-                def flush_if_current(_now) -> None:
-                    if timer_generation == self._pending_timer_generation:
-                        self._flush_pending_command(_now)
-
                 self._pending_unsub = async_call_later(
                     self.hass,
                     self._min_command_interval - elapsed,
-                    flush_if_current,
+                    self._flush_pending_command,
                 )
             return
-        # A newer immediate request supersedes a queued absolute value.
-        # Its old timer may still fire later; the queue must be empty then.
-        if self._pending_command is not None:
-            self._cancel_pending_command()
         self._last_command_at = now
-        self._dispatch_call(
-            domain, service, data, result, command_generation
-        )
+        self._dispatch_call(domain, service, data, result)
 
     @callback
     def _flush_pending_command(self, _now=None) -> None:
         """Send the newest queued value once the interval has passed."""
-        self._pending_timer_generation += 1
         self._pending_unsub = None
         pending = self._pending_command
         self._pending_command = None
@@ -1760,7 +1566,6 @@ class LightBinding:
 
     @callback
     def _cancel_pending_command(self) -> None:
-        self._pending_timer_generation += 1
         if self._pending_unsub is not None:
             self._pending_unsub()
             self._pending_unsub = None
@@ -1773,7 +1578,6 @@ class LightBinding:
         service: str,
         data: dict[str, Any],
         result: dict[str, Any],
-        command_generation: int | None = None,
     ) -> None:
         transition = _as_float(data.get(ATTR_TRANSITION)) or 0.0
         # The scroll epoch this command belongs to. The next batch of the
@@ -1785,20 +1589,8 @@ class LightBinding:
         payload = {ATTR_ENTITY_ID: self._target, **data}
         action = self._active_action
         self._report_activity("pending", result=result, action=action)
-        is_value_service = (
-            (self._mode == MODE_NUMBER and domain in ("number", "input_number")
-             and service == "set_value")
-            or (self._mode == MODE_TEMPERATURE and domain == "climate"
-                and service == "set_temperature")
-        )
-        if is_value_service:
-            # Only a completed handler confirms numeric/climate acceptance.
-            # This coroutine is awaited in a background task below, so the
-            # wheel event callback stays responsive without losing exceptions.
-            key = "temperature" if self._mode == MODE_TEMPERATURE else "value"
-            self._value_last_dispatched = _as_float(data.get(key))
         service_call = self.hass.services.async_call(
-            domain, service, payload, blocking=is_value_service
+            domain, service, payload, blocking=False
         )
         self.hass.async_create_task(
             self._async_dispatch_service(
@@ -1807,7 +1599,6 @@ class LightBinding:
                 service_call,
                 result=result,
                 action=action,
-                command_generation=command_generation,
             )
         )
 
@@ -1849,14 +1640,12 @@ class LightBinding:
         *,
         result: dict[str, Any],
         action: WheelAction | None,
-        command_generation: int | None = None,
     ) -> None:
         """Report whether Home Assistant accepted this exact service action.
 
-        Numeric/climate handlers are awaited in this background task so a
-        rejected value can reset stale rotation tracking. Other modes still
-        use non-blocking service dispatch for tuned latency. Successful task
-        completion alone does not prove a physical device applied the value.
+        ``blocking=False`` preserves the tuned dispatch latency. ``accepted``
+        means Home Assistant validated and scheduled the service call; it is not
+        a claim that the target device physically changed.
         """
         try:
             await service_call
@@ -1867,26 +1656,6 @@ class LightBinding:
                 service,
                 type(err).__name__,
             )
-            if (
-                command_generation is not None
-                and command_generation == self._value_command_generation
-                and (
-                    (self._mode == MODE_NUMBER and domain in ("number", "input_number")
-                     and service == "set_value")
-                    or (self._mode == MODE_TEMPERATURE and domain == "climate"
-                        and service == "set_temperature")
-                )
-            ):
-                # Only the newest requested numeric/climate command can
-                # invalidate tracking on rejection. Older failures must not
-                # discard newer dispatched or coalesced absolute targets.
-                # Keep the existing light/group policy unchanged.
-                self._forget_target("service_dispatch_failed")
-                self._cancel_pending_command()
-                self._commanded.clear()
-                self._last_reported = None
-                self._command_authoritative_until = 0.0
-                self._last_command_at = None
             self._report_activity(
                 "failed",
                 result=result,
