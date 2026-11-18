@@ -262,6 +262,102 @@ double and triple clicks. Existing intermittent missed clicks remained;
 this recipe does not recover events the integration never receives.
 See the [hardware observations in PR #5](https://github.com/Vituhlos/ha-ikea-bilresa/pull/5#issuecomment-6452179129).
 
+### Recipe: cycle Philips Hue scenes with a press
+
+Use a Hue Bridge v2 and a Hue room or zone with a **Scene** selector in Home
+Assistant. A single press turns an off lamp on or advances to the next Hue
+scene when the lamp is on. Double-press for 3000 K white and hold to turn the
+lamp off. The selector uses the scenes saved in the Hue app and wraps after the
+last option. [Philips Hue scene selection](https://www.home-assistant.io/integrations/hue/#scene-selection)
+
+Replace `event.bilresa_scroll_wheel_channel_1` with your BILRESA channel,
+`light.example` with the Hue light, and `select.example`
+with its room or zone's Scene entity. A scene can change every light in that
+Hue group. Use a zone containing just that lamp if the wheel should control
+one light. The lamp must support 3000 K.
+
+Keep the brightness binding for rotation. In the BILRESA panel, remove any
+entries from **Cycle scenes** and set **Short press**, **Double press**,
+**Triple press** and **Hold** to **No action** for this channel. Set any other
+automation for these gestures to skip this channel.
+
+The press triggers wait for the completed click count. If Hue is slow to
+report the lamp or scene state, a quick follow-up press can read the old lamp
+state or repeat the same scene. Give Hue a moment to update between gestures.
+
+<details>
+<summary>Complete automation YAML</summary>
+
+```yaml
+alias: BILRESA – Hue scenes, white and off
+triggers:
+  - trigger: ikea_bilresa.pressed
+    target:
+      entity_id: event.bilresa_scroll_wheel_channel_1
+    id: single
+  - trigger: ikea_bilresa.double_pressed
+    target:
+      entity_id: event.bilresa_scroll_wheel_channel_1
+    id: double
+  - trigger: ikea_bilresa.held
+    target:
+      entity_id: event.bilresa_scroll_wheel_channel_1
+    id: hold
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: single
+        sequence:
+          - if:
+              - condition: state
+                entity_id: light.example
+                state: "off"
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: light.example
+                data:
+                  transition: 0
+            else:
+              - condition: state
+                entity_id: light.example
+                state: "on"
+              - action: select.select_next
+                target:
+                  entity_id: select.example
+                data:
+                  cycle: true
+      - conditions:
+          - condition: trigger
+            id: double
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.example
+            data:
+              color_temp_kelvin: 3000
+              transition: 0
+      - conditions:
+          - condition: trigger
+            id: hold
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: light.example
+            data:
+              transition: 0
+mode: queued
+max: 10
+```
+
+</details>
+
+[@amodig](https://github.com/amodig) tested this setup on a physical BILRESA
+scroll wheel using Home Assistant Core `2026.11.2`, BILRESA `0.7.0-rc.5` and a
+Hue group with one lamp and two scenes.
+
 ## Multiple wheels
 
 Everything is keyed by Matter node and endpoint, so **any number of wheels** work

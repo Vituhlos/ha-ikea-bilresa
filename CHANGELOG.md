@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Documentation
+- Add a recipe for cycling scenes from the Philips Hue app with the BILRESA
+  wheel, with warm white on double-press and off on hold.
+
 ### Fixed
 - **A range limit of `0` is a real limit.** A `number` or `input_number` that stops
   at 0 (for example -10 to 0), or a thermostat whose `min_temp` or `max_temp` is 0,

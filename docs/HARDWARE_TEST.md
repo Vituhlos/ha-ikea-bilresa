@@ -862,3 +862,19 @@ on this firmware. The remaining perceived delay is not in the binding dispatch
 path. Physical release-to-Matter delivery and actual relay actuation are not
 observable from HA timestamps, and firmware `1.8.7` has not yet been measured
 with the same trace.
+
+### 2026-11-18 — Philips Hue scene recipe
+
+[@amodig](https://github.com/amodig) tried the automation on a physical
+BILRESA scroll wheel and confirmed it worked. The setup was Home Assistant
+Green with Core `2026.11.2`, BILRESA `0.7.0-rc.5`, and a Hue group with one
+lamp and two scenes. The automation used the Hue v2 scene selector and the
+wheel's completed-press triggers, with brightness handled by its channel
+binding. The published example uses generic entity IDs and checks that the lamp
+reports `on` before cycling scenes. [Hue recipe](en/events-and-automations.md#recipe-cycle-philips-hue-scenes-with-a-press)
+
+**PASS WITH LIMITATIONS**
+
+The result covers one installation. The unavailable-state guard was checked
+against the Home Assistant action schema and by inspection. Wheel firmware
+and behaviour with multiple lights in the Hue group were not verified.

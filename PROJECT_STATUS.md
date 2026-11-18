@@ -63,6 +63,23 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 
 ## Verified
 
+- **Philips Hue recipe (2026-11-18).** Added the English example and its Czech
+  companion next to the KAJPLATS recipe. [Recipe](docs/en/events-and-automations.md#recipe-cycle-philips-hue-scenes-with-a-press)
+  [Hardware record](docs/HARDWARE_TEST.md#2026-11-18--philips-hue-scene-recipe)
+  @amodig tested the setup with a physical wheel on Core `2026.11.2` and
+  BILRESA `0.7.0-rc.5`. The shared YAML uses generic entity IDs and checks
+  that the lamp reports `on` before cycling. Home Assistant's action schema
+  and a smoke check of the three gesture branches validated the YAML.
+  `python tools/check.py --fast` passed with Node 22 and mypy isolated from
+  Home Assistant. `python -m pytest -q -p no:cacheprovider` reported 1,334
+  passed, one skipped and 32 expected failures. A live unavailable-state or
+  multi-lamp test was outside the contributor's one-lamp smoke test.
+  PR #86 review clarified how to remove overlapping binding actions and
+  documented slow Hue state updates. The example uses Home Assistant's
+  default 10-run queue. `git diff --check` and
+  `python -m pytest -q -p no:cacheprovider tests/test_docs.py` passed
+  (72 documentation tests).
+
 `agent/panel-0.6.1` after merging PR #25 and PR #20, local Windows stand-ins, 2026-10-29:
 
 - `ruff format --check custom_components tests tools` and `ruff check custom_components tests tools` clean; `.venv\Scripts\python.exe -m mypy custom_components/ikea_bilresa` only the 2 known errors (`device_link.py:256`, `legacy_triggers.py:68`).
@@ -87,6 +104,8 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 - The preview server needs a `.claude/launch.json` in the repository folder; it is not git-ignored, so delete it after use.
 
 ## Remaining
+
+- Review the Philips Hue recipe documentation PR on the development branch.
 
 1. **Owner:** try `v0.7.0-rc.7` in Home Assistant 2026.11 (the same checks as rc.6, plus a press right after a scroll on one light and on two bindings of one light): the panel, *Run actions* (does Home Assistant's own action editor load, or the fallback form), the actions by kind of target (media player, cover, `input_boolean`, `input_button`), a binding with several lights and the short press of such a binding; every item is pending in `docs/HARDWARE_TEST.md`. Also the checks of the earlier candidates (B/F `short_release`, C disabled channels, Issue #9 on a Zigbee2MQTT group).
 2. **Answers owed on GitHub:** the reporters of #38, #37, #17, #3 and cdegut (PR #45) were told what the candidate would carry; short "rc.6 is out" notes are drafted in `DRAFT_ODPOVEDI.md` (untracked) and are posted only with the owner's approval. Issue #22 waits for the reporter's check of the theme variables (rc.5); #9 waits for the reporter's check.

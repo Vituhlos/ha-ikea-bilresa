@@ -192,6 +192,34 @@ jednoduchými, dvojitými i trojitými stisky. Dřívější občasné vynecháv
 stisků přetrvalo; recept nedokáže obnovit události, které integrace neobdrží.
 Viz [pozorování z hardwarového testu v PR #5](https://github.com/Vituhlos/ha-ikea-bilresa/pull/5#issuecomment-6452179129).
 
+### Recept: přepínání scén Philips Hue stiskem
+
+Použijte Hue Bridge v2 a místnost nebo zónu Hue, která má v Home Assistantu
+výběr **Scéna**. Jedním stiskem zhasnuté světlo rozsvítíte. Pokud už svítí,
+přejdete na další scénu Hue. Dvojitý stisk nastaví bílou na 3000 K a podržení
+světlo zhasne. Výběr používá scény uložené v aplikaci Hue a po poslední
+přejde na první. [Výběr scén Philips Hue](https://www.home-assistant.io/integrations/hue/#scene-selection)
+
+V [kompletním YAML příkladu v anglickém průvodci](../en/events-and-automations.md#recipe-cycle-philips-hue-scenes-with-a-press)
+nahraďte `event.bilresa_scroll_wheel_channel_1` entitou kanálu BILRESY,
+`light.example` světlem Hue a `select.example` entitou
+výběru scény v jeho místnosti nebo zóně. Scéna může změnit všechna světla
+v dané skupině Hue. Pokud má kolečko ovládat jedno světlo, použijte zónu
+s jediným světlem. Světlo musí podporovat 3000 K.
+
+Pro otáčení ponechte vazbu pro stmívání. V panelu BILRESA odeberte všechny
+položky ze seznamu **Procházet scény** a pro tento kanál nastavte u krátkého,
+dvojitého a trojitého stisku i podržení **Bez akce**. V ostatních automatizacích
+pro stejná gesta tento kanál vynechte.
+
+Spouštěče stisku čekají na výsledný počet stisků. Pokud Hue hlásí stav světla
+nebo scény se zpožděním, rychlý další stisk může vycházet z předchozího stavu
+světla nebo zopakovat stejnou scénu. Mezi gesty dejte Hue chvíli na aktualizaci.
+
+[@amodig](https://github.com/amodig) toto nastavení vyzkoušel na fyzickém kolečku
+BILRESA s Home Assistant Core `2026.11.2`, integrací BILRESA `0.7.0-rc.5`
+a skupinou Hue s jedním světlem a dvěma scénami.
+
 ## Více koleček
 
 Vše je klíčované podle Matter uzlu a endpointu, takže **libovolný počet koleček**
