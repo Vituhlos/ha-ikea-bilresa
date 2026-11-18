@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a pre-release tag, and a stale-issue workflow for issues waiting for information.
 
 ### Fixed
+- Reloading IKEA BILRESA with a healthy Matter connection no longer raises a
+  false Matter Server disconnect repair after 60 seconds (GitHub issue #84).
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
   device converted every node to a mapping and walked every attribute of every

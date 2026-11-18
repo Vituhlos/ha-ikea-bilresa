@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.util import dt as dt_util
 import pytest
 
 from custom_components.ikea_bilresa.channel_controls import (
@@ -26,8 +30,11 @@ from custom_components.ikea_bilresa.const import (
     CONF_HOLD_ACTION,
     CONF_NODE_ID,
     DIRECTION_UP,
+    DISCONNECT_GRACE_SECONDS,
+    DOMAIN,
     EVENT_BILRESA,
     HOLD_NONE,
+    ISSUE_CANNOT_CONNECT,
     SUBENTRY_BINDING,
     signal_raw_button,
 )
@@ -35,7 +42,9 @@ from custom_components.ikea_bilresa.coordinator import BilresaCoordinator
 from custom_components.ikea_bilresa.engine import WheelAction
 from custom_components.ikea_bilresa.matter_core import CoreMatterUnavailable
 from custom_components.ikea_bilresa.model import BilresaWheel
+from tests.ha_common import async_fire_time_changed
 from tests.test_binding import _binding
+from tests.test_matter_core import FakeConfigEntries, FakeMatterClient
 
 
 class FailingCoreSource:
@@ -196,6 +205,43 @@ def test_server_shutdown_marks_connection_disconnected(monkeypatch) -> None:
     coordinator._on_event("server_shutdown", None)
 
     coordinator._set_connected.assert_called_once_with(False)
+
+
+async def test_reload_does_not_raise_disconnect_repair(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = FakeMatterClient()
+    entries = FakeConfigEntries(client)
+    monkeypatch.setattr(
+        hass.config_entries, "async_loaded_entries", entries.async_loaded_entries
+    )
+    registry = ir.async_get(hass)
+    grace = timedelta(seconds=DISCONNECT_GRACE_SECONDS + 1)
+
+    old = BilresaCoordinator(hass, entries.url)
+    await old.async_start()
+    assert old.connected
+    await old.async_stop()
+
+    replacement = BilresaCoordinator(hass, entries.url)
+    await replacement.async_start()
+    try:
+        assert replacement.connected
+        async_fire_time_changed(hass, dt_util.utcnow() + grace)
+        await hass.async_block_till_done()
+        reload_repair = registry.async_get_issue(DOMAIN, ISSUE_CANNOT_CONNECT)
+
+        client.callback("server_shutdown", None)
+        assert not replacement.connected
+        repair_during_grace = registry.async_get_issue(DOMAIN, ISSUE_CANNOT_CONNECT)
+        async_fire_time_changed(hass, dt_util.utcnow() + grace)
+        await hass.async_block_till_done()
+    finally:
+        await replacement.async_stop()
+
+    assert reload_repair is None
+    assert repair_during_grace is None
+    assert registry.async_get_issue(DOMAIN, ISSUE_CANNOT_CONNECT) is not None
 
 
 def test_raw_gesture_hint_is_dispatched_only_internally(monkeypatch) -> None:

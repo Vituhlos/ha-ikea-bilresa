@@ -1,5 +1,27 @@
 # Project status and agent handoff
 
+## False Matter Server repair after reload (2026-11-18)
+
+Issue [#84](https://github.com/Vituhlos/ha-ikea-bilresa/issues/84). The
+coordinator now skips scheduling a repair while it is stopping. The regression
+in `tests/test_coordinator.py` stops a connected coordinator, starts its
+replacement, and uses Home Assistant's clock and issue registry to verify the
+reload and a subsequent server disconnect.
+
+- `python -m pytest -q tests/test_coordinator.py::test_reload_does_not_raise_disconnect_repair` failed on the unpatched code with an unexpected repair and passed with the guard.
+- `python -m pytest -q --cov=custom_components/ikea_bilresa --cov-report=term-missing --cov-report=xml` passed all 544 tests on Python 3.14 and Home Assistant 2026.10.4. The XML output was written to a temporary directory.
+- `ruff format --check custom_components tests`, `ruff check custom_components tests`, `mypy custom_components/ikea_bilresa` (in a lint-only environment), `python -m compileall -q custom_components tests`, JSON validation with `python -m json.tool`, and `git diff --check` passed.
+- `node --check custom_components/ikea_bilresa/frontend/ikea_bilresa_panel.js`, `node --check tools/agent_handoff.mjs`, and `node --test --test-reporter=tap tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs tests/agent_handoff.test.mjs` passed on Node 22 (59 tests).
+
+Live verification used the same guard on `0.7.0-rc.5` with Home Assistant Core
+`2026.11.2`. BILRESA showed a live Matter connection and Repairs stayed clear
+71 seconds after reload. The [dated checklist entry](docs/HARDWARE_TEST.md#2026-11-18--bilresa-reload-and-false-disconnect-repair)
+records the environment and observations. The documentation follow-up passed
+`git diff --check` and
+`python -m pytest -q tests/test_coordinator.py::test_reload_does_not_raise_disconnect_repair`
+(1 passed). The `main` branch build and physical wheel gestures remain untested
+on hardware. Next action is to verify reload on the stable line before release.
+
 ## GitHub development automation — Phase 2A proposed (2026-11-10)
 
 **Phase 1: complete.** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) was merged into main. Maintainer created and stopped an interactive Codespace after **543 Python tests and 47 Node tests passed**; Ruff and mypy (existing no-site-packages baseline) were clean. Both GitHub branch rulesets are **active**: main #26934594 and agent/panel-0.6.1 #26934615, with six source-pinned CI checks, required PRs and resolved conversations. Actual enforcement on a new post-activation PR remains to be observed. Physical device validation is separate.

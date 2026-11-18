@@ -474,7 +474,7 @@ class BilresaCoordinator:
                 self._disconnect_timer()
                 self._disconnect_timer = None
             ir.async_delete_issue(self.hass, DOMAIN, ISSUE_CANNOT_CONNECT)
-        elif self._disconnect_timer is None:
+        elif not self._stopping and self._disconnect_timer is None:
             self._disconnect_timer = async_call_later(
                 self.hass, DISCONNECT_GRACE_SECONDS, self._raise_connect_issue
             )

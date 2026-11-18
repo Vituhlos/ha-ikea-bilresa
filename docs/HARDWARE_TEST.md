@@ -73,6 +73,8 @@ checklists:
       compatible Home Assistant version.
 - [ ] Reloading the core Matter integration reattaches the event stream within
       five seconds and wheel actions resume.
+- [ ] Reloading IKEA BILRESA with Matter connected leaves Repairs clear past
+      the 60-second disconnect grace period.
 - [ ] On a deliberately incompatible/mocked core client API, the integration
       falls back to `dedicated_websocket` and still receives wheel actions.
 - [ ] The dedicated WebSocket accepts the matter.js schema-11 ServerInfo and
@@ -760,3 +762,24 @@ on this firmware. The remaining perceived delay is not in the binding dispatch
 path. Physical release-to-Matter delivery and actual relay actuation are not
 observable from HA timestamps, and firmware `1.8.7` has not yet been measured
 with the same trace.
+
+### 2026-11-18 — BILRESA reload and false disconnect repair
+
+- Codex observed Home Assistant Core `2026.11.2` on HAOS `18.4` with two
+  BILRESA scroll wheels and BILRESA `0.7.0-rc.5`. The Matter Server app was
+  running matter.js. Its installed version, `9.3.0`, was confirmed after the
+  run. The SDK, schema, and wheel firmware versions were not recorded.
+- Before the fix, reloading BILRESA made “Cannot reach the Matter Server”
+  reappear while diagnostics still showed Home Assistant's Matter client
+  connected.
+- After applying the coordinator guard locally, `ha core check` passed and
+  `ha core restart` loaded the change.
+  BILRESA reloaded successfully, both wheels appeared, and diagnostics showed
+  live Matter event delivery connected. Repairs was clear 71 seconds after
+  reload and remained clear at the subsequent version check.
+  [Issue #84](https://github.com/Vituhlos/ha-ikea-bilresa/issues/84)
+
+**PASS WITH LIMITATIONS**
+
+Physical gestures, a forced Matter Server outage, and a live build from the
+stable branch remain untested.
