@@ -1,5 +1,29 @@
 # Project status and agent handoff
 
+## PR #71: invalid-range safety follow-up (2026-11-18)
+
+- **Review finding:** Sourcery identified an effective climate range of
+  `min_temp=7` (fallback for missing/invalid min) and explicit `max_temp=0`.
+  Without a range guard, the clamp produces an invalid temperature of 0.
+- **Minimal fix:** Numeric and climate rotations now skip dispatch when the
+  effective minimum is not less than the effective maximum. A valid negative
+  minimum and zero maximum still dispatch correctly. No async scheduling,
+  gestures, precision policy or other service behavior is modified.
+- **Regression tests:** Cases for missing, invalid, equal and reversed bounds
+  ensure no service calls occur. Existing negative-to-zero tests still cover
+  valid zero bounds.
+- **Earlier exact-head evidence:** Commit `b40e6da` passed CI
+  [#44249294213](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294213)
+  and CodeQL
+  [#44249294198](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294198).
+  Those checks apply **only** to that earlier commit, not the new one.
+  Local dependency-equipped pytest, Ruff and mypy were not available; check
+  exact-head GitHub Actions for this follow-up before calling it CI-verified.
+- **Hardware:** Still **NOT validated** on the patched physical BILRESA.
+  A new device test and exact environment versions are required.
+- **Next action:** Verify exact-head CI and CodeQL, then allow maintainer
+  review and arrange the physical zero-bound retest.
+
 ## PR #71: focused zero-bound bug fix (2026-11-18)
 
 - **Scope:** Restore upstream `main` binding/service behavior except for explicit

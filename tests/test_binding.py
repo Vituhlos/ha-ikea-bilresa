@@ -1927,3 +1927,55 @@ def test_missing_numeric_maximum_retains_legacy_fallback(monkeypatch) -> None:
     assert binding._rotate_number(1, True)
     args = binding.hass.services.async_call.call_args.args
     assert args[2]["value"] == 10.0
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum"),
+    [
+        (None, 0),
+        ("invalid", 0),
+        (0, 0),
+        (5, 0),
+    ],
+)
+def test_climate_invalid_effective_bounds_do_not_dispatch(
+    monkeypatch, minimum, maximum
+) -> None:
+    """A zero max is valid only when the effective minimum is below it."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "climate.test", CONF_MODE: "temperature"},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={
+            "temperature": 0,
+            "min_temp": minimum,
+            "max_temp": maximum,
+            "target_temp_step": 0.5,
+        },
+    )
+
+    assert not binding._rotate_temperature(1, True)
+    binding.hass.services.async_call.assert_not_called()
+    binding.hass.async_create_task.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum"),
+    [(None, 0), (0, 0), (10, 0)],
+)
+def test_number_invalid_effective_bounds_do_not_dispatch(
+    monkeypatch, minimum, maximum
+) -> None:
+    """Degenerate numeric limits must not produce out-of-range service calls."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.test", CONF_MODE: "number"},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="0", attributes={"min": minimum, "max": maximum, "step": 1},
+    )
+
+    assert not binding._rotate_number(1, True)
+    binding.hass.services.async_call.assert_not_called()
+    binding.hass.async_create_task.assert_not_called()

@@ -1338,6 +1338,11 @@ class LightBinding:
             min_t = 7.0
         if max_t is None:
             max_t = 35.0
+        if min_t >= max_t:
+            # A missing min with an explicit max=0 must not send an invalid
+            # temperature below the fallback minimum of 7.
+            self._report_activity("skipped", reason="invalid_target_range")
+            return False
         temp_step = _as_float(state.attributes.get("target_temp_step")) or 0.5
         tracked = self._resync(
             _as_float(state.attributes.get("temperature")), (min_t + max_t) / 2
@@ -1391,6 +1396,9 @@ class LightBinding:
             min_n = 0.0
         if max_n is None:
             max_n = 100.0
+        if min_n >= max_n:
+            self._report_activity("skipped", reason="invalid_target_range")
+            return False
         num_step = _as_float(state.attributes.get("step")) or 1.0
         current = _as_float(state.state)
         tracked = self._resync(current, (min_n + max_n) / 2)
