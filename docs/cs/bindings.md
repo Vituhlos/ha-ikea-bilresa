@@ -57,8 +57,8 @@ Pro hlasitost přehrávače omezuje **Maximální hlasitost** (%) otáčení kol
 zvolenou úroveň (0–100 %, výchozí 100 %). Limit platí pro toto propojení; změny
 hlasitosti z jiných ovládacích prvků nebo akcí tlačítek neomezuje. Pokud jiný
 ovládací prvek zvýší hlasitost nad limit, další otočení kolečka v kterémkoli
-směru ji vrátí na limit nebo níže. Při limitu 0 % nastavují příkazy hlasitosti
-z kolečka nulovou hlasitost.
+směru ji vrátí na limit nebo níže, i při malém zvýšení během probíhajícího
+otáčení. Při limitu 0 % nastavují příkazy hlasitosti z kolečka nulovou hlasitost.
 
 ## Více světel na jednom kanálu
 

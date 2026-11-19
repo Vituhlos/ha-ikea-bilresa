@@ -145,6 +145,36 @@ changes. Hardware remains unverified and bot approval cannot be guaranteed.
 Next action: commit/push the reviewed follow-up when authorized, then have the
 maintainer approve fork CI and obtain fresh reviews before merging PR #73.
 
+### PR #73 volume state-report review — 2026-11-19, Codex
+
+The contributor pushed `849079c`; PR #73 has that head and no merge conflict.
+CodeRabbit's new findings concern above-ceiling reports hidden by echo/command
+authority and rounded comparisons, rather than the already-fixed replay.
+`binding.py` now rebases above-limit reports when tracking could suppress the
+correction, while retaining recognized descending echoes below the ceiling.
+Volume dispatch forces a correction when an above-limit baseline rounds equal
+to the cap. Reports send no services; queued capped commands remain intact.
+Other modes and Matter/gesture handling are unchanged.
+
+`tests/test_binding.py` covers both authority windows/directions, small and
+large external increases, fractional/zero comparisons, in-range echoes,
+preserved queued corrections and delayed descending reports. Eight targeted
+cases failed before the fix; two additional delayed-report cases exposed a
+regression in the first draft and now pass. Final independent review found no
+remaining defect. EN/CS guides, `CHANGELOG.md` and the pending hardware checklist
+clarify corrections during active scrolling.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py`
+passed (1,413 Python tests, 2 skipped, 15 xfailed; 105 frontend tests; all static
+gates; only the two known mypy errors). `.venv/bin/python -m pytest -q -p
+no:cacheprovider tests/test_docs.py tests/test_version_consistency.py` passed
+(79 tests). `git diff --check` passed. These corrections are local/uncommitted;
+CI and fresh bot reviews have not run on them. Live Home Assistant and hardware
+remain unverified (no instance/device available). A delayed or quantized report
+above the cap may require another bounded correction on the next wheel input;
+it never triggers one by itself. Next action: commit/push this follow-up to
+PR #73, then complete maintainer-approved CI and fresh reviews before merging.
+
 ## Goal
 
 - **Stable line:** `v0.6.1` is the latest stable release on `main`. Stable releases stay deferred until the hardware checks pass (`AGENTS.md`).

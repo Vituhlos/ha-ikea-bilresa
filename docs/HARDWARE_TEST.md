@@ -146,7 +146,9 @@ Repeat on all three channels:
       upward scrolling sends no higher volume, and downward scrolling still
       lowers it. Raise the volume above 20% from another control, then scroll
       once in each direction (reset above 20% between trials): the wheel brings
-      it to 20% or below. With a 0% ceiling, rotation sets zero and further
+      it to 20% or below. Repeat with a small increase from 20% to 21% during
+      an active scroll and immediately after a wheel command; the next turn
+      still corrects it. With a 0% ceiling, rotation sets zero and further
       rotation at zero sends no command. Save/reopen the binding and restart
       Home Assistant to confirm the ceiling persists. Status: pending.
 - [ ] **Default maximum volume:** an existing volume binding without

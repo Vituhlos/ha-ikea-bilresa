@@ -804,6 +804,22 @@ class LightBinding:
         # where the target has actually got to.
         if observed is not None:
             self._last_reported[entity_id] = observed
+        # Echo tolerance must not suppress a volume correction at the ceiling.
+        # Below it, keep recognized catch-up reports: a player descending
+        # from an old high level must not undo further downward steps.
+        if (
+            self._mode == MODE_VOLUME
+            and observed is not None
+            and observed > self._max_volume
+            and (
+                not own_echo
+                or self._tracked is None
+                or round(self._tracked, 3) >= round(self._max_volume, 3)
+            )
+        ):
+            # Keep a queued bounded command; it may be the final correction.
+            self._forget_target("volume_above_maximum", observed)
+            return
         if self._scroll_authoritative(now):
             if (
                 not own_echo
@@ -1215,7 +1231,8 @@ class LightBinding:
         """Dispatch a bounded value only when its service payload can change.
 
         ``force`` sends it anyway, for a value that stays put while a light of
-        a multi-light binding is not yet at it.
+        a multi-light binding is not yet at it, or an above-ceiling volume
+        whose correction would otherwise round to the same comparison value.
         """
         if before == after and not force:
             self._report_activity(
@@ -1644,6 +1661,7 @@ class LightBinding:
             before=round(tracked, 3),
             after=round(target, 3),
             result=result,
+            force=tracked > self._max_volume,
         )
 
     @callback

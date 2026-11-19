@@ -58,7 +58,8 @@ For media-player volume, **Maximum volume** (%) limits wheel scrolling to the
 chosen level (0–100%, default 100%). This is a per-binding limit; volume changes
 from other controls or button actions are not capped. If another control raises
 the volume above the limit, the next wheel rotation in either direction brings
-it back to the limit or below. A limit of 0% makes wheel volume commands set zero.
+it back to the limit or below, including small increases during an active scroll.
+A limit of 0% makes wheel volume commands set zero.
 
 ## Several lights on one channel
 
