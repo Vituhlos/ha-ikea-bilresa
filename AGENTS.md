@@ -4,8 +4,17 @@ These instructions apply to the entire repository and to every coding agent.
 
 ## Start every session
 
-1. Read `PROJECT_STATUS.md` completely. It is the canonical source of truth for
-   current work, validation state, decisions, and backlog.
+The guardrails in this file apply to every agent, delegated ones included. Only
+the start-up reading below is for the main session: a delegated agent reads only
+what its task needs (the files its prompt names, and the files it finds with
+`Grep` and `Glob` inside the scope the prompt sets), and the prompt carries the
+guardrails the task touches.
+
+1. Read `PROJECT_STATUS.md`: the header and every section except `## Done`
+   (Goal, Verified, Failed, Remaining, Git / build / test). It is the canonical
+   source of truth for current work, validation state, decisions, and backlog.
+   `## Done` is the dated log and `docs/archive/` the older one: `grep` them for
+   the item at hand and read only that range. Nothing is removed from either.
 2. Read `docs/DEVELOPMENT.md` before changing code. For device-facing changes,
    also read `docs/DEVICE_REFERENCE.md`, `docs/MATTERJS_COMPATIBILITY.md`, and
    `docs/HARDWARE_TEST.md`.
@@ -15,6 +24,8 @@ These instructions apply to the entire repository and to every coding agent.
    relevant diff. Preserve existing user/agent work.
 5. Confirm whether the selected task is already implemented, only statically
    verified, CI-verified, or hardware-verified. Never collapse these states.
+6. For GitHub governance, Codespaces, CI automation or AI-agent integrations,
+   follow the owner-approved plan in `docs/architecture/ai-development-automation.md`.
 
 ## Project guardrails
 
@@ -100,20 +111,22 @@ not with a merge.
 
 ## Replying on GitHub (issues and pull requests)
 
-**Every comment an agent posts on GitHub says that an agent wrote it,** not only
-replies to contributors: also short ones (a review request such as `@codex review`,
-"fixed in <commit>", a status note, an answer to a review thread) and review
-replies. They are posted under the owner's account, so without the line they look
-as if the owner wrote them. A short comment gets the short form:
+**Every comment an agent posts on GitHub says that an agent helped write it,** once,
+at the end, and not only replies to contributors: also short ones (a review
+request such as `@codex review`, "fixed in <commit>", a status note, an answer to a
+review thread). They are posted under the owner's account, so without the line
+they look as if the owner wrote them. A comment ends with
 
 ```
-*🤖 Agent-assisted: this comment was written by Claude, an AI assistant working on this repository with the maintainer (@Vituhlos), who asked for it.*
+🤖 Prepared with assistance from Claude Code.
 ```
 
-at the top and the signature line at the end. A comment that is a bot command (for
-example `@codex review`) starts with the command and carries the lines after it, so
-the bot still recognises it. Name the agent that really wrote it. Pull request
-descriptions end with `🤖 Generated with [<agent>](<its link>)` naming the agent that
+naming the agent that really helped (Claude Code, Codex). There is no disclaimer at
+the top and no second line with the model. A comment that is a bot command (for
+example `@codex review`) still starts with the command, so the bot recognises it,
+and carries the signature at the end. Comments that are already posted are not
+edited. Pull request descriptions end with
+`🤖 Generated with [<agent>](<its link>)` naming the agent that
 wrote them (`[Claude Code](https://claude.com/claude-code)` for Claude Code).
 
 The rest of this section is about a longer reply to a contributor.
@@ -124,10 +137,8 @@ after the owner approved the text. It is written like the ones to @amodig on PR 
 - **Language and voice:** English (the project's language), warm and specific.
   Answer what this person wrote, thank them for something concrete, and say what
   was done with their idea instead of a generic "thanks for the report".
-- **First line, in italics:** `*🤖 Agent-assisted: this reply was written by
-  Claude, an AI assistant working on this repository with the maintainer
-  (@Vituhlos), who read and approved it before it was posted.*` Then a greeting
-  with the person's `@login` and a 👋.
+- **Opening:** a greeting with the person's `@login` and a 👋, without an AI
+  disclaimer.
 - **Bold lead sentences** that carry the point of each paragraph (what was
   decided, what works today, what is coming). A reader who only reads the bold
   text still gets the answer.
@@ -141,9 +152,8 @@ after the owner approved the text. It is written like the ones to @amodig on PR 
   a release, a pre-release or only on the development line. Promise no dates.
 - **Numbered questions** at the end, specific to the person (which device, what
   behaviour they expect), so the reply is useful to answer.
-- **Last line:** `🤖 Agent-authored: <agent>, model ` followed by the model id in
-  backticks. Name the agent that really wrote the reply (Claude Code, Codex) in
-  this line and in the first one, not always Claude.
+- **Last line:** the signature `🤖 Prepared with assistance from <agent>.`, once,
+  naming the agent that really helped (Claude Code, Codex), not always Claude.
 - Keep the issue open until the change is in a release (or the reporter
   confirms). Do not paste anything from the owner's own Home Assistant (names,
   ids, paths): documents and replies stay generic.
@@ -159,5 +169,8 @@ tree with:
 - hardware validation status;
 - known risks or assumptions;
 - the single best next action.
+
+The next session reads every section except `## Done`: put the next action and
+the open risks in `Remaining`, `Verified` or `Failed`, not only in a `Done` entry.
 
 Do not use chat history as the only record of unfinished work.

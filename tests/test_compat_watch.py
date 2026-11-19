@@ -131,8 +131,8 @@ def test_a_further_release_edits_the_issue_and_comments(monkeypatch) -> None:
 
     assert _run(monkeypatch, newest, _open_issue(older)).verbs() == [
         "list",
-        "edit",
         "comment",
+        "edit",
     ]
 
 
@@ -162,4 +162,4 @@ def test_a_new_baseline_below_the_latest_release_rewrites_the_issue(
     )
     monkeypatch.setattr(compat_watch, "BASELINE", baseline)
 
-    assert _run(monkeypatch, newest, issue).verbs() == ["list", "edit", "comment"]
+    assert _run(monkeypatch, newest, issue).verbs() == ["list", "comment", "edit"]

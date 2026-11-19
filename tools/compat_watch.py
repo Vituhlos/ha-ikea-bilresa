@@ -210,8 +210,9 @@ def main() -> int:
         # An edit tells nobody; a comment does. Only when the news changed: ticking
         # a task, or a version that is not news, is not news.
         if _signature(changed) not in old:
-            _gh("issue", "edit", number, "--body", mention + text)
             now = ", ".join(f"{key} {new}" for key, (_old, new) in changed.items())
+            # The comment first: the edit is what marks the news as told, so a
+            # comment that fails is tried again by the next run.
             _gh(
                 "issue",
                 "comment",
@@ -219,6 +220,7 @@ def main() -> int:
                 "--body",
                 f"{mention}Newer than tested: {now}.",
             )
+            _gh("issue", "edit", number, "--body", mention + text)
     elif existing:
         _gh(
             "issue",

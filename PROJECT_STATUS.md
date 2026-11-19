@@ -1,6 +1,6 @@
 # Project status and agent handoff
 
-Last updated: **2026-11-09 by Claude Code** (branch `agent/panel-0.6.1`: PR #11 merged; `0.7.0-rc.2` released and deployed; `0.7.0-rc.3` released and deployed; PR #19 merged: scene and script gesture targets; `0.7.0-rc.4` released and deployed; PR #25 and PR #20 merged on 2026-10-29: the theme variables and an action per gesture, BILRESA-21; `0.7.0-rc.5` released and deployed on 2026-10-29).
+Last updated: **2026-11-16 by Claude Code** (branch `agent/panel-0.6.1`: PR #11 merged; `0.7.0-rc.2` released and deployed; `0.7.0-rc.3` released and deployed; PR #19 merged: scene and script gesture targets; `0.7.0-rc.4` released and deployed; PR #25 and PR #20 merged on 2026-10-29: the theme variables and an action per gesture, BILRESA-21; `0.7.0-rc.5` released and deployed on 2026-10-29; AI-BOOT-00 (BILRESA-61): pull request #78 is open, see `## Done`).
 The dated log up to the first handoff, and the entries `main` wrote on 2026-10-25
 (PR #16, Issue #9 / PRs #14 and #15, PR #13, the 0.6.1 language release), are in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
@@ -49,12 +49,41 @@ mypy only the two known baseline errors. CodeRabbit CLI was not run because
 `command -v coderabbit` found no installed executable. No live Home Assistant
 or hardware validation was performed (no instance available); hardware remains
 pending. Older captures retain the default because they contain no ceiling.
-Next action for this follow-up: commit and push the review fixes to the existing
-fork PR, then perform the pending maximum-volume hardware checklist.
+These review fixes are already in PR #73 at `cc3da2c`.
 
 Assumption: this is a per-binding wheel limit, not a player-wide volume limit.
-Next action: submit a fork PR against `agent/panel-0.6.1`, then verify a configured
-cap and the unchanged default with a physical wheel and media-player target.
+
+### PR #73 conflict resolution — 2026-11-19, Codex
+
+Merged development tip `ec9d198` into the local `feat/maximum-volume` working
+tree with `git merge --no-commit --no-ff FETCH_HEAD`. The sole conflict was
+`CHANGELOG.md`: retained the maximum-volume Added entry alongside upstream's
+Fixed and Changed entries. `binding.py` merged automatically; review against
+the development tip confirms both the volume ceiling/trace support and the
+upstream zero-range-limit fix remain. All other incoming files are upstream
+changes, including the Lab tests and repository tooling. Updated this file with
+the handoff. The maintainer authorized committing and pushing this merge to
+`GnussonNet/ha-ikea-bilresa:feat/maximum-volume` for the existing PR #73.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py`
+passed JSON, compile, syntax, diff, Ruff format/lint, 103 frontend tests and
+1,367 Python tests (2 skipped, 15 xfailed). Mypy reports only the two known
+baseline errors. `node --check tools/agent_handoff.mjs && node --test
+tests/agent_handoff.test.mjs` passed (12 tests). `git diff --cached --check`
+reports three existing Markdown hard-break lines with trailing spaces in the
+incoming `docs/architecture/ai-development-automation.md` (lines 3–5); these
+upstream lines were preserved. `git diff FETCH_HEAD --check` passes for the
+PR changes relative to the fetched development tip. No new regression test was needed for a
+changelog-only manual resolution; the existing runtime and Lab tests ran.
+
+Not run before publication: CI and fresh Codex/CodeRabbit reviews; these must
+be checked on the updated PR. Not run: live Home Assistant/browser and physical hardware checks, because
+no test instance or device is available in this session. Hardware remains
+unverified; Lab results are simulated tests. No new runtime behavior was added
+by the manual resolution. Assumption: merge upstream history rather than
+rewrite the contributor's commits. Next action: check CI and fresh
+Codex/CodeRabbit reviews on the updated PR before any merge. The maximum-volume
+hardware checklist stays pending.
 
 ## Goal
 
@@ -62,6 +91,7 @@ cap and the unchanged default with a physical wheel and media-player target.
 - **Development line:** branch `agent/panel-0.6.1` carries the redesigned panel, the binding editor, actions by kind of target, action sequences with the panel editor, one binding for several lights and everything on `main` up to the Issue #21 fix. It becomes **0.7.0**. The newest pre-release is `v0.7.0-rc.7` (2026-11-09; the tag is recorded in the next entry once it exists); the earlier candidates are `v0.7.0-rc.1` to `rc.6` and, on `main`, `v0.6.2-rc.1` and `rc.2`.
 - **Nearest step:** the owner tries `v0.7.0-rc.7` in the owner's Home Assistant (2026.11, installed through the Marketplace, where HACS has moved) and reports what the panel, the action editor and the new actions do; the hardware checks stay open and postponed by the owner (tracker BILRESA-12, `docs/HARDWARE_TEST.md`).
 - **Do not** install `0.6.2-rc.*` or `0.6.1` on the owner's instance: they have the old panel layout. Do not deploy, tag or release without the owner's explicit word.
+- **Reading rule:** at the start of a session read this header and every section except `## Done`; `grep` `## Done` and `docs/archive/` for the item at hand (`AGENTS.md`).
 
 ## Done
 
@@ -109,6 +139,7 @@ cap and the unchanged default with a physical wheel and media-player target.
 - 2026-11-09: issue #63, case 2 (branch `fix/cross-binding-queued-dimming`, base `agent/panel-0.6.1`, not released): a press, a scene or a run of actions of one binding no longer loses to a rotation another binding still has queued for the same light (reproduced in a test first: binding A queued a dim, binding B turned the light off, A's flush relit it). `binding.py` sends the dispatcher signal `SIGNAL_TARGETS_COMMANDED` (`const.py`) from `_call_entity` (after the availability checks) and from `_async_run_sequence` (before the run starts) with the sender and the changed entities (scene/group members from the `entity_id` attribute, nested groups too; the script's `referenced_entities` plus the lights of its areas, devices, floors and labels through `homeassistant.helpers.target`); every other binding rotating one of them, or a group holding one, runs `_invalidate_tracking("other_binding_changed_target")`. PR #64. The sender ignores itself, rotations send nothing, a mute/playback press keeps a queued volume (`_keeps_volume`, shared with the #59 check). Connected in `async_attach`, released by its unsubscribe. Case 1 of #63 (ramp) stays disproved. Validated: `python tools/check.py` all green (format, lint, mypy 2 known errors, node 102 passed, pytest 1057 passed); mutation check: each of the 12 new/changed test cases in `tests/test_binding.py` fails when its part of the fix is disabled (signal, disconnect, self-check, target filter, volume exception, group expansion on either side, area resolution). Not verified: real lights, real Home Assistant, hardware (item in `docs/HARDWARE_TEST.md` section C pending). Risks: an entity a template picks at run time is not known (documented shortcut); pressing a `script.*` entity names only the script, as for the binding's own press since #59; actions that only read a light in a condition also cancel another binding's queue (the cost is one dropped coalesced value); a hold ramp running on the other binding keeps ramping. Next: CI and review bots on the pull request, then the maintainer's merge decision.
 - 2026-11-09: `0.7.0-rc.7` prepared (branch `release/prepare-v0.7.0-rc.7`; the owner said "udělej tedy rc.7"): manifest, CHANGELOG section and links, both READMEs, the how-it-works guides and the `docs/HARDWARE_TEST.md` headings. Contents beyond rc.6: the fix of a rotation still queued after a press on a binding with one light (PR #59, by @Hinrixx3026), the fix for two bindings on one light (PR #64, issue #63), and the Marketplace installation guides (PR #56, #57). Validated locally: `.venv\Scripts\python.exe tools/check.py` (format, lint, mypy with the 2 known errors, node, pytest; see the pull request for the numbers). NOT validated: a real Home Assistant, real lights; both fixes are pending in `docs/HARDWARE_TEST.md`. Tag, GitHub pre-release and the record of the release come in the next entry once done. Not deployed to the owner's instance.
 - 2026-11-09: `v0.7.0-rc.7` released as a GitHub **pre-release** (not latest) at the owner's request ("udělej tedy rc.7"): annotated tag `v0.7.0-rc.7` (tag object `748dc2d`) on the merge commit `67639e1` of PR #65, https://github.com/Vituhlos/ha-ikea-bilresa/releases/tag/v0.7.0-rc.7 with the notes of the CHANGELOG section. GitHub CI on `67639e1` (`gh workflow run ci.yml --ref agent/panel-0.6.1`, run `42656481640`): all 7 jobs succeeded, the newest-pre-release job included. Created by hand (`gh release create --verify-tag --prerelease --latest=false`); the release workflow lives on `main` only. NOT deployed to the owner's Home Assistant (no backup, no restart); the owner installs it through the Marketplace. Not verified: installation through the Marketplace, a real Home Assistant, real lights; all pending in `docs/HARDWARE_TEST.md`. Next: the owner tests rc.7; answers from the reporters.
+- 2026-11-16: AI-BOOT-00 (BILRESA-61), branch `chore/ai-boot-config` from `28c1035`, pull request #78 to `agent/panel-0.6.1`: (1) start-up reading rule in `AGENTS.md`, `CLAUDE.md` and `docs/DEVELOPMENT.md`: a main session reads this file except `## Done`, a subagent reads the files its prompt names and what it finds inside the scope the prompt sets, the guardrails of `AGENTS.md` apply to every agent; (2) `.claude/settings.json` denies the write and control tools of Home Assistant MCP servers (51 of 85 tools; the 34 read-only tools stay) and `Read` of `.env*`, `secrets.yaml`, the project-local `settings.local.json` and private Claude and SSH files (tool rules, not a sandbox: a shell can still read what `Read` denies); (3) two read-only subagents, `repo-scout` (Haiku, optional) and `critical-reviewer` (Opus, for critical changes), and a Delegation section in `CLAUDE.md`. Nothing was removed from this file or from the archive; the open risks and decisions that were only in `## Done` are now Remaining 10 and 11. **Local (Windows stand-ins):** `python tools/check.py` all gates ok (mypy 2 known errors and none new, node 102 passed, pytest 1057 passed); `tests/test_docs.py` and `tests/test_version_consistency.py` pass. **Headless pilot S5 (6 runs, Claude Code 2.1.325, not a Desktop session):** the Opus reviewer found the seeded defect with more complete evidence than Sonnet alone at about twice the tokens; the Haiku scout showed no saving for the whole workflow. A profile of plugins and connectors to cut the start-up context was only an experiment and is not deployed; no global Claude configuration was changed. **Not verified:** a real Claude Desktop session (`/context`, `/agents`, `/tasks`); the deny rules protect sessions started in the root of a checkout that contains the file. **Hardware:** not applicable.
 
 ## Verified
 
@@ -130,7 +161,7 @@ cap and the unchanged default with a physical wheel and media-player target.
 - CodeRabbit's free tier allows about one review per hour; Codex failed on PR #11 ("unknown error", then stuck "Running").
 - `ruff check ... | tail -1` in a `&&` chain hides a failing lint; run ruff without the pipe.
 - Bash heredocs containing `'''` fail in this tool; write scripts to the scratchpad. A PowerShell here-string passed to `git commit -F -` was read as a pathspec; write the message to a file and use `-F <file>`.
-- `ha_manage_backup create` times out and `ha_restart` drops the MCP transport; use `backup/generate` over the WebSocket (`ha_manage_custom_tool`) with the Synology agent, poll `backup/info`, and read the manifest version after a restart.
+- `ha_manage_backup create` times out and `ha_restart` drops the MCP transport; use `backup/generate` over the WebSocket (`ha_manage_custom_tool`) with the Synology agent, poll `backup/info`, and read the manifest version after a restart. Agents with the project deny rules (`.claude/settings.json`) cannot run this: the owner does the backup, the update and the restart in Home Assistant.
 - Reading `backup/config/info` returns the backup encryption password; never print it.
 - The global `mypy` (Python 3.13) cannot parse Home Assistant's Python 3.14 syntax; use the one in `.venv`.
 - The preview server needs a `.claude/launch.json` in the repository folder; it is not git-ignored, so delete it after use.
@@ -146,6 +177,9 @@ cap and the unchanged default with a physical wheel and media-player target.
 7. **Still owed from `docs/V0.6.0_CHECKLIST.md`:** keyboard and screen-reader pass, dark and custom theme check, Section G, smoothing A/B. The room-lights profile (discussion #7) is still planned for 0.7.0.
 8. **Repository:** the Devin GitHub App is removed (the owner says so); Sourcery reviews pull requests as an optional commentator; Codex and CodeRabbit are the required review bots. `main` needs one approving review and the author of a pull request cannot approve it, so changes to `main` go in with an administrator merge and the owner's explicit yes.
 9. Enable Sponsorships in the repository settings (owner); `FUNDING.yml` must be on `main` for the Sponsor button.
+10. **Open risks carried from `## Done`:** (a) the Git history still contains the owner's old entity names, device nicknames, a NAS backup agent id and a local path (the files were made generic on 2026-10-29, PR #28); removing them needs a history rewrite, which was not done, so it is the owner's decision; (b) BILRESA-36 (action sequences, backend) and BILRESA-37 (their editor in the panel) must be released together, never one without the other, also in a backport or a cherry-pick; (c) the two follow-ups to the Issue #21 fix (PR #24: the position paths are looked up again every 30 to 60 seconds, and `node_removed` drops the cache) are on this line only, and `main` shows no sign of them (a search of its `matter_core.py` on 2026-11-16, not a test); (d) known limits of the cross-binding fix for issue #63 (in `0.7.0-rc.7`, hardware check pending): an entity that a template picks at run time is not known to the other bindings; pressing a `script.*` entity names only the script; actions that only read a light in a condition also cancel another binding's queued dim (one coalesced value is dropped); a hold ramp running on the other binding keeps ramping.
+11. **Decisions in force, details in `## Done`:** gesture verbs by kind of target (BILRESA-35, 2026-10-29): unlock, siren on, valve open and alarm disarm are left out on purpose, and a lock, a siren and a valve take no toggle, turn on or turn off; a scene is run and never turned off; a multi-light binding without its own short-press target presses all its lights (owner, 2026-11-09). Keep the tracker states in step with this file: a Done needs recorded evidence.
+12. **AI-BOOT (BILRESA-61):** pull request #78 is merged into `agent/panel-0.6.1` (merge commit `57c819b`). Six required checks and CodeRabbit passed, Sourcery and Copilot findings are answered and all 11 threads are resolved. The Codex review did not run (usage limit); the owner waived it for this pull request in a public comment, so it is **not** a pass. Not verified: a real Claude Desktop session (only CLI runs). No CI ran on the merge commit itself (`ci.yml` runs on pull requests and on pushes to `main` only).
 
 ## Git / build / test
 
@@ -159,4 +193,13 @@ cap and the unchanged default with a physical wheel and media-player target.
   - `node --test tests/panel_frontend.test.mjs tests/iconset_frontend.test.mjs`
 - CI runs on PRs and pushes to `main`. For another branch use `gh workflow run ci.yml --ref <branch>`. A first-time contributor's fork run waits for maintainer approval.
 - Preview: `python tools/panel_preview/build.py`, then a `bilresa-panel-preview` entry in `.claude/launch.json` (port 8765). Query: `lang`, `instance`, `theme=warm`, `inset=16`, `narrow=1`, `open`, `view`, `edit`.
-- Deploy: backup first (the NAS backup agent, whose id `backup/info` lists, via `backup/generate`), HACS `update_information` then `download` with the tag, restart, read back manifest and log.
+- Deploy: backup first (the NAS backup agent, whose id `backup/info` lists, via `backup/generate`), HACS `update_information` then `download` with the tag, restart, read back manifest and log. This is the owner's procedure: agents with the project deny rules do not run the backup, the update or the restart.
+
+## Merged from `main` (synced 2026-11-17, branch `chore/sync-main-into-dev-070`)
+
+`origin/main` (`3060507`, manifest `0.6.2-rc.2`, stable `v0.6.1`) was merged into the development line. `main` changes nothing under `custom_components/`; the merge brings repository tooling, CI and documentation only. The long entries `main` wrote on 2026-11-06 to 2026-11-10 are in [docs/archive/PROJECT_STATUS_MAIN_2026-11-10.md](docs/archive/PROJECT_STATUS_MAIN_2026-11-10.md).
+
+- **New from `main`:** quiet CodeRabbit profile (all base branches and the path instructions are kept), weekly Dependabot (ignores `homeassistant`, which `pytest-homeassistant-custom-component` pins), CodeQL, `release.yml` (a `v*-*` tag publishes a GitHub pre-release only if the tag, `manifest.json` and a `CHANGELOG.md` section that names the pending hardware checks agree; `tools/release_notes.py`), a stale-issue workflow, `CODEOWNERS`, a Codespaces devcontainer with its CI job, staged rulesets in `docs/architecture/`, an owner-only AI issue handoff (`ai-issue-handoff.yml`, `tools/agent_handoff.mjs`, Node tests; Phase 2A, PR #69) and a newer `tools/compat_watch.py` (comment first, then edit; one run at a time).
+- **Open risks:** (a) the AI issue handoff posts comments on issues from the owner's `/agent prepare` comment; it was written before the AI-BOOT rules, so its prompts must not contradict `AGENTS.md` (one AI signature, no full reading of this file); the prompt built by `tools/agent_handoff.mjs` still says "Read AGENTS.md, PROJECT_STATUS.md and docs/DEVELOPMENT.md" without the `## Done` exception, left as it is in this merge; (b) `ci.yml` does not run on a push to this branch, only on pull requests, so a merge commit has no CI of its own; (c) the 39 mypy errors of the full-environment run on `main` are outside this change; (d) `docs/architecture/ruleset-*.json` are the importable definitions; the rulesets that are active are set on GitHub, and this merge does not change them.
+- **Fixed after the merge (PR #71 reported it):** a valid range limit of `0` of a `number`, `input_number` or `climate` target was read as missing (`binding.py` `_rotate_number`, `_rotate_temperature`); `_bound()` now falls back only for a missing limit. Only that part of PR #71 is ported; its sub-step tracking (`_set_target(tracked=...)`, quantized `before` values) is not and stays with PR #71 for a separate decision. The Lab tests of the defect are ordinary tests now.
+- **Open pull requests:** #71, #75 and #76 target `main`, #73 targets this branch; none was changed by this merge.

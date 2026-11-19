@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   available in the panel and native binding form. Other volume controls and
   button actions are unaffected.
 
+### Fixed
+- **A range limit of `0` is a real limit.** A `number` or `input_number` that stops
+  at 0 (for example -10 to 0), or a thermostat whose `min_temp` or `max_temp` is 0,
+  was rotated as if that limit were missing: the maximum 0 became 100 and the
+  minimum 0 became 7. One notch up on a -10 to 0 number asked for 10, which the
+  entity refuses, and one notch down on a thermostat at 1 degree with a minimum of
+  0 raised the setpoint to 7. Only a limit that the entity does not report
+  falls back to the default now. (Reported in pull request #71.)
+
+### Changed
+- **Compatibility watch and test setup (repository tooling, no change to the
+  integration).** A weekly compatibility watch (`tools/compat_watch.py`) keeps one issue open while Home Assistant Core,
+  the Matter Server app or matterjs-server has a newer stable release than the one
+  last checked, and the weekly pre-release test job uses the test package that Home
+  Assistant publishes itself from 2026.11.
+- **Repository tooling only, no change to the integration.** Quieter CodeRabbit
+  reviews, weekly Dependabot updates, CodeQL code scanning, a release workflow
+  that publishes the GitHub pre-release from the matching changelog section of
+  a pre-release tag, and a stale-issue workflow for issues waiting for information.
+
 ## [0.7.0-rc.7] - 2026-11-09
 
 Pre-release candidate for testing, not a stable release. It fixes two cases in

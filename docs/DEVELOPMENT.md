@@ -5,7 +5,8 @@ and GitHub Actions. `PROJECT_STATUS.md` is the live source of truth.
 
 ## 1. Orient before editing
 
-Read `AGENTS.md`, `PROJECT_STATUS.md`, and `docs/ROADMAP.md`. For device-facing
+Read `AGENTS.md`, `PROJECT_STATUS.md` (every section except `## Done`, see
+`AGENTS.md`), and `docs/ROADMAP.md`. For device-facing
 work also read `docs/DEVICE_REFERENCE.md`, `docs/MATTERJS_COMPATIBILITY.md`,
 `docs/SCROLL_PERFORMANCE.md`, and `docs/HARDWARE_TEST.md`, then inspect:
 
