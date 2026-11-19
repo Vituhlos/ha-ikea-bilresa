@@ -85,6 +85,66 @@ rewrite the contributor's commits. Next action: check CI and fresh
 Codex/CodeRabbit reviews on the updated PR before any merge. The maximum-volume
 hardware checklist stays pending.
 
+### PR #73 replay snapshot follow-up — 2026-11-19, Codex
+
+Confirmed CodeRabbit's finding: `tests/replay.py` exposed only `brightness`, so
+volume replay fell back to 50% and masked a wrong baseline at the ceiling.
+Snapshots now expose `volume_level` for volume mode; brightness remains the
+default. `tests/test_replay.py` adds two below-ceiling cases for the initial
+level and a captured state report (10% plus one 3% step must send 13%). Both
+failed before the fix with 40%, then passed after it.
+
+Validation: `.venv/bin/python -m pytest -q -p no:cacheprovider
+tests/test_replay.py -k volume_replay_uses_observed` reproduced both failures.
+`PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` then passed 1,369
+Python tests (2 skipped, 15 xfailed) and 103 frontend tests; only formatting and
+one line-length check failed. After `.venv/bin/ruff format tests/replay.py
+tests/test_replay.py`, `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python
+tools/check.py --fast` passed all gates, with only the two known mypy errors.
+The Python suite was not repeated after formatting only. `git diff --check`
+passed. Changes are local and uncommitted. CI/review bots were not rerun because
+these changes have not been pushed. No runtime or user-facing behavior changes;
+no live Home Assistant or hardware test needed for this test-helper fix, and
+the feature's hardware checks remain pending. Next action: commit and push this
+follow-up to PR #73 when authorized, then check CI and reviews.
+
+### PR #73 full review — 2026-11-19, Codex
+
+Reviewed the full contributor diff against development tip `ec9d198`, including
+the uncommitted replay fix, with an independent read-only review. Shared
+validation, constants, selectors, serialization and translations follow the
+surrounding code. Fixed one further edge case in `binding.py`: rounding a
+40.06% ceiling could send 40.1%; the rounded payload is now capped too, without
+changing tracking or duplicate suppression. Its regression failed before the
+fix (0.401 instead of 0.4006). Final independent review: no findings.
+
+Expanded `test_binding.py`, `test_config_flow.py`, `test_panel_api.py`,
+`test_replay.py` and `panel_frontend.test.mjs` for fractional/zero/default limits,
+repeat-at-limit suppression, uncapped volume button actions, invalid numeric
+inputs, native create/reconfigure/copy defaults, panel save/response, selector
+visibility/editing and older captures. Preserved the original light API case.
+EN/CS binding guides, `CHANGELOG.md` and `HARDWARE_TEST.md` now explain/check
+the existing above-ceiling clamp and zero ceiling; physical checks stay open.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py --fast`
+passed all gates (105 frontend tests; mypy only the two known baseline errors).
+`.venv/bin/python -m pytest -q -p no:cacheprovider
+--cov=custom_components/ikea_bilresa --cov-report=json:/tmp/pr73-coverage.json
+--cov-report=term` passed: 1,396 tests, 2 skipped, 15 xfailed; coverage 87% overall
+and 96% in `binding.py`. Coverage is not complete repository coverage; existing
+gaps and expected failures remain. `node --check tools/agent_handoff.mjs &&
+node --test tests/agent_handoff.test.mjs` passed (12 tests). `git diff --check`
+passed. The full non-coverage gates also passed before the last API test case.
+
+Changes remain local and uncommitted. CI run `44559149789` on published head
+`5873509` is `action_required` (fork workflow approval), not a CI pass. No bot
+review covers these local changes; Codex's required GitHub review remains
+missing on the published head. Not run: live Home Assistant, real browser and
+physical BILRESA checks (no instance/device available). No Matter or gesture
+changes. Hardware remains unverified and bot approval cannot be guaranteed.
+Next action: commit/push the reviewed follow-up when authorized, then have the
+maintainer approve fork CI and obtain fresh reviews before merging PR #73.
+
 ## Goal
 
 - **Stable line:** `v0.6.1` is the latest stable release on `main`. Stable releases stay deferred until the hardware checks pass (`AGENTS.md`).

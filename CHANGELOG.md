@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Added
 - Configurable maximum volume (0–100%, default 100%) for wheel volume bindings,
   available in the panel and native binding form. Other volume controls and
-  button actions are unaffected.
+  button actions are unaffected; if they raise the volume above the limit, the
+  next wheel rotation clamps it back to the limit or below.
 
 ### Fixed
 - **A range limit of `0` is a real limit.** A `number` or `input_number` that stops

@@ -1639,7 +1639,8 @@ class LightBinding:
         return self._call_value_if_changed(
             "media_player",
             "volume_set",
-            {"volume_level": round(target, 3)},
+            # Rounding must not raise a fractional ceiling (40.06% -> 40.1%).
+            {"volume_level": min(self._max_volume, round(target, 3))},
             before=round(tracked, 3),
             after=round(target, 3),
             result=result,

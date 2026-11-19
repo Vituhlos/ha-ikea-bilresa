@@ -476,8 +476,9 @@ def test_a_capture_with_member_rows_but_no_targets_is_refused(monkeypatch) -> No
         replay(capture, monkeypatch, initial_value=255)
 
 
-def test_replay_restores_captured_maximum_volume(monkeypatch) -> None:
-    """A replay must use the recorded ceiling rather than the 100% default."""
+@pytest.mark.parametrize("maximum", [None, 40, 100])
+def test_replay_restores_captured_maximum_volume(monkeypatch, maximum) -> None:
+    """Restore the recorded ceiling; captures without one retain the 100% range."""
     from .test_trace import _traced
 
     binding, trace = _traced(
@@ -485,15 +486,46 @@ def test_replay_restores_captured_maximum_volume(monkeypatch) -> None:
         **{
             CONF_MODE: "volume",
             CONF_TARGET: "media_player.test",
-            CONF_MAX_VOLUME: 40,
+            CONF_MAX_VOLUME: 100 if maximum is None else maximum,
         },
     )
+    binding.hass.states.get.return_value.attributes = {"volume_level": 0.39}
     binding._rotate_by(25, True)
     capture = trace.capture()
 
-    assert capture["bindings"][binding.trace_key]["max_volume"] == 40
+    config = capture["bindings"][binding.trace_key]
+    assert config["max_volume"] == (100 if maximum is None else maximum)
+    if maximum is None:
+        del config["max_volume"]  # Captures recorded before the setting existed.
 
-    result = replay(capture, monkeypatch, initial_value=0.5)
+    result = replay(capture, monkeypatch, initial_value=0.39)
 
-    assert result.sent == [0.4]
-    assert result.final_value == 0.4
+    expected = 1.0 if maximum is None else maximum / 100
+    assert result.sent == [expected]
+    assert result.final_value == expected
+
+
+@pytest.mark.parametrize("reported", [None, 0.1])
+def test_volume_replay_uses_observed_level_below_ceiling(monkeypatch, reported) -> None:
+    """Initial and captured volume reports must supply the rotation baseline."""
+    key = "14:channel:1"
+    rows = []
+    if reported is not None:
+        rows.append({"t": 0.0, "kind": "state", "binding": key, "value": reported})
+    rows.append(
+        {"t": 0.5, "kind": "rotate", "binding": key, "notches": 1, "direction": "up"}
+    )
+    capture = {
+        "capture_version": CAPTURE_VERSION,
+        "bindings": {
+            key: {"mode": "volume", "target": "media_player.test", "max_volume": 40}
+        },
+        "rows": _rows(*rows),
+    }
+
+    result = replay(
+        capture, monkeypatch, initial_value=0.1 if reported is None else 0.2
+    )
+
+    assert result.sent == [0.13]
+    assert result.final_value == 0.13

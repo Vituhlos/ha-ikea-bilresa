@@ -144,8 +144,11 @@ Repeat on all three channels:
 - [ ] **Configured maximum volume:** set a volume binding's maximum to 20%
       and start below it. Slow and fast upward scrolling stop at 20%; further
       upward scrolling sends no higher volume, and downward scrolling still
-      lowers it. Save/reopen the binding and restart Home Assistant to confirm
-      the ceiling persists. Status: pending.
+      lowers it. Raise the volume above 20% from another control, then scroll
+      once in each direction (reset above 20% between trials): the wheel brings
+      it to 20% or below. With a 0% ceiling, rotation sets zero and further
+      rotation at zero sends no command. Save/reopen the binding and restart
+      Home Assistant to confirm the ceiling persists. Status: pending.
 - [ ] **Default maximum volume:** an existing volume binding without
       `max_volume`, and a new binding left at the 100% default, retain the
       original 0–100% range. Verify commanded values with a muted player.

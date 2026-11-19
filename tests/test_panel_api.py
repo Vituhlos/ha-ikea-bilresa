@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from custom_components.ikea_bilresa.channel_controls import DEFAULT_SETTINGS
 from custom_components.ikea_bilresa.const import (
     CONF_ACCELERATION,
@@ -14,6 +16,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_CLICK_TARGET,
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
+    CONF_MAX_VOLUME,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_STEP,
@@ -504,7 +507,18 @@ def test_binding_save_rejects_stale_revision(monkeypatch) -> None:
     hass.config_entries.async_update_subentry.assert_not_called()
 
 
-def test_binding_save_creates_only_normalized_subentry(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("mode", "target", "maximum"),
+    [
+        ("brightness", "light.office", None),
+        ("volume", "media_player.test", None),
+        ("volume", "media_player.test", 0),
+        ("volume", "media_player.test", 40),
+    ],
+)
+def test_binding_save_creates_only_normalized_subentry(
+    monkeypatch, mode, target, maximum
+) -> None:
     hass, _entry = _mutation_hass()
     connection = _connection()
     created = {}
@@ -524,6 +538,9 @@ def test_binding_save_creates_only_normalized_subentry(monkeypatch) -> None:
     monkeypatch.setattr(
         "custom_components.ikea_bilresa.panel_api.async_dispatcher_send", MagicMock()
     )
+    data = {CONF_TARGET: target, CONF_MODE: mode}
+    if maximum is not None:
+        data[CONF_MAX_VOLUME] = maximum
 
     ws_binding_save(
         hass,
@@ -533,10 +550,7 @@ def test_binding_save_creates_only_normalized_subentry(monkeypatch) -> None:
             "type": TYPE_BINDING_SAVE,
             "wheel": wheel_key(NODE_A),
             "channel": 1,
-            "data": {
-                CONF_TARGET: "light.office",
-                CONF_MODE: "brightness",
-            },
+            "data": data,
         },
     )
 
@@ -544,6 +558,9 @@ def test_binding_save_creates_only_normalized_subentry(monkeypatch) -> None:
     assert result["ok"] is True
     assert dict(created["item"].data)[CONF_NODE_ID] == str(NODE_A)
     assert dict(created["item"].data)[CONF_CHANNEL] == "1"
+    expected = 100 if maximum is None else maximum
+    assert dict(created["item"].data)[CONF_MAX_VOLUME] == expected
+    assert result["binding"]["data"][CONF_MAX_VOLUME] == expected
     hass.config_entries.async_add_subentry.assert_called_once()
 
 

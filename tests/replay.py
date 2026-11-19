@@ -143,16 +143,19 @@ class _Clock:
 
 
 class _Target:
-    """A light that obeys absolute commands and reports back only on cue."""
+    """A target that obeys absolute commands and reports back only on cue."""
 
-    def __init__(self, value: float, state: str = "on") -> None:
+    def __init__(
+        self, value: float, state: str = "on", mode: str = "brightness"
+    ) -> None:
         self.applied = value
         self.reported = value
         self.state = state
+        self.value_attribute = "volume_level" if mode == "volume" else "brightness"
 
     def snapshot(self) -> SimpleNamespace:
         return SimpleNamespace(
-            state=self.state, attributes={"brightness": self.reported}
+            state=self.state, attributes={self.value_attribute: self.reported}
         )
 
 
@@ -311,7 +314,7 @@ def replay(
         "custom_components.ikea_bilresa.binding.async_dispatcher_send", Mock()
     )
 
-    target = _Target(initial_value)
+    target = _Target(initial_value, mode=config.get("mode", "brightness"))
     result = ReplayResult(initial_value=initial_value)
 
     def _service_call(domain, service, payload, **_kw):

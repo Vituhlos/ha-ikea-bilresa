@@ -3868,6 +3868,7 @@ def test_a_failed_call_keeps_the_level_while_a_newer_one_is_queued(
     ("maximum", "current", "notches", "up", "expected"),
     [
         (40, 0.39, 1, True, 0.4),
+        (40.06, 0.39, 1, True, 0.4006),
         (40, 0.1, 100, True, 0.4),
         (40, 0.8, 1, True, 0.4),
         (40, 0.8, 1, False, 0.4),
@@ -3895,19 +3896,43 @@ def test_volume_rotation_respects_maximum(
     assert call[2]["volume_level"] == expected
 
 
-def test_volume_rotation_at_maximum_sends_no_command(monkeypatch) -> None:
+@pytest.mark.parametrize("maximum", [0, 40, 40.06, 100])
+def test_volume_rotation_at_maximum_sends_no_command(monkeypatch, maximum) -> None:
     binding, _, _ = _binding(
         monkeypatch,
         **{
             CONF_TARGET: "media_player.test",
             CONF_MODE: MODE_VOLUME,
-            CONF_MAX_VOLUME: 40,
+            CONF_MAX_VOLUME: maximum,
         },
     )
     binding.hass.states.get.return_value = SimpleNamespace(
-        state="playing", attributes={"volume_level": 0.4}
+        state="playing", attributes={"volume_level": maximum / 100}
     )
 
     binding._rotate_volume(10, up=True)
+    binding._rotate_volume(10, up=True)
 
     binding.hass.services.async_call.assert_not_called()
+
+
+@pytest.mark.parametrize("verb", ["volume_up", "volume_down"])
+def test_maximum_volume_does_not_cap_button_actions(monkeypatch, verb) -> None:
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+            "click_action": verb,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.8}
+    )
+
+    _press(binding, "short_press")
+
+    assert _service_calls(binding) == [
+        ("media_player", verb, {"entity_id": "media_player.test"})
+    ]

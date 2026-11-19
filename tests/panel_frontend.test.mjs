@@ -1650,7 +1650,10 @@ const walk = (node, found = []) => {
 
 const withFakeDom = (run) => {
   const previous = globalThis.document;
-  globalThis.document = { createElement: (tag) => new FakeNode(tag) };
+  globalThis.document = {
+    createElement: (tag) => new FakeNode(tag),
+    createElementNS: (_namespace, tag) => new FakeNode(tag),
+  };
   try {
     return run();
   } finally {
@@ -2345,4 +2348,50 @@ test("maximum volume survives an editor round trip and reveals validation errors
   assert.equal(sent.max_volume, 40);
   assert.equal(panel._advancedOpen, true);
   assert.deepEqual(panel._editorErrors, { max_volume: "invalid_value" });
+});
+
+test("maximum volume defaults to 100 for an existing binding", () => {
+  const panel = newPanel();
+  panel._loadEditor(false, { mode: "volume", target: "media_player.test" });
+
+  assert.equal(panel._editorData.max_volume, 100);
+});
+
+test("maximum volume is editable only in expanded volume rotation settings", () => {
+  for (const native of [false, true]) {
+    for (const [mode, expanded, visible] of [
+      ["volume", true, true],
+      ["volume", false, false],
+      ["brightness", true, false],
+    ]) {
+      const { panel } = actionPanel({ mode, max_volume: 0 });
+      panel._advancedOpen = expanded;
+      withFakeDom(() => {
+        if (native) registry.set("ha-selector", class {});
+        const form = panel._bindingForm(
+          { key: "wheel-a", variant: "wheel" },
+          { channel: 1 },
+        );
+        const control = walk(form).find(
+          (node) => node.id === panel._fieldId("max_volume"),
+        );
+        assert.equal(Boolean(control), visible);
+        if (!visible) return;
+        assert.equal(Number(control.value), 0);
+        if (native) {
+          assert.deepEqual(control.selector.number, {
+            min: 0, max: 100, step: 1, mode: "slider", unit_of_measurement: "%",
+          });
+          control.listeners["value-changed"]({
+            detail: { value: 40 }, stopPropagation() {},
+          });
+        } else {
+          assert.equal(control.max, "100");
+          control.value = "40";
+          control.listeners.input();
+        }
+        assert.equal(panel._editorData.max_volume, 40);
+      });
+    }
+  }
 });
