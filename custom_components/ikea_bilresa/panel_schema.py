@@ -19,6 +19,7 @@ import voluptuous as vol
 from .const import (
     CONF_ACCELERATION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_STEP,
     CONF_TRANSITION,
@@ -53,6 +54,7 @@ BINDING_NUMBERS: dict[str, NumberField] = {
     CONF_ACCELERATION: NumberField(0, 100, 5, "%"),
     CONF_MIN_BRIGHTNESS: NumberField(0, 50, 1, "%"),
     CONF_MAX_BRIGHTNESS: NumberField(1, 100, 1, "%"),
+    CONF_MAX_VOLUME: NumberField(0, 100, 1, "%"),
     CONF_TRANSITION: NumberField(0, 5, 0.1, "s"),
 }
 

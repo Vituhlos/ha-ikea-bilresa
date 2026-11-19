@@ -34,6 +34,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_ENDPOINT,
     CONF_HOLD_ACTION,
     CONF_HOLD_TARGET,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -3861,3 +3862,246 @@ def test_a_failed_call_keeps_the_level_while_a_newer_one_is_queued(
     )
 
     assert binding._tracked is not None
+
+
+@pytest.mark.parametrize(
+    ("maximum", "current", "notches", "up", "expected"),
+    [
+        (40, 0.39, 1, True, 0.4),
+        (40.06, 0.39, 1, True, 0.4006),
+        (40.06, 0.401, 1, True, 0.4006),
+        (40, 0.1, 100, True, 0.4),
+        (40, 0.8, 1, True, 0.4),
+        (40, 0.8, 1, False, 0.4),
+        (40, 0.3, 1, False, 0.27),
+        (40, 0.01, 1, False, 0.0),
+        (0, 0.3, 1, True, 0.0),
+        (0, 0.0001, 1, True, 0.0),
+        (None, 0.99, 1, True, 1.0),
+    ],
+)
+def test_volume_rotation_respects_maximum(
+    monkeypatch, maximum, current, notches, up, expected
+) -> None:
+    overrides = {CONF_TARGET: "media_player.test", CONF_MODE: MODE_VOLUME, CONF_STEP: 3}
+    if maximum is not None:
+        overrides[CONF_MAX_VOLUME] = maximum
+    binding, _, _ = _binding(monkeypatch, **overrides)
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": current}
+    )
+
+    binding._rotate_volume(notches, up)
+
+    call = binding.hass.services.async_call.call_args.args
+    assert call[:2] == ("media_player", "volume_set")
+    assert call[2]["volume_level"] == expected
+
+
+@pytest.mark.parametrize("maximum", [0, 40, 40.06, 100])
+def test_volume_rotation_at_maximum_sends_no_command(monkeypatch, maximum) -> None:
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_TARGET: "media_player.test",
+            CONF_MODE: MODE_VOLUME,
+            CONF_MAX_VOLUME: maximum,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": maximum / 100}
+    )
+
+    binding._rotate_volume(10, up=True)
+    binding._rotate_volume(10, up=True)
+
+    binding.hass.services.async_call.assert_not_called()
+
+
+@pytest.mark.parametrize("verb", ["volume_up", "volume_down"])
+def test_maximum_volume_does_not_cap_button_actions(monkeypatch, verb) -> None:
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+            "click_action": verb,
+        },
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.8}
+    )
+
+    _press(binding, "short_press")
+
+    assert _service_calls(binding) == [
+        ("media_player", verb, {"entity_id": "media_player.test"})
+    ]
+
+
+@pytest.mark.parametrize("active_scroll", [False, True])
+@pytest.mark.parametrize("reported", [0.41, 0.8])
+@pytest.mark.parametrize("up", [False, True])
+def test_above_ceiling_report_rebases_next_volume_rotation(
+    monkeypatch, active_scroll, reported, up
+) -> None:
+    """An above-cap report cannot be hidden by echo or command authority."""
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+            CONF_STEP: 3,
+        },
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._min_command_interval = 0.0
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.39}
+    )
+    if active_scroll:
+        binding._handle_raw_input("scroll_up", "initial_press", 1)
+    binding._rotate_volume(1, up=True)
+    assert _service_calls(binding)[-1][2]["volume_level"] == 0.4
+
+    now[0] = 0.1
+    external = SimpleNamespace(state="playing", attributes={"volume_level": reported})
+    binding.hass.states.get.return_value = external
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
+    assert len(_service_calls(binding)) == 1, "a report alone must not change volume"
+
+    binding._rotate_volume(1, up=up)
+
+    expected = min(0.4, round(reported + (0.03 if up else -0.03), 3))
+    assert len(_service_calls(binding)) == 2
+    assert _service_calls(binding)[-1][2]["volume_level"] == expected
+    if up:
+        # The snapshot can still be stale before the correction is acknowledged.
+        binding._rotate_volume(1, up=True)
+        assert len(_service_calls(binding)) == 2
+        now[0] = 0.2
+        echo = SimpleNamespace(state="playing", attributes={"volume_level": expected})
+        binding.hass.states.get.return_value = echo
+        binding._handle_target_state_change(SimpleNamespace(data={"new_state": echo}))
+        binding._rotate_volume(1, up=True)
+        assert len(_service_calls(binding)) == 2
+
+
+@pytest.mark.parametrize("active_scroll", [False, True])
+@pytest.mark.parametrize("reported", [0.39, 0.4])
+def test_in_range_volume_echo_keeps_ceiling_quiet(
+    monkeypatch, active_scroll, reported
+) -> None:
+    """An in-range acknowledgement must not create duplicate capped commands."""
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+            CONF_STEP: 3,
+        },
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._min_command_interval = 0.0
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.39}
+    )
+    if active_scroll:
+        binding._handle_raw_input("scroll_up", "initial_press", 1)
+    binding._rotate_volume(1, up=True)
+
+    now[0] = 0.1
+    echo = SimpleNamespace(state="playing", attributes={"volume_level": reported})
+    binding.hass.states.get.return_value = echo
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": echo}))
+    binding._rotate_volume(1, up=True)
+
+    assert len(_service_calls(binding)) == 1
+
+
+def test_above_ceiling_report_keeps_queued_volume_correction(monkeypatch) -> None:
+    """A report must not cancel the last bounded command of a coalesced burst."""
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+            CONF_STEP: 3,
+        },
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._min_command_interval = 1.0
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.1}
+    )
+    binding._rotate_volume(1, up=True)
+    now[0] = 0.05
+    binding._rotate_volume(100, up=True)
+    pending = binding._pending_command
+    assert pending is not None
+
+    now[0] = 0.1
+    external = SimpleNamespace(state="playing", attributes={"volume_level": 0.8})
+    binding.hass.states.get.return_value = external
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": external}))
+    assert binding._pending_command is pending
+    assert len(_service_calls(binding)) == 1
+
+    now[0] = 1.0
+    binding._flush_pending_command()
+
+    assert len(_service_calls(binding)) == 2
+    assert _service_calls(binding)[-1][2]["volume_level"] == 0.4
+
+
+@pytest.mark.parametrize("active_scroll", [False, True])
+def test_delayed_above_ceiling_echo_keeps_downward_volume_steps(
+    monkeypatch, active_scroll
+) -> None:
+    """A player still reporting its old high level must not undo downward steps."""
+    binding, _, _ = _binding(
+        monkeypatch,
+        **{
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: 40,
+            CONF_STEP: 3,
+        },
+    )
+    now = [0.0]
+    monkeypatch.setattr(
+        "custom_components.ikea_bilresa.binding.time.monotonic", lambda: now[0]
+    )
+    binding._min_command_interval = 0.0
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="playing", attributes={"volume_level": 0.8}
+    )
+    if active_scroll:
+        binding._handle_raw_input(ROLE_SCROLL_DOWN, "initial_press", 2)
+    binding._rotate_volume(1, up=False)
+    now[0] = 0.05
+    binding._rotate_volume(1, up=False)
+    now[0] = 0.1
+    echo = SimpleNamespace(state="playing", attributes={"volume_level": 0.7})
+    binding.hass.states.get.return_value = echo
+    binding._handle_target_state_change(SimpleNamespace(data={"new_state": echo}))
+    binding._rotate_volume(1, up=False)
+
+    assert [data["volume_level"] for _, _, data in _service_calls(binding)] == [
+        0.4,
+        0.37,
+        0.34,
+    ]

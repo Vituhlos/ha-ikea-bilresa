@@ -48,6 +48,7 @@ from .const import (
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -65,6 +66,7 @@ from .const import (
     DEFAULT_HOLD_ACTION,
     DEFAULT_MATTER_URL,
     DEFAULT_MAX_BRIGHTNESS,
+    DEFAULT_MAX_VOLUME,
     DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_MODE,
     DEFAULT_RAMP_DIRECTION,
@@ -650,6 +652,18 @@ class BindingSubentryFlowHandler(ConfigSubentryFlow):
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=1,
+                        max=100,
+                        step=1,
+                        mode=selector.NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_MAX_VOLUME,
+                    default=defaults.get(CONF_MAX_VOLUME, DEFAULT_MAX_VOLUME),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
                         max=100,
                         step=1,
                         mode=selector.NumberSelectorMode.SLIDER,

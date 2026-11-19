@@ -79,6 +79,7 @@ from .const import (
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -96,6 +97,7 @@ from .const import (
     DEFAULT_CLICK_ACTION,
     DEFAULT_HOLD_ACTION,
     DEFAULT_MAX_BRIGHTNESS,
+    DEFAULT_MAX_VOLUME,
     DEFAULT_MIN_BRIGHTNESS,
     DEFAULT_MODE,
     DEFAULT_RAMP_DIRECTION,
@@ -365,6 +367,7 @@ class LightBinding:
         self._max_units = _pct_to_units(
             float(data.get(CONF_MAX_BRIGHTNESS, DEFAULT_MAX_BRIGHTNESS))
         )
+        self._max_volume = float(data.get(CONF_MAX_VOLUME, DEFAULT_MAX_VOLUME)) / 100
         self._transition = float(data.get(CONF_TRANSITION, DEFAULT_TRANSITION))
         self._click = data.get(CONF_CLICK_ACTION, DEFAULT_CLICK_ACTION)
         explicit_click = data.get(CONF_CLICK_TARGET)
@@ -520,6 +523,7 @@ class LightBinding:
             "acceleration": self._accelerator.percent,
             "min_units": self._min_units,
             "max_units": self._max_units,
+            "max_volume": self._max_volume * 100,
             "transition": self._transition,
         }
         if self._multi:
@@ -800,6 +804,22 @@ class LightBinding:
         # where the target has actually got to.
         if observed is not None:
             self._last_reported[entity_id] = observed
+        # Echo tolerance must not suppress a volume correction at the ceiling.
+        # Below it, keep recognized catch-up reports: a player descending
+        # from an old high level must not undo further downward steps.
+        if (
+            self._mode == MODE_VOLUME
+            and observed is not None
+            and observed > self._max_volume
+            and (
+                not own_echo
+                or self._tracked is None
+                or round(self._tracked, 3) >= round(self._max_volume, 3)
+            )
+        ):
+            # Keep a queued bounded command; it may be the final correction.
+            self._forget_target("volume_above_maximum", observed)
+            return
         if self._scroll_authoritative(now):
             if (
                 not own_echo
@@ -1211,7 +1231,8 @@ class LightBinding:
         """Dispatch a bounded value only when its service payload can change.
 
         ``force`` sends it anyway, for a value that stays put while a light of
-        a multi-light binding is not yet at it.
+        a multi-light binding is not yet at it, or an above-ceiling volume
+        whose correction would otherwise round to the same comparison value.
         """
         if before == after and not force:
             self._report_activity(
@@ -1624,7 +1645,10 @@ class LightBinding:
         if state is None:
             return False
         tracked = self._resync(_as_float(state.attributes.get("volume_level")), 0.5)
-        target = min(1.0, max(0.0, tracked + self._delta(self._step, 1, notches, up)))
+        target = min(
+            self._max_volume,
+            max(0.0, tracked + self._delta(self._step, 1, notches, up)),
+        )
         self._set_target(target, 1)
         result = self._value_result(
             "volume", round(tracked * 100), round(target * 100), "%"
@@ -1632,10 +1656,12 @@ class LightBinding:
         return self._call_value_if_changed(
             "media_player",
             "volume_set",
-            {"volume_level": round(target, 3)},
+            # Rounding must not raise a fractional ceiling (40.06% -> 40.1%).
+            {"volume_level": min(self._max_volume, round(target, 3))},
             before=round(tracked, 3),
             after=round(target, 3),
             result=result,
+            force=tracked > self._max_volume,
         )
 
     @callback

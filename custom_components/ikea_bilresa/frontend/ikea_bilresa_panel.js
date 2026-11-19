@@ -43,6 +43,7 @@ const DEFAULT_BINDING = {
   acceleration: 0,
   min_brightness: 1,
   max_brightness: 100,
+  max_volume: 100,
   transition: 1,
   click_action: "toggle",
   button_response: "multi_press",
@@ -65,6 +66,7 @@ const FALLBACK_SCHEMA = {
     acceleration: { min: 0, max: 100, step: 5, unit: "%" },
     min_brightness: { min: 0, max: 50, step: 1, unit: "%" },
     max_brightness: { min: 1, max: 100, step: 1, unit: "%" },
+    max_volume: { min: 0, max: 100, step: 1, unit: "%" },
     transition: { min: 0, max: 5, step: 0.1, unit: "s" },
   },
   settings_numbers: {
@@ -1611,6 +1613,7 @@ const ROTATION_MORE_FIELDS = [
   "step_curve",
   "min_brightness",
   "max_brightness",
+  "max_volume",
   "acceleration",
 ];
 
@@ -3837,6 +3840,11 @@ class IkeaBilresaPanel extends HTMLElement {
         rotation.appendChild(
           this._numberField("max_brightness", this._t("field_max_brightness")),
         );
+        if (this._editorData.mode === "volume") {
+          rotation.appendChild(
+            this._numberField("max_volume", this._t("field_max_volume")),
+          );
+        }
         rotation.appendChild(
           this._numberField("acceleration", this._t("field_acceleration"), {
             help: this._t("field_acceleration_help"),

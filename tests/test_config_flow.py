@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from custom_components.ikea_bilresa.binding_config import validate_binding_data
 from custom_components.ikea_bilresa.config_flow import (
     BindingSubentryFlowHandler,
     _run_scripts_and_scenes,
@@ -38,6 +39,7 @@ from custom_components.ikea_bilresa.const import (
     CONF_HOLD_TARGET,
     CONF_HOLD_TARGET_ACTION,
     CONF_MAX_BRIGHTNESS,
+    CONF_MAX_VOLUME,
     CONF_MIN_BRIGHTNESS,
     CONF_MODE,
     CONF_NODE_ID,
@@ -218,6 +220,7 @@ def test_dual_button_schema_uses_real_endpoint_shape_and_hides_rotary_fields() -
         CONF_ACCELERATION,
         CONF_MIN_BRIGHTNESS,
         CONF_MAX_BRIGHTNESS,
+        CONF_MAX_VOLUME,
         CONF_TRANSITION,
         CONF_TRIPLE_TARGET,
         CONF_SCENES,
@@ -265,6 +268,7 @@ def test_wheel_schema_keeps_rotary_and_triple_press_options() -> None:
         CONF_ACCELERATION,
         CONF_MIN_BRIGHTNESS,
         CONF_MAX_BRIGHTNESS,
+        CONF_MAX_VOLUME,
         CONF_TRANSITION,
         CONF_TRIPLE_TARGET,
         CONF_SCENES,
@@ -899,3 +903,82 @@ async def test_changing_the_mode_redraws_the_target_picker() -> None:
     [marker] = [m for m in shown[-1]["data_schema"].schema if m == CONF_TARGET]
     assert shown[-1]["data_schema"].schema[marker].config["multiple"] is True
     assert flow._shown_multiple is True
+
+
+@pytest.mark.parametrize(
+    ("maximum", "expected"),
+    [
+        (0, 0),
+        (40, 40),
+        ("40", 40),
+        (40.06, 40.06),
+        (100, 100),
+        (-1, None),
+        (101, None),
+        (None, None),
+        ("invalid", None),
+        ("nan", None),
+        (float("inf"), None),
+        (float("-inf"), None),
+    ],
+)
+def test_maximum_volume_validation(maximum, expected) -> None:
+    data, errors = validate_binding_data(
+        {
+            CONF_MODE: MODE_VOLUME,
+            CONF_TARGET: "media_player.test",
+            CONF_MAX_VOLUME: maximum,
+        },
+        node_id="303",
+        channel="1",
+    )
+
+    if expected is not None:
+        assert errors == {}
+        assert data[CONF_MAX_VOLUME] == expected
+    else:
+        assert data is None
+        assert errors == {CONF_MAX_VOLUME: "invalid_value"}
+
+
+def test_existing_volume_binding_defaults_to_full_volume() -> None:
+    data, errors = validate_binding_data(
+        {CONF_MODE: MODE_VOLUME, CONF_TARGET: "media_player.test"},
+        node_id="303",
+        channel="1",
+    )
+
+    assert errors == {}
+    assert data[CONF_MAX_VOLUME] == 100
+
+
+@pytest.mark.parametrize("operation", ["create", "reconfigure", "copy"])
+@pytest.mark.parametrize("maximum", [None, 0, 40])
+async def test_native_volume_form_preserves_ceiling(operation, maximum) -> None:
+    """A form saved unchanged keeps its ceiling, including zero and legacy data."""
+    flow = _form_flow()
+    source = {
+        CONF_NODE_ID: "101",
+        CONF_CHANNEL: "1",
+        CONF_MODE: MODE_VOLUME,
+        CONF_TARGET: "media_player.test",
+    }
+    if maximum is not None:
+        source[CONF_MAX_VOLUME] = maximum
+    if operation == "copy":
+        copied = SimpleNamespace(subentry_type=SUBENTRY_BINDING, data=source)
+        flow._get_entry = lambda: SimpleNamespace(subentries={"source": copied})
+        defaults = flow._copy_defaults("source")
+    else:
+        defaults = source
+    form = flow._wheel_schema(defaults)({})
+
+    if operation == "reconfigure":
+        flow._get_reconfigure_subentry = lambda: SimpleNamespace(data=source)
+        result = await flow.async_step_reconfigure(form)
+    else:
+        flow._pending_defaults = defaults
+        result = await flow._async_step_form("user", form)
+
+    assert result["type"] == ("abort" if operation == "reconfigure" else "create_entry")
+    assert result["data"][CONF_MAX_VOLUME] == (100 if maximum is None else maximum)

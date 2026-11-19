@@ -29,6 +29,7 @@ from custom_components.ikea_bilresa.binding import LightBinding
 from custom_components.ikea_bilresa.const import (
     CONF_ACCELERATION,
     CONF_CHANNEL,
+    CONF_MAX_VOLUME,
     CONF_MODE,
     CONF_NODE_ID,
     CONF_STEP,
@@ -142,16 +143,19 @@ class _Clock:
 
 
 class _Target:
-    """A light that obeys absolute commands and reports back only on cue."""
+    """A target that obeys absolute commands and reports back only on cue."""
 
-    def __init__(self, value: float, state: str = "on") -> None:
+    def __init__(
+        self, value: float, state: str = "on", mode: str = "brightness"
+    ) -> None:
         self.applied = value
         self.reported = value
         self.state = state
+        self.value_attribute = "volume_level" if mode == "volume" else "brightness"
 
     def snapshot(self) -> SimpleNamespace:
         return SimpleNamespace(
-            state=self.state, attributes={"brightness": self.reported}
+            state=self.state, attributes={self.value_attribute: self.reported}
         )
 
 
@@ -169,6 +173,7 @@ def _binding_data(
         CONF_CHANNEL: channel,
         CONF_TARGET: config.get("target") or "light.replay",
         CONF_MODE: config.get("mode", "brightness"),
+        CONF_MAX_VOLUME: config.get("max_volume", 100),
         CONF_STEP: config.get("step", 3),
         CONF_ACCELERATION: config.get("acceleration", 0),
         CONF_TRANSITION: config.get("transition", 0.0),
@@ -309,7 +314,7 @@ def replay(
         "custom_components.ikea_bilresa.binding.async_dispatcher_send", Mock()
     )
 
-    target = _Target(initial_value)
+    target = _Target(initial_value, mode=config.get("mode", "brightness"))
     result = ReplayResult(initial_value=initial_value)
 
     def _service_call(domain, service, payload, **_kw):

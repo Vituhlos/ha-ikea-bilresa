@@ -5,6 +5,176 @@ The dated log up to the first handoff, and the entries `main` wrote on 2026-10-2
 (PR #16, Issue #9 / PRs #14 and #15, PR #13, the 0.6.1 language release), are in
 [docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md](docs/archive/PROJECT_STATUS_HISTORY_2026-10-25.md).
 
+## Maximum volume for wheel bindings — 2026-11-13
+
+Local feature branch `feat/maximum-volume`, based on `origin/agent/panel-0.6.1`.
+Adds `max_volume` (0–100%, default 100%) to the shared binding schema, native
+create/reconfigure form and panel's More rotation settings in volume mode.
+Wheel volume commands clamp to this ceiling; existing bindings retain 100%.
+Other controls and button actions are not capped. No migration or Matter
+protocol changes.
+
+Files: `binding.py`, `binding_config.py`, `config_flow.py`, `const.py`,
+`panel_schema.py`, `panel_strings.py`, panel JavaScript, EN/CS JSON strings,
+`tests/test_binding.py`, `tests/test_config_flow.py`, `tests/test_panel_schema.py`,
+`tests/panel_frontend.test.mjs`, EN/CS binding guides and `CHANGELOG.md`.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` passed:
+1,073 Python tests, 103 Node tests, JSON, compile, JavaScript syntax, diff,
+Ruff formatting/lint. Mypy reports only the two known baseline errors, no new
+errors. Dependencies installed from `requirements-test.txt` in ignored `.venv`
+with Python 3.14.8 / Home Assistant 2026.9.4. No CI run, live Home Assistant,
+browser or physical BILRESA validation was performed; these need an external
+instance or PR. Hardware status: unverified.
+
+Review follow-up: `docs/HARDWARE_TEST.md` section C now has pending checks
+for a configured ceiling (slow/fast scrolling, downward control and persistence),
+the 100% default on existing/new bindings, and unaffected external volume
+controls and volume-up/down button actions. Documentation-only change;
+`git diff --check` passed. Runtime tests were not rerun because no code changed.
+Physical checks remain unperformed; this prescribes validation, not a hardware
+pass. No new runtime risks or assumptions.
+
+Trace/replay review follow-up: verified that `binding.py`'s `trace_config()`
+omitted the ceiling and `tests/replay.py` restored the default. The trace now
+captures `max_volume` as a percentage and replay restores it, defaulting to 100%
+for older captures. `tests/test_replay.py` records and replays a 40% ceiling and
+asserts that the volume command remains 0.4.
+
+Validation: `.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_replay.py
+ tests/test_trace.py` passed (23 tests). Full
+`PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` passed: 1,074 Python
+and 103 Node tests, formatting, lint, JSON, compilation, syntax and diff checks;
+mypy only the two known baseline errors. CodeRabbit CLI was not run because
+`command -v coderabbit` found no installed executable. No live Home Assistant
+or hardware validation was performed (no instance available); hardware remains
+pending. Older captures retain the default because they contain no ceiling.
+These review fixes are already in PR #73 at `cc3da2c`.
+
+Assumption: this is a per-binding wheel limit, not a player-wide volume limit.
+
+### PR #73 conflict resolution — 2026-11-19, Codex
+
+Merged development tip `ec9d198` into the local `feat/maximum-volume` working
+tree with `git merge --no-commit --no-ff FETCH_HEAD`. The sole conflict was
+`CHANGELOG.md`: retained the maximum-volume Added entry alongside upstream's
+Fixed and Changed entries. `binding.py` merged automatically; review against
+the development tip confirms both the volume ceiling/trace support and the
+upstream zero-range-limit fix remain. All other incoming files are upstream
+changes, including the Lab tests and repository tooling. Updated this file with
+the handoff. The maintainer authorized committing and pushing this merge to
+`GnussonNet/ha-ikea-bilresa:feat/maximum-volume` for the existing PR #73.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py`
+passed JSON, compile, syntax, diff, Ruff format/lint, 103 frontend tests and
+1,367 Python tests (2 skipped, 15 xfailed). Mypy reports only the two known
+baseline errors. `node --check tools/agent_handoff.mjs && node --test
+tests/agent_handoff.test.mjs` passed (12 tests). `git diff --cached --check`
+reports three existing Markdown hard-break lines with trailing spaces in the
+incoming `docs/architecture/ai-development-automation.md` (lines 3–5); these
+upstream lines were preserved. `git diff FETCH_HEAD --check` passes for the
+PR changes relative to the fetched development tip. No new regression test was needed for a
+changelog-only manual resolution; the existing runtime and Lab tests ran.
+
+Not run before publication: CI and fresh Codex/CodeRabbit reviews; these must
+be checked on the updated PR. Not run: live Home Assistant/browser and physical hardware checks, because
+no test instance or device is available in this session. Hardware remains
+unverified; Lab results are simulated tests. No new runtime behavior was added
+by the manual resolution. Assumption: merge upstream history rather than
+rewrite the contributor's commits. Next action: check CI and fresh
+Codex/CodeRabbit reviews on the updated PR before any merge. The maximum-volume
+hardware checklist stays pending.
+
+### PR #73 replay snapshot follow-up — 2026-11-19, Codex
+
+Confirmed CodeRabbit's finding: `tests/replay.py` exposed only `brightness`, so
+volume replay fell back to 50% and masked a wrong baseline at the ceiling.
+Snapshots now expose `volume_level` for volume mode; brightness remains the
+default. `tests/test_replay.py` adds two below-ceiling cases for the initial
+level and a captured state report (10% plus one 3% step must send 13%). Both
+failed before the fix with 40%, then passed after it.
+
+Validation: `.venv/bin/python -m pytest -q -p no:cacheprovider
+tests/test_replay.py -k volume_replay_uses_observed` reproduced both failures.
+`PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py` then passed 1,369
+Python tests (2 skipped, 15 xfailed) and 103 frontend tests; only formatting and
+one line-length check failed. After `.venv/bin/ruff format tests/replay.py
+tests/test_replay.py`, `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python
+tools/check.py --fast` passed all gates, with only the two known mypy errors.
+The Python suite was not repeated after formatting only. `git diff --check`
+passed. Changes are local and uncommitted. CI/review bots were not rerun because
+these changes have not been pushed. No runtime or user-facing behavior changes;
+no live Home Assistant or hardware test needed for this test-helper fix, and
+the feature's hardware checks remain pending. Next action: commit and push this
+follow-up to PR #73 when authorized, then check CI and reviews.
+
+### PR #73 full review — 2026-11-19, Codex
+
+Reviewed the full contributor diff against development tip `ec9d198`, including
+the uncommitted replay fix, with an independent read-only review. Shared
+validation, constants, selectors, serialization and translations follow the
+surrounding code. Fixed one further edge case in `binding.py`: rounding a
+40.06% ceiling could send 40.1%; the rounded payload is now capped too, without
+changing tracking or duplicate suppression. Its regression failed before the
+fix (0.401 instead of 0.4006). Final independent review: no findings.
+
+Expanded `test_binding.py`, `test_config_flow.py`, `test_panel_api.py`,
+`test_replay.py` and `panel_frontend.test.mjs` for fractional/zero/default limits,
+repeat-at-limit suppression, uncapped volume button actions, invalid numeric
+inputs, native create/reconfigure/copy defaults, panel save/response, selector
+visibility/editing and older captures. Preserved the original light API case.
+EN/CS binding guides, `CHANGELOG.md` and `HARDWARE_TEST.md` now explain/check
+the existing above-ceiling clamp and zero ceiling; physical checks stay open.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py --fast`
+passed all gates (105 frontend tests; mypy only the two known baseline errors).
+`.venv/bin/python -m pytest -q -p no:cacheprovider
+--cov=custom_components/ikea_bilresa --cov-report=json:/tmp/pr73-coverage.json
+--cov-report=term` passed: 1,396 tests, 2 skipped, 15 xfailed; coverage 87% overall
+and 96% in `binding.py`. Coverage is not complete repository coverage; existing
+gaps and expected failures remain. `node --check tools/agent_handoff.mjs &&
+node --test tests/agent_handoff.test.mjs` passed (12 tests). `git diff --check`
+passed. The full non-coverage gates also passed before the last API test case.
+
+Changes remain local and uncommitted. CI run `44559149789` on published head
+`5873509` is `action_required` (fork workflow approval), not a CI pass. No bot
+review covers these local changes; Codex's required GitHub review remains
+missing on the published head. Not run: live Home Assistant, real browser and
+physical BILRESA checks (no instance/device available). No Matter or gesture
+changes. Hardware remains unverified and bot approval cannot be guaranteed.
+Next action: commit/push the reviewed follow-up when authorized, then have the
+maintainer approve fork CI and obtain fresh reviews before merging PR #73.
+
+### PR #73 volume state-report review — 2026-11-19, Codex
+
+The contributor pushed `849079c`; PR #73 has that head and no merge conflict.
+CodeRabbit's new findings concern above-ceiling reports hidden by echo/command
+authority and rounded comparisons, rather than the already-fixed replay.
+`binding.py` now rebases above-limit reports when tracking could suppress the
+correction, while retaining recognized descending echoes below the ceiling.
+Volume dispatch forces a correction when an above-limit baseline rounds equal
+to the cap. Reports send no services; queued capped commands remain intact.
+Other modes and Matter/gesture handling are unchanged.
+
+`tests/test_binding.py` covers both authority windows/directions, small and
+large external increases, fractional/zero comparisons, in-range echoes,
+preserved queued corrections and delayed descending reports. Eight targeted
+cases failed before the fix; two additional delayed-report cases exposed a
+regression in the first draft and now pass. Final independent review found no
+remaining defect. EN/CS guides, `CHANGELOG.md` and the pending hardware checklist
+clarify corrections during active scrolling.
+
+Validation: `PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tools/check.py`
+passed (1,413 Python tests, 2 skipped, 15 xfailed; 105 frontend tests; all static
+gates; only the two known mypy errors). `.venv/bin/python -m pytest -q -p
+no:cacheprovider tests/test_docs.py tests/test_version_consistency.py` passed
+(79 tests). `git diff --check` passed. These corrections are local/uncommitted;
+CI and fresh bot reviews have not run on them. Live Home Assistant and hardware
+remain unverified (no instance/device available). A delayed or quantized report
+above the cap may require another bounded correction on the next wheel input;
+it never triggers one by itself. Next action: commit/push this follow-up to
+PR #73, then complete maintainer-approved CI and fresh reviews before merging.
+
 ## Goal
 
 - **Stable line:** `v0.6.1` is the latest stable release on `main`. Stable releases stay deferred until the hardware checks pass (`AGENTS.md`).
