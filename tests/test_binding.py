@@ -1955,7 +1955,8 @@ def test_climate_invalid_effective_bounds_do_not_dispatch(
         },
     )
 
-    # If the guard were removed, an upward notch would dispatch 0 from -1.\n    assert not binding._rotate_temperature(1, True)
+    # If the guard were removed, an upward notch would dispatch 0 from -1.
+    assert not binding._rotate_temperature(1, True)
     binding.hass.services.async_call.assert_not_called()
     binding.hass.async_create_task.assert_not_called()
 
@@ -1976,6 +1977,7 @@ def test_number_invalid_effective_bounds_do_not_dispatch(
         state="-1", attributes={"min": minimum, "max": maximum, "step": 1},
     )
 
-    # Without the range guard, clamping would ask to change -1 to 0.\n    assert not binding._rotate_number(1, True)
+    # Without the range guard, clamping would ask to change -1 to 0.
+    assert not binding._rotate_number(1, True)
     binding.hass.services.async_call.assert_not_called()
     binding.hass.async_create_task.assert_not_called()
