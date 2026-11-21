@@ -1,5 +1,12 @@
 # Project status and agent handoff
 
+## PR #71: exact-head automation status (2026-11-21)
+
+- The focused fix commit `631026b` passed exact-head [CI #44257094558](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094558) and [CodeQL #44257094600](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094600).
+- The local-hardware-documentation commit `793dbfb` also passed exact-head [CI #44859735427](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44859735427) and [CodeQL #44859735460](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44859735460).
+- Any later change needs its **own exact-head CI/CodeQL check**. Prior green runs do not validate later commits. No full physical test of the exact PR head has been conducted.
+- The latest Sourcery review identified additional invalid-range edge cases; these require maintainer scope review rather than automatically expanding the PR into general service-dispatch changes.
+
 ## PR #71: local hardware retest on 2026-11-21 (partial evidence)
 
 - **Observed PASS:** On a physical BILRESA scroll wheel (firmware 1.9.15,
@@ -29,17 +36,20 @@
 - **Regression tests:** Cases for missing, invalid, equal and reversed bounds
   ensure no service calls occur. Existing negative-to-zero tests still cover
   valid zero bounds.
-- **Earlier exact-head evidence:** Commit `b40e6da` passed CI
-  [#44249294213](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294213)
-  and CodeQL
-  [#44249294198](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294198).
-  Those checks apply **only** to that earlier commit, not the new one.
-  Local dependency-equipped pytest, Ruff and mypy were not available; check
-  exact-head GitHub Actions for this follow-up before calling it CI-verified.
-- **Hardware:** Still **NOT validated** on the patched physical BILRESA.
-  A new device test and exact environment versions are required.
-- **Next action:** Verify exact-head CI and CodeQL, then allow maintainer
-  review and arrange the physical zero-bound retest.
+- **Automated validation (updated 2026-11-21):** `b40e6da` passed
+  [CI #44249294213](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294213)
+  and [CodeQL #44249294198](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294198).
+  The later focused commit `631026b` passed
+  [CI #44257094558](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094558)
+  and [CodeQL #44257094600](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094600).
+  The documentation commit `793dbfb` passed its own CI and CodeQL (see
+  exact-head status above). Recheck checks after each new commit.
+- **Hardware (updated 2026-11-21):** Three narrow zero-bound tests passed on a
+  locally patched `v0.7.0-rc.7`, *not* on PR #71's exact head. Exact-head
+  hardware validation and climate verification are still pending.
+- **Next action:** Maintainer to decide whether newly reported invalid-range
+  cases belong to this narrowly scoped PR or a separate issue, then review
+  any remaining exact-head hardware requirements.
 
 ## PR #71: focused zero-bound bug fix (2026-11-18)
 
@@ -55,18 +65,19 @@
   suppression and missing-maximum fallback. Changelog describes only this fix.
   The EN/CS README scope notes and pre-fix `docs/HARDWARE_TEST.md` evidence
   remain intact.
-- **Validation:** The changed source was checked against the upstream base
-  to confirm no unrelated runtime edits. Local Python/HA suite, Ruff, mypy
-  and CodeQL were **not run** because a dependency-equipped checkout was not
-  available. Exact-head GitHub CI/CodeQL must run after this commit.
-- **Hardware:** The Nov 13 observation is only **pre-fix FAIL**, not patched
-  hardware verification. Record exact Home Assistant, Matter Server, integration
-  and BILRESA firmware versions during the patched retest.
+- **Automated validation (updated 2026-11-21):** The initial source
+  comparison did not include a local dependency-equipped suite. The later
+  commit `631026b` passed exact-head CI and CodeQL; documentation commit
+  `793dbfb` also passed both (see exact-head status above). Any subsequent
+  revision requires new exact-head verification.
+- **Hardware (updated 2026-11-21):** Nov 13 was a pre-fix FAIL; Nov 21
+  provides three narrow PASS observations for a manually patched
+  `v0.7.0-rc.7`. These are **not** evidence of a tested PR-head build.
 - **Known limitation:** The existing small-notch rounding stall and normal
   service dispatch/race behavior of upstream `main` are not fixed here.
   They require separate, narrowly scoped and hardware-validated work.
-- **Next action:** Check exact-head CI and CodeQL, then request maintainer
-  review and retest on a physical BILRESA before claiming release readiness.
+- **Next action:** Review the new Sourcery findings with the maintainer;
+  keep the exact-head physical test open until performed.
 
 ## GitHub development automation — Phase 2A proposed (2026-11-10)
 

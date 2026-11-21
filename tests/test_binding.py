@@ -1948,14 +1948,14 @@ def test_climate_invalid_effective_bounds_do_not_dispatch(
     binding.hass.states.get.return_value = SimpleNamespace(
         state="heat",
         attributes={
-            "temperature": 0,
+            "temperature": -1,
             "min_temp": minimum,
             "max_temp": maximum,
             "target_temp_step": 0.5,
         },
     )
 
-    assert not binding._rotate_temperature(1, True)
+    # If the guard were removed, an upward notch would dispatch 0 from -1.\n    assert not binding._rotate_temperature(1, True)
     binding.hass.services.async_call.assert_not_called()
     binding.hass.async_create_task.assert_not_called()
 
@@ -1973,9 +1973,9 @@ def test_number_invalid_effective_bounds_do_not_dispatch(
         **{CONF_TARGET: "number.test", CONF_MODE: "number"},
     )
     binding.hass.states.get.return_value = SimpleNamespace(
-        state="0", attributes={"min": minimum, "max": maximum, "step": 1},
+        state="-1", attributes={"min": minimum, "max": maximum, "step": 1},
     )
 
-    assert not binding._rotate_number(1, True)
+    # Without the range guard, clamping would ask to change -1 to 0.\n    assert not binding._rotate_number(1, True)
     binding.hass.services.async_call.assert_not_called()
     binding.hass.async_create_task.assert_not_called()
