@@ -269,9 +269,80 @@ candidate and must not be claimed as RC.5 hardware coverage.
 
 ## Recorded runs
 
+### 2026-11-13 — contributor reproduction of zero-bound regression (pre-fix)
+
+**Result: FAIL (pre-fix calculation).** The contributor operated a physical
+BILRESA scroll wheel on channel 3 and supplied a screenshot of the integration
+panel's Live test. A dedicated Home Assistant `input_number` helper named
+"BILRESA Grenzwerttest" was configured with min -10, max 0 and step 1;
+the initial value was -1. The BILRESA Value binding targeted that helper
+with 10% change per notch and 1 s smoothing; short, double, triple and hold
+actions were set to "No action".
+
+One deliberate upward detent was recognized in the panel as
+`Channel 3 · rotate up · 1 steps`. The action result read
+`Value -1 → 10` and `Home Assistant accepted the action`. **The calculated
+target +10 is outside the configured helper maximum 0**, independently
+confirming the zero-bound fallback bug in the installed pre-fix integration.
+"Accepted" means the service call was accepted by Home Assistant, **not**
+that the invalid numeric value was applied. A follow-up screenshot of the
+helper showed the current value was still -1, with no later recorded
+successful change after the 02:54:20 initialization. The helper thus
+did not apply +10; the exact Home Assistant validation/rejection layer
+was not established because lower-level service logs were not captured.
+
+**Version and verification limits:** Exact installed integration, Home
+Assistant Core and Matter Server versions were not present in the screenshot
+and remain to be collected. This is **only a pre-fix hardware reproduction**;
+the contributor fix branch `fix/zero-numeric-bounds` was **not deployed or
+validated on hardware**. Re-run this same setup on the patched code, confirm
+that the computed target is 0 and that the helper reaches 0 without errors.
+Do not check off section C until the fixed run has been observed.
+
 A complete B4 hardware run is recorded across the RC.2, RC.3 and RC.4 sections
 below. Unchecked items belong to the broader all-features matrix and are not
 claims made by B4.
+
+### 2026-11-21 — Contributor zero-bound retest (local rc.7 patch; not PR #71 head)
+
+**Result: PASS for the three observed numeric boundary behaviours only.**
+The contributor tested a physical IKEA BILRESA scroll wheel on Home Assistant
+Core **2026.11.2**, Matter Server app **9.3.0**, BILRESA firmware **1.9.15**,
+hardware **P2.0**, and IKEA BILRESA integration **v0.7.0-rc.7 with manual local
+edits**. Those edits replace truthiness-based numeric and climate min/max
+fallbacks with explicit missing-value checks and add a guard for effective
+`min >= max`. This is **not** a deployment of PR #71's exact head
+`631026bbd10789631d33ff768f1d8678a9394fe9` or of PR #82's merged
+branch; the local rc.7 build contains other upstream differences.
+
+Test setup: a dedicated Home Assistant `input_number` helper with minimum
+**-10**, maximum **0**, and step **1**, bound to the wheel's **channel 3** in
+**Value** mode, **10% per notch**, **1 s smoothing**, **0% acceleration**, and
+no short/double/triple/hold actions. The pre-fix reproduction on November 13
+had computed `-1 -> 10` (invalid); this retest used the corrected local code.
+
+Controlled physical rotations and independently viewed target-state results:
+
+1. Start helper at **-1**; one upward notch: Live Test reports
+   `Channel 3 · rotate up · 1 steps`, `Value -1 -> 0`, and
+   `Home Assistant accepted the action`. The actual helper state reaches **0**.
+   **PASS** for reaching an explicitly zero-valued upper bound.
+2. At **0**, one additional upward notch: Live Test reports `Value 0 -> 0`
+   and `Binding action completed`; the helper remains **0**. **PASS** for
+   respecting the upper bound. No service-call trace was captured, so this
+   does **not** prove that no redundant service call occurred.
+3. At **0**, one downward notch: Live Test reports `Value 0 -> -1` and
+   `Home Assistant accepted the action`; the helper's activity/history shows
+   **-1**. **PASS** for moving back inside the valid range.
+
+**Limits / still pending:** These observations validate the shared zero-upper-
+bound *behaviour* on a locally patched release candidate only. A physical run
+of the precise PR #71 commit is still required before claiming that PR's
+hardware gate passed; the climate binding, other numeric/invalid-bound cases,
+full section C, lower-level Matter event capture, and a check for redundant
+service calls were **not** performed here. The Matter Server SDK/schema/client
+versions and Thread border-router details were not collected. No private
+serials, entity IDs, or network identifiers are published in this record.
 
 ### 2026-07-18 — `v0.6.0-rc.6` deployment baseline
 

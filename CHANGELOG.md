@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a pre-release tag, and a stale-issue workflow for issues waiting for information.
 
 ### Fixed
+- **Number/input_number and climate scroll limits:** Explicit `0` min/max values
+  are treated as valid bounds instead of missing attributes. Missing limits and
+  invalid zero steps retain their previous fallback behavior.
+
 - **A Matter attribute update no longer scans every node.** With Home Assistant's
   core Matter client as the event source, every attribute update from any Matter
   device converted every node to a mapping and walked every attribute of every

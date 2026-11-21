@@ -1,5 +1,84 @@
 # Project status and agent handoff
 
+## PR #71: exact-head automation status (2026-11-21)
+
+- The focused fix commit `631026b` passed exact-head [CI #44257094558](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094558) and [CodeQL #44257094600](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094600).
+- The local-hardware-documentation commit `793dbfb` also passed exact-head [CI #44859735427](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44859735427) and [CodeQL #44859735460](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44859735460).
+- Any later change needs its **own exact-head CI/CodeQL check**. Prior green runs do not validate later commits. No full physical test of the exact PR head has been conducted.
+- The latest Sourcery review identified additional invalid-range edge cases; these require maintainer scope review rather than automatically expanding the PR into general service-dispatch changes.
+
+## PR #71: local hardware retest on 2026-11-21 (partial evidence)
+
+- **Observed PASS:** On a physical BILRESA scroll wheel (firmware 1.9.15,
+  hardware P2.0), Home Assistant Core 2026.11.2 + Matter Server app 9.3.0,
+  a locally modified v0.7.0-rc.7 produced and applied `-1 -> 0`, held
+  `0 -> 0` at the upper bound, and applied `0 -> -1` when rotated downward.
+  Helper min=-10, max=0, step=1; channel 3 Value binding, 10%/notch, 1 s
+  smoothing, 0% acceleration. Details in `docs/HARDWARE_TEST.md`.
+- **Scope limitation:** The installation was patched manually; it was **not**
+  the exact PR #71 head (`631026bb`). Climate and full hardware matrix were
+  not exercised. The previous **PR-head hardware validation pending** status
+  remains in force; do not mark the Sourcery thread complete solely from this.
+- **Next:** Maintainer assesses applicability; if exact-head validation is
+  needed, test that specific code in a controlled environment and document
+  the remaining version information. Re-run CI/reviews after documentation edit.
+
+
+## PR #71: invalid-range safety follow-up (2026-11-18)
+
+- **Review finding:** Sourcery identified an effective climate range of
+  `min_temp=7` (fallback for missing/invalid min) and explicit `max_temp=0`.
+  Without a range guard, the clamp produces an invalid temperature of 0.
+- **Minimal fix:** Numeric and climate rotations now skip dispatch when the
+  effective minimum is not less than the effective maximum. A valid negative
+  minimum and zero maximum still dispatch correctly. No async scheduling,
+  gestures, precision policy or other service behavior is modified.
+- **Regression tests:** Cases for missing, invalid, equal and reversed bounds
+  ensure no service calls occur. Existing negative-to-zero tests still cover
+  valid zero bounds.
+- **Automated validation (updated 2026-11-21):** `b40e6da` passed
+  [CI #44249294213](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294213)
+  and [CodeQL #44249294198](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44249294198).
+  The later focused commit `631026b` passed
+  [CI #44257094558](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094558)
+  and [CodeQL #44257094600](https://github.com/Vituhlos/ha-ikea-bilresa/actions/runs/44257094600).
+  The documentation commit `793dbfb` passed its own CI and CodeQL (see
+  exact-head status above). Recheck checks after each new commit.
+- **Hardware (updated 2026-11-21):** Three narrow zero-bound tests passed on a
+  locally patched `v0.7.0-rc.7`, *not* on PR #71's exact head. Exact-head
+  hardware validation and climate verification are still pending.
+- **Next action:** Maintainer to decide whether newly reported invalid-range
+  cases belong to this narrowly scoped PR or a separate issue, then review
+  any remaining exact-head hardware requirements.
+
+## PR #71: focused zero-bound bug fix (2026-11-18)
+
+- **Scope:** Restore upstream `main` binding/service behavior except for explicit
+  zero-bound checks in number/input_number and climate. Previous experimental
+  fractional-accumulation, command-generation and asynchronous dispatch
+  hardening was deliberately excluded: it created complex review regressions.
+  Its historical reviews remain in the PR conversation, but those changes are
+  no longer in the proposed diff.
+- **Changes:** `custom_components/ikea_bilresa/binding.py` fixes zero-valued
+  min/max handling; `tests/test_binding.py` tests the physical reproduction
+  (-1 to 0), two numeric domains, climate bounds, zero-step fallback, limit
+  suppression and missing-maximum fallback. Changelog describes only this fix.
+  The EN/CS README scope notes and pre-fix `docs/HARDWARE_TEST.md` evidence
+  remain intact.
+- **Automated validation (updated 2026-11-21):** The initial source
+  comparison did not include a local dependency-equipped suite. The later
+  commit `631026b` passed exact-head CI and CodeQL; documentation commit
+  `793dbfb` also passed both (see exact-head status above). Any subsequent
+  revision requires new exact-head verification.
+- **Hardware (updated 2026-11-21):** Nov 13 was a pre-fix FAIL; Nov 21
+  provides three narrow PASS observations for a manually patched
+  `v0.7.0-rc.7`. These are **not** evidence of a tested PR-head build.
+- **Known limitation:** The existing small-notch rounding stall and normal
+  service dispatch/race behavior of upstream `main` are not fixed here.
+  They require separate, narrowly scoped and hardware-validated work.
+- **Next action:** Review the new Sourcery findings with the maintainer;
+  keep the exact-head physical test open until performed.
+
 ## GitHub development automation — Phase 2A proposed (2026-11-10)
 
 **Phase 1: complete.** PR [#68](https://github.com/Vituhlos/ha-ikea-bilresa/pull/68) was merged into main. Maintainer created and stopped an interactive Codespace after **543 Python tests and 47 Node tests passed**; Ruff and mypy (existing no-site-packages baseline) were clean. Both GitHub branch rulesets are **active**: main #26934594 and agent/panel-0.6.1 #26934615, with six source-pinned CI checks, required PRs and resolved conversations. Actual enforcement on a new post-activation PR remains to be observed. Physical device validation is separate.

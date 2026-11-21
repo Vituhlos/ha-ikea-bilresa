@@ -192,6 +192,10 @@ stavu entity. Otočení nahoru z vypnutého světla začne na nastaveném minimu
 přenastaví výchozí bod dalšího otočení; obrácení směru během přechodu pokračuje
 z poslední požadované hodnoty.
 
+Při ovládání entit `number`, `input_number` a klimatizace kolečko respektuje
+minimum i maximum cílové entity, včetně hranice výslovně nastavené na `0`.
+Pokud některá hranice chybí, použije se dosavadní výchozí hodnota.
+
 U dvoutlačítka stejný průvodce nejdřív vybere Tlačítko 1 nebo Tlačítko 2 a pak
 zobrazí jen podporované akce: nezávislý cíl jednoduchého/dvojitého stisku a
 podržení/uvolnění. Nejsou tam pole pro otáčení, scény ani trojitý stisk. Podržení

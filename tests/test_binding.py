@@ -1851,3 +1851,133 @@ def test_the_perceptual_curve_cannot_leave_the_brightness_range(monkeypatch) -> 
 
     assert binding._brightness_step(255, 80, True) <= 255
     assert binding._brightness_step(4, 80, False) >= 0
+
+@pytest.mark.parametrize("domain", ["number", "input_number"])
+@pytest.mark.parametrize("step", [0, 1])
+def test_numeric_zero_maximum_is_not_treated_as_missing(
+    monkeypatch, domain, step
+) -> None:
+    """The reported -1 to 0 hardware regression must dispatch 0, not +10."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: f"{domain}.test", CONF_MODE: "number", CONF_STEP: 10},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes={"min": -10, "max": 0, "step": step}
+    )
+
+    assert binding._rotate_number(1, True)
+    args = binding.hass.services.async_call.call_args.args
+    assert args[0] == domain
+    assert args[1] == "set_value"
+    assert args[2]["value"] == 0.0
+
+
+@pytest.mark.parametrize("temperature,minimum,maximum,up", [
+    (-1, -10, 0, True),
+    (1, 0, 10, False),
+])
+def test_climate_explicit_zero_temperature_bound(
+    monkeypatch, temperature, minimum, maximum, up
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "climate.test", CONF_MODE: "temperature", CONF_STEP: 10},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={
+            "temperature": temperature,
+            "min_temp": minimum,
+            "max_temp": maximum,
+            "target_temp_step": 0.5,
+        },
+    )
+
+    assert binding._rotate_temperature(1, up)
+    args = binding.hass.services.async_call.call_args.args
+    assert args[0:2] == ("climate", "set_temperature")
+    assert args[2]["temperature"] == 0.0
+
+
+@pytest.mark.parametrize("domain", ["number", "input_number"])
+def test_numeric_at_zero_max_does_not_repeat_command(
+    monkeypatch, domain
+) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: f"{domain}.test", CONF_MODE: "number", CONF_STEP: 10},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="0", attributes={"min": -10, "max": 0, "step": 1}
+    )
+
+    assert not binding._rotate_number(1, True)
+    binding.hass.services.async_call.assert_not_called()
+
+
+def test_missing_numeric_maximum_retains_legacy_fallback(monkeypatch) -> None:
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.test", CONF_MODE: "number", CONF_STEP: 10},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes={"min": -10, "step": 1}
+    )
+    assert binding._rotate_number(1, True)
+    args = binding.hass.services.async_call.call_args.args
+    assert args[2]["value"] == 10.0
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum"),
+    [
+        (None, 0),
+        ("invalid", 0),
+        (0, 0),
+        (5, 0),
+    ],
+)
+def test_climate_invalid_effective_bounds_do_not_dispatch(
+    monkeypatch, minimum, maximum
+) -> None:
+    """A zero max is valid only when the effective minimum is below it."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "climate.test", CONF_MODE: "temperature"},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="heat",
+        attributes={
+            "temperature": -1,
+            "min_temp": minimum,
+            "max_temp": maximum,
+            "target_temp_step": 0.5,
+        },
+    )
+
+    # If the guard were removed, an upward notch would dispatch 0 from -1.
+    assert not binding._rotate_temperature(1, True)
+    binding.hass.services.async_call.assert_not_called()
+    binding.hass.async_create_task.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum"),
+    [(None, 0), (0, 0), (10, 0)],
+)
+def test_number_invalid_effective_bounds_do_not_dispatch(
+    monkeypatch, minimum, maximum
+) -> None:
+    """Degenerate numeric limits must not produce out-of-range service calls."""
+    binding, _interval_unsub, _watchdog_unsub = _binding(
+        monkeypatch,
+        **{CONF_TARGET: "number.test", CONF_MODE: "number"},
+    )
+    binding.hass.states.get.return_value = SimpleNamespace(
+        state="-1", attributes={"min": minimum, "max": maximum, "step": 1},
+    )
+
+    # Without the range guard, clamping would ask to change -1 to 0.
+    assert not binding._rotate_number(1, True)
+    binding.hass.services.async_call.assert_not_called()
+    binding.hass.async_create_task.assert_not_called()
