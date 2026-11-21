@@ -1,5 +1,22 @@
 # Project status and agent handoff
 
+## PR #71: local hardware retest on 2026-11-21 (partial evidence)
+
+- **Observed PASS:** On a physical BILRESA scroll wheel (firmware 1.9.15,
+  hardware P2.0), Home Assistant Core 2026.11.2 + Matter Server app 9.3.0,
+  a locally modified v0.7.0-rc.7 produced and applied `-1 -> 0`, held
+  `0 -> 0` at the upper bound, and applied `0 -> -1` when rotated downward.
+  Helper min=-10, max=0, step=1; channel 3 Value binding, 10%/notch, 1 s
+  smoothing, 0% acceleration. Details in `docs/HARDWARE_TEST.md`.
+- **Scope limitation:** The installation was patched manually; it was **not**
+  the exact PR #71 head (`631026bb`). Climate and full hardware matrix were
+  not exercised. The previous **PR-head hardware validation pending** status
+  remains in force; do not mark the Sourcery thread complete solely from this.
+- **Next:** Maintainer assesses applicability; if exact-head validation is
+  needed, test that specific code in a controlled environment and document
+  the remaining version information. Re-run CI/reviews after documentation edit.
+
+
 ## PR #71: invalid-range safety follow-up (2026-11-18)
 
 - **Review finding:** Sourcery identified an effective climate range of
